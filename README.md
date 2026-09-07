@@ -40,6 +40,13 @@ Dự án Frontend được xây dựng bằng **Vite**, **React 19**, và **Type
   npm run preview
   ```
 
+### Tài khoản Mock (Đăng nhập thử nghiệm)
+
+Hệ thống hiện tại đang sử dụng mock auth để kiểm tra phân quyền (Role-Based Access Control). Bạn có thể đăng nhập bằng các email sau (mật khẩu bất kỳ, hoặc dùng các nút Quick Login trên màn hình đăng nhập):
+- **Admin**: `admin@eh.com`
+- **Giáo viên**: `teacher@eh.com`
+- **Học sinh**: `student@eh.com`
+
 ## 🛠 Công nghệ sử dụng
 - [Vite](https://vitejs.dev/) - Trình đóng gói và server phát triển siêu tốc.
 - [React](https://react.dev/) (v19) - Thư viện xây dựng giao diện người dùng.
