@@ -4,7 +4,7 @@ import TopBar from './TopBar';
 import Sidebar from './Sidebar';
 import { LanguageProvider } from '../../contexts/LanguageContext';
 
-const MainLayout = ({ role }: { role?: string }) => {
+const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
@@ -14,7 +14,7 @@ const MainLayout = ({ role }: { role?: string }) => {
   return (
     <LanguageProvider>
       <div className="layout-wrapper">
-        <Sidebar isOpen={sidebarOpen} role={role as 'admin' | 'teacher' | 'student'} />
+        <Sidebar isOpen={sidebarOpen} />
         <div className="layout-main">
           <TopBar toggleSidebar={toggleSidebar} />
           <main

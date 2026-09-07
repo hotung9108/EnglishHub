@@ -1,9 +1,11 @@
 
 import { Search, Bell, HelpCircle, Menu } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../hooks/useAuth';
 
 const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { language, toggleLanguage, t } = useLanguage();
+  const { user } = useAuth();
 
   return (
     <header className="topbar">
@@ -41,10 +43,12 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
 
         <div className="topbar-user">
           <div className="topbar-user-info">
-            <div className="topbar-user-name">Nguyễn Văn Hùng</div>
-            <div className="topbar-user-role">Quản trị viên</div>
+            <div className="topbar-user-name">{user?.name || 'Guest'}</div>
+            <div className="topbar-user-role" style={{ textTransform: 'capitalize' }}>
+              {user?.role || ''}
+            </div>
           </div>
-          <div className="topbar-avatar">NV</div>
+          <div className="topbar-avatar">{user?.name?.substring(0, 2).toUpperCase() || 'G'}</div>
         </div>
       </div>
     </header>

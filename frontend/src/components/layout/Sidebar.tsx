@@ -16,9 +16,14 @@ import {
   Layout
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../hooks/useAuth';
 
-const Sidebar = ({ isOpen, role = 'admin' }: { isOpen: boolean; role?: 'admin' | 'teacher' | 'student' }) => {
+const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  
+  // Default to admin if no user is found for some reason
+  const role = user?.role || 'admin';
 
   const portalLabels = {
     admin: t('adminPortal'),
@@ -52,12 +57,12 @@ const Sidebar = ({ isOpen, role = 'admin' }: { isOpen: boolean; role?: 'admin' |
       { path: '/progress', label: t('progress'), icon: TrendingUp },
     ],
     student: [
-      { path: '/my-classes', label: t('myClasses'), icon: BookOpen },
-      { path: '/assignments', label: t('studentAssignments'), icon: ClipboardList },
-      { path: '/workspace', label: t('studentWorkspace'), icon: Layout },
-      { path: '/grades', label: t('studentGrades'), icon: CheckCircle },
-      { path: '/analytics', label: t('studentAnalytics'), icon: BarChart3 },
-      { path: '/feedback', label: t('studentFeedback'), icon: TrendingUp },
+      { path: '/student/my-classes', label: t('myClasses'), icon: BookOpen },
+      { path: '/student/assignments', label: t('studentAssignments'), icon: ClipboardList },
+      { path: '/student/workspace', label: t('studentWorkspace'), icon: Layout },
+      { path: '/student/grades', label: t('studentGrades'), icon: CheckCircle },
+      { path: '/student/analytics', label: t('studentAnalytics'), icon: BarChart3 },
+      { path: '/student/feedback', label: t('studentFeedback'), icon: TrendingUp },
     ]
   };
 

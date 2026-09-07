@@ -29,7 +29,6 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
       {/* Page Header */}
       <div className="page-header">
         <h2 className="page-title">Phân quyền &amp; Vai trò</h2>
-        <p className="page-subtitle">Quản Trị Trung Tâm &gt; Admin &gt; Ma trận phân quyền hệ thống</p>
       </div>
 
       {/* Main Container */}

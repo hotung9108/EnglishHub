@@ -13,7 +13,6 @@ const Accounts = () => {
       {/* Page Header */}
       <div className="page-header">
         <h2 className="page-title">Quản lý tài khoản</h2>
-        <p className="page-subtitle">Quản Trị Trung Tâm - Quản lý toàn bộ tài khoản người dùng trên hệ thống.</p>
       </div>
 
       {/* Content Card */}

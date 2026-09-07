@@ -11,8 +11,7 @@ const Students = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h2 className="page-title">Quản lý học viên</h2>
-        <p className="page-subtitle">Quản Trị Trung Tâm • Kiểm soát thông tin đầu vào và trạng thái học tập của học viên.</p>
+        <h1 className="page-title">Quản Lý Học Viên</h1>
       </div>
 
       {/* Content Card */}

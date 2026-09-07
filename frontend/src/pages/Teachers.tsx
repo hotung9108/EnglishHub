@@ -42,8 +42,7 @@ const Teachers = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h2 className="page-title">Quản lý giáo viên</h2>
-        <p className="page-subtitle">Admin &gt; Quản lý hồ sơ chuyên môn và phân công giảng dạy</p>
+        <h1 className="page-title">Quản Lý Giáo Viên</h1>
       </div>
 
       {/* Main Container */}

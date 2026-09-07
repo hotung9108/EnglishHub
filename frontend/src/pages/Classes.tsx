@@ -110,7 +110,6 @@ const Classes = () => {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 className="page-title">Quản lý lớp học</h2>
-          <p className="page-subtitle">Quản trị Trung tâm • Tổ chức các lớp học và phân công giáo viên phụ trách.</p>
         </div>
         <button className="btn btn-primary" style={{ padding: '10px 24px' }}>
           + Tạo lớp học mới

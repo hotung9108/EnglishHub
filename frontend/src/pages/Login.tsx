@@ -1,7 +1,50 @@
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage, LanguageProvider } from '../contexts/LanguageContext';
+import { useAuth } from '../hooks/useAuth';
+import type { User } from '../types/auth';
+
+const MOCK_ACCOUNTS: Record<string, User> = {
+  'admin@eh.com': { id: '1', name: 'Nguyễn Văn Hùng (Admin)', email: 'admin@eh.com', role: 'admin' },
+  'teacher@eh.com': { id: '2', name: 'Cô Lan (Teacher)', email: 'teacher@eh.com', role: 'teacher' },
+  'student@eh.com': { id: '3', name: 'Bé Na (Student)', email: 'student@eh.com', role: 'student' },
+};
 
 const LoginForm = () => {
   const { t, toggleLanguage } = useLanguage();
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const [email, setEmail] = useState('admin@eh.com');
+  const [error, setError] = useState('');
+
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError('');
+
+    const user = MOCK_ACCOUNTS[email];
+    if (user) {
+      login(user);
+      
+      // Where did they come from?
+      const from = location.state?.from?.pathname || '/';
+      
+      if (from === '/') {
+        if (user.role === 'admin') navigate('/admin', { replace: true });
+        else if (user.role === 'teacher') navigate('/teacher', { replace: true });
+        else if (user.role === 'student') navigate('/student', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    } else {
+      setError('Email không tồn tại. Hãy dùng admin@eh.com, teacher@eh.com, hoặc student@eh.com');
+    }
+  };
+
+  const quickLogin = (mockEmail: string) => {
+    setEmail(mockEmail);
+  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'var(--background)' }}>
@@ -78,20 +121,32 @@ const LoginForm = () => {
               </p>
             </div>
 
+            {/* Quick Login Buttons (Mock) */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', justifyContent: 'center' }}>
+              <button onClick={() => quickLogin('admin@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'admin@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Admin</button>
+              <button onClick={() => quickLogin('teacher@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'teacher@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Teacher</button>
+              <button onClick={() => quickLogin('student@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'student@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Student</button>
+            </div>
+
             {/* Divider */}
             <hr style={{ border: 'none', borderTop: '1px solid rgba(197, 197, 211, 0.5)', marginBottom: '32px' }} />
 
             {/* Form */}
-            <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {error && <div style={{ color: 'var(--error)', fontSize: '14px', background: 'var(--error-container)', padding: '12px', borderRadius: '8px' }}>{error}</div>}
+              
               {/* Email */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label className="label-md text-on-surface" style={{ textTransform: 'uppercase' }}>
                   {t('email')} *
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   className="input"
-                  defaultValue="teacher.lan@center.edu.vn"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@eh.com"
+                  required
                 />
               </div>
 
@@ -104,7 +159,7 @@ const LoginForm = () => {
                   <input
                     type="password"
                     className="input"
-                    defaultValue="..............."
+                    defaultValue="password123"
                   />
                   <button
                     type="button"
@@ -138,7 +193,7 @@ const LoginForm = () => {
 
               {/* Submit */}
               <div style={{ paddingTop: '8px' }}>
-                <button className="btn btn-primary" style={{ width: '100%', textTransform: 'uppercase', fontWeight: 700 }}>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', textTransform: 'uppercase', fontWeight: 700 }}>
                   {t('loginBtn')} &rarr;
                 </button>
               </div>

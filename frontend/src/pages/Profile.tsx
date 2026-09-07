@@ -1,6 +1,7 @@
 
 
 import { useState } from 'react';
+
 const Profile = () => {
   const [showPasswordChange, setShowPasswordChange] = useState(false);
 
@@ -8,8 +9,7 @@ const Profile = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h2 className="page-title">Quản lý tài khoản cá nhân</h2>
-        <p className="page-subtitle">Hồ Sơ Cá Nhân • Cập nhật thông tin hồ sơ và bảo mật cá nhân.</p>
+        <h1 className="page-title">Quản Lý Tài Khoản Cá Nhân</h1>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

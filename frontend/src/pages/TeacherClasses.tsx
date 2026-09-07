@@ -135,7 +135,6 @@ const TeacherClasses = () => {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', paddingBottom: '24px' }}>
         <div>
           <h2 className="page-title">Xem danh sách lớp học</h2>
-          <p className="page-subtitle">Không Gian Lớp Học • Biết được các lớp mình đang giảng dạy hoặc tham gia học tập.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" style={{ backgroundColor: 'transparent', border: '1px solid var(--outline-variant)' }}>

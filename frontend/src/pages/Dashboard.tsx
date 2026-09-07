@@ -6,7 +6,6 @@ const Dashboard = () => {
       {/* Page Header */}
       <div className="page-header">
         <h2 className="page-title">Tổng quan hệ thống</h2>
-        <p className="page-subtitle">Theo dõi các chỉ số quan trọng và hoạt động gần đây của trung tâm.</p>
       </div>
 
       {/* Stat Cards - Bento Grid */}
