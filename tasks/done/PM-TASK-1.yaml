@@ -1,0 +1,6 @@
+id: PM-TASK-1
+title: "Setup project repository and Antigravity agents"
+assignee: "@pm"
+status: "Done"
+priority: "High"
+description: "Initialize the project structure, AGENTS.md, and custom agent profiles."
