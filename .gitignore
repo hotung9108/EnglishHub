@@ -1,3 +1,4 @@
 .env
 .vscode
-.agents
+.idea/
+.DS_Store
