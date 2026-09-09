@@ -1,7 +1,9 @@
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 const Teachers = () => {
   useLanguage();
+  const navigate = useNavigate();
 
   const teachers = [
     {
@@ -53,7 +55,7 @@ const Teachers = () => {
             <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Hồ sơ đội ngũ Giáo viên</h3>
             <p className="label-md text-on-surface-variant">Admin &gt; Quản lý Giáo viên &amp; Chuyên môn</p>
           </div>
-          <button className="btn btn-primary" style={{ backgroundColor: 'var(--inverse-surface)' }}>
+          <button className="btn btn-primary" style={{ backgroundColor: 'var(--inverse-surface)' }} onClick={() => navigate('/admin/teachers/create')}>
             Thêm hồ sơ giáo viên +
           </button>
         </div>
@@ -107,7 +109,7 @@ const Teachers = () => {
 
               {/* Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <button className="btn btn-secondary">Chi tiết hồ sơ</button>
+                <button className="btn btn-secondary" onClick={() => navigate(`/admin/teachers/${teacher.id}`)}>Chi tiết hồ sơ</button>
                 <button className="btn btn-secondary">Phân lớp</button>
               </div>
             </div>
