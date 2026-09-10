@@ -1,4 +1,4 @@
-
+import { Link } from 'react-router-dom';
 
 const Classes = () => {
   const activeClasses = [
@@ -91,15 +91,23 @@ const Classes = () => {
         </div>
 
         {/* Action Button */}
-        <button className="btn" style={{ 
-          width: '100%', 
-          backgroundColor: isPast ? 'var(--surface-container-lowest)' : 'transparent', 
-          color: 'var(--on-surface)', 
-          border: '1px solid var(--outline-variant)',
-          marginTop: 'auto'
-        }}>
+        <Link 
+          to={`/admin/classes/${cls.code}`}
+          className="btn" 
+          style={{ 
+            width: '100%', 
+            backgroundColor: isPast ? 'var(--surface-container-lowest)' : 'transparent', 
+            color: 'var(--on-surface)', 
+            border: '1px solid var(--outline-variant)',
+            marginTop: 'auto',
+            textDecoration: 'none',
+            textAlign: 'center',
+            display: 'block',
+            boxSizing: 'border-box'
+          }}
+        >
           {isPast ? 'Xem chi tiết' : 'Quản lý lớp'}
-        </button>
+        </Link>
       </div>
     );
   };
@@ -111,9 +119,9 @@ const Classes = () => {
         <div>
           <h2 className="page-title">Quản lý lớp học</h2>
         </div>
-        <button className="btn btn-primary" style={{ padding: '10px 24px' }}>
+        <Link to="/admin/classes/create" className="btn btn-primary" style={{ padding: '10px 24px', textDecoration: 'none' }}>
           + Tạo lớp học mới
-        </button>
+        </Link>
       </div>
 
       <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', margin: '0 0 32px 0' }} />

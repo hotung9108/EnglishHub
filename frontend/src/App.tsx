@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Roles from './pages/Roles';
 import Classes from './pages/Classes';
+import AddClass from './pages/AddClass';
+import ClassDetails from './pages/ClassDetails';
 import Teachers from './pages/Teachers';
 import AddTeacher from './pages/AddTeacher';
 import Students from './pages/Students';
@@ -32,6 +34,8 @@ function App() {
             <Route path="accounts/profile" element={<Profile />} />
             <Route path="roles" element={<Roles />} />
             <Route path="classes" element={<Classes />} />
+            <Route path="classes/create" element={<AddClass />} />
+            <Route path="classes/:id" element={<ClassDetails />} />
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/create" element={<AddTeacher />} />
             <Route path="teachers/:id" element={<TeacherDetails />} />
