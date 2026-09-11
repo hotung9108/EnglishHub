@@ -15,6 +15,11 @@ import Profile from './pages/Profile';
 import TeacherClasses from './pages/TeacherClasses';
 import TeacherDetails from './pages/TeacherDetails';
 import StudentAssignments from './pages/StudentAssignments';
+import TeacherAssignments from './pages/TeacherAssignments';
+import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
+import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
+import TeacherSubmissionDetails from './pages/TeacherSubmissionDetails';
+import TeacherClassProgress from './pages/TeacherClassProgress';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -51,6 +56,11 @@ function App() {
           <Route path="/teacher" element={<MainLayout />}>
             <Route index element={<Navigate to="/teacher/classes" replace />} />
             <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:id/progress" element={<TeacherClassProgress />} />
+            <Route path="assignments" element={<TeacherAssignments />} />
+            <Route path="assignments/create" element={<TeacherCreateAssignment />} />
+            <Route path="assignments/:id" element={<TeacherAssignmentDetails />} />
+            <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
           </Route>
         </Route>
 
