@@ -50,10 +50,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
     ],
     teacher: [
       { path: '/teacher/classes', label: t('myClasses'), icon: BookOpen },
-      { path: '/assignments', label: t('assignments'), icon: ClipboardList },
-      { path: '/assignments/new', label: t('createAssignment'), icon: Plus },
-      { path: '/grading', label: t('grading'), icon: CheckCircle },
-      { path: '/grades', label: t('grades'), icon: BarChart3 },
+      { path: '/teacher/assignments', label: t('assignments'), icon: ClipboardList },
       { path: '/progress', label: t('progress'), icon: TrendingUp },
     ],
     student: [

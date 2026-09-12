@@ -5,11 +5,21 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Roles from './pages/Roles';
 import Classes from './pages/Classes';
+import AddClass from './pages/AddClass';
+import ClassDetails from './pages/ClassDetails';
 import Teachers from './pages/Teachers';
+import AddTeacher from './pages/AddTeacher';
 import Students from './pages/Students';
+import AddStudent from './pages/AddStudent';
 import Profile from './pages/Profile';
 import TeacherClasses from './pages/TeacherClasses';
+import TeacherDetails from './pages/TeacherDetails';
 import StudentAssignments from './pages/StudentAssignments';
+import TeacherAssignments from './pages/TeacherAssignments';
+import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
+import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
+import TeacherSubmissionDetails from './pages/TeacherSubmissionDetails';
+import TeacherClassProgress from './pages/TeacherClassProgress';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -29,8 +39,13 @@ function App() {
             <Route path="accounts/profile" element={<Profile />} />
             <Route path="roles" element={<Roles />} />
             <Route path="classes" element={<Classes />} />
+            <Route path="classes/create" element={<AddClass />} />
+            <Route path="classes/:id" element={<ClassDetails />} />
             <Route path="teachers" element={<Teachers />} />
+            <Route path="teachers/create" element={<AddTeacher />} />
+            <Route path="teachers/:id" element={<TeacherDetails />} />
             <Route path="students" element={<Students />} />
+            <Route path="students/create" element={<AddStudent />} />
             <Route path="reports" element={<Dashboard />} />
             <Route path="settings" element={<Dashboard />} />
           </Route>
@@ -41,6 +56,11 @@ function App() {
           <Route path="/teacher" element={<MainLayout />}>
             <Route index element={<Navigate to="/teacher/classes" replace />} />
             <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:id/progress" element={<TeacherClassProgress />} />
+            <Route path="assignments" element={<TeacherAssignments />} />
+            <Route path="assignments/create" element={<TeacherCreateAssignment />} />
+            <Route path="assignments/:id" element={<TeacherAssignmentDetails />} />
+            <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
           </Route>
         </Route>
 

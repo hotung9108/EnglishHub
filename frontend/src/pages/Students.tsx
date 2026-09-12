@@ -1,6 +1,9 @@
 
 
+import { useNavigate } from 'react-router-dom';
+
 const Students = () => {
+  const navigate = useNavigate();
   const data = [
     { id: 'HV-8801', name: 'Alice Johnson', class: 'ENG-IELTS-6.5A', target: 'Target: 7.0 (Đầu vào 5.5)', progress: '14/15 Bài', progressStatus: 'good' },
     { id: 'HV-8802', name: 'David Pham', class: 'ENG-IELTS-6.5A', target: 'Target: 6.5 (Đầu vào 5.0)', progress: '8/15 Bài', progressStatus: 'warning' },
@@ -38,7 +41,7 @@ const Students = () => {
               <option>Giao tiếp</option>
             </select>
           </div>
-          <button className="btn btn-primary" style={{ backgroundColor: 'var(--primary)' }}>
+          <button className="btn btn-primary" style={{ backgroundColor: 'var(--primary)' }} onClick={() => navigate('/admin/students/create')}>
             Thêm học viên +
           </button>
         </div>

@@ -1,6 +1,7 @@
-
+import { useNavigate } from 'react-router-dom';
 
 const TeacherClasses = () => {
+  const navigate = useNavigate();
   const activeClasses = [
     {
       code: 'ENG-IELTS-6.5A',
@@ -111,7 +112,10 @@ const TeacherClasses = () => {
         </div>
 
         {/* Action Button */}
-        <button className="btn" style={{
+        <button 
+          onClick={() => !isPast && navigate(`/teacher/classes/${cls.code}/progress`)}
+          className="btn" 
+          style={{
           width: '100%',
           backgroundColor: isPast ? 'var(--surface-container-low)' : '#0F172A',
           color: isPast ? 'var(--on-surface)' : 'white',
@@ -121,9 +125,10 @@ const TeacherClasses = () => {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          cursor: isPast ? 'default' : 'pointer'
         }}>
-          {isPast ? 'Xem lại tài liệu & Điểm 👁' : 'Vào lớp học →'}
+          {isPast ? 'Xem lại tài liệu & Điểm 👁' : 'Xem lớp học →'}
         </button>
       </div>
     );

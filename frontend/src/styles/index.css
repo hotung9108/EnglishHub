@@ -236,6 +236,17 @@ input, select, textarea {
   background-color: var(--error-container);
 }
 
+.btn-danger {
+  background-color: transparent;
+  color: #DC2626;
+  border: 1px solid #DC2626;
+  transition: all 0.2s ease-in-out;
+}
+.btn-danger:hover {
+  background-color: #DC2626 !important;
+  color: #FFFFFF !important;
+}
+
 /* === Inputs === */
 .input {
   width: 100%;
