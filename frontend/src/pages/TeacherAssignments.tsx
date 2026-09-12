@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   UploadCloud, Plus, Mic, BookOpen, 
-  Volume2, PenTool, Clock, Calendar, Search
+  Volume2, PenTool, Clock, Calendar, Search, X
 } from 'lucide-react';
 
 const TeacherAssignments = () => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [showSkillModal, setShowSkillModal] = useState(false);
 
   const assignments = [
     {
@@ -106,7 +107,7 @@ const TeacherAssignments = () => {
           </button>
           <button 
             className="btn btn-primary" 
-            onClick={() => navigate('/teacher/assignments/create')}
+            onClick={() => setShowSkillModal(true)}
             style={{ backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', border: 'none', fontWeight: 500, cursor: 'pointer' }}
           >
             <Plus size={18} /> Tạo bài tập mới
@@ -289,6 +290,70 @@ const TeacherAssignments = () => {
           <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>Sau</button>
         </div>
       </div>
+
+      {/* Skill Selection Modal */}
+      {showSkillModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSkillModal(false)}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: '#111827' }}>Chọn kỹ năng</h2>
+              <button onClick={() => setShowSkillModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div 
+                onClick={() => navigate('/teacher/assignments/create?skill=listening')}
+                style={{ padding: '20px', border: '1px solid #E0F2FE', borderRadius: '12px', backgroundColor: '#F0F9FF', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+              >
+                <div style={{ padding: '16px', backgroundColor: '#E0F2FE', borderRadius: '50%', color: '#0284C7' }}>
+                  <Volume2 size={28} />
+                </div>
+                <div style={{ fontWeight: 600, color: '#0369A1', fontSize: '16px' }}>Listening</div>
+              </div>
+              
+              <div 
+                onClick={() => navigate('/teacher/assignments/create?skill=speaking')}
+                style={{ padding: '20px', border: '1px solid #FCE7F3', borderRadius: '12px', backgroundColor: '#FDF2F8', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+              >
+                <div style={{ padding: '16px', backgroundColor: '#FCE7F3', borderRadius: '50%', color: '#DB2777' }}>
+                  <Mic size={28} />
+                </div>
+                <div style={{ fontWeight: 600, color: '#BE185D', fontSize: '16px' }}>Speaking</div>
+              </div>
+              
+              <div 
+                onClick={() => navigate('/teacher/assignments/create?skill=reading')}
+                style={{ padding: '20px', border: '1px solid #DCFCE7', borderRadius: '12px', backgroundColor: '#F0FDF4', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+              >
+                <div style={{ padding: '16px', backgroundColor: '#DCFCE7', borderRadius: '50%', color: '#16A34A' }}>
+                  <BookOpen size={28} />
+                </div>
+                <div style={{ fontWeight: 600, color: '#15803D', fontSize: '16px' }}>Reading</div>
+              </div>
+              
+              <div 
+                onClick={() => navigate('/teacher/assignments/create?skill=writing')}
+                style={{ padding: '20px', border: '1px solid #F3E8FF', borderRadius: '12px', backgroundColor: '#FAF5FF', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+              >
+                <div style={{ padding: '16px', backgroundColor: '#F3E8FF', borderRadius: '50%', color: '#9333EA' }}>
+                  <PenTool size={28} />
+                </div>
+                <div style={{ fontWeight: 600, color: '#7E22CE', fontSize: '16px' }}>Writing</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
