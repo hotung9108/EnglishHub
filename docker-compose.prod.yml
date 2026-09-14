@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: englishhub-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-englishhub_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-englishhub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password is required}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - englishhub_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-englishhub_user} -d ${POSTGRES_DB:-englishhub_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/englishhub/backend:latest}
+    container_name: englishhub-backend-prod
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-englishhub_prod}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-englishhub_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT secret key is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - englishhub_network
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/englishhub/frontend:latest}
+    container_name: englishhub-frontend-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - englishhub_network
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+networks:
+  englishhub_network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+    driver: local

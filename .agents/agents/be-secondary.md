@@ -8,7 +8,7 @@ description: Backend Developer Agent. Works on any API, Database, or AI integrat
 You are a Backend Developer for the **EnglishHub** project. You share the exact same capabilities as `@be-primary`.
 
 ## Your Responsibilities:
-1. **Full-Stack Backend**: Design database schemas, write any APIs, and handle AI grading integration.
+1. **Full-Stack Backend (DDD)**: Design database schemas, write APIs, and handle AI grading integration strictly following **Domain-Driven Design (DDD)** as outlined in [.agents/rules/convention-be.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-be.md).
 2. **Task Pulling**: Read from `tasks/active/` for tasks assigned to `@be` generally or `@be-secondary` specifically.
 
 ## Task Claiming Protocol:

@@ -12,6 +12,12 @@ Hệ thống hoạt động dựa trên cơ chế "chuyền gậy" (Handoff) th�
    - `tasks/done/`: Chứa các file task đã hoàn thành (`Done`).
    - `tasks/bugs/`: Chứa các file bug (ví dụ `BUG-1.yaml`).
 2. **`production_artifacts/`**: Thư mục dùng để chứa các file "bàn giao" giữa các Agent (ví dụ: PM viết specs thả vào đây để BE/FE đọc, BE/FE code xong thả file test vào đây để Tester đọc).
+3. **Bộ Quy chuẩn & Hợp đồng API chung (Shared Contract)**:
+   - Quy ước kết nối FE-BE: [.agents/rules/common-conventions.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/common-conventions.md) (Envelope JSON chuẩn, mã lỗi, phân trang 1-indexed, xác thực Silent Refresh, xử lý AI bất đồng bộ).
+   - Hợp đồng API chính thức: [docs/api-contract.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/api-contract.md).
+   - Quy chuẩn Backend DDD: [.agents/rules/convention-be.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-be.md).
+   - Quy chuẩn Frontend React: [.agents/rules/convention-fe.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-fe.md).
+
 
 ---
 
@@ -22,17 +28,17 @@ Do hiện tại Antigravity IDE chưa hỗ trợ gọi tên Agent qua menu `@` (
 ### Product Manager (`@pm` / `pm.md`)
 **Nhiệm vụ:** Phân tích yêu cầu, chia task, viết đặc tả (specifications).
 * **Cách yêu cầu:** 
-  > "Đọc file `pm.md` để lấy bối cảnh vai trò của bạn. Hãy phân tích tính năng chấm điểm Speaking AI thành các task nhỏ và cập nhật vào `tasks/board.yaml`."
+  > "Đọc file `pm.md` để lấy bối cảnh vai trò của bạn. Hãy phân tích tính năng chấm điểm Speaking AI thành các task nhỏ và tạo file trong `tasks/active/`."
 * **Cách PM bàn giao:** Khi PM làm xong, hệ thống sẽ tự sinh ra file spec (ví dụ: `spec-speaking.md`) và thả vào thư mục `production_artifacts/pm_to_dev/`.
 
 ### Backend Developer (`@be-primary`, `@be-secondary` / `be-primary.md`, `be-secondary.md`)
-**Nhiệm vụ:** Viết API, thiết kế Database, tích hợp AI chấm điểm. Primary và Secondary có quyền hạn và kỹ năng **ngang nhau**.
+**Nhiệm vụ:** Viết API theo kiến trúc **Domain-Driven Design (DDD)**, thiết kế Database, tích hợp AI chấm điểm. Tuân thủ quy chuẩn tại [.agents/rules/convention-be.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-be.md). Primary và Secondary có quyền hạn và kỹ năng **ngang nhau**.
 * **Luồng nhận việc (Task Pulling):** Cả hai sẽ theo dõi các task được gắn mác chung là `@be` trong `tasks/active/`. 
 * **Nhận task (Claiming):** Khi bắt đầu làm, người nào nhận sẽ đổi `assignee` thành tên đích danh của mình (ví dụ `@be-primary`) để người kia biết mà không làm trùng.
 * **Cách BE bàn giao:** Sau khi code xong API, BE sẽ tạo hướng dẫn test và thả vào `production_artifacts/be_to_tester/`, đồng thời chuyển task sang `Ready for FE` hoặc `In Review`.
 
 ### Frontend Developer (`@fe-primary`, `@fe-secondary` / `fe-primary.md`, `fe-secondary.md`)
-**Nhiệm vụ:** Cắt HTML/CSS, làm UI/UX bằng React/Vue, tích hợp API từ BE. Primary và Secondary có kỹ năng **ngang nhau**.
+**Nhiệm vụ:** Cắt UI/UX bằng React 19 + TypeScript, tích hợp API từ BE. Tuân thủ quy chuẩn tại [.agents/rules/convention-fe.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-fe.md). Primary và Secondary có kỹ năng **ngang nhau**.
 * **Luồng nhận việc:** Tương tự như BE, ai rảnh sẽ vào `tasks/active/` tìm các task `@fe` hoặc đích danh mình, đổi assignee để "nhận thầu" task đó.
 * **Cách FE bàn giao:** Tương tự BE, tạo file hướng dẫn test thả vào `production_artifacts/fe_to_tester/`.
 
@@ -87,6 +93,7 @@ Workflows là tập hợp nhiều bước thao tác đã được lập trình s
 ---
 
 ### Mẹo nhỏ (Best Practices)
-- **Đừng quên cập nhật board:** Bất cứ khi nào bạn yêu cầu Agent code xong một file lớn, hãy kèm theo câu chốt: *"Nhớ cập nhật trạng thái trên `tasks/board.yaml`"*.
+- **Đừng quên cập nhật board:** Bất cứ khi nào bạn yêu cầu Agent code xong một file lớn, hãy kèm theo câu chốt: *"Nhớ cập nhật file task trong `tasks/active/` hoặc chuyển sang `tasks/done/`"*.
 - **Giữ `production_artifacts/` sạch sẽ:** Sau mỗi đợt release, bạn có thể yêu cầu Agent tự động dọn dẹp các tệp bàn giao cũ.
 - **Nếu Agent quên vai:** Cứ nhắc lại *"Đọc lại rule trong file AGENTS.md và vai trò của bạn trong be.md"*.
+
