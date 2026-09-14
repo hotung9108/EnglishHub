@@ -1,6 +1,8 @@
-
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+
   return (
     <div>
       {/* Page Header */}
@@ -99,12 +101,12 @@ const Dashboard = () => {
             <h3 className="headline-md" style={{ fontWeight: 700, marginBottom: '8px' }}>Tạo mới nhanh</h3>
             <p className="body-md" style={{ color: 'var(--primary-fixed-dim)', marginBottom: '24px' }}>Khởi tạo dữ liệu hệ thống chỉ với vài thao tác.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 'var(--radius-default)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--on-primary)', transition: 'background 0.2s', cursor: 'pointer' }}>
+              <button onClick={() => navigate('/admin/classes/create')} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 'var(--radius-default)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--on-primary)', transition: 'background 0.2s', cursor: 'pointer' }}>
                 <span className="label-md" style={{ flex: 1, textAlign: 'left' }}>Thêm Lớp học mới</span>
                 <span style={{ fontSize: '14px' }}>&rarr;</span>
               </button>
-              <button style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 'var(--radius-default)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--on-primary)', transition: 'background 0.2s', cursor: 'pointer' }}>
-                <span className="label-md" style={{ flex: 1, textAlign: 'left' }}>Đăng ký Học viên</span>
+              <button onClick={() => navigate('/admin/students/create')} style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 'var(--radius-default)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--on-primary)', transition: 'background 0.2s', cursor: 'pointer' }}>
+                <span className="label-md" style={{ flex: 1, textAlign: 'left' }}>Thêm học viên mới</span>
                 <span style={{ fontSize: '14px' }}>&rarr;</span>
               </button>
             </div>

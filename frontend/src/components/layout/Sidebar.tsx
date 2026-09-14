@@ -33,7 +33,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
 
   const menus = {
     admin: [
-      { path: '/', label: t('dashboard'), icon: LayoutDashboard },
+      { path: '/admin/dashboard', label: t('dashboard'), icon: LayoutDashboard },
       { 
         path: '/admin/accounts', 
         label: t('accounts'),
