@@ -1,6 +1,6 @@
 ---
 name: bug-report
-description: Skill for logging and tracking bugs effectively using the file-based issue tracking system.
+description: Skill for logging and tracking bugs effectively in .agents/tasks/bugs/ using file-based issue tracking.
 ---
 
 # Bug Reporting Skill
@@ -8,9 +8,7 @@ description: Skill for logging and tracking bugs effectively using the file-base
 Use this skill when you need to report a bug found during testing or development.
 
 ## Bug Report Format
-When logging a new bug, create a **NEW YAML file** in the `tasks/bugs/` directory, for example `tasks/bugs/BUG-1.yaml`.
-
-Use the following structure for the file content:
+When logging a new bug, create a **NEW YAML file** in `.agents/tasks/bugs/`, for example `.agents/tasks/bugs/BUG-1.yaml`.
 
 ```yaml
 id: BUG-1
@@ -29,7 +27,7 @@ description: |
 ```
 
 ## Instructions for Agents
-1. **Identify**: Clearly identify the bug and gather necessary logs or reproduction steps.
-2. **Log**: Create a new file in `tasks/bugs/BUG-X.yaml`. Ensure the ID and filename follow the `BUG-X` format and are unique.
-3. **Assign**: Assign the bug to the relevant agent (e.g., `@fe-primary`, `@be-secondary`, or `@devops`) and set an appropriate priority (`Low`, `Medium`, `High`, `Critical`).
-4. **Resolve**: When a bug is successfully fixed and verified, modify the file to change the status to `Fixed`.
+1. **Identify**: Clearly identify the bug and gather reproduction steps.
+2. **Log**: Create a new file in `.agents/tasks/bugs/BUG-X.yaml`.
+3. **Assign**: Assign the bug to the relevant role (`@be-primary`, `@be-secondary`, `@fe-primary`, `@devops-*`) based on [.agents/rules/git-user-mapping.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
+4. **Resolve**: When fixed and verified by QA (`@tester`), update the status inside the file to `Fixed`.
