@@ -1,37 +1,44 @@
 ---
 name: task-board
-description: Skill for reading and updating the project task tracking files in the tasks/ directory using a file-based structure.
+description: Skill for reading and updating the project task tracking files in .agents/tasks/ using a role-based folder structure.
 ---
 
 # Task Board Management Skill
 
-This skill provides instructions on how to interact with the task tracking system in the `tasks/` directory.
+This skill provides instructions on how to interact with the role-based task tracking system in `.agents/tasks/`.
 
 ## Board Structure
-The project uses a File-Based Issue Tracking structure. Instead of one large YAML file, **every task is a separate YAML file**.
-- `tasks/active/`: Contains files for active tasks (To Do, In Progress, In Review, Ready for Dev). Example: `tasks/active/FE-TASK-1.yaml`.
-- `tasks/done/`: Contains files for completed tasks (Done). Example: `tasks/done/PM-TASK-1.yaml`.
-- `tasks/bugs/`: Contains files for both active and fixed bugs. Example: `tasks/bugs/BUG-1.yaml`.
+To prevent Git merge conflicts between team members working concurrently, each role owns its dedicated directory:
 
-Example content for a task file (`tasks/active/BE-TASK-1.yaml`):
+```text
+.agents/tasks/
+├── pm/                 # Product Manager (hotung9108) -> active/ & done/
+├── be-primary/         # Backend Primary (doanthaison2706) -> active/ & done/
+├── be-secondary/       # Backend Secondary (tuanpham21105) -> active/ & done/
+├── fe-primary/         # Frontend Primary (Maloque18705) -> active/ & done/
+├── fe-secondary/       # Frontend Secondary -> active/ & done/
+├── devops-primary/     # DevOps Primary (tuanpham21105) -> active/ & done/
+├── devops-secondary/   # DevOps Secondary (hotung9108) -> active/ & done/
+├── tester/             # QA / Tester (Zawn-Tsu) -> active/ & done/
+└── bugs/               # Common Bug Reports (BUG-X.yaml)
+```
+
+## How to Use This Skill
+1. **Identify User Role**: Run `git config user.name` or check `.agents/rules/git-user-mapping.md` to identify the current member's role and directory.
+2. **Read Active Tasks**: Check `.agents/tasks/{role}/active/` for active tasks.
+3. **Create New Task**:
+   - PM creates tasks directly in the target role's directory, e.g. `.agents/tasks/be-primary/active/BE-TASK-2.yaml`.
+4. **Update Status**:
+   - Modify the YAML file in-place (e.g. change `status: "In Progress"`).
+5. **Moving to Done**:
+   - When finished, move the task file from `.agents/tasks/{role}/active/` to `.agents/tasks/{role}/done/`.
+
+## Task File Format Example
 ```yaml
 id: BE-TASK-1
 title: "Implement AI Grading for Writing"
 assignee: "@be-primary"
-status: "To Do"
+status: "In Progress"
 priority: "High"
 description: "Integrate with AI API to grade writing submissions."
 ```
-
-## How to use this skill
-When asked to read the board, check task status, or update a task/bug:
-1. Use directory listing to see all files in `tasks/active/`, `tasks/done/`, or `tasks/bugs/`.
-2. To create a new task, create a NEW `.yaml` file in `tasks/active/` with the filename matching the Task ID.
-3. To update a task/bug, modify its corresponding `.yaml` file.
-4. Always maintain valid YAML syntax.
-
-## Rules
-- **Moving to Done:** When a task is marked as "Done", you MUST use file moving commands to move the file from `tasks/active/` to `tasks/done/`.
-- **Moving Fixed Bugs:** When a bug is fixed/resolved, update its status inside the file to `Fixed`. Leave it in the `tasks/bugs/` directory.
-- **Never** delete a task file completely unless explicitly told to. If cancelled, mark status as "Cancelled".
-- When an agent completes their part of a task and places their deliverable in `production_artifacts/`, they MUST update the task status and assignee inside the task file.

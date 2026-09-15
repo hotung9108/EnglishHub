@@ -1,22 +1,32 @@
 ---
 name: daily-sync
-description: A workflow to summarize the current project status by reading the file-based task tracking directories and generating a report.
+description: A workflow to summarize the current project status by reading role-based tasks in .agents/tasks/ and generating an executive report.
 ---
 
 # Daily Sync Workflow
 
-When triggered via `/daily-sync`, execute the following steps to provide a status update for the EnglishHub project.
+When triggered via `/daily-sync`, execute the following steps to provide a status update for the EnglishHub project across all roles and team members.
 
 ## Steps:
-1. **Read Task Files**: List and read all `.yaml` files in the following directories:
-   - `tasks/active/` (active tasks)
-   - `tasks/done/` (completed tasks)
-   - `tasks/bugs/` (all bugs)
-2. **Analyze**:
-   - Count the total number of tasks in active vs done.
-   - For bugs, count how many are active (To Do / In Progress) vs Fixed.
-   - Identify any active tasks or bugs that are blocked or have been `In Progress` for an unusually long time.
-   - Highlight high-priority active bugs.
-3. **Report Generation**: Create a clear, concise summary report outlining the current sprint's progress by aggregating data from all these individual files.
-4. **Action Items**: Suggest the next immediate actions for each agent (e.g., `@be-primary`, `@fe-secondary`) based on their assigned active tasks and bugs.
-5. **Output**: Display the report to the user in the chat interface. Do not save it as a file unless requested.
+1. **Read Task Files**: List and read all `.yaml` files in `.agents/tasks/`:
+   - `.agents/tasks/pm/` (`active/` & `done/`)
+   - `.agents/tasks/be-primary/` (`active/` & `done/`)
+   - `.agents/tasks/be-secondary/` (`active/` & `done/`)
+   - `.agents/tasks/fe-primary/` (`active/` & `done/`)
+   - `.agents/tasks/fe-secondary/` (`active/` & `done/`)
+   - `.agents/tasks/devops-primary/` (`active/` & `done/`)
+   - `.agents/tasks/devops-secondary/` (`active/` & `done/`)
+   - `.agents/tasks/tester/` (`active/` & `done/`)
+   - `.agents/tasks/bugs/` (active vs fixed)
+
+2. **Analyze by Member & Role**:
+   - Map each directory to the team member via [.agents/rules/git-user-mapping.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
+   - Summarize active vs completed tasks per member.
+   - For bugs, count active (To Do / In Progress) vs Fixed. Highlight High/Critical priority bugs.
+
+3. **Report Generation**: Output a clean Markdown table summarizing:
+   - Progress per member: `Member (Role) | Active Tasks | Done Tasks | Current Focus`
+   - Active bugs requiring attention.
+
+4. **Action Items**: Suggest immediate next steps for each member today.
+5. **Output**: Display the report directly in the chat interface.
