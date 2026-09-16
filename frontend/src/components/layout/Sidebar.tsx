@@ -66,7 +66,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       { path: '/progress', label: t('menuProgress'), icon: TrendingUp },
     ],
     student: [
-      { path: '/student/my-classes', label: t('menuMyClasses'), icon: BookOpen },
+      { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
       { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList },
       { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
       { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },

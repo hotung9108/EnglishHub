@@ -39,6 +39,24 @@ export const studentVi = {
     paginationSuffix: ' bài tập đã giao',
     btnViewAll: 'Xem tất cả bài tập cũ',
     syncStatus: 'Hệ thống chấm điểm AI & Đồng bộ tự động 10 giây trước'
+  },
+  studentClasses: {
+    title: 'Lớp học của tôi',
+    subtitle: 'Không Gian Học Viên • Danh sách các khóa học và lớp bạn đang tham gia kỳ này.',
+    searchPlaceholder: 'Tìm theo tên lớp, giảng viên, mã lớp (ENG-...)',
+    filterActive: 'Đang diễn ra',
+    filterCompleted: 'Đã hoàn thành',
+    instructorPrefix: 'Giảng viên: ',
+    statsAssigned: 'BÀI TẬP',
+    statsAssignedUnit: ' Đã giao',
+    statsPending: 'CHỜ NỘP',
+    statsPendingUnit: ' Bài',
+    statsAvgScore: 'ĐIỂM TB',
+    statsResult: 'KẾT QUẢ',
+    statsFinalScore: 'ĐIỂM TỔNG KẾT',
+    certIssued: 'Đã cấp chứng chỉ hoàn thành',
+    btnViewClass: 'Xem lớp học',
+    btnViewMaterials: 'Xem lại tài liệu & Bảng điểm'
   }
 };
 
@@ -83,5 +101,23 @@ export const studentEn = {
     paginationSuffix: ' assigned tasks',
     btnViewAll: 'View all past assignments',
     syncStatus: 'AI Grading System & Auto-synced 10 seconds ago'
+  },
+  studentClasses: {
+    title: 'My Classes',
+    subtitle: 'Student Portal • List of courses and classes you are enrolled in this semester.',
+    searchPlaceholder: 'Search by class name, instructor, class code (ENG-...)',
+    filterActive: 'In Progress',
+    filterCompleted: 'Completed',
+    instructorPrefix: 'Instructor: ',
+    statsAssigned: 'ASSIGNMENTS',
+    statsAssignedUnit: ' Assigned',
+    statsPending: 'PENDING',
+    statsPendingUnit: ' Tasks',
+    statsAvgScore: 'AVG SCORE',
+    statsResult: 'RESULT',
+    statsFinalScore: 'FINAL SCORE',
+    certIssued: 'Certificate of completion issued',
+    btnViewClass: 'View Class',
+    btnViewMaterials: 'Review Materials & Grades'
   }
 };
