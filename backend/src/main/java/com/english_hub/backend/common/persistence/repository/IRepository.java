@@ -12,7 +12,7 @@ import java.util.Optional;
  * @param <T>  the aggregate type
  * @param <ID> the aggregate identity type
  */
-public interface BaseRepository<T, ID> {
+public interface IRepository<T, ID> {
 
 	Optional<T> findById(ID id);
 
