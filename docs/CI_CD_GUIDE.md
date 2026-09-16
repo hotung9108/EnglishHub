@@ -45,9 +45,9 @@ Tài liệu hướng dẫn chi tiết quy trình Tích hợp liên tục (CI) v�
 ### 2.3. Quét Bảo Mật & Rò Rỉ Bí Mật (`.github/workflows/security-scan.yml`)
 - **Kích hoạt**: Mọi `push` và `pull_request` vào `main` và `develop`.
 - **Nhiệm vụ**:
-  - Tự động sử dụng **Gitleaks** để rà soát toàn bộ commit và code diff.
-  - Ngăn chặn và chặn đứng (Block) PR nếu phát hiện lập trình viên vô tình commit API Keys (OpenAI, AWS, JWT Secret, Private Key,...).
-  - Có file cấu hình [`.gitleaks.toml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.gitleaks.toml) cho phép bỏ qua các file mẫu `.example`.
+  - Tự động sử dụng **TruffleHog OSS** (100% mã nguồn mở hoàn toàn miễn phí, không yêu cầu license key hay tài khoản tổ chức).
+  - Ngăn chặn và chặn đứng (Block) PR nếu phát hiện lập trình viên vô tình commit API Keys (OpenAI, AWS, JWT Secret, Private Key, Database Credentials,...).
+  - Chạy quét với chế độ xác thực trực tuyến và debug log, không gây false positive trên các file mẫu `.example`.
 
 ### 2.4. CD Pipeline & Post-Deploy Healthcheck (`.github/workflows/cd-deploy.yml`)
 - **Kích hoạt**: Tự động khi merge code vào nhánh `main` hoặc gắn tag phiên bản (`v*.*.*`).
