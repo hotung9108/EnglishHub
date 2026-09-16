@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gitleaks:
-    name: Gitleaks Secret Detection
+  secret-scan:
+    name: TruffleHog OSS Secret Detection
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code with Full History
@@ -25,8 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Gitleaks Scan
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+      - name: Run TruffleHog OSS Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
