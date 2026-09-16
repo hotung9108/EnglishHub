@@ -48,15 +48,21 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const keys = key.split('.');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let value: any = dict[language];
-    for (const k of keys) {
-      if (value === undefined || value === null) break;
-      value = value[k];
-    }
+    let value: unknown = dict[language];
     
+    for (const k of keys) {
+      if (typeof value === 'object' && value !== null) {
+        value = (value as Record<string, unknown>)[k];
+      } else {
+        value = undefined;
+        break;
+      }
+    }
+
     if (typeof value === 'string') return value;
-    if (value !== undefined) return value; // Return object if matched exactly
+    
+    // Fallback: If the value is undefined or an object, return the raw key 
+    // to prevent React "Objects are not valid as a child" crashes.
     return key;
   };
 
