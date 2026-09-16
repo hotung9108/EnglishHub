@@ -1,0 +1,7 @@
+id: DEVOPS-TASK-3
+title: "PC Self-Hosting Architecture & DevSecOps CI/CD Hardening"
+assignee: "@devops-secondary"
+status: "Done"
+priority: "High"
+description: "Configure docker-compose.selfhost.yml with optional Cloudflare Tunnel (cloudflared), automated Gitleaks secret scanning (.gitleaks.toml & security-scan.yml), Flyway validation against PostgreSQL in CI, post-deploy healthcheck in CD, and documentation."
+completedAt: "2026-09-16"

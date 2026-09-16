@@ -68,13 +68,14 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Run Automated Tests
+      - name: Validate Flyway Migrations & Run Tests
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/englishhub_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: testpassword
-          SPRING_FLYWAY_ENABLED: false
+          SPRING_FLYWAY_ENABLED: true
         run: ./gradlew test --no-daemon
+
 
       - name: Build Application Jar
         run: ./gradlew bootJar -x test --no-daemon

@@ -36,23 +36,31 @@ Tài liệu hướng dẫn chi tiết quy trình Tích hợp liên tục (CI) v�
 ### 2.2. Backend CI (`.github/workflows/ci-backend.yml`)
 - **Kích hoạt**: Khi có `push` hoặc `pull_request` vào nhánh `main` hoặc `develop` có thay đổi trong `backend/**`.
 - **Nhiệm vụ**:
-  1. Khởi chạy tạm thời container **PostgreSQL 16** làm service database.
+  1. Khởi chạy tạm thời container **PostgreSQL 16** làm service database thực thụ.
   2. Cấp quyền thực thi cho Gradle wrapper.
-  3. Chạy unit tests: `./gradlew test`.
-  4. Kiểm tra đóng gói file jar: `./gradlew bootJar -x test`.
+  3. **Xác thực Flyway Migrations**: Chạy toàn bộ các file SQL trong `src/main/resources/db/migration/` trực tiếp lên PostgreSQL để đảm bảo không có lỗi cú pháp DDL/DML.
+  4. Chạy toàn bộ Unit Tests với JUnit 5.
+  5. Kiểm tra đóng gói file jar: `./gradlew bootJar -x test`.
 
-### 2.3. CD Pipeline (`.github/workflows/cd-deploy.yml`)
+### 2.3. Quét Bảo Mật & Rò Rỉ Bí Mật (`.github/workflows/security-scan.yml`)
+- **Kích hoạt**: Mọi `push` và `pull_request` vào `main` và `develop`.
+- **Nhiệm vụ**:
+  - Tự động sử dụng **Gitleaks** để rà soát toàn bộ commit và code diff.
+  - Ngăn chặn và chặn đứng (Block) PR nếu phát hiện lập trình viên vô tình commit API Keys (OpenAI, AWS, JWT Secret, Private Key,...).
+  - Có file cấu hình [`.gitleaks.toml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.gitleaks.toml) cho phép bỏ qua các file mẫu `.example`.
+
+### 2.4. CD Pipeline & Post-Deploy Healthcheck (`.github/workflows/cd-deploy.yml`)
 - **Kích hoạt**: Tự động khi merge code vào nhánh `main` hoặc gắn tag phiên bản (`v*.*.*`).
 - **Nhiệm vụ**:
-  1. Đăng nhập vào **GitHub Container Registry (`ghcr.io`)** bằng token tự cấp của GitHub (`GITHUB_TOKEN`).
+  1. Đăng nhập vào **GitHub Container Registry (`ghcr.io`)** bằng `GITHUB_TOKEN`.
   2. Build và đẩy 2 Docker images lên registry:
-     - `ghcr.io/<github_username>/englishhub/backend:latest` (và kèm commit SHA).
-     - `ghcr.io/<github_username>/englishhub/frontend:latest` (và kèm commit SHA).
-  3. Nếu cấu hình Secrets máy chủ SSH, workflow tự động SSH vào VPS và kích hoạt:
-     ```bash
-     cd /opt/englishhub
-     docker compose -f docker-compose.prod.yml pull
-     docker compose -f docker-compose.prod.yml up -d --remove-orphans
+     - `ghcr.io/<github_username>/englishhub/backend:latest`
+     - `ghcr.io/<github_username>/englishhub/frontend:latest`
+  3. Tự động SSH vào máy chủ VPS/PC:
+     - Pull image mới nhất về máy chủ.
+     - Khởi động lại dịch vụ với `docker compose up -d`.
+     - **Post-deploy Healthcheck**: Đợi 15 giây để Spring Boot ổn định, kiểm tra trạng thái các container bằng `docker compose ps` để đảm bảo hệ thống không bị crash sau khi cập nhật.
+
      docker image prune -f
      ```
 
