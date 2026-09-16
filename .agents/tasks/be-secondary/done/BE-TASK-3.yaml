@@ -1,0 +1,7 @@
+id: BE-TASK-3
+title: "Add base interfaces and abstract classes"
+assignee: "@be-secondary"
+status: "Done"
+priority: "High"
+description: "Create pure-Java base scaffolding under com.english_hub.backend.common: BaseEntity<TId>, BaseDto<TId>, BasePageRequest, BasePageResponse<T>, IService<TEntity, TDto>, IMapper<TSource, TDest>; add Lombok to build.gradle; add createdAt/updatedAt to BaseEntity."
+completedAt: "2026-09-16"
