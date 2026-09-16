@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: englishhub-postgres-fullstack-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-devuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata_fullstack_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-devuser} -d ${DB_NAME:-appdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - englishhub_dev_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: englishhub-backend-fullstack-dev
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-appdb}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-devuser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-devpassword}
+      JWT_SECRET: ${JWT_SECRET:-englishhub-dev-jwt-secret-key-32chars-min}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - englishhub_dev_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: englishhub-frontend-fullstack-dev
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - englishhub_dev_network
+
+networks:
+  englishhub_dev_network:
+    driver: bridge
+
+volumes:
+  pgdata_fullstack_dev:
+    driver: local

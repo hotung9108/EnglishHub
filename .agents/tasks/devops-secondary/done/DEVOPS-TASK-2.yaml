@@ -1,0 +1,7 @@
+id: DEVOPS-TASK-2
+title: "Full-Stack Development Orchestration & Multi-Stage Frontend Containerization"
+assignee: "@devops-secondary"
+status: "Done"
+priority: "High"
+description: "Create root docker-compose.dev.yml for full-stack local development with hot reload, multi-stage frontend Dockerfile (dev Vite server & prod Nginx), nginx.conf reverse proxy, and docs/DEV_ENVIRONMENT_GUIDE.md."
+completedAt: "2026-09-16"
