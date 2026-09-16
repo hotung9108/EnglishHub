@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 import { 
   UploadCloud, Plus, Mic, BookOpen, 
-  Volume2, PenTool, Clock, Calendar, Search, X
+  Volume2, PenTool, Clock, Calendar, X
 } from 'lucide-react';
 
 const TeacherAssignments = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState('all');
   const [showSkillModal, setShowSkillModal] = useState(false);
 
@@ -25,7 +27,8 @@ const TeacherAssignments = () => {
       typeLabel: 'Speaking Part 2',
       title: 'Speaking Part 2: Describe an environmental problem',
       dueDate: '14/09/2026 (23:59)',
-      dueType: 'normal'
+      dueType: 'normal',
+      hasProgress: true
     },
     {
       id: 'HW-03',
@@ -74,9 +77,9 @@ const TeacherAssignments = () => {
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', paddingBottom: '24px' }}>
         <div>
-          <h1 className="page-title" style={{ margin: '0 0 8px 0', fontSize: '28px' }}>Quản lý bài tập</h1>
+          <h1 className="page-title" style={{ margin: '0 0 8px 0', fontSize: '28px' }}>{t('teacherAssignments.title')}</h1>
           <p className="body-md text-on-surface-variant" style={{ margin: 0, color: '#6B7280' }}>
-            Quản Lý Bài Tập • Kiểm soát thư viện bài tập của lớp, theo dõi tiến độ nộp và phân loại theo 4 kỹ năng.
+            {t('teacherAssignments.subtitle')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -95,7 +98,7 @@ const TeacherAssignments = () => {
                 cursor: 'pointer'
               }}
             >
-              <option>Lớp: ENG-IELTS-6.5A (Intensive)</option>
+              <option>{t('teacherAssignments.classPrefix')}ENG-IELTS-6.5A (Intensive)</option>
             </select>
             <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6B7280' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -103,14 +106,14 @@ const TeacherAssignments = () => {
           </div>
           
           <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
-            <UploadCloud size={18} /> Kho đề mẫu
+            <UploadCloud size={18} /> {t('teacherAssignments.btnTemplateBank')}
           </button>
           <button 
             className="btn btn-primary" 
             onClick={() => setShowSkillModal(true)}
             style={{ backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', border: 'none', fontWeight: 500, cursor: 'pointer' }}
           >
-            <Plus size={18} /> Tạo bài tập mới
+            <Plus size={18} /> {t('teacherAssignments.btnCreate')}
           </button>
         </div>
       </div>
@@ -127,7 +130,7 @@ const TeacherAssignments = () => {
         <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid rgba(224, 231, 255, 0.6)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: 0 }}>Thư viện bài tập lớp ENG-IELTS-6.5A</h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: 0 }}>{t('teacherAssignments.libraryTitle')} ENG-IELTS-6.5A</h2>
               <span style={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontSize: '12px', fontWeight: 500, padding: '4px 10px', borderRadius: '12px' }}>
                 Active Term
               </span>
@@ -135,22 +138,22 @@ const TeacherAssignments = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151', fontWeight: 500 }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-                12 <span style={{ color: '#6B7280', fontWeight: 400 }}>Đang mở</span>
+                12 <span style={{ color: '#6B7280', fontWeight: 400 }}>{t('teacherAssignments.statOpen')}</span>
               </div>
               <div style={{ color: '#D1D5DB' }}>|</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151', fontWeight: 500 }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#9CA3AF' }}></span>
-                3 <span style={{ color: '#6B7280', fontWeight: 400 }}>Đã khóa</span>
+                3 <span style={{ color: '#6B7280', fontWeight: 400 }}>{t('teacherAssignments.statClosed')}</span>
               </div>
               <div style={{ color: '#D1D5DB' }}>|</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#FEF3C7', color: '#D97706', padding: '4px 12px', borderRadius: '16px', fontWeight: 600 }}>
                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B' }}></span>
-                Cần chấm: 6
+                {t('teacherAssignments.statNeedsGrading')} 6
               </div>
             </div>
           </div>
           <p style={{ margin: 0, color: '#6B7280', fontSize: '14px' }}>
-            Tổng hợp 15 bài tập Nghe - Nói - Đọc - Viết • Tỷ lệ hoàn thành trung bình: <span style={{ color: '#10B981', fontWeight: 600 }}>88.4%</span>
+            {t('teacherAssignments.summaryText')} <span style={{ color: '#10B981', fontWeight: 600 }}>88.4%</span>
           </p>
         </div>
         
@@ -158,7 +161,7 @@ const TeacherAssignments = () => {
         <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.6)', backdropFilter: 'blur(8px)' }}>
           <div style={{ display: 'flex', gap: '12px' }}>
             {[
-              { id: 'all', label: 'Tất cả (15)' },
+              { id: 'all', label: `${t('teacherAssignments.filterAll')} (15)` },
               { id: 'listening', label: 'Listening (4)' },
               { id: 'speaking', label: 'Speaking (3)' },
               { id: 'reading', label: 'Reading (4)' },
@@ -184,14 +187,14 @@ const TeacherAssignments = () => {
             ))}
           </div>
           <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
-            Hiển thị 5 / 15 bài gần nhất
+            {t('teacherAssignments.showingRecentPrefix')}5{t('teacherAssignments.showingRecentMid')}15{t('teacherAssignments.showingRecentSuffix')}
           </div>
         </div>
       </div>
 
       {/* Assignment List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-        {assignments.map((item, index) => {
+        {assignments.map((item) => {
           const badge = getBadgeStyle(item.type);
           
           return (
@@ -252,12 +255,12 @@ const TeacherAssignments = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                     {item.autoOpen ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2563EB', fontWeight: 500 }}>
-                        <Calendar size={14} /> Tự động mở: {item.dueDate}
+                        <Calendar size={14} /> {t('teacherAssignments.autoOpenPrefix')}{item.dueDate}
                       </span>
                     ) : (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6B7280' }}>
                         <Clock size={14} color={item.dueType === 'warning' ? '#4B5563' : '#9CA3AF'} /> 
-                        Hạn nộp: <span style={{ color: item.dueType === 'warning' ? '#111827' : '#6B7280' }}>{item.dueDate}</span>
+                        {t('teacherAssignments.dueDatePrefix')}<span style={{ color: item.dueType === 'warning' ? '#111827' : '#6B7280' }}>{item.dueDate}</span>
                       </span>
                     )}
                   </div>
@@ -280,14 +283,14 @@ const TeacherAssignments = () => {
       {/* Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#6B7280', fontSize: '14px' }}>
         <div>
-          Hiển thị <strong>1-5</strong> trên tổng số <strong>15</strong> bài tập
+          {t('teacherAssignments.paginationPrefix')}<strong>1-5</strong>{t('teacherAssignments.paginationMid')}<strong>15</strong>{t('teacherAssignments.paginationSuffix')}
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#9CA3AF', cursor: 'pointer' }}>Trước</button>
+          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#9CA3AF', cursor: 'pointer' }}>{t('teacherAssignments.btnPrev')}</button>
           <button style={{ padding: '6px 12px', backgroundColor: '#2563EB', border: 'none', borderRadius: '6px', color: 'white', fontWeight: 500, cursor: 'pointer' }}>1</button>
           <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>2</button>
           <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>3</button>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>Sau</button>
+          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>{t('teacherAssignments.btnNext')}</button>
         </div>
       </div>
 
@@ -296,7 +299,7 @@ const TeacherAssignments = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSkillModal(false)}>
           <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: '#111827' }}>Chọn kỹ năng</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: '#111827' }}>{t('teacherAssignments.modalSelectSkill')}</h2>
               <button onClick={() => setShowSkillModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={20} />
               </button>

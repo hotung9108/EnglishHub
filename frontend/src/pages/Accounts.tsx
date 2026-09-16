@@ -1,6 +1,7 @@
-
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Accounts = () => {
+  const { t } = useLanguage();
   const data = [
     { id: 'HV-8801', avatar: 'AJ', name: 'Alice Johnson', email: 'alice@center.edu.vn', phone: '0987-654-321', role: 'Student', status: 'Active' },
     { id: 'GV-001', avatar: 'TL', name: 'Trần Thị Mai Lan', email: 'mailan@center.edu.vn', phone: '0912-345-678', role: 'Teacher', status: 'Active' },
@@ -12,36 +13,36 @@ const Accounts = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h2 className="page-title">Quản lý tài khoản</h2>
+        <h2 className="page-title">{t('accounts.title')}</h2>
       </div>
 
       {/* Content Card */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Quản lý người dùng toàn hệ thống</h3>
-            <p className="label-md text-on-surface-variant">Admin Dashboard &gt; Danh sách tài khoản</p>
+            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('accounts.subtitle')}</h3>
+            <p className="label-md text-on-surface-variant">{t('accounts.breadcrumb')}</p>
           </div>
           <button className="btn btn-primary">
-            Thêm tài khoản mới +
+            {t('accounts.addAccount')}
           </button>
         </div>
 
         {/* Filters */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <input type="text" className="input" placeholder="Tìm tên, email, SĐT..." style={{ maxWidth: '320px' }} />
+          <input type="text" className="input" placeholder={t('accounts.searchPlaceholder')} style={{ maxWidth: '320px' }} />
           <select className="input" style={{ maxWidth: '200px' }}>
-            <option>Tất cả vai trò</option>
+            <option>{t('accounts.filterAllRoles')}</option>
             <option>Student</option>
             <option>Teacher</option>
             <option>Admin</option>
           </select>
           <select className="input" style={{ maxWidth: '200px' }}>
-            <option>Tất cả trạng thái</option>
+            <option>{t('accounts.filterAllStatuses')}</option>
             <option>Active</option>
             <option>Blocked</option>
           </select>
-          <span className="label-md text-on-surface-variant" style={{ alignSelf: 'center' }}>Tổng số: {data.length} tài khoản</span>
+          <span className="label-md text-on-surface-variant" style={{ alignSelf: 'center' }}>{t('accounts.totalAccounts')}{data.length}{t('accounts.totalAccountsSuffix')}</span>
         </div>
 
         {/* Table */}
@@ -49,12 +50,12 @@ const Accounts = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>ID / AVATAR</th>
-                <th>HỌ VÀ TÊN</th>
-                <th>EMAIL &amp; SĐT</th>
-                <th>VAI TRÒ</th>
-                <th>TRẠNG THÁI</th>
-                <th>THAO TÁC</th>
+                <th>{t('accounts.colIdAvatar')}</th>
+                <th>{t('accounts.colName')}</th>
+                <th>{t('accounts.colEmailPhone')}</th>
+                <th>{t('accounts.colRole')}</th>
+                <th>{t('accounts.colStatus')}</th>
+                <th>{t('accounts.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -83,9 +84,9 @@ const Accounts = () => {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="label-md text-primary" style={{ padding: '4px 8px', cursor: 'pointer' }}>Sửa</button>
+                      <button className="label-md text-primary" style={{ padding: '4px 8px', cursor: 'pointer' }}>{t('accounts.actionEdit')}</button>
                       <button className="label-md text-error" style={{ padding: '4px 8px', cursor: 'pointer' }}>
-                        {row.status === 'Active' ? 'Khóa' : 'Mở'}
+                        {row.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}
                       </button>
                     </div>
                   </td>
@@ -112,8 +113,8 @@ const Accounts = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className={row.role === 'Admin' ? 'badge badge-primary' : 'badge'} style={row.role !== 'Admin' ? { border: '1px solid var(--outline-variant)' } : {}}>{row.role}</span>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>Sửa</button>
-                    <button className="btn btn-error" style={{ padding: '6px 12px', fontSize: '13px' }}>{row.status === 'Active' ? 'Khóa' : 'Mở'}</button>
+                    <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>{t('accounts.actionEdit')}</button>
+                    <button className="btn btn-error" style={{ padding: '6px 12px', fontSize: '13px' }}>{row.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}</button>
                   </div>
                 </div>
               </div>
@@ -123,7 +124,7 @@ const Accounts = () => {
 
         {/* Pagination */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', flexWrap: 'wrap', gap: '8px' }}>
-          <span className="label-md text-on-surface-variant">Hiển thị 1 - 4 trên {data.length} người dùng</span>
+          <span className="label-md text-on-surface-variant">{t('accounts.paginationText1')}1 - 4{t('accounts.paginationText2')}{data.length}{t('accounts.paginationText3')}</span>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button className="btn btn-secondary" style={{ padding: '6px 12px' }}>&lt;</button>
             <button className="btn btn-primary" style={{ padding: '6px 12px' }}>1</button>

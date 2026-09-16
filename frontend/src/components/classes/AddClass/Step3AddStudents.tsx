@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const Step3AddStudents = () => {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);

@@ -38,7 +38,7 @@ const LoginForm = () => {
         navigate(from, { replace: true });
       }
     } else {
-      setError('Email không tồn tại. Hãy dùng admin@eh.com, teacher@eh.com, hoặc student@eh.com');
+      setError(t('loginError'));
     }
   };
 

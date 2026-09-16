@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const Step2AssignTeacher = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);

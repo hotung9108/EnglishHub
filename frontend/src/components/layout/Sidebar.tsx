@@ -18,6 +18,18 @@ import {
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
 
+export interface MenuItem {
+  path: string;
+  label: string;
+  icon?: React.ElementType;
+  children?: MenuChild[];
+}
+
+export interface MenuChild {
+  path: string;
+  label: string;
+}
+
 const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -31,35 +43,35 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
     student: t('studentPortal'),
   };
 
-  const menus = {
+  const menus: Record<string, MenuItem[]> = {
     admin: [
-      { path: '/', label: t('dashboard'), icon: LayoutDashboard },
+      { path: '/admin/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
       { 
         path: '/admin/accounts', 
-        label: t('accounts'),
+        label: t('menuAccounts'),
         icon: Users,
         children: [
-          { path: '/admin/accounts/profile', label: 'Hồ sơ cá nhân' },
-          { path: '/admin/roles', label: 'Phân quyền & Vai trò' }
+          { path: '/admin/accounts/profile', label: t('menuProfile') },
+          { path: '/admin/roles', label: t('menuRoles') }
         ]
       },
-      { path: '/admin/classes', label: t('classes'), icon: GraduationCap },
-      { path: '/admin/teachers', label: t('teachers'), icon: User },
-      { path: '/admin/students', label: t('students'), icon: Users },
-      { path: '/reports', label: t('reports'), icon: BarChart3 },
+      { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
+      { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
+      { path: '/admin/students', label: t('menuStudents'), icon: Users },
+      { path: '/reports', label: t('menuReports'), icon: BarChart3 },
     ],
     teacher: [
-      { path: '/teacher/classes', label: t('myClasses'), icon: BookOpen },
-      { path: '/teacher/assignments', label: t('assignments'), icon: ClipboardList },
-      { path: '/progress', label: t('progress'), icon: TrendingUp },
+      { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
+      { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+      { path: '/progress', label: t('menuProgress'), icon: TrendingUp },
     ],
     student: [
-      { path: '/student/my-classes', label: t('myClasses'), icon: BookOpen },
-      { path: '/student/assignments', label: t('studentAssignments'), icon: ClipboardList },
-      { path: '/student/workspace', label: t('studentWorkspace'), icon: Layout },
-      { path: '/student/grades', label: t('studentGrades'), icon: CheckCircle },
-      { path: '/student/analytics', label: t('studentAnalytics'), icon: BarChart3 },
-      { path: '/student/feedback', label: t('studentFeedback'), icon: TrendingUp },
+      { path: '/student/my-classes', label: t('menuMyClasses'), icon: BookOpen },
+      { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList },
+      { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
+      { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
+      { path: '/student/analytics', label: t('menuStudentAnalytics'), icon: BarChart3 },
+      { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
     ]
   };
 
@@ -90,9 +102,9 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
               {item.icon && <item.icon size={20} />}
               {item.label}
             </NavLink>
-            {(item as any).children && (
+            {item.children && (
               <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '16px', borderLeft: '1px solid var(--outline-variant)' }}>
-                {(item as any).children.map((child: any, cIndex: any) => (
+                {item.children.map((child: MenuChild, cIndex: number) => (
                   <NavLink
                     key={`child-${cIndex}`}
                     to={child.path}

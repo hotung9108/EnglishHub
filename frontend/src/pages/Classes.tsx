@@ -1,6 +1,17 @@
 import { Link } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
+interface ClassItem {
+  code: string;
+  name: string;
+  teacher: string;
+  students?: number;
+  schedule?: string;
+  status: string;
+  completedDate?: string;
+}
 
 const Classes = () => {
+  const { t } = useLanguage();
   const activeClasses = [
     {
       code: 'ENG-IELTS-6.5A',
@@ -39,7 +50,7 @@ const Classes = () => {
     }
   ];
 
-  const renderClassCard = (cls: any, isPast = false) => {
+  const renderClassCard = (cls: ClassItem, isPast = false) => {
     const cardStyle = isPast ? {
       backgroundColor: 'var(--surface-container-lowest)',
       border: '1px solid var(--outline-variant)',
@@ -72,20 +83,20 @@ const Classes = () => {
         <h3 className="headline-md text-on-surface" style={{ marginBottom: '16px', lineHeight: 1.4, flex: 1 }}>{cls.name}</h3>
         
         <p className="body-md text-on-surface-variant" style={{ marginBottom: '16px' }}>
-          GV: {cls.teacher}
+          {t('adminClasses.teacherPrefix')}{cls.teacher}
         </p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
           <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>👥</span> Sĩ số: {cls.students} học viên
+            <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>👥</span> {t('adminClasses.studentsPrefix')}{cls.students}{t('adminClasses.studentsSuffix')}
           </p>
           {isPast ? (
             <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>📅</span> Hoàn thành {cls.completedDate}
+              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>📅</span> {t('adminClasses.completedPrefix')}{cls.completedDate}
             </p>
           ) : (
             <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>🕒</span> Lịch: {cls.schedule}
+              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>🕒</span> {t('adminClasses.schedulePrefix')}{cls.schedule}
             </p>
           )}
         </div>
@@ -106,7 +117,7 @@ const Classes = () => {
             boxSizing: 'border-box'
           }}
         >
-          {isPast ? 'Xem chi tiết' : 'Quản lý lớp'}
+          {isPast ? t('adminClasses.viewDetails') : t('adminClasses.manageClass')}
         </Link>
       </div>
     );
@@ -117,10 +128,10 @@ const Classes = () => {
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 className="page-title">Quản lý lớp học</h2>
+          <h2 className="page-title">{t('adminClasses.title')}</h2>
         </div>
         <Link to="/admin/classes/create" className="btn btn-primary" style={{ padding: '10px 24px', textDecoration: 'none' }}>
-          + Tạo lớp học mới
+          {t('adminClasses.createClass')}
         </Link>
       </div>
 
@@ -128,8 +139,8 @@ const Classes = () => {
 
       {/* Grid container */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
-        {activeClasses.map((cls: any) => renderClassCard(cls, false))}
-        {pastClasses.map((cls: any) => renderClassCard(cls, true))}
+        {activeClasses.map((cls: ClassItem) => renderClassCard(cls, false))}
+        {pastClasses.map((cls: ClassItem) => renderClassCard(cls, true))}
       </div>
     </div>
   );

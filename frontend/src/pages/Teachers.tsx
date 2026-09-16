@@ -2,7 +2,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 
 const Teachers = () => {
-  useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const teachers = [
@@ -44,7 +44,7 @@ const Teachers = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h1 className="page-title">Quản Lý Giáo Viên</h1>
+        <h1 className="page-title">{t('teachers.title')}</h1>
       </div>
 
       {/* Main Container */}
@@ -52,35 +52,35 @@ const Teachers = () => {
         {/* Header Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Hồ sơ đội ngũ Giáo viên</h3>
-            <p className="label-md text-on-surface-variant">Admin &gt; Quản lý Giáo viên &amp; Chuyên môn</p>
+            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('teachers.subtitle')}</h3>
+            <p className="label-md text-on-surface-variant">{t('teachers.breadcrumb')}</p>
           </div>
           <button className="btn btn-primary" style={{ backgroundColor: 'var(--inverse-surface)' }} onClick={() => navigate('/admin/teachers/create')}>
-            Thêm hồ sơ giáo viên +
+            {t('teachers.addTeacher')}
           </button>
         </div>
 
         {/* Stats Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '32px' }}>
           <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>TỔNG SỐ GIÁO VIÊN</p>
+            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statTotal')}</p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
               <span className="display-lg text-primary">18</span>
-              <span className="headline-md text-on-surface">Giảng viên</span>
+              <span className="headline-md text-on-surface">{t('teachers.statTotalUnit')}</span>
             </div>
           </div>
           <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>LỚP ĐANG PHỤ TRÁCH</p>
+            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statClasses')}</p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
               <span className="display-lg text-on-surface">32</span>
-              <span className="headline-md text-on-surface">Lớp học</span>
+              <span className="headline-md text-on-surface">{t('teachers.statClassesUnit')}</span>
             </div>
           </div>
           <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>BÀI CHẤM TRUNG BÌNH/TUẦN</p>
+            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statAvgGrades')}</p>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
               <span className="display-lg text-on-surface">145</span>
-              <span className="headline-md text-on-surface">Bài</span>
+              <span className="headline-md text-on-surface">{t('teachers.statAvgGradesUnit')}</span>
             </div>
           </div>
         </div>
@@ -103,14 +103,14 @@ const Teachers = () => {
 
               {/* Stats */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', flex: 1 }}>
-                <p className="body-md text-on-surface-variant">{teacher.classesCount} lớp đang dạy</p>
-                <p className="body-md text-on-surface-variant">{teacher.pendingGrades} bài chờ chấm</p>
+                <p className="body-md text-on-surface-variant">{teacher.classesCount}{t('teachers.classesCountSuffix')}</p>
+                <p className="body-md text-on-surface-variant">{teacher.pendingGrades}{t('teachers.pendingGradesSuffix')}</p>
               </div>
 
               {/* Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <button className="btn btn-secondary" onClick={() => navigate(`/admin/teachers/${teacher.id}`)}>Chi tiết hồ sơ</button>
-                <button className="btn btn-secondary">Phân lớp</button>
+                <button className="btn btn-secondary" onClick={() => navigate(`/admin/teachers/${teacher.id}`)}>{t('teachers.viewProfile')}</button>
+                <button className="btn btn-secondary">{t('teachers.assignClass')}</button>
               </div>
             </div>
           ))}

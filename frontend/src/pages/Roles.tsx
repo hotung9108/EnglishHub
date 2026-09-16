@@ -1,14 +1,16 @@
 import { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Roles = ({ role = 'admin' }: { role?: string }) => {
   const [activeTab, setActiveTab] = useState(role);
+  const { t } = useLanguage();
 
   const modules = [
-    'Quản lý tài khoản & Phân quyền',
-    'Quản lý Lớp học & Thành viên',
-    'Ngân hàng đề & Giao bài tập 4 kỹ năng',
-    'Chấm bài & Kích hoạt AI Grading',
-    'Xuất báo cáo tài chính & chất lượng'
+    t('roles.mod1'),
+    t('roles.mod2'),
+    t('roles.mod3'),
+    t('roles.mod4'),
+    t('roles.mod5')
   ];
 
   const getPermissions = (role: string) => {
@@ -28,7 +30,7 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h2 className="page-title">Phân quyền &amp; Vai trò</h2>
+        <h2 className="page-title">{t('roles.title')}</h2>
       </div>
 
       {/* Main Container */}
@@ -41,21 +43,21 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
             style={activeTab !== 'admin' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
             onClick={() => setActiveTab('admin')}
           >
-            1. Admin (Quản trị viên)
+            {t('roles.adminRole')}
           </button>
           <button 
             className={`btn ${activeTab === 'teacher' ? 'btn-primary' : ''}`}
             style={activeTab !== 'teacher' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
             onClick={() => setActiveTab('teacher')}
           >
-            2. Teacher (Giáo viên)
+            {t('roles.teacherRole')}
           </button>
           <button 
             className={`btn ${activeTab === 'student' ? 'btn-primary' : ''}`}
             style={activeTab !== 'student' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
             onClick={() => setActiveTab('student')}
           >
-            3. Student (Học viên)
+            {t('roles.studentRole')}
           </button>
         </div>
 
@@ -63,17 +65,17 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
 
         {/* Permissions Table Section */}
         <h3 className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>
-          QUYỀN HẠN TRUY CẬP CÁC PHÂN HỆ:
+          {t('roles.permHeading')}
         </h3>
 
         <div className="data-table-wrapper" style={{ marginBottom: '40px', border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)' }}>
           <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ backgroundColor: 'var(--surface-container-low)' }}>
               <tr>
-                <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--on-surface-variant)' }}>Module Chức năng</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>Xem<br/>(Read)</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>Ghi<br/>(Write)</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>Duyệt/Khóa</th>
+                <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--on-surface-variant)' }}>{t('roles.colModule')}</th>
+                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colRead')}</th>
+                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colWrite')}</th>
+                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colApprove')}</th>
               </tr>
             </thead>
             <tbody>
@@ -100,14 +102,14 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
         {/* Footer Actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <span className="body-md text-on-surface-variant" style={{ fontStyle: 'italic' }}>
-            * Mọi thay đổi quyền hạn sẽ có hiệu lực ngay lập tức.
+            {t('roles.note')}
           </span>
           <div style={{ display: 'flex', gap: '16px' }}>
             <button className="btn" style={{ backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' }}>
-              Khôi phục mặc định
+              {t('roles.restoreDefault')}
             </button>
             <button className="btn btn-primary">
-              Cập nhật phân quyền
+              {t('roles.updatePerms')}
             </button>
           </div>
         </div>

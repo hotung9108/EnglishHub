@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, Download, Calendar, Shield, PenTool, 
-  Zap, FileText, Search, Mail, Eye, Bell
+  Zap, FileText, Search, Bell
 } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const TeacherAssignmentDetails = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('all');
   const [subTab, setSubTab] = useState('graded');
@@ -83,7 +85,7 @@ const TeacherAssignmentDetails = () => {
           padding: 0
         }}
       >
-        <ArrowLeft size={16} /> Quay lại Thư viện bài tập
+        <ArrowLeft size={16} /> {t('assignmentDetails.backToLibrary')}
       </button>
 
       {/* Header */}
@@ -94,14 +96,14 @@ const TeacherAssignmentDetails = () => {
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span style={{ backgroundColor: '#DCFCE7', color: '#16A34A', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: 600 }}>
-              Đang mở (Open)
+              {t('assignmentDetails.statusOpen')}
             </span>
             <span style={{ backgroundColor: '#F3E8FF', color: '#9333EA', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
               Writing Task 2
             </span>
             <span style={{ color: '#6B7280', fontSize: '14px' }}>•</span>
             <span style={{ color: '#4B5563', fontSize: '14px', fontWeight: 500 }}>
-              Lớp: ENG-IELTS-6.5A
+              {t('assignmentDetails.classPrefix')}ENG-IELTS-6.5A
             </span>
           </div>
         </div>
@@ -112,7 +114,7 @@ const TeacherAssignmentDetails = () => {
             border: '1px solid #D1D5DB', backgroundColor: 'white', 
             color: '#374151', fontWeight: 500, cursor: 'pointer' 
           }}>
-            <Edit2 size={16} /> Chỉnh sửa bài tập
+            <Edit2 size={16} /> {t('assignmentDetails.btnEdit')}
           </button>
           <button style={{ 
             display: 'flex', alignItems: 'center', gap: '8px', 
@@ -120,7 +122,7 @@ const TeacherAssignmentDetails = () => {
             border: '1px solid #D1D5DB', backgroundColor: 'white', 
             color: '#374151', fontWeight: 500, cursor: 'pointer' 
           }}>
-            <Download size={16} /> Xuất danh sách (Excel)
+            <Download size={16} /> {t('assignmentDetails.btnExport')}
           </button>
         </div>
       </div>
@@ -130,13 +132,13 @@ const TeacherAssignmentDetails = () => {
         {/* Card 1 */}
         <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>Thời gian & Hạn chót</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardTimeTitle')}</h3>
             <div style={{ backgroundColor: '#EFF6FF', color: '#3B82F6', padding: '8px', borderRadius: '8px' }}>
               <Calendar size={18} />
             </div>
           </div>
           <div style={{ color: '#6B7280', fontSize: '14px', marginBottom: '8px' }}>
-            Giao: <span style={{ color: '#374151', fontWeight: 500 }}>10/09 (08:00)</span>
+            {t('assignmentDetails.assignedPrefix')}<span style={{ color: '#374151', fontWeight: 500 }}>10/09 (08:00)</span>
           </div>
           <div style={{ fontSize: '18px', fontWeight: 700, color: '#111827' }}>
             15/09/2026 (23:59)
@@ -146,7 +148,7 @@ const TeacherAssignmentDetails = () => {
         {/* Card 2 */}
         <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>Tiến độ nộp bài</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardProgressTitle')}</h3>
             <div style={{ backgroundColor: '#ECFDF5', color: '#10B981', padding: '8px', borderRadius: '8px' }}>
               <Shield size={18} />
             </div>
@@ -159,15 +161,15 @@ const TeacherAssignmentDetails = () => {
             <div style={{ width: '10%', backgroundColor: '#EF4444' }}></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: '#6B7280' }}>Đã nộp: <span style={{ color: '#374151', fontWeight: 500 }}>22</span></span>
-            <span style={{ color: '#EF4444', fontWeight: 500 }}>Chưa nộp: 2</span>
+            <span style={{ color: '#6B7280' }}>{t('assignmentDetails.submittedCount')}<span style={{ color: '#374151', fontWeight: 500 }}>22</span></span>
+            <span style={{ color: '#EF4444', fontWeight: 500 }}>{t('assignmentDetails.missingCount')}2</span>
           </div>
         </div>
 
         {/* Card 3 */}
         <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>Tình trạng chấm điểm</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardGradingTitle')}</h3>
             <div style={{ backgroundColor: '#FFFBEB', color: '#D97706', padding: '8px', borderRadius: '8px' }}>
               <PenTool size={18} />
             </div>
@@ -177,18 +179,18 @@ const TeacherAssignmentDetails = () => {
               16<span style={{ fontSize: '16px', color: '#9CA3AF', fontWeight: 500 }}>/22</span>
             </div>
             <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 8px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}>
-              72.7% đã chấm
+              72.7%{t('assignmentDetails.gradedSuffix')}
             </span>
           </div>
           <div style={{ color: '#D97706', fontSize: '13px', fontWeight: 600, backgroundColor: '#FEF3C7', display: 'inline-block', padding: '4px 12px', borderRadius: '12px' }}>
-            6 bài chờ chấm
+            6{t('assignmentDetails.pendingSuffix')}
           </div>
         </div>
 
         {/* Card 4 */}
         <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>Điểm TB hiện tại</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardAverageTitle')}</h3>
             <div style={{ backgroundColor: '#F5F3FF', color: '#8B5CF6', padding: '8px', borderRadius: '8px' }}>
               <Zap size={18} />
             </div>
@@ -198,7 +200,7 @@ const TeacherAssignmentDetails = () => {
               6.8
             </div>
             <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: 500 }}>
-              / 9.0 IELTS Band
+              {t('assignmentDetails.bandSuffix')}
             </span>
           </div>
         </div>
@@ -208,7 +210,7 @@ const TeacherAssignmentDetails = () => {
       <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-            <FileText size={20} color="#2563EB" /> Nội dung đề bài & Tiêu chí chấm (Prompt & Rubrics)
+            <FileText size={20} color="#2563EB" /> {t('assignmentDetails.promptTitle')}
           </h2>
           <span style={{ border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '6px', fontSize: '13px', color: '#6B7280', backgroundColor: '#F9FAFB' }}>
             IELTS Academic
@@ -216,11 +218,11 @@ const TeacherAssignmentDetails = () => {
         </div>
         <div style={{ color: '#374151', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
           <strong>Topic:</strong> The burning of fossil fuels has caused substantial environmental damage over the last century. Some people believe that renewable energy resources should replace fossil fuels entirely, while others argue that doing so is impractical. Discuss both views and give your opinion.<br/>
-          <span style={{ color: '#2563EB' }}>(Tối thiểu 250 từ, đảm bảo 4 tiêu chí: TR, CC, LR, GRA).</span>
+          <span style={{ color: '#2563EB' }}>{t('assignmentDetails.promptHint')}</span>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <span style={{ color: '#6B7280', fontSize: '14px' }}>Tài liệu đính kèm:</span>
+          <span style={{ color: '#6B7280', fontSize: '14px' }}>{t('assignmentDetails.attachmentsLabel')}</span>
           <button style={{ 
             display: 'flex', alignItems: 'center', gap: '8px', 
             padding: '8px 16px', borderRadius: '20px', 
@@ -245,9 +247,9 @@ const TeacherAssignmentDetails = () => {
         {/* Tabs */}
         <div style={{ borderBottom: '1px solid #E5E7EB', display: 'flex', padding: '0 16px', gap: '24px' }}>
           {[
-            { id: 'all', label: 'Tất cả học sinh', count: 24 },
-            { id: 'submitted', label: 'Đã nộp bài', count: 22 },
-            { id: 'missing', label: 'Chưa nộp bài', count: 2, isRed: true }
+            { id: 'all', label: t('assignmentDetails.tabAll'), count: 24 },
+            { id: 'submitted', label: t('assignmentDetails.tabSubmitted'), count: 22 },
+            { id: 'missing', label: t('assignmentDetails.tabMissing'), count: 2, isRed: true }
           ].map(tab => (
             <button
               key={tab.id}
@@ -287,7 +289,7 @@ const TeacherAssignmentDetails = () => {
                 cursor: 'pointer'
               }}
             >
-              Đã chấm (16)
+              {t('assignmentDetails.subTabGraded')} (16)
             </button>
             <button 
               onClick={() => setSubTab('pending')}
@@ -302,7 +304,7 @@ const TeacherAssignmentDetails = () => {
                 cursor: 'pointer'
               }}
             >
-              Chờ chấm (6)
+              {t('assignmentDetails.subTabPending')} (6)
             </button>
           </div>
           
@@ -310,7 +312,7 @@ const TeacherAssignmentDetails = () => {
             <div style={{ position: 'relative' }}>
               <input 
                 type="text" 
-                placeholder="Tìm theo tên hoặc mã HV..." 
+                placeholder={t('assignmentDetails.searchPlaceholder')} 
                 style={{ 
                   padding: '8px 16px 8px 36px', 
                   borderRadius: '8px', 
@@ -328,7 +330,7 @@ const TeacherAssignmentDetails = () => {
               border: '1px solid #FCD34D', backgroundColor: '#FFFBEB', 
               color: '#D97706', fontSize: '14px', fontWeight: 500, cursor: 'pointer' 
             }}>
-              <Bell size={16} /> Nhắc nhở nộp bài (2 bạn)
+              <Bell size={16} /> {t('assignmentDetails.btnRemind')} (2{t('assignmentDetails.unitFriends')})
             </button>
           </div>
         </div>
@@ -341,10 +343,10 @@ const TeacherAssignmentDetails = () => {
                 <th style={{ padding: '16px', width: '40px' }}>
                   <input type="checkbox" style={{ cursor: 'pointer' }} />
                 </th>
-                <th style={{ padding: '16px' }}>HỌC SINH / MÃ HV</th>
-                <th style={{ padding: '16px' }}>TÌNH TRẠNG NỘP BÀI</th>
-                <th style={{ padding: '16px' }}>TRẠNG THÁI CHẤM ĐIỂM</th>
-                <th style={{ padding: '16px', textAlign: 'right' }}>THAO TÁC</th>
+                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStudent')}</th>
+                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStatus')}</th>
+                <th style={{ padding: '16px' }}>{t('assignmentDetails.colGrading')}</th>
+                <th style={{ padding: '16px', textAlign: 'right' }}>{t('assignmentDetails.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -373,28 +375,28 @@ const TeacherAssignmentDetails = () => {
                     {student.status === 'submitted' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ECFDF5', color: '#10B981', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
-                        Đã nộp bài
+                        {t('assignmentDetails.statusSubmittedLabel')}
                       </span>
                     ) : (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#FEF2F2', color: '#EF4444', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></div>
-                        Chưa nộp bài
+                        {t('assignmentDetails.statusMissingLabel')}
                       </span>
                     )}
                   </td>
                   <td style={{ padding: '16px' }}>
                     {student.gradingStatus === 'graded' && (
                       <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
-                        Đã chấm
+                        {t('assignmentDetails.gradingGraded')}
                       </span>
                     )}
                     {student.gradingStatus === 'pending' && (
                       <span style={{ border: '1px solid #FCD34D', color: '#D97706', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
-                        Chưa chấm
+                        {t('assignmentDetails.gradingPending')}
                       </span>
                     )}
                     {student.gradingStatus === 'none' && (
-                      <span style={{ color: '#9CA3AF', fontSize: '13px' }}>— Chưa có bài —</span>
+                      <span style={{ color: '#9CA3AF', fontSize: '13px' }}>{t('assignmentDetails.gradingNone')}</span>
                     )}
                   </td>
                   <td style={{ padding: '16px', textAlign: 'right' }}>
@@ -405,7 +407,7 @@ const TeacherAssignmentDetails = () => {
                         border: '1px solid #D1D5DB', backgroundColor: 'white', color: '#374151', 
                         padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
                       }}>
-                        Xem bài nộp
+                        {t('assignmentDetails.btnView')}
                       </button>
                     )}
                     {student.gradingStatus === 'pending' && (
@@ -415,7 +417,7 @@ const TeacherAssignmentDetails = () => {
                         border: 'none', backgroundColor: '#2563EB', color: 'white', 
                         padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
                       }}>
-                        Chấm bài ngay
+                        {t('assignmentDetails.btnGradeNow')}
                       </button>
                     )}
                     {student.gradingStatus === 'none' && (
@@ -423,7 +425,7 @@ const TeacherAssignmentDetails = () => {
                         border: '1px solid #FCD34D', backgroundColor: 'white', color: '#D97706', 
                         padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
                       }}>
-                        Gửi nhắc nhở
+                        {t('assignmentDetails.btnSendReminder')}
                       </button>
                     )}
                   </td>

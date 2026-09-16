@@ -1,21 +1,25 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Download, Plus, Users,
+  ArrowLeft, Download, Users,
   ClipboardList, Settings, CheckCircle2
 } from 'lucide-react';
 import TabStudents from '../components/classes/ClassDetails/TabStudents';
 import TabAssignments from '../components/classes/ClassDetails/TabAssignments';
 import TabSettings from '../components/classes/ClassDetails/TabSettings';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ClassDetails = () => {
-  const { id } = useParams();
+  const { t } = useLanguage();
+  // id removed, not used
+
   const [activeTab, setActiveTab] = useState('students');
 
   // Mock data for the layout
   const classData = {
     code: 'ENG-IELTS-6.5A',
     name: 'IELTS Intensive Band 6.5 - 7.5',
+    description: 'Khóa học tăng cường 4 kỹ năng chuẩn đầu ra IELTS 6.5+',
     status: 'Đang diễn ra',
     teacher: {
       name: 'Cô Trần Thị Mai Lan',
@@ -27,9 +31,9 @@ const ClassDetails = () => {
   };
 
   const tabs = [
-    { id: 'students', label: 'Danh sách học viên', icon: Users, badge: 24 },
-    { id: 'assignments', label: 'Bài tập & Điểm số', icon: ClipboardList, badge: '15 bài' },
-    { id: 'settings', label: 'Cài đặt lớp học', icon: Settings }
+    { id: 'students', label: t('classDetails.tabStudents'), icon: Users, badge: 24 },
+    { id: 'assignments', label: t('classDetails.tabAssignments'), icon: ClipboardList, badge: '15' },
+    { id: 'settings', label: t('classDetails.tabSettings'), icon: Settings }
   ];
 
   return (
@@ -38,11 +42,11 @@ const ClassDetails = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Admin</span>
+            <span>{t('classDetails.breadcrumbAdmin')}</span>
             <span>&rsaquo;</span>
-            <Link to="/admin/classes" style={{ color: '#6B7280', textDecoration: 'none' }}>Quản lý lớp học</Link>
+            <Link to="/admin/classes" style={{ color: '#6B7280', textDecoration: 'none' }}>{t('classDetails.breadcrumbManage')}</Link>
             <span>&rsaquo;</span>
-            <span style={{ fontWeight: '500', color: '#111827' }}>Chi tiết lớp học {classData.code}</span>
+            <span style={{ fontWeight: '500', color: '#111827' }}>{t('classDetails.breadcrumbPrefix')}{classData.code}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
             <h1 className="display-sm" style={{ fontSize: '28px' }}>{classData.name}</h1>
@@ -53,7 +57,7 @@ const ClassDetails = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             <span className="badge" style={{ backgroundColor: '#D1FAE5', color: '#065F46', fontSize: '12px', padding: '4px 8px', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#059669' }}></span>
-              {classData.status}
+              {t('active')}
             </span>
           </div>
           <p style={{ color: '#6B7280', fontSize: '14px' }}>{classData.description}</p>
@@ -62,11 +66,11 @@ const ClassDetails = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <ArrowLeft size={16} />
-            Danh sách lớp
+            {t('classDetails.btnBack')}
           </button>
           <button className="btn" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Download size={16} />
-            Xuất báo cáo
+            {t('classDetails.btnExport')}
           </button>
 
         </div>
@@ -77,7 +81,7 @@ const ClassDetails = () => {
         {/* Card 1: Teacher */}
         <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>Giáo viên phụ trách</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>{t('classDetails.teacherInCharge')}</span>
             <div style={{ width: '32px', height: '32px', backgroundColor: '#EFF6FF', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6' }}>
               <ArrowLeft size={16} style={{ transform: 'rotate(135deg)' }} />
             </div>
@@ -99,19 +103,19 @@ const ClassDetails = () => {
         {/* Card 2: Students */}
         <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>Sĩ số lớp hiện tại</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>{t('classDetails.currentClassSize')}</span>
             <div style={{ width: '32px', height: '32px', backgroundColor: '#EFF6FF', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6' }}>
               <Users size={16} />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
             <span style={{ fontSize: '32px', fontWeight: '700' }}>{classData.studentsCount}</span>
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>/ {classData.studentsMax} học viên</span>
+            <span style={{ fontSize: '14px', color: '#6B7280' }}>/ {classData.studentsMax}{t('classDetails.studentUnit')}</span>
           </div>
           <div style={{ marginTop: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
-              <span style={{ color: '#4B5563', fontWeight: '500' }}>Tỷ lệ lấp đầy</span>
-              <span style={{ color: '#059669', fontWeight: '600' }}>{Math.round((classData.studentsCount / classData.studentsMax) * 100)}% (Còn {classData.studentsMax - classData.studentsCount} chỗ)</span>
+              <span style={{ color: '#4B5563', fontWeight: '500' }}>{t('classDetails.occupancyRate')}</span>
+              <span style={{ color: '#059669', fontWeight: '600' }}>{Math.round((classData.studentsCount / classData.studentsMax) * 100)}% {t('classDetails.seatsLeftPrefix')}{classData.studentsMax - classData.studentsCount}{t('classDetails.seatsLeftSuffix')}</span>
             </div>
             <div style={{ height: '6px', backgroundColor: '#E5E7EB', borderRadius: '3px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${(classData.studentsCount / classData.studentsMax) * 100}%`, backgroundColor: '#059669', borderRadius: '3px' }}></div>
@@ -159,7 +163,7 @@ const ClassDetails = () => {
             </button>
           ))}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingRight: '16px', gap: '8px', fontSize: '12px', color: '#6B7280' }}>
-            <CheckCircle2 size={14} color="#059669" /> Dữ liệu đồng bộ lúc: 14:32 hôm nay
+            <CheckCircle2 size={14} color="#059669" /> {t('classDetails.syncStatus')}
           </div>
         </div>
 
