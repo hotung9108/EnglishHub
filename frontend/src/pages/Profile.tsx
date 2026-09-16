@@ -1,15 +1,17 @@
 
 
 import { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Profile = () => {
+  const { t } = useLanguage();
   const [showPasswordChange, setShowPasswordChange] = useState(false);
 
   return (
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h1 className="page-title">Quản Lý Tài Khoản Cá Nhân</h1>
+        <h1 className="page-title">{t('profile.title')}</h1>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -17,8 +19,8 @@ const Profile = () => {
         {/* Profile Info Card */}
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
           <div style={{ padding: '24px', borderBottom: '1px solid var(--outline-variant)' }}>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Hồ sơ tài khoản cá nhân</h3>
-            <p className="label-md text-on-surface-variant">Cập nhật thông tin liên hệ và cài đặt bảo mật</p>
+            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('profile.cardInfoTitle')}</h3>
+            <p className="label-md text-on-surface-variant">{t('profile.cardInfoSubtitle')}</p>
           </div>
           
           <div style={{ display: 'flex', flexWrap: 'wrap', padding: '32px', gap: '32px' }}>
@@ -47,8 +49,8 @@ const Profile = () => {
               </span>
               
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Đổi ảnh đại diện</button>
-                <button className="btn" style={{ width: '100%', justifyContent: 'center', backgroundColor: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', color: 'var(--on-surface-variant)' }}>Xóa ảnh</button>
+                <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>{t('profile.btnChangeAvatar')}</button>
+                <button className="btn" style={{ width: '100%', justifyContent: 'center', backgroundColor: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', color: 'var(--on-surface-variant)' }}>{t('profile.btnDeleteAvatar')}</button>
               </div>
             </div>
 
@@ -56,29 +58,29 @@ const Profile = () => {
             <div style={{ flex: '1', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Họ và tên <span className="text-error">*</span></label>
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.fullName')} <span className="text-error">*</span></label>
                   <input type="text" className="input" defaultValue="Trần Thị Mai Lan" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Mã định danh</label>
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.userId')}</label>
                   <input type="text" className="input" defaultValue="GV-2026-088" readOnly style={{ backgroundColor: 'var(--surface-container-low)', color: 'var(--on-surface-variant)' }} />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Email liên hệ</label>
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.email')}</label>
                   <input type="email" className="input" defaultValue="teacher.lan@center.edu.vn" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Số điện thoại</label>
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.phone')}</label>
                   <input type="text" className="input" defaultValue="0987 654 321" />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Vai trò người dùng <span className="text-error">*</span></label>
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.role')} <span className="text-error">*</span></label>
                   <select className="input" defaultValue="gv">
                     <option value="gv">Giáo viên</option>
                     <option value="admin">Quản trị viên</option>
@@ -88,8 +90,8 @@ const Profile = () => {
 
               {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', marginTop: 'auto', paddingTop: '24px' }}>
-                <button className="btn btn-secondary">Hủy</button>
-                <button className="btn btn-primary" style={{ backgroundColor: '#0F172A' }}>Lưu thay đổi</button>
+                <button className="btn btn-secondary">{t('profile.btnCancel')}</button>
+                <button className="btn btn-primary" style={{ backgroundColor: '#0F172A' }}>{t('profile.btnSave')}</button>
               </div>
             </div>
           </div>
@@ -99,14 +101,14 @@ const Profile = () => {
         <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
           <div style={{ padding: '24px', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Bảo mật tài khoản</h3>
-              <p className="label-md text-on-surface-variant">Cập nhật mật khẩu định kỳ để đảm bảo an toàn</p>
+              <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('profile.cardSecurityTitle')}</h3>
+              <p className="label-md text-on-surface-variant">{t('profile.cardSecuritySubtitle')}</p>
             </div>
             <button 
               className="btn btn-secondary" 
               onClick={() => setShowPasswordChange(!showPasswordChange)}
             >
-              {showPasswordChange ? 'Đóng' : 'Thay đổi mật khẩu'}
+              {showPasswordChange ? t('profile.btnClose') : t('profile.btnChangePassword')}
             </button>
           </div>
           
@@ -116,39 +118,39 @@ const Profile = () => {
               {/* Form */}
               <div style={{ flex: '2', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Mật khẩu hiện tại <span className="text-error">*</span></label>
-                  <input type="password" className="input" placeholder="Nhập mật khẩu hiện tại" />
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.currentPassword')} <span className="text-error">*</span></label>
+                  <input type="password" className="input" placeholder={t('profile.currentPasswordPlaceholder')} />
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Mật khẩu mới <span className="text-error">*</span></label>
-                  <input type="password" className="input" placeholder="Nhập mật khẩu mới" />
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.newPassword')} <span className="text-error">*</span></label>
+                  <input type="password" className="input" placeholder={t('profile.newPasswordPlaceholder')} />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>Xác nhận mật khẩu mới <span className="text-error">*</span></label>
-                  <input type="password" className="input" placeholder="Nhập lại mật khẩu mới" />
+                  <label className="label-md text-on-surface" style={{ fontWeight: 600 }}>{t('profile.confirmPassword')} <span className="text-error">*</span></label>
+                  <input type="password" className="input" placeholder={t('profile.confirmPasswordPlaceholder')} />
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-start', paddingTop: '16px' }}>
-                  <button className="btn btn-primary" style={{ backgroundColor: '#0F172A' }}>Cập nhật mật khẩu</button>
+                  <button className="btn btn-primary" style={{ backgroundColor: '#0F172A' }}>{t('profile.btnUpdatePassword')}</button>
                 </div>
               </div>
 
               {/* Notification / Requirements Box */}
               <div style={{ flex: '1', minWidth: '250px' }}>
                 <div style={{ backgroundColor: 'var(--primary-container)', borderRadius: 'var(--radius-lg)', padding: '24px', border: '1px solid var(--primary-fixed-dim)' }}>
-                  <h4 className="headline-md" style={{ marginBottom: '16px', color: '#FFFFFF' }}>Yêu cầu mật khẩu</h4>
+                  <h4 className="headline-md" style={{ marginBottom: '16px', color: '#FFFFFF' }}>{t('profile.passwordRequirementsTitle')}</h4>
                   <ul className="body-md" style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '12px', color: '#FFFFFF' }}>
-                    <li>Ít nhất <strong>8 ký tự</strong>.</li>
-                    <li>Chứa ít nhất <strong>1 chữ cái viết hoa</strong> (A-Z).</li>
-                    <li>Chứa ít nhất <strong>1 chữ số</strong> (0-9).</li>
-                    <li>Chứa ít nhất <strong>1 ký tự đặc biệt</strong> (!@#$%^&*).</li>
+                    <li dangerouslySetInnerHTML={{ __html: t('profile.reqLength') }}></li>
+                    <li dangerouslySetInnerHTML={{ __html: t('profile.reqUppercase') }}></li>
+                    <li dangerouslySetInnerHTML={{ __html: t('profile.reqNumber') }}></li>
+                    <li dangerouslySetInnerHTML={{ __html: t('profile.reqSpecial') }}></li>
                   </ul>
                   <div style={{ marginTop: '24px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 'var(--radius-md)', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                     <span style={{ fontSize: '16px' }}>ℹ️</span>
                     <p className="label-md text-on-primary-container" style={{ margin: 0, lineHeight: 1.5 }}>
-                      Khuyến nghị thay đổi mật khẩu 3 tháng 1 lần để đảm bảo an toàn cho dữ liệu học viên.
+                      {t('profile.passwordHint')}
                     </p>
                   </div>
                 </div>

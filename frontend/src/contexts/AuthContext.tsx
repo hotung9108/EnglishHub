@@ -1,22 +1,16 @@
-import { createContext, useState, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, User } from '../types/auth';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // TODO: In the future, this will check for a token and fetch the user profile from the backend API.
-    // For now, we'll check localStorage for a mock user session.
+  const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('mockUser');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+  const [isLoading] = useState(false);
 
   const login = (userData: User) => {
     setUser(userData);

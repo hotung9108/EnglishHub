@@ -1,8 +1,10 @@
 
 
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Students = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const data = [
     { id: 'HV-8801', name: 'Alice Johnson', class: 'ENG-IELTS-6.5A', target: 'Target: 7.0 (Đầu vào 5.5)', progress: '14/15 Bài', progressStatus: 'good' },
@@ -14,7 +16,7 @@ const Students = () => {
     <div>
       {/* Page Header */}
       <div className="page-header">
-        <h1 className="page-title">Quản Lý Học Viên</h1>
+        <h1 className="page-title">{t('students.title')}</h1>
       </div>
 
       {/* Content Card */}
@@ -22,27 +24,27 @@ const Students = () => {
         {/* Header Section */}
         <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid var(--outline-variant)' }}>
           <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>Quản lý danh sách Học viên</h3>
-            <p className="label-md text-on-surface-variant">Admin &gt; Danh bạ học viên toàn khóa</p>
+            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('students.subtitle')}</h3>
+            <p className="label-md text-on-surface-variant">{t('students.breadcrumb')}</p>
           </div>
           <button className="btn btn-secondary" style={{ backgroundColor: 'var(--inverse-surface)', color: 'var(--inverse-on-surface)', border: 'none' }}>
-            Import Excel (.xlsx)
+            {t('students.importExcel')}
           </button>
         </div>
 
         {/* Filters & Actions */}
         <div style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
           <div style={{ display: 'flex', gap: '16px', flex: 1, flexWrap: 'wrap' }}>
-            <input type="text" className="input" placeholder="Tìm tên học viên, mã HV..." style={{ maxWidth: '400px' }} />
+            <input type="text" className="input" placeholder={t('students.searchPlaceholder')} style={{ maxWidth: '400px' }} />
             <select className="input" style={{ maxWidth: '240px' }}>
-              <option>Tất cả trình độ (A1-C1)</option>
+              <option>{t('students.filterAllLevels')}</option>
               <option>IELTS</option>
               <option>TOEIC</option>
-              <option>Giao tiếp</option>
+              <option>{t('students.filterGiaoTiep')}</option>
             </select>
           </div>
           <button className="btn btn-primary" style={{ backgroundColor: 'var(--primary)' }} onClick={() => navigate('/admin/students/create')}>
-            Thêm học viên +
+            {t('students.addStudent')}
           </button>
         </div>
 
@@ -51,12 +53,12 @@ const Students = () => {
           <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ backgroundColor: 'var(--surface-container-low)' }}>
               <tr>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>MÃ HV</th>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>HỌ VÀ TÊN</th>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>LỚP HIỆN TẠI</th>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>TARGET / ĐIỂM VÀO</th>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>TIẾN ĐỘ NỘP BÀI</th>
-                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>THAO TÁC</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colId')}</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colName')}</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colClass')}</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colTarget')}</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colProgress')}</th>
+                <th style={{ padding: '16px 24px', color: 'var(--on-surface-variant)' }}>{t('students.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -73,8 +75,8 @@ const Students = () => {
                   </td>
                   <td style={{ padding: '16px 24px' }}>
                     <div style={{ display: 'flex', gap: '16px' }}>
-                      <button className="label-md text-primary" style={{ padding: 0, cursor: 'pointer' }}>Sửa</button>
-                      <button className="label-md text-on-surface-variant" style={{ padding: 0, cursor: 'pointer' }}>Lịch sử</button>
+                      <button className="label-md text-primary" style={{ padding: 0, cursor: 'pointer' }}>{t('students.actionEdit')}</button>
+                      <button className="label-md text-on-surface-variant" style={{ padding: 0, cursor: 'pointer' }}>{t('students.actionHistory')}</button>
                     </div>
                   </td>
                 </tr>
@@ -96,8 +98,8 @@ const Students = () => {
                 <div className="body-md text-on-surface-variant" style={{ marginBottom: '4px' }}>{row.class}</div>
                 <div className="label-md text-on-surface-variant" style={{ marginBottom: '16px' }}>{row.target}</div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px', flex: 1 }}>Sửa</button>
-                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px', flex: 1 }}>Lịch sử</button>
+                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px', flex: 1 }}>{t('students.actionEdit')}</button>
+                  <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px', flex: 1 }}>{t('students.actionHistory')}</button>
                 </div>
               </div>
             ))}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, Download, Plus, Eye, FileEdit } from 'lucide-react';
 
 const TabStudents = () => {

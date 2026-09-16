@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, FileText, UploadCloud, CheckCircle, Calendar, Eye,
-  Bold, Italic, Underline, Link, X, ChevronDown, Send
+  Bold, Link, ChevronDown, Send
 } from 'lucide-react';
+import { FileItem, StickyActionBar } from '../components/common';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const TeacherCreateAssignment = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div style={{ paddingBottom: '80px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -31,16 +33,16 @@ const TeacherCreateAssignment = () => {
           onMouseOver={(e) => e.currentTarget.style.color = '#2563EB'}
           onMouseOut={(e) => e.currentTarget.style.color = '#6B7280'}
         >
-          <ArrowLeft size={16} /> Quay lại Quản lý bài tập
+          <ArrowLeft size={16} /> {t('createAssignment.backToList')}
         </button>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', margin: '0 0 4px 0', letterSpacing: '-0.025em' }}>
-              Tạo bài tập mới
+              {t('createAssignment.title')}
             </h1>
             <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>
-              Thiết lập thông tin đề bài, tệp đính kèm, tiêu chí chấm và lịch nộp bài cho lớp học.
+              {t('createAssignment.subtitle')}
             </p>
           </div>
           
@@ -52,7 +54,7 @@ const TeacherCreateAssignment = () => {
             alignSelf: 'flex-start'
           }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-            <span style={{ fontSize: '12px', color: '#6B7280' }}>Đang giao cho:</span>
+            <span style={{ fontSize: '12px', color: '#6B7280' }}>{t('createAssignment.assigningTo')}</span>
             <span style={{ fontSize: '12px', fontWeight: 600, color: '#1F2937' }}>ENG-IELTS-6.5A (Intensive)</span>
             <button style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', marginLeft: '4px', padding: 0 }}>
               <ChevronDown size={14} />
@@ -100,20 +102,20 @@ const TeacherCreateAssignment = () => {
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Assignment Details</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>Thông tin tiêu đề, mô tả và phân loại bài tập</p>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card1Title')}</h2>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card1Subtitle')}</p>
                 </div>
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                   <label className="label-text">
-                    Tiêu đề bài tập <span style={{ color: '#EF4444' }}>*</span>
+                    {t('createAssignment.fieldTitle')} <span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <input 
                     type="text" 
                     className="input-field" 
-                    placeholder="Ví dụ: HW-06: IELTS Writing Task 2 - Renewable Energy Essay" 
+                    placeholder={t('createAssignment.placeholderTitle')} 
                     defaultValue="HW-06: IELTS Writing Task 2 - Renewable Energy Essay"
                     style={{ fontWeight: 500 }}
                   />
@@ -121,26 +123,26 @@ const TeacherCreateAssignment = () => {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                   <div>
-                    <label className="label-text">Kỹ năng giảng dạy</label>
+                    <label className="label-text">{t('createAssignment.fieldSkill')}</label>
                     <select className="input-field">
-                      <option value="writing">Writing (Kỹ năng Viết)</option>
-                      <option value="speaking">Speaking (Kỹ năng Nói)</option>
-                      <option value="reading">Reading (Kỹ năng Đọc)</option>
-                      <option value="listening">Listening (Kỹ năng Nghe)</option>
+                      <option value="writing">{t('createAssignment.skillWriting')}</option>
+                      <option value="speaking">{t('createAssignment.skillSpeaking')}</option>
+                      <option value="reading">{t('createAssignment.skillReading')}</option>
+                      <option value="listening">{t('createAssignment.skillListening')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label-text">Dạng đề bài</label>
+                    <label className="label-text">{t('createAssignment.fieldType')}</label>
                     <select className="input-field">
-                      <option value="task2">IELTS Writing Task 2 (Essay)</option>
-                      <option value="task1">IELTS Writing Task 1 (Report/Letter)</option>
-                      <option value="custom">Tự luận / Đoạn văn tự do</option>
+                      <option value="task2">{t('createAssignment.typeTask2')}</option>
+                      <option value="task1">{t('createAssignment.typeTask1')}</option>
+                      <option value="custom">{t('createAssignment.typeCustom')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="label-text">Đề bài & Hướng dẫn chi tiết</label>
+                  <label className="label-text">{t('createAssignment.fieldInstructions')}</label>
                   <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F8FAFC' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px', backgroundColor: '#F1F5F9', borderBottom: '1px solid #E2E8F0' }}>
                       <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569', fontWeight: 'bold' }}>B</button>
@@ -169,11 +171,11 @@ const TeacherCreateAssignment = () => {
                     <UploadCloud size={20} />
                   </div>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Import From Files</h2>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>Đính kèm file đề bài, hình ảnh minh họa hoặc rubric chấm</p>
+                    <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card2Title')}</h2>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card2Subtitle')}</p>
                   </div>
                 </div>
-                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>Đã tải lên: 2 tệp</span>
+                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>{t('createAssignment.uploadedCount')}</span>
               </div>
               
               <div style={{ 
@@ -189,49 +191,31 @@ const TeacherCreateAssignment = () => {
                   <UploadCloud size={24} />
                 </div>
                 <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600, color: '#334155' }}>
-                  Kéo và thả tệp đính kèm vào đây hoặc <span style={{ color: '#2563EB', textDecoration: 'underline' }}>bấm để duyệt</span>
+                  {t('createAssignment.dragDropPrefix')}<span style={{ color: '#2563EB', textDecoration: 'underline' }}>{t('createAssignment.dragDropLink')}</span>
                 </p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
-                  Hỗ trợ định dạng: PDF, DOCX, JPG, PNG, MP3 (Tối đa 25MB/tệp)
+                  {t('createAssignment.supportedFormats')}
                 </p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '4px', backgroundColor: '#FFE4E6', color: '#E11D48', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>
-                      PDF
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B' }}>De_bai_Writing_Task_2_Renewable_Energy.pdf</div>
-                      <div style={{ fontSize: '11px', color: '#94A3B8' }}>1.2 MB • Hoàn tất tải lên 100%</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button style={{ padding: '4px 8px', fontSize: '12px', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>Xem</button>
-                    <button style={{ padding: '4px', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
+                <FileItem 
+                  name="De_bai_Writing_Task_2_Renewable_Energy.pdf"
+                  extension="pdf"
+                  size="1.2 MB"
+                  details={t('createAssignment.uploadComplete')}
+                  onView={() => {}}
+                  onRemove={() => {}}
+                />
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '4px', backgroundColor: '#FFE4E6', color: '#E11D48', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>
-                      PDF
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#1E293B' }}>Rubric_IELTS_Writing_Band_Descriptors.pdf</div>
-                      <div style={{ fontSize: '11px', color: '#94A3B8' }}>450 KB • Đã đính kèm làm thang chấm</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button style={{ padding: '4px 8px', fontSize: '12px', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>Xem</button>
-                    <button style={{ padding: '4px', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px' }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
+                <FileItem 
+                  name="Rubric_IELTS_Writing_Band_Descriptors.pdf"
+                  extension="pdf"
+                  size="450 KB"
+                  details={t('createAssignment.attachedRubric')}
+                  onView={() => {}}
+                  onRemove={() => {}}
+                />
               </div>
             </section>
 
@@ -242,8 +226,8 @@ const TeacherCreateAssignment = () => {
                   <CheckCircle size={20} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Answer Keys and Grading</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>Cấu hình thang điểm, gợi ý chấm và hỗ trợ chấm tự động bằng AI</p>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card3Title')}</h2>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card3Subtitle')}</p>
                 </div>
               </div>
 
@@ -254,8 +238,8 @@ const TeacherCreateAssignment = () => {
                       <CheckCircle size={16} />
                     </div>
                     <div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B', display: 'block' }}>Kích hoạt Smart AI Grading Assistant</span>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#64748B' }}>Tự động sửa lỗi ngữ pháp, gợi ý band điểm IELTS sơ bộ trước khi giáo viên phê duyệt.</p>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B', display: 'block' }}>{t('createAssignment.enableAi')}</span>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#64748B' }}>{t('createAssignment.aiDesc')}</p>
                     </div>
                   </div>
                   <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
@@ -268,15 +252,15 @@ const TeacherCreateAssignment = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                   <div>
-                    <label className="label-text">Thang điểm đánh giá</label>
+                    <label className="label-text">{t('createAssignment.fieldScale')}</label>
                     <select className="input-field">
-                      <option value="9.0">Thang điểm 9.0 (IELTS Official Band)</option>
-                      <option value="10">Thang điểm 10</option>
-                      <option value="100">Thang điểm 100</option>
+                      <option value="9.0">{t('createAssignment.scale9')}</option>
+                      <option value="10">{t('createAssignment.scale10')}</option>
+                      <option value="100">{t('createAssignment.scale100')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="label-text">Bộ tiêu chí IELTS (Rubric Weight)</label>
+                    <label className="label-text">{t('createAssignment.fieldRubric')}</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '8px' }}>
                       <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>TR: 25%</span>
                       <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>CC: 25%</span>
@@ -287,10 +271,10 @@ const TeacherCreateAssignment = () => {
                 </div>
 
                 <div>
-                  <label className="label-text">Bài mẫu / Đáp án đối chiếu (Tùy chọn)</label>
+                  <label className="label-text">{t('createAssignment.fieldSample')}</label>
                   <textarea 
                     className="input-field" 
-                    placeholder="Dán bài viết mẫu Band 8.0+ hoặc dàn ý chi tiết để học sinh so sánh sau khi hoàn thành bài nộp..." 
+                    placeholder={t('createAssignment.placeholderSample')} 
                     rows={3}
                   ></textarea>
                 </div>
@@ -308,18 +292,18 @@ const TeacherCreateAssignment = () => {
                   <Calendar size={20} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Schedule</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>Lên lịch mở đề và thời hạn nộp bài</p>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card4Title')}</h2>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card4Subtitle')}</p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="label-text">Ngày bắt đầu mở đề</label>
+                  <label className="label-text">{t('createAssignment.fieldStartDate')}</label>
                   <input type="datetime-local" className="input-field" defaultValue="2026-09-10T08:00" />
                 </div>
                 <div>
-                  <label className="label-text">Hạn chót nộp bài (Due date) <span style={{ color: '#EF4444' }}>*</span></label>
+                  <label className="label-text">{t('createAssignment.fieldDueDate')} <span style={{ color: '#EF4444' }}>*</span></label>
                   <input type="datetime-local" className="input-field" defaultValue="2026-09-15T23:59" style={{ fontWeight: 500 }} />
                 </div>
                 
@@ -327,17 +311,17 @@ const TeacherCreateAssignment = () => {
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
                     <input type="checkbox" defaultChecked style={{ marginTop: '2px', accentColor: '#2563EB' }} />
                     <span style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong style={{ fontWeight: 600, color: '#1E293B', display: 'block' }}>Cho phép nộp bài muộn</strong>
-                      <span style={{ color: '#94A3B8', display: 'block', marginTop: '2px' }}>Tối đa trễ 24 giờ sau hạn chót (tự động gắn cờ "Nộp muộn").</span>
+                      <strong style={{ fontWeight: 600, color: '#1E293B', display: 'block' }}>{t('createAssignment.allowLate')}</strong>
+                      <span style={{ color: '#94A3B8', display: 'block', marginTop: '2px' }}>{t('createAssignment.allowLateDesc')}</span>
                     </span>
                   </label>
                 </div>
 
                 <div>
-                  <label className="label-text">Thời lượng làm bài có bấm giờ</label>
+                  <label className="label-text">{t('createAssignment.fieldDuration')}</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input type="number" className="input-field" defaultValue="60" style={{ width: '96px' }} />
-                    <span style={{ fontSize: '12px', color: '#64748B' }}>Phút (để trống nếu không giới hạn)</span>
+                    <span style={{ fontSize: '12px', color: '#64748B' }}>{t('createAssignment.durationHint')}</span>
                   </div>
                 </div>
               </div>
@@ -350,36 +334,36 @@ const TeacherCreateAssignment = () => {
                   <Eye size={20} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>Status & Target</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>Trạng thái công bố và đối tượng nhận bài</p>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card5Title')}</h2>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card5Subtitle')}</p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="label-text" style={{ marginBottom: '8px' }}>Trạng thái bài tập</label>
+                  <label className="label-text" style={{ marginBottom: '8px' }}>{t('createAssignment.fieldStatus')}</label>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: '1px solid #3B82F6', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                       <input type="radio" name="publish_status" value="active" defaultChecked style={{ accentColor: '#2563EB' }} />
-                      Công khai ngay
+                      {t('createAssignment.statusActive')}
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0', backgroundColor: 'white', color: '#475569', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
                       <input type="radio" name="publish_status" value="draft" style={{ accentColor: '#2563EB' }} />
-                      Lưu bản nháp
+                      {t('createAssignment.statusDraft')}
                     </label>
                   </div>
                 </div>
 
                 <div>
-                  <label className="label-text" style={{ marginBottom: '8px' }}>Đối tượng giao bài</label>
+                  <label className="label-text" style={{ marginBottom: '8px' }}>{t('createAssignment.fieldAudience')}</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
                       <input type="radio" name="audience" defaultChecked style={{ accentColor: '#2563EB' }} />
-                      Toàn bộ học viên trong lớp (24 học viên)
+                      {t('createAssignment.audienceAll')}
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
                       <input type="radio" name="audience" style={{ accentColor: '#2563EB' }} />
-                      Chỉ định học viên / nhóm cụ thể
+                      {t('createAssignment.audienceSpecific')}
                     </label>
                   </div>
                 </div>
@@ -388,7 +372,7 @@ const TeacherCreateAssignment = () => {
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                     <input type="checkbox" defaultChecked style={{ accentColor: '#2563EB' }} />
                     <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
-                      Gửi email & thông báo app đến học viên
+                      {t('createAssignment.notifyStudents')}
                     </span>
                   </label>
                 </div>
@@ -398,44 +382,41 @@ const TeacherCreateAssignment = () => {
         </div>
       </div>
 
-      {/* Bottom Action Bar */}
-      <div style={{ 
-        position: 'fixed', bottom: 0, left: '256px', right: 0, 
-        backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(8px)',
-        borderTop: '1px solid #E2E8F0', padding: '14px 32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        zIndex: 30, boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.05)'
-      }}>
-        <button 
-          onClick={() => navigate('/teacher/assignments')}
-          style={{ 
-            padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#475569', 
-            background: 'none', border: 'none', cursor: 'pointer', borderRadius: '8px' 
-          }}
-        >
-          Hủy bỏ (Cancel)
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button style={{ 
-            padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#334155', 
-            backgroundColor: 'white', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer'
-          }}>
-            Lưu bản nháp (Save as Draft)
-          </button>
+      <StickyActionBar 
+        leftActions={
           <button 
             onClick={() => navigate('/teacher/assignments')}
             style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '8px 24px', fontSize: '12px', fontWeight: 700, color: 'white', 
-              backgroundColor: '#2563EB', border: 'none', borderRadius: '8px', cursor: 'pointer',
-              boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+              padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#475569', 
+              background: 'none', border: 'none', cursor: 'pointer', borderRadius: '8px' 
             }}
           >
-            Xuất bản bài tập (Publish)
-            <Send size={14} />
+            {t('createAssignment.btnCancel')}
           </button>
-        </div>
-      </div>
+        }
+        rightActions={
+          <>
+            <button style={{ 
+              padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#334155', 
+              backgroundColor: 'white', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer'
+            }}>
+              {t('createAssignment.btnSaveDraft')}
+            </button>
+            <button 
+              onClick={() => navigate('/teacher/assignments')}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 24px', fontSize: '12px', fontWeight: 700, color: 'white', 
+                backgroundColor: '#2563EB', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              {t('createAssignment.btnPublish')}
+              <Send size={14} />
+            </button>
+          </>
+        }
+      />
     </div>
   );
 };

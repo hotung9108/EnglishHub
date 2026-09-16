@@ -1,7 +1,23 @@
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
+interface TeacherClassItem {
+  code: string;
+  name: string;
+  teacher: string;
+  room: string;
+  schedule?: string;
+  status: string;
+  completedDate?: string;
+  stats: {
+    assigned: number;
+    pending: number;
+    avgScore: number;
+  };
+}
 
 const TeacherClasses = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const activeClasses = [
     {
       code: 'ENG-IELTS-6.5A',
@@ -60,7 +76,7 @@ const TeacherClasses = () => {
     }
   ];
 
-  const renderClassCard = (cls: any, isPast = false) => {
+  const renderClassCard = (cls: TeacherClassItem, isPast = false) => {
     return (
       <div key={cls.code} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
         {/* Top Badges */}
@@ -82,7 +98,7 @@ const TeacherClasses = () => {
         <h3 className="headline-md text-on-surface" style={{ marginBottom: '8px', lineHeight: 1.4 }}>{cls.name}</h3>
 
         <p className="body-md text-on-surface-variant" style={{ marginBottom: '4px' }}>
-          Giảng viên: {cls.teacher} | Phòng học: {cls.room}
+          {t('teacherClasses.teacherPrefix')}{cls.teacher}{t('teacherClasses.roomPrefix')}{cls.room}
         </p>
 
         {isPast ? (
@@ -98,15 +114,15 @@ const TeacherClasses = () => {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', borderRight: '1px solid var(--outline-variant)' }}>
-            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>BÀI TẬP</span>
-            <span className="headline-md text-on-surface">{cls.stats.assigned} Đã giao</span>
+            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>{t('teacherClasses.statAssignments')}</span>
+            <span className="headline-md text-on-surface">{cls.stats.assigned}{t('teacherClasses.statAssignedUnit')}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', borderRight: '1px solid var(--outline-variant)' }}>
-            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>CHỜ NỘP</span>
-            <span className="headline-md" style={{ color: cls.stats.pending > 0 ? 'var(--error)' : 'var(--on-surface-variant)' }}>{cls.stats.pending} Bài</span>
+            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>{t('teacherClasses.statPending')}</span>
+            <span className="headline-md" style={{ color: cls.stats.pending > 0 ? 'var(--error)' : 'var(--on-surface-variant)' }}>{cls.stats.pending}{t('teacherClasses.statPendingUnit')}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>ĐIỂM TB</span>
+            <span className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', fontSize: '11px', marginBottom: '4px' }}>{t('teacherClasses.statAvgScore')}</span>
             <span className="headline-md" style={{ color: cls.stats.avgScore >= 7.0 ? '#006C49' : 'var(--on-surface)' }}>{cls.stats.avgScore.toFixed(1)}/10</span>
           </div>
         </div>
@@ -128,7 +144,7 @@ const TeacherClasses = () => {
           gap: '8px',
           cursor: isPast ? 'default' : 'pointer'
         }}>
-          {isPast ? 'Xem lại tài liệu & Điểm 👁' : 'Xem lớp học →'}
+          {isPast ? t('teacherClasses.btnReviewPast') : t('teacherClasses.btnViewClass')}
         </button>
       </div>
     );
@@ -139,14 +155,14 @@ const TeacherClasses = () => {
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', paddingBottom: '24px' }}>
         <div>
-          <h2 className="page-title">Xem danh sách lớp học</h2>
+          <h2 className="page-title">{t('teacherClasses.title')}</h2>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" style={{ backgroundColor: 'transparent', border: '1px solid var(--outline-variant)' }}>
-            <span style={{ marginRight: '8px' }}></span>Vào lớp nhanh
+            <span style={{ marginRight: '8px' }}></span>{t('teacherClasses.btnQuickJoin')}
           </button>
           <button className="btn btn-primary" style={{ backgroundColor: '#0F172A' }}>
-            + Tạo lớp học mới
+            {t('teacherClasses.btnCreateClass')}
           </button>
         </div>
       </div>
@@ -155,27 +171,27 @@ const TeacherClasses = () => {
 
       {/* Filters Bar */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap', backgroundColor: 'var(--surface)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--outline-variant)' }}>
-        <input type="text" className="input" placeholder="Tìm theo mã lớp, tên khóa học..." style={{ flex: 1, minWidth: '300px', backgroundColor: 'var(--surface-container-lowest)' }} />
+        <input type="text" className="input" placeholder={t('teacherClasses.searchPlaceholder')} style={{ flex: 1, minWidth: '300px', backgroundColor: 'var(--surface-container-lowest)' }} />
         <select className="input" style={{ width: '200px', backgroundColor: 'var(--surface-container-lowest)' }}>
-          <option>Tất cả trạng thái</option>
-          <option>Đang diễn ra</option>
-          <option>Đã kết thúc</option>
+          <option>{t('teacherClasses.filterAllStatus')}</option>
+          <option>{t('teacherClasses.statusOngoing')}</option>
+          <option>{t('teacherClasses.statusCompleted')}</option>
         </select>
         <select className="input" style={{ width: '200px', backgroundColor: 'var(--surface-container-lowest)' }}>
-          <option>Kỳ học hiện tại</option>
-          <option>Kỳ trước</option>
+          <option>{t('teacherClasses.filterCurrentSemester')}</option>
+          <option>{t('teacherClasses.filterPreviousSemester')}</option>
         </select>
       </div>
 
       {/* Main Content Area */}
       <div className="card" style={{ padding: '32px', border: '1px solid var(--outline-variant)', boxShadow: 'none' }}>
-        <h3 className="headline-md text-on-surface" style={{ marginBottom: '8px' }}>Lớp học của tôi</h3>
-        <p className="label-md text-on-surface-variant" style={{ marginBottom: '32px' }}>Danh sách các khóa học bạn đang tham gia kỳ này</p>
+        <h3 className="headline-md text-on-surface" style={{ marginBottom: '8px' }}>{t('teacherClasses.myClassesTitle')}</h3>
+        <p className="label-md text-on-surface-variant" style={{ marginBottom: '32px' }}>{t('teacherClasses.myClassesSubtitle')}</p>
 
         {/* Grid container */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
-          {activeClasses.map((cls: any) => renderClassCard(cls, false))}
-          {pastClasses.map((cls: any) => renderClassCard(cls, true))}
+          {activeClasses.map((cls: TeacherClassItem) => renderClassCard(cls, false))}
+          {pastClasses.map((cls: TeacherClassItem) => renderClassCard(cls, true))}
         </div>
       </div>
     </div>

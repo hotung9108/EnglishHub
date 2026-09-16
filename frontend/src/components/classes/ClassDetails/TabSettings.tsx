@@ -1,4 +1,3 @@
-import React from 'react';
 import { Save, AlertTriangle } from 'lucide-react';
 
 const TabSettings = () => {
