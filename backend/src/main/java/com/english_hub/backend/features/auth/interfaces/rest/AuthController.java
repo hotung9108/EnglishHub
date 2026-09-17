@@ -1,10 +1,13 @@
 package com.english_hub.backend.features.auth.interfaces.rest;
 
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.LogoutCommand;
 import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.application.service.AuthService;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.LoginRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshRequest;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +41,13 @@ public class AuthController {
 	@PostMapping("/refresh")
 	public ResponseEntity<RefreshResponse> refresh(@RequestBody RefreshRequest request) {
 		RefreshResponse response = authService.refresh(new RefreshCommand(
+				request == null ? null : request.refreshToken()));
+		return ResponseEntity.ok(response);
+	}
+
+	@PostMapping("/logout")
+	public ResponseEntity<LogoutResponse> logout(@RequestBody LogoutRequest request) {
+		LogoutResponse response = authService.logout(new LogoutCommand(
 				request == null ? null : request.refreshToken()));
 		return ResponseEntity.ok(response);
 	}

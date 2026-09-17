@@ -3,6 +3,7 @@ package com.english_hub.backend.features.auth.application.service;
 import com.english_hub.backend.common.ApiException;
 import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.LogoutCommand;
 import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.domain.model.AuthUser;
 import com.english_hub.backend.features.auth.domain.model.RefreshToken;
@@ -11,6 +12,7 @@ import com.english_hub.backend.features.auth.domain.repository.RefreshTokenRepos
 import com.english_hub.backend.features.auth.domain.service.TokenHasher;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
 import com.english_hub.backend.security.JwtTokenService;
 import java.time.Instant;
@@ -99,6 +101,20 @@ public class AuthService {
 
 		String accessToken = jwtTokenService.createAccessToken(user.getId(), toUserFeatureRole(user.getRole()));
 		return new RefreshResponse("Đã làm mới access token.", accessToken);
+	}
+
+	@Transactional
+	public LogoutResponse logout(LogoutCommand command) {
+		if (command == null || !hasText(command.refreshToken())) {
+			throw ApiException.badRequest("Vui lòng cung cấp refresh token.");
+		}
+
+		String tokenHash = TokenHasher.sha256(command.refreshToken());
+		refreshTokenRepository.findByTokenHash(tokenHash)
+				.orElseThrow(() -> ApiException.notFound("Refresh token không hợp lệ."));
+
+		refreshTokenRepository.revokeByTokenHash(tokenHash);
+		return new LogoutResponse("Đăng xuất thành công.");
 	}
 
 	private com.english_hub.backend.features.user.domain.model.UserRole toUserFeatureRole(

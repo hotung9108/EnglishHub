@@ -5,11 +5,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.LogoutCommand;
 import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.application.service.AuthService;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.LoginRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshRequest;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +69,18 @@ class AuthControllerTest {
 		ResponseEntity<RefreshResponse> response = authController.refresh(new RefreshRequest("raw-refresh-token"));
 
 		verify(authService).refresh(new RefreshCommand("raw-refresh-token"));
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isEqualTo(expected);
+	}
+
+	@Test
+	void mapsLogoutRequestIntoTheCommand() {
+		LogoutResponse expected = new LogoutResponse("Đăng xuất thành công.");
+		when(authService.logout(new LogoutCommand("raw-refresh-token"))).thenReturn(expected);
+
+		ResponseEntity<LogoutResponse> response = authController.logout(new LogoutRequest("raw-refresh-token"));
+
+		verify(authService).logout(new LogoutCommand("raw-refresh-token"));
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(expected);
 	}

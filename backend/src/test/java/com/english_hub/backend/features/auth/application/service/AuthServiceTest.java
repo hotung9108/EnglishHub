@@ -11,6 +11,7 @@ import com.english_hub.backend.common.ApiException;
 import com.english_hub.backend.common.domain.UserRole;
 import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.LogoutCommand;
 import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.domain.model.AuthUser;
 import com.english_hub.backend.features.auth.domain.model.RefreshToken;
@@ -131,6 +132,40 @@ class AuthServiceTest {
 
 	private LoginCommand loginCommand() {
 		return new LoginCommand(EMAIL, PASSWORD, "TestAgent", "127.0.0.1");
+	}
+
+	@Test
+	void logoutRejectsBlankToken() {
+		assertThatThrownBy(() -> authService.logout(new LogoutCommand(" ")))
+				.isInstanceOf(ApiException.class)
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
+						.isEqualTo(HttpStatus.BAD_REQUEST));
+	}
+
+	@Test
+	void logoutReturnsNotFoundForUnknownToken() {
+		when(refreshTokenRepository.findByTokenHash(TokenHasher.sha256(RAW_REFRESH_TOKEN)))
+				.thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> authService.logout(logoutCommand()))
+				.isInstanceOf(ApiException.class)
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
+						.isEqualTo(HttpStatus.NOT_FOUND));
+	}
+
+	@Test
+	void logoutRevokesTheToken() {
+		when(refreshTokenRepository.findByTokenHash(TokenHasher.sha256(RAW_REFRESH_TOKEN)))
+				.thenReturn(Optional.of(validToken()));
+
+		var response = authService.logout(logoutCommand());
+
+		verify(refreshTokenRepository).revokeByTokenHash(TokenHasher.sha256(RAW_REFRESH_TOKEN));
+		assertThat(response.message()).isEqualTo("Đăng xuất thành công.");
+	}
+
+	private LogoutCommand logoutCommand() {
+		return new LogoutCommand(RAW_REFRESH_TOKEN);
 	}
 
 	@Test
