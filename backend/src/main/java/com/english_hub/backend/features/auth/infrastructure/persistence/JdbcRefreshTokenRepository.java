@@ -5,6 +5,8 @@ import com.english_hub.backend.features.auth.domain.repository.RefreshTokenRepos
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,7 +50,7 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
 				""", new MapSqlParameterSource()
 				.addValue("userId", userId)
 				.addValue("tokenHash", tokenHash)
-				.addValue("expiresAt", expiresAt)
+				.addValue("expiresAt", expiresAt.atOffset(ZoneOffset.UTC))
 				.addValue("userAgent", userAgent)
 				.addValue("ipAddress", ipAddress), Long.class);
 		return id == null ? 0L : id;
@@ -121,10 +123,14 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
 				.addValue("id", entity.getId())
 				.addValue("userId", entity.getUserId())
 				.addValue("tokenHash", entity.getTokenHash())
-				.addValue("expiresAt", entity.getExpiresAt())
-				.addValue("revokedAt", entity.getRevokedAt())
+				.addValue("expiresAt", toOffsetDateTime(entity.getExpiresAt()))
+				.addValue("revokedAt", toOffsetDateTime(entity.getRevokedAt()))
 				.addValue("userAgent", entity.getUserAgent())
 				.addValue("ipAddress", entity.getIpAddress());
+	}
+
+	private OffsetDateTime toOffsetDateTime(Instant instant) {
+		return instant == null ? null : instant.atOffset(ZoneOffset.UTC);
 	}
 
 	private static final RowMapper<RefreshToken> REFRESH_TOKEN_ROW_MAPPER = new RefreshTokenRowMapper();
@@ -137,11 +143,12 @@ public class JdbcRefreshTokenRepository implements RefreshTokenRepository {
 			token.setId(resultSet.getLong("id"));
 			token.setUserId(resultSet.getLong("user_id"));
 			token.setTokenHash(resultSet.getString("token_hash"));
-			token.setExpiresAt(resultSet.getObject("expires_at", Instant.class));
-			token.setRevokedAt(resultSet.getObject("revoked_at", Instant.class));
+			token.setExpiresAt(resultSet.getObject("expires_at", OffsetDateTime.class).toInstant());
+			OffsetDateTime revokedAt = resultSet.getObject("revoked_at", OffsetDateTime.class);
+			token.setRevokedAt(revokedAt == null ? null : revokedAt.toInstant());
 			token.setUserAgent(resultSet.getString("user_agent"));
 			token.setIpAddress(resultSet.getString("ip_address"));
-			token.setCreatedAt(resultSet.getObject("created_at", Instant.class));
+			token.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class).toInstant());
 			return token;
 		}
 	}

@@ -6,7 +6,7 @@ import com.english_hub.backend.features.auth.domain.model.AuthUser;
 import com.english_hub.backend.features.auth.domain.repository.AuthUserRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -138,8 +138,8 @@ public class JdbcAuthUserRepository implements AuthUserRepository {
 			user.setPasswordHash(resultSet.getString("password_hash"));
 			user.setRole(UserRole.valueOf(resultSet.getString("role")));
 			user.setStatus(UserStatus.valueOf(resultSet.getString("status")));
-			user.setCreatedAt(resultSet.getObject("created_at", Instant.class));
-			user.setUpdatedAt(resultSet.getObject("updated_at", Instant.class));
+			user.setCreatedAt(resultSet.getObject("created_at", OffsetDateTime.class).toInstant());
+			user.setUpdatedAt(resultSet.getObject("updated_at", OffsetDateTime.class).toInstant());
 			return user;
 		}
 	}
