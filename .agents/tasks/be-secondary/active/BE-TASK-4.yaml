@@ -1,6 +1,0 @@
-id: BE-TASK-4
-title: "Create Auth APIs"
-assignee: "@be-secondary"
-status: "Ongoing"
-priority: "High"
-description: "Implement authentication APIs (login, register, refresh token, token revocation) on top of existing JWT infrastructure; deliver per convention-be.md DDD structure."

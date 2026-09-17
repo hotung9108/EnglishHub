@@ -27,7 +27,10 @@ public class SecurityConfig {
 						.authenticationEntryPoint(authenticationEntryPoint)
 						.accessDeniedHandler(accessDeniedHandler))
 				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers("/actuator/health", "/error", "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
+						.requestMatchers("/actuator/health", "/error",
+								"/api/v1/auth/login", "/api/v1/auth/refresh",
+								"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
+								"/swagger-resources/**", "/webjars/**").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
