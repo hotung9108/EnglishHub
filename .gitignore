@@ -2,5 +2,5 @@
 .vscode
 .idea/
 .DS_Store
-.agents/plans
+.agents/private
 .codegraphy/*
