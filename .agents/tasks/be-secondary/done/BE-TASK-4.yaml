@@ -1,0 +1,6 @@
+id: BE-TASK-4
+title: "Create Auth APIs"
+assignee: "@be-secondary"
+status: "Done"
+priority: "High"
+description: "Implement authentication APIs (login, refresh token, token revocation) on top of existing JWT infrastructure; deliver per convention-be.md DDD structure. Note: 'register' in the task title is NOT in the approved plan scope and was not implemented. Swagger UI added (bearer auth scheme, permitAll paths). Manual test steps/results: backend/src/test + production_artifacts/be_to_tester/BE-TASK-4-auth-api-testing.md. Live integration validated against Postgres (Phase 6) — see artifact."
