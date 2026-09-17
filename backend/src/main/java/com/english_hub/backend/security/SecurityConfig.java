@@ -27,7 +27,7 @@ public class SecurityConfig {
 						.authenticationEntryPoint(authenticationEntryPoint)
 						.accessDeniedHandler(accessDeniedHandler))
 				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers("/actuator/health", "/error").permitAll()
+						.requestMatchers("/actuator/health", "/error", "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
 						.anyRequest().authenticated())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
