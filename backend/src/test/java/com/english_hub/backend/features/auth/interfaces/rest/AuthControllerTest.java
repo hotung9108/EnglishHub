@@ -5,10 +5,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.application.service.AuthService;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.LoginRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshRequest;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,18 @@ class AuthControllerTest {
 				httpRequest);
 
 		verify(authService).login(new LoginCommand("teacher@example.com", "Secret01", "MockAgent", "10.0.0.1"));
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isEqualTo(expected);
+	}
+
+	@Test
+	void mapsRefreshRequestIntoTheCommand() {
+		RefreshResponse expected = new RefreshResponse("Đã làm mới access token.", "new-access-token");
+		when(authService.refresh(new RefreshCommand("raw-refresh-token"))).thenReturn(expected);
+
+		ResponseEntity<RefreshResponse> response = authController.refresh(new RefreshRequest("raw-refresh-token"));
+
+		verify(authService).refresh(new RefreshCommand("raw-refresh-token"));
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(expected);
 	}

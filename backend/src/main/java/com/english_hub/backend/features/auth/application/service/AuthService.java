@@ -3,12 +3,15 @@ package com.english_hub.backend.features.auth.application.service;
 import com.english_hub.backend.common.ApiException;
 import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.auth.application.command.LoginCommand;
+import com.english_hub.backend.features.auth.application.command.RefreshCommand;
 import com.english_hub.backend.features.auth.domain.model.AuthUser;
+import com.english_hub.backend.features.auth.domain.model.RefreshToken;
 import com.english_hub.backend.features.auth.domain.repository.AuthUserRepository;
 import com.english_hub.backend.features.auth.domain.repository.RefreshTokenRepository;
 import com.english_hub.backend.features.auth.domain.service.TokenHasher;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
+import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
 import com.english_hub.backend.security.JwtTokenService;
 import java.time.Instant;
 import java.util.UUID;
@@ -71,6 +74,31 @@ public class AuthService {
 				truncate(command.ipAddress(), IP_ADDRESS_MAX_LENGTH));
 
 		return new AuthResponse("Đăng nhập thành công.", accessToken, rawRefreshToken, AuthUserResponse.from(user));
+	}
+
+	@Transactional(readOnly = true)
+	public RefreshResponse refresh(RefreshCommand command) {
+		if (command == null || !hasText(command.refreshToken())) {
+			throw ApiException.badRequest("Vui lòng cung cấp refresh token.");
+		}
+
+		RefreshToken token = refreshTokenRepository.findByTokenHash(TokenHasher.sha256(command.refreshToken()))
+				.orElseThrow(() -> ApiException.unauthorized("Refresh token không hợp lệ."));
+		if (token.getRevokedAt() != null) {
+			throw ApiException.unauthorized("Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại.");
+		}
+		if (token.getExpiresAt().isBefore(Instant.now())) {
+			throw ApiException.unauthorized("Refresh token đã hết hạn, vui lòng đăng nhập lại.");
+		}
+
+		AuthUser user = authUserRepository.findById(token.getUserId())
+				.orElseThrow(() -> ApiException.unauthorized("Refresh token không hợp lệ."));
+		if (user.getStatus() == UserStatus.LOCKED) {
+			throw ApiException.forbidden("Tài khoản đã bị khoá.");
+		}
+
+		String accessToken = jwtTokenService.createAccessToken(user.getId(), toUserFeatureRole(user.getRole()));
+		return new RefreshResponse("Đã làm mới access token.", accessToken);
 	}
 
 	private com.english_hub.backend.features.user.domain.model.UserRole toUserFeatureRole(
