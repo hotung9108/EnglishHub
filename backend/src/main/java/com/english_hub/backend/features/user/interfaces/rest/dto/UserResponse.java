@@ -18,9 +18,13 @@ public class UserResponse extends BaseDto<Long> {
 	private final String phone;
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final String avatarUrl;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final String specialization;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final String studentCode;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final LocalDate dateOfBirth;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private final String parentPhone;
 
 	private UserResponse(User user) {
