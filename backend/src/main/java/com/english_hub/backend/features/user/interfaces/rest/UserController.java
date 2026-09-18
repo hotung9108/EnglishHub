@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -29,7 +27,7 @@ public class UserController {
 	}
 
 	@GetMapping("/me")
-	public ResponseEntity<Map<String, Object>> getMyProfile() {
+	public ResponseEntity<UserResponse> getMyProfile() {
 		User user = userProfileService.getMyProfile();
 		return ResponseEntity.ok(UserResponse.from(user));
 	}

@@ -1,11 +1,11 @@
 package com.english_hub.backend.features.user.interfaces.rest;
 
+import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.application.command.CreateUserCommand;
 import com.english_hub.backend.features.user.application.command.UpdateUserCommand;
 import com.english_hub.backend.features.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.backend.features.user.application.service.AdminUserService;
 import com.english_hub.backend.features.user.domain.model.UserPage;
-import com.english_hub.backend.features.user.domain.model.UserStatus;
 import com.english_hub.backend.features.user.interfaces.rest.dto.AdminUserListResponse;
 import com.english_hub.backend.features.user.interfaces.rest.dto.AdminUserSummary;
 import com.english_hub.backend.features.user.interfaces.rest.dto.CreateUserRequest;
