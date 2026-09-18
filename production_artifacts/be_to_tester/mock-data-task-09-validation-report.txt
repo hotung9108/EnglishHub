@@ -1,0 +1,51 @@
+================ Task 9 Validation Report ================
+Generated at: 2026-09-17T22:08:10.256331+07:00
+Scope: read-only SELECT validation; no database mutation.
+Latest log rule: ROW_NUMBER() OVER (PARTITION BY grading_id ORDER BY changed_at DESC, id DESC).
+
+[1] No orphan foreign keys
+PASS - violations: 0
+
+[2] Assignments have open_at before close_at
+PASS - violations: 0
+
+[3] Non-IN_PROGRESS submissions have submitted_at
+PASS - violations: 0
+
+[4] Question answers contain valid JSON
+PASS - violations: 0
+
+[5] Each answer has exactly one content source
+PASS - violations: 0
+
+[6] Grading final_score does not exceed max_score_snapshot
+PASS - violations: 0
+
+[7] Latest grading change log matches final_score
+PASS - violations: 0
+
+[8] All 16 table row counts are available
+PASS - violations: 0
+  TABLE SUMMARY
+  table_name | row_count
+  users | 91
+  teacher_profiles | 8
+  student_profiles | 80
+  classes | 6
+  class_members | 92
+  assignments | 17
+  modules | 68
+  questions | 264
+  submissions | 217
+  submission_modules | 868
+  answers | 3400
+  answer_annotations | 798
+  gradings | 476
+  refresh_tokens | 172
+  student_evaluations | 97
+  grading_change_logs | 20
+
+[9] GRADED submission modules have COMPLETED grading
+PASS - violations: 0
+
+OVERALL: PASS (failed checks: 0)
