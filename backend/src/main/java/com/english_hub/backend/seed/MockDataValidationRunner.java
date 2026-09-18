@@ -252,7 +252,11 @@ public class MockDataValidationRunner implements CommandLineRunner {
 		List<String> violations = new ArrayList<>();
 		List<Answer> answers = answerRepository.findAll(Sort.by(Sort.Direction.ASC, "id"));
 		for (Answer answer : answers) {
-			if (answer.getQuestionId() == null || answer.getContent() == null) {
+if (answer.getQuestionId() == null) {
+				continue;
+			}
+			if (answer.getContent() == null) {
+				violations.add("answer_id=" + answer.getId() + ", content is null");
 				continue;
 			}
 
