@@ -1,40 +1,43 @@
 package com.english_hub.backend.features.user.interfaces.rest.dto;
 
+import com.english_hub.backend.common.application.BaseDto;
+import com.english_hub.backend.common.domain.UserRole;
 import com.english_hub.backend.features.user.domain.model.User;
-import com.english_hub.backend.features.user.domain.model.UserRole;
-
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDate;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import lombok.Getter;
 
-public final class UserResponse {
+@Getter
+public class UserResponse extends BaseDto<Long> {
 
-	private UserResponse() {
+	private final String fullName;
+	private final String email;
+	private final String role;
+	private final String status;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final String phone;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final String avatarUrl;
+	private final String specialization;
+	private final String studentCode;
+	private final LocalDate dateOfBirth;
+	private final String parentPhone;
+
+	private UserResponse(User user) {
+		setId(user.id());
+		fullName = user.fullName();
+		email = user.email();
+		role = user.role().name();
+		status = user.status().name();
+		phone = user.phone();
+		avatarUrl = user.avatarUrl();
+		specialization = user.role() == UserRole.TEACHER ? user.specialization() : null;
+		studentCode = user.role() == UserRole.STUDENT ? user.studentCode() : null;
+		dateOfBirth = user.role() == UserRole.STUDENT ? user.dateOfBirth() : null;
+		parentPhone = user.role() == UserRole.STUDENT ? user.parentPhone() : null;
 	}
 
-	public static Map<String, Object> from(User user) {
-		Map<String, Object> response = new LinkedHashMap<>();
-		response.put("id", user.id());
-		response.put("fullName", user.fullName());
-		response.put("email", user.email());
-		response.put("role", user.role().name());
-		response.put("status", user.status().name());
-
-		if (user.phone() != null) {
-			response.put("phone", user.phone());
-		}
-		if (user.avatarUrl() != null) {
-			response.put("avatarUrl", user.avatarUrl());
-		}
-		if (user.role() == UserRole.TEACHER) {
-			response.put("specialization", user.specialization());
-		}
-		if (user.role() == UserRole.STUDENT) {
-			response.put("studentCode", user.studentCode());
-			LocalDate dateOfBirth = user.dateOfBirth();
-			response.put("dateOfBirth", dateOfBirth);
-			response.put("parentPhone", user.parentPhone());
-		}
-		return response;
+	public static UserResponse from(User user) {
+		return new UserResponse(user);
 	}
 }

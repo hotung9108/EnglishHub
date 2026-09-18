@@ -1,13 +1,26 @@
 package com.english_hub.backend.features.user.interfaces.rest.dto;
 
+import com.english_hub.backend.common.application.BaseDto;
 import com.english_hub.backend.features.user.domain.model.User;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
-public record AdminUserSummary(
-		Long id,
-		String fullName,
-		String email,
-		String role,
-		String status) {
+@Getter
+@EqualsAndHashCode(callSuper = true)
+public class AdminUserSummary extends BaseDto<Long> {
+
+	private final String fullName;
+	private final String email;
+	private final String role;
+	private final String status;
+
+	public AdminUserSummary(Long id, String fullName, String email, String role, String status) {
+		setId(id);
+		this.fullName = fullName;
+		this.email = email;
+		this.role = role;
+		this.status = status;
+	}
 
 	public static AdminUserSummary from(User user) {
 		return new AdminUserSummary(
@@ -16,5 +29,25 @@ public record AdminUserSummary(
 				user.email(),
 				user.role().name(),
 				user.status().name());
+	}
+
+	public Long id() {
+		return getId();
+	}
+
+	public String fullName() {
+		return fullName;
+	}
+
+	public String email() {
+		return email;
+	}
+
+	public String role() {
+		return role;
+	}
+
+	public String status() {
+		return status;
 	}
 }

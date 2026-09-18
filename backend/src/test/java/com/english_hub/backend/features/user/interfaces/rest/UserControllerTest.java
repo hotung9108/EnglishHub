@@ -1,14 +1,15 @@
 package com.english_hub.backend.features.user.interfaces.rest;
 
+import com.english_hub.backend.common.domain.UserRole;
+import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.application.command.ChangePasswordCommand;
 import com.english_hub.backend.features.user.application.command.UpdateOwnProfileCommand;
 import com.english_hub.backend.features.user.application.service.UserProfileService;
 import com.english_hub.backend.features.user.domain.model.User;
-import com.english_hub.backend.features.user.domain.model.UserRole;
-import com.english_hub.backend.features.user.domain.model.UserStatus;
 import com.english_hub.backend.features.user.interfaces.rest.dto.ChangePasswordRequest;
 import com.english_hub.backend.features.user.interfaces.rest.dto.MessageResponse;
 import com.english_hub.backend.features.user.interfaces.rest.dto.UpdateOwnProfileRequest;
+import com.english_hub.backend.features.user.interfaces.rest.dto.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,8 +17,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -40,15 +39,13 @@ class UserControllerTest {
 	void returnsTheAuthenticatedProfileWithoutThePasswordHash() {
 		when(userProfileService.getMyProfile()).thenReturn(user(12L));
 
-		ResponseEntity<Map<String, Object>> response = userController.getMyProfile();
+		ResponseEntity<UserResponse> response = userController.getMyProfile();
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getBody())
-				.containsEntry("id", 12L)
-				.containsEntry("fullName", "Teacher")
-				.containsEntry("role", "TEACHER")
-				.containsEntry("specialization", "IELTS Writing")
-				.doesNotContainKey("passwordHash");
+		assertThat(response.getBody().getId()).isEqualTo(12L);
+		assertThat(response.getBody().getFullName()).isEqualTo("Teacher");
+		assertThat(response.getBody().getRole()).isEqualTo("TEACHER");
+		assertThat(response.getBody().getSpecialization()).isEqualTo("IELTS Writing");
 	}
 
 	@Test

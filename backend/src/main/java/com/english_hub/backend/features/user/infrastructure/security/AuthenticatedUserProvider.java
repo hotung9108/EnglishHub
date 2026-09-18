@@ -1,10 +1,10 @@
 package com.english_hub.backend.features.user.infrastructure.security;
 
 import com.english_hub.backend.common.ApiException;
+import com.english_hub.backend.common.domain.UserRole;
+import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.application.port.CurrentUserProvider;
 import com.english_hub.backend.features.user.domain.model.User;
-import com.english_hub.backend.features.user.domain.model.UserRole;
-import com.english_hub.backend.features.user.domain.model.UserStatus;
 import com.english_hub.backend.features.user.domain.repository.UserRepository;
 import com.english_hub.backend.security.JwtPrincipal;
 import org.springframework.security.core.Authentication;
