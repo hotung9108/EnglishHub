@@ -26,7 +26,7 @@ export const studentVi = {
     completedOn: 'Hoàn thành: ',
     accuracyPrefix: 'Độ chính xác: ',
     correctAnswers: ' câu đúng',
-    gradedPrefix: 'Đã chấm: ',
+    gradedPrefix: 'Đã có điểm: ',
     btnFeedback: 'Xem Feedback & Bài chữa',
     badgeExpiring: 'Sắp hết hạn',
     duePrefix: 'Hạn nộp: ',

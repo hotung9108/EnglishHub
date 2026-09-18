@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -8,7 +8,6 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  Plus,
   BookOpen,
   ClipboardList,
   CheckCircle,
@@ -22,12 +21,18 @@ export interface MenuItem {
   path: string;
   label: string;
   icon?: React.ElementType;
+  badge?: string;
   children?: MenuChild[];
 }
 
 export interface MenuChild {
   path: string;
   label: string;
+}
+
+export interface MenuSection {
+  title?: string;
+  items: MenuItem[];
 }
 
 const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
@@ -37,103 +42,146 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
   // Default to admin if no user is found for some reason
   const role = user?.role || 'admin';
 
-  const portalLabels = {
+  const portalLabels: Record<string, string> = {
     admin: t('adminPortal'),
     teacher: t('teacherPortal'),
     student: t('studentPortal'),
   };
 
-  const menus: Record<string, MenuItem[]> = {
+  const menuSections: Record<string, MenuSection[]> = {
     admin: [
-      { path: '/admin/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
-      { 
-        path: '/admin/accounts', 
-        label: t('menuAccounts'),
-        icon: Users,
-        children: [
-          { path: '/admin/accounts/profile', label: t('menuProfile') },
-          { path: '/admin/roles', label: t('menuRoles') }
+      {
+        title: t('sectionOverview'),
+        items: [
+          { path: '/admin/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
         ]
       },
-      { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
-      { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
-      { path: '/admin/students', label: t('menuStudents'), icon: Users },
-      { path: '/reports', label: t('menuReports'), icon: BarChart3 },
+      {
+        title: t('sectionManagement'),
+        items: [
+          { 
+            path: '/admin/accounts', 
+            label: t('menuAccounts'),
+            icon: Users,
+            children: [
+              { path: '/admin/accounts/profile', label: t('menuProfile') },
+              { path: '/admin/roles', label: t('menuRoles') }
+            ]
+          },
+          { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
+          { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
+          { path: '/admin/students', label: t('menuStudents'), icon: Users },
+        ]
+      },
+      {
+        title: t('sectionResults'),
+        items: [
+          { path: '/reports', label: t('menuReports'), icon: BarChart3 },
+        ]
+      }
     ],
     teacher: [
-      { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
-      { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
-      { path: '/progress', label: t('menuProgress'), icon: TrendingUp },
+      {
+        title: t('sectionTeaching'),
+        items: [
+          { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
+          { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+        ]
+      },
+      {
+        title: t('sectionResults'),
+        items: [
+          { path: '/progress', label: t('menuProgress'), icon: TrendingUp },
+        ]
+      }
     ],
     student: [
-      { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
-      { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList },
-      { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
-      { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
-      { path: '/student/analytics', label: t('menuStudentAnalytics'), icon: BarChart3 },
-      { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
+      {
+        title: t('sectionLearning'),
+        items: [
+          { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
+          { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList, badge: '7' },
+          { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
+        ]
+      },
+      {
+        title: t('sectionResults'),
+        items: [
+          { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
+          { path: '/student/analytics', label: t('menuStudentAnalytics'), icon: BarChart3 },
+          { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
+        ]
+      }
     ]
   };
 
-  const currentMenu = menus[role as keyof typeof menus] || menus.admin;
+  const currentSections = menuSections[role] || menuSections.admin;
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-      {/* Brand */}
+      {/* Brand Header */}
       <div className="sidebar-brand">
-        <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
-          <GraduationCap size={24} />
+        <div className="sidebar-brand-icon">
+          <GraduationCap size={22} strokeWidth={2.3} />
         </div>
-        <div>
+        <div className="sidebar-brand-info">
           <div className="sidebar-brand-name">{t('systemName')}</div>
-          <div className="sidebar-brand-sub">{portalLabels[role]}</div>
+          <div className="sidebar-brand-sub">{portalLabels[role] || portalLabels.student}</div>
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation Sections */}
       <nav className="sidebar-nav">
-        {currentMenu.map((item, index) => (
-          <div key={index}>
-            <NavLink
-              to={item.path}
-              end={item.path === '/'}
-              className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-            >
-              {item.icon && <item.icon size={20} />}
-              {item.label}
-            </NavLink>
-            {item.children && (
-              <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '16px', borderLeft: '1px solid var(--outline-variant)' }}>
-                {item.children.map((child: MenuChild, cIndex: number) => (
-                  <NavLink
-                    key={`child-${cIndex}`}
-                    to={child.path}
-                    className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                    style={{ fontSize: '13px', paddingLeft: '16px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', marginTop: '4px' }}
-                  >
-                    {child.label}
-                  </NavLink>
-                ))}
+        {currentSections.map((section, sIndex) => (
+          <div key={`sec-${sIndex}`}>
+            {section.title && (
+              <div className="sidebar-section-title">
+                {section.title}
               </div>
             )}
+            {section.items.map((item, itemIndex) => (
+              <div key={`item-${itemIndex}`}>
+                <NavLink
+                  to={item.path}
+                  end={item.path === '/'}
+                  className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                >
+                  {item.icon && <item.icon size={18} strokeWidth={2} />}
+                  <span>{item.label}</span>
+                  {item.badge && (
+                    <span className="sidebar-link-badge">{item.badge}</span>
+                  )}
+                </NavLink>
+                {item.children && (
+                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '22px', borderLeft: '1px solid #F1F5F9' }}>
+                    {item.children.map((child: MenuChild, cIndex: number) => (
+                      <NavLink
+                        key={`child-${cIndex}`}
+                        to={child.path}
+                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                        style={{ fontSize: '13px', padding: '6px 14px', marginTop: '2px' }}
+                      >
+                        <span>{child.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         ))}
       </nav>
 
-      {/* Footer */}
+      {/* Footer Utility Links */}
       <div className="sidebar-footer">
-        <button className="sidebar-footer-btn">
-          <Plus size={18} />
-          {t('createNew')}
-        </button>
         <div className="sidebar-divider"></div>
         <NavLink to="/settings" className="sidebar-link">
-          <Settings size={20} />
-          {t('settings')}
+          <Settings size={18} strokeWidth={2} />
+          <span>{t('settings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link">
-          <LogOut size={20} />
-          {t('logout')}
+        <NavLink to="/login" className="sidebar-link" style={{ color: '#EF4444' }}>
+          <LogOut size={18} strokeWidth={2} />
+          <span>{t('logout')}</span>
         </NavLink>
       </div>
     </aside>

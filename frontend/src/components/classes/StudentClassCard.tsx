@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { User, ArrowRight, CheckCircle2, GraduationCap, FileText, Clock, Award } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export interface StudentClassInfo {
@@ -28,80 +28,113 @@ const StudentClassCard: React.FC<StudentClassCardProps> = ({ classInfo, onViewCl
   const { t } = useLanguage();
 
   return (
-    <div className="card student-class-card">
+    <div className="student-class-card">
+      {/* Header: Course Code & Status Badge */}
       <div className="card-header">
         <span className="course-code">{classInfo.code}</span>
         {classInfo.status === 'active' ? (
-          <span className="badge badge-active-course">
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor' }}></span>
+          <span className="badge-active-course">
+            <span className="badge-active-dot"></span>
             {t('studentClasses.filterActive')}
           </span>
         ) : (
-          <span className="badge badge-completed-course">
-            <CheckCircle2 size={12} />
+          <span className="badge-completed-course">
+            <CheckCircle2 size={13} />
             {t('studentClasses.filterCompleted')}
           </span>
         )}
       </div>
 
+      {/* Course Title */}
       <h3 className="course-title">{classInfo.name}</h3>
       
+      {/* Instructor info */}
       <div className="instructor-info">
-        <User size={16} />
-        <span>{t('studentClasses.instructorPrefix')}{classInfo.instructorName}</span>
+        <div style={{
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          backgroundColor: 'var(--surface-dim)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--on-surface-variant)'
+        }}>
+          <User size={14} />
+        </div>
+        <span>{t('studentClasses.instructorPrefix')}<strong>{classInfo.instructorName}</strong></span>
       </div>
 
+      {/* Metrics Section */}
       {classInfo.status === 'active' ? (
-        <div className="student-class-stats">
-          <div className="student-class-stat-item">
-            <span className="stat-label">{t('studentClasses.statsAssigned')}</span>
-            <span className="stat-value">{classInfo.stats.assigned}{t('studentClasses.statsAssignedUnit')}</span>
+        <div className="student-class-metrics">
+          {/* Assigned */}
+          <div className="student-class-metric-item">
+            <span className="metric-label">{t('studentClasses.statsAssigned')}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <FileText size={13} color="var(--on-surface-variant)" />
+              <span className="metric-value">{classInfo.stats.assigned}</span>
+            </div>
           </div>
-          <div className="student-class-stat-item">
-            <span className="stat-label">{t('studentClasses.statsPending')}</span>
-            <span className={`stat-value ${classInfo.stats.pending > 0 ? 'highlight-red' : 'highlight-green'}`}>
-              {classInfo.stats.pending}{t('studentClasses.statsPendingUnit')}
-            </span>
+
+          {/* Pending */}
+          <div className="student-class-metric-item">
+            <span className="metric-label">{t('studentClasses.statsPending')}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={13} color={classInfo.stats.pending > 0 ? 'var(--error)' : 'var(--secondary)'} />
+              <span className={`metric-value ${classInfo.stats.pending > 0 ? 'highlight-red' : 'highlight-green'}`}>
+                {classInfo.stats.pending}
+              </span>
+            </div>
           </div>
-          <div className="student-class-stat-item">
-            <span className="stat-label">{t('studentClasses.statsAvgScore')}</span>
-            <span className="stat-value highlight-green">{classInfo.stats.avgScore?.toFixed(1) || '-.-'}/10</span>
+
+          {/* Avg Score */}
+          <div className="student-class-metric-item">
+            <span className="metric-label">{t('studentClasses.statsAvgScore')}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Award size={13} color="var(--secondary)" />
+              <span className="metric-value highlight-green">
+                {classInfo.stats.avgScore ? `${classInfo.stats.avgScore.toFixed(1)}/10` : '-.-'}
+              </span>
+            </div>
           </div>
         </div>
       ) : (
-        <>
+        <div style={{ marginTop: 'auto', marginBottom: '18px' }}>
           {classInfo.hasCertificate && (
             <div className="badge-cert-issued">
-              <CheckCircle2 size={16} />
-              {t('studentClasses.certIssued')}
+              <GraduationCap size={15} />
+              <span>{t('studentClasses.certIssued')}</span>
             </div>
           )}
-          <div className="student-class-stats">
-            <div className="student-class-stat-item">
-              <span className="stat-label">{t('studentClasses.statsResult')}</span>
-              <span className="stat-value highlight-green">{classInfo.stats.result || '-'}</span>
+          <div className="student-class-metrics" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: 0 }}>
+            <div className="student-class-metric-item">
+              <span className="metric-label">{t('studentClasses.statsResult')}</span>
+              <span className="metric-value highlight-green">{classInfo.stats.result || '-'}</span>
             </div>
-            <div className="student-class-stat-item">
-              <span className="stat-label">{t('studentClasses.statsFinalScore')}</span>
-              <span className="stat-value">{classInfo.stats.finalScore?.toFixed(1) || '-.-'}/10</span>
+            <div className="student-class-metric-item">
+              <span className="metric-label">{t('studentClasses.statsFinalScore')}</span>
+              <span className="metric-value">{classInfo.stats.finalScore ? `${classInfo.stats.finalScore.toFixed(1)}/10` : '-.-'}</span>
             </div>
           </div>
-        </>
+        </div>
       )}
 
+      {/* Action Button */}
       {classInfo.status === 'active' ? (
         <button 
-          className="btn btn-dark"
+          className="btn-primary-card"
           onClick={() => onViewClass(classInfo.id)}
         >
-          {t('studentClasses.btnViewClass')} <ArrowRight size={16} />
+          <span>{t('studentClasses.btnViewClass')}</span>
+          <ArrowRight size={16} />
         </button>
       ) : (
         <button 
-          className="btn btn-light"
+          className="btn-secondary-card"
           onClick={() => onViewMaterials(classInfo.id)}
         >
-          {t('studentClasses.btnViewMaterials')}
+          <span>{t('studentClasses.btnViewMaterials')}</span>
         </button>
       )}
     </div>

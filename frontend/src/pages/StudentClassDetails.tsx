@@ -73,7 +73,7 @@ const StudentClassDetails: React.FC = () => {
         </div>
 
         {/* Status Summary Boxes */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '32px' }}>
           <div style={{ padding: '16px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#64748B' }}>{t('studentAssignments.statusNotStarted')}</span>
             <span style={{ backgroundColor: '#E2E8F0', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#475569' }}>1</span>
@@ -84,13 +84,6 @@ const StudentClassDetails: React.FC = () => {
               {t('studentAssignments.statusPending')}
             </span>
             <span style={{ backgroundColor: '#FDE68A', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#D97706' }}>2</span>
-          </div>
-          <div style={{ padding: '16px', borderRadius: '8px', border: '1px solid #BFDBFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#EFF6FF' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#2563EB', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '16px' }}>✧</span>
-              {t('studentAssignments.statusAIProcessing')}
-            </span>
-            <span style={{ backgroundColor: '#DBEAFE', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#2563EB' }}>1</span>
           </div>
           <div style={{ padding: '16px', borderRadius: '8px', border: '1px solid #BBF7D0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F0FDF4' }}>
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#16A34A' }}>{t('studentAssignments.statusGraded')}</span>
@@ -105,18 +98,15 @@ const StudentClassDetails: React.FC = () => {
             <div>
               <h4 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', color: 'var(--on-surface)' }}>HW-01: Renewable Energy Essay (Writing Task 2)</h4>
               <p style={{ fontSize: '13px', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📅 {t('studentAssignments.submittedOn')}04/09/2026</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{t('studentAssignments.submittedOn')}04/09/2026</span>
                 <span>•</span>
                 <span>{t('studentAssignments.deadlinePrefix')}05/09/2026</span>
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706', fontSize: '14px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#FFFBEB', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                <span style={{ fontSize: '16px' }}>🕒</span> {t('studentAssignments.statusGrading')}
+                {t('studentAssignments.statusGrading')}
               </div>
-              <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid var(--outline-variant)', padding: '8px 16px', fontSize: '14px' }}>
-                {t('studentAssignments.btnReview')}
-              </button>
             </div>
           </div>
 
@@ -127,21 +117,15 @@ const StudentClassDetails: React.FC = () => {
                 <span style={{ backgroundColor: '#EEF2FF', color: '#4F46E5', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', border: '1px solid #C7D2FE' }}>{t('studentAssignments.badgeAudio')}</span>
               </div>
               <p style={{ fontSize: '13px', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>📅 {t('studentAssignments.submittedOn')}04/09/2026</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>{t('studentAssignments.submittedOn')}04/09/2026</span>
                 <span>•</span>
                 <span>{t('studentAssignments.aiEngine')}</span>
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#EFF6FF', padding: '6px 16px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
-                <div style={{ width: '60px', height: '6px', backgroundColor: '#DBEAFE', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '85%', height: '100%', backgroundColor: '#2563EB' }}></div>
-                </div>
-                <span style={{ color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>{t('studentAssignments.aiGradingPrefix')}85%</span>
+              <div style={{ color: '#16A34A', fontSize: '14px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#DCFCE7', borderRadius: '4px', border: '1px solid #BBF7D0' }}>
+                {t('studentAssignments.statusGraded')}
               </div>
-              <button className="btn btn-secondary" style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', color: '#2563EB', padding: '8px 16px', fontSize: '14px' }}>
-                {t('studentAssignments.btnDetails')}
-              </button>
             </div>
           </div>
 
@@ -161,9 +145,6 @@ const StudentClassDetails: React.FC = () => {
               <div style={{ color: '#64748B', fontSize: '14px', fontWeight: 500, padding: '6px 16px', backgroundColor: '#E2E8F0', borderRadius: '4px' }}>
                 {t('studentAssignments.statusNotStarted')}
               </div>
-              <button className="btn btn-primary" style={{ backgroundColor: '#2563EB', padding: '8px 16px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {t('studentAssignments.btnStart')} <span>→</span>
-              </button>
             </div>
           </div>
 
