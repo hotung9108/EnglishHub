@@ -1,6 +1,4 @@
-package com.english_hub.backend.user.entity;
-
-import java.time.LocalDate;
+package com.english_hub.backend.features.user.infrastructure.persistence.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,10 +13,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "student_profiles")
+@Table(name = "teacher_profiles")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StudentProfile {
+public class TeacherProfile {
 
 	@Id
 	@Column(name = "user_id")
@@ -29,23 +27,15 @@ public class StudentProfile {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	@Column(name = "student_code", length = 30, unique = true)
-	private String studentCode;
+	@Column(length = 150)
+	private String specialization;
 
-	@Column(name = "date_of_birth")
-	private LocalDate dateOfBirth;
-
-	@Column(name = "parent_phone", length = 20)
-	private String parentPhone;
-
-	public StudentProfile(
-			User user,
-			String studentCode,
-			LocalDate dateOfBirth,
-			String parentPhone) {
+	public TeacherProfile(User user, String specialization) {
 		this.user = user;
-		this.studentCode = studentCode;
-		this.dateOfBirth = dateOfBirth;
-		this.parentPhone = parentPhone;
+		this.specialization = specialization;
+	}
+
+	public void updateSpecialization(String specialization) {
+		this.specialization = specialization;
 	}
 }

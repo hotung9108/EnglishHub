@@ -14,11 +14,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-import com.english_hub.backend.user.entity.StudentProfile;
-import com.english_hub.backend.user.entity.TeacherProfile;
-import com.english_hub.backend.user.entity.User;
-import com.english_hub.backend.user.entity.UserRole;
-import com.english_hub.backend.user.entity.UserStatus;
+import com.english_hub.backend.common.domain.UserRole;
+import com.english_hub.backend.common.domain.UserStatus;
+import com.english_hub.backend.features.user.infrastructure.persistence.entity.StudentProfile;
+import com.english_hub.backend.features.user.infrastructure.persistence.entity.TeacherProfile;
+import com.english_hub.backend.features.user.infrastructure.persistence.entity.User;
 import com.english_hub.backend.user.repository.StudentProfileRepository;
 import com.english_hub.backend.user.repository.TeacherProfileRepository;
 import com.english_hub.backend.user.repository.UserRepository;

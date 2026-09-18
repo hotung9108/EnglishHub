@@ -1,23 +1,22 @@
 package com.english_hub.backend.features.user.application.service;
 
 import com.english_hub.backend.common.ApiException;
+import com.english_hub.backend.common.domain.UserRole;
+import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.application.command.CreateUserCommand;
 import com.english_hub.backend.features.user.application.command.UpdateUserCommand;
 import com.english_hub.backend.features.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.backend.features.user.application.port.CurrentUserProvider;
+import com.english_hub.backend.features.user.application.page.UserPageRequest;
 import com.english_hub.backend.features.user.domain.model.UserPage;
 import com.english_hub.backend.features.user.domain.model.User;
-import com.english_hub.backend.features.user.domain.model.UserRole;
-import com.english_hub.backend.features.user.domain.model.UserStatus;
 import com.english_hub.backend.features.user.domain.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -43,8 +42,9 @@ public class AdminUserService {
 	@Transactional(readOnly = true)
 	public UserPage listUsers(String query, String roleValue, int page, int limit) {
 		currentUserProvider.requireAdmin();
-		validatePagination(page, limit);
-		return userRepository.findPage(query, parseRoleFilter(roleValue), page, limit);
+		UserPageRequest pageRequest = new UserPageRequest(page, limit);
+		validatePagination(pageRequest);
+		return userRepository.findPage(query, parseRoleFilter(roleValue), pageRequest);
 	}
 
 	@Transactional
@@ -76,30 +76,30 @@ public class AdminUserService {
 			throw ApiException.conflict("Email đã được sử dụng.");
 		}
 
-		long userId;
 		try {
-			userId = userRepository.create(
+			User user = User.create(
 					request.fullName().trim(),
 					email,
+					null,
+					null,
 					passwordEncoder.encode(request.password()),
-					role);
-			if (role == UserRole.TEACHER) {
-				userRepository.createTeacherProfile(userId, emptyToNull(request.specialization()));
-			} else {
-				userRepository.createStudentProfile(
-						userId,
-						emptyToNull(request.studentCode()),
-						request.dateOfBirth(),
-						emptyToNull(request.parentPhone()));
+					role,
+					UserStatus.ACTIVE,
+					emptyToNull(request.specialization()),
+					emptyToNull(request.studentCode()),
+					request.dateOfBirth(),
+					emptyToNull(request.parentPhone()));
+			user = userRepository.save(user);
+			if (user.id() == null) {
+				throw new IllegalStateException("User insert did not return an id");
 			}
+			return new CreatedUserData(user.id(), email, role.name());
 		} catch (DataIntegrityViolationException exception) {
 			if (userRepository.existsByEmail(email)) {
 				throw ApiException.conflict("Email đã được sử dụng.");
 			}
 			throw exception;
 		}
-
-		return new CreatedUserData(userId, email, role.name());
 	}
 
 	@Transactional
@@ -110,15 +110,17 @@ public class AdminUserService {
 			throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 		}
 
-		Map<String, Object> baseUpdates = new LinkedHashMap<>();
+		boolean changed = false;
 		if (request.fullName() != null) {
 			if (!hasText(request.fullName())) {
 				throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 			}
-			baseUpdates.put("full_name", request.fullName().trim());
+			target.updateFullName(request.fullName().trim());
+			changed = true;
 		}
 		if (request.phone() != null) {
-			baseUpdates.put("phone", emptyToNull(request.phone()));
+			target.updatePhone(emptyToNull(request.phone()));
+			changed = true;
 		}
 
 		boolean hasProfileUpdate = target.role() == UserRole.TEACHER
@@ -127,36 +129,26 @@ public class AdminUserService {
 						&& (request.studentCode() != null
 						|| request.dateOfBirth() != null
 						|| request.parentPhone() != null);
-		if (baseUpdates.isEmpty() && !hasProfileUpdate) {
+		if (!changed && !hasProfileUpdate) {
 			throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 		}
-
-		userRepository.updateBase(target.id(), baseUpdates);
 		if (target.role() == UserRole.TEACHER && request.specialization() != null) {
-			userRepository.updateTeacherProfile(target.id(), emptyToNull(request.specialization()));
+			target.updateTeacherProfile(emptyToNull(request.specialization()));
 		}
 		if (target.role() == UserRole.STUDENT && hasProfileUpdate) {
-			Map<String, Object> profileUpdates = new LinkedHashMap<>();
-			if (request.studentCode() != null) {
-				profileUpdates.put("student_code", emptyToNull(request.studentCode()));
-			}
-			if (request.dateOfBirth() != null) {
-				profileUpdates.put("date_of_birth", request.dateOfBirth());
-			}
-			if (request.parentPhone() != null) {
-				profileUpdates.put("parent_phone", emptyToNull(request.parentPhone()));
-			}
-			userRepository.updateStudentProfile(target.id(), profileUpdates);
+			target.updateStudentProfile(
+					request.studentCode() == null ? target.studentCode() : emptyToNull(request.studentCode()),
+					request.dateOfBirth() == null ? target.dateOfBirth() : request.dateOfBirth(),
+					request.parentPhone() == null ? target.parentPhone() : emptyToNull(request.parentPhone()));
 		}
+		userRepository.save(target);
 	}
 
 	@Transactional
 	public void deleteUser(long userId) {
 		currentUserProvider.requireAdmin();
 		findUserOrThrow(userId);
-		if (userRepository.markDeleted(userId) == 0) {
-			throw ApiException.notFound(USER_NOT_FOUND_MESSAGE);
-		}
+		userRepository.deleteById(userId);
 	}
 
 	@Transactional
@@ -169,10 +161,9 @@ public class AdminUserService {
 			throw ApiException.badRequest("status phải là ACTIVE hoặc LOCKED.");
 		}
 
-		findUserOrThrow(userId);
-		if (userRepository.updateStatus(userId, status) == 0) {
-			throw ApiException.notFound(USER_NOT_FOUND_MESSAGE);
-		}
+		User target = findUserOrThrow(userId);
+		target.changeStatus(status);
+		userRepository.save(target);
 		if (status == UserStatus.LOCKED) {
 			userRepository.revokeActiveRefreshTokens(userId);
 		}
@@ -195,8 +186,8 @@ public class AdminUserService {
 		}
 	}
 
-	private void validatePagination(int page, int limit) {
-		if (page < 1 || limit < 1 || limit > 100) {
+	private void validatePagination(UserPageRequest pageRequest) {
+		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest("Dữ liệu phân trang không hợp lệ.");
 		}
 	}

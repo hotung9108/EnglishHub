@@ -10,8 +10,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -44,24 +42,26 @@ public class UserProfileService {
 			throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 		}
 
-		Map<String, Object> updates = new LinkedHashMap<>();
+		boolean changed = false;
 		if (request.fullName() != null) {
 			if (!hasText(request.fullName())) {
 				throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 			}
-			updates.put("full_name", request.fullName().trim());
+			currentUser.updateFullName(request.fullName().trim());
+			changed = true;
 		}
 		if (request.phone() != null) {
-			updates.put("phone", emptyToNull(request.phone()));
+			currentUser.updatePhone(emptyToNull(request.phone()));
+			changed = true;
 		}
 		if (request.avatarUrl() != null) {
-			updates.put("avatar_url", emptyToNull(request.avatarUrl()));
+			currentUser.updateAvatarUrl(emptyToNull(request.avatarUrl()));
+			changed = true;
 		}
-		if (updates.isEmpty()) {
+		if (!changed) {
 			throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 		}
-
-		userRepository.updateBase(currentUser.id(), updates);
+		userRepository.save(currentUser);
 	}
 
 	@Transactional
@@ -76,9 +76,8 @@ public class UserProfileService {
 		if (!PASSWORD_PATTERN.matcher(request.newPassword()).matches()) {
 			throw ApiException.badRequest("Mật khẩu mới phải từ 8 ký tự, có chữ hoa và chữ số.");
 		}
-		userRepository.updateBase(
-				currentUser.id(),
-				Map.of("password_hash", passwordEncoder.encode(request.newPassword())));
+		currentUser.changePassword(passwordEncoder.encode(request.newPassword()));
+		userRepository.save(currentUser);
 	}
 
 	private boolean hasText(String value) {
