@@ -25,16 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JpaUserRepository implements UserRepository {
 
-	private final com.english_hub.backend.user.repository.UserRepository userJpaRepository;
-	private final com.english_hub.backend.user.repository.TeacherProfileRepository teacherProfileJpaRepository;
-	private final com.english_hub.backend.user.repository.StudentProfileRepository studentProfileJpaRepository;
+	private final com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.UserRepository userJpaRepository;
+	private final com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.TeacherProfileRepository teacherProfileJpaRepository;
+	private final com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.StudentProfileRepository studentProfileJpaRepository;
 	private final UserPersistenceMapper mapper;
 	private final EntityManager entityManager;
 
 	public JpaUserRepository(
-			com.english_hub.backend.user.repository.UserRepository userJpaRepository,
-			com.english_hub.backend.user.repository.TeacherProfileRepository teacherProfileJpaRepository,
-			com.english_hub.backend.user.repository.StudentProfileRepository studentProfileJpaRepository,
+			com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.UserRepository userJpaRepository,
+			com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.TeacherProfileRepository teacherProfileJpaRepository,
+			com.english_hub.backend.infrastructure.persistence.jpa_impl.repository.StudentProfileRepository studentProfileJpaRepository,
 			UserPersistenceMapper mapper,
 			EntityManager entityManager) {
 		this.userJpaRepository = userJpaRepository;

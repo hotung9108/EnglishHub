@@ -5,7 +5,7 @@ import com.english_hub.backend.common.domain.UserRole;
 import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.domain.model.User;
 import com.english_hub.backend.features.user.domain.repository.UserRepository;
-import com.english_hub.backend.security.JwtPrincipal;
+import com.english_hub.backend.infrastructure.security.JwtPrincipal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

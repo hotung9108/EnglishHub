@@ -14,7 +14,7 @@ import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.LogoutResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.RefreshResponse;
-import com.english_hub.backend.security.JwtTokenService;
+import com.english_hub.backend.infrastructure.security.JwtTokenService;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
