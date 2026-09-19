@@ -6,7 +6,7 @@ import com.english_hub.backend.common.domain.UserStatus;
 import com.english_hub.backend.features.user.application.port.CurrentUserProvider;
 import com.english_hub.backend.features.user.domain.model.User;
 import com.english_hub.backend.features.user.domain.repository.UserRepository;
-import com.english_hub.backend.security.JwtPrincipal;
+import com.english_hub.backend.infrastructure.security.JwtPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;

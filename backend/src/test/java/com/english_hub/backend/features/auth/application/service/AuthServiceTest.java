@@ -20,7 +20,7 @@ import com.english_hub.backend.features.auth.domain.repository.RefreshTokenRepos
 import com.english_hub.backend.features.auth.domain.service.TokenHasher;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthResponse;
 import com.english_hub.backend.features.auth.interfaces.rest.dto.AuthUserResponse;
-import com.english_hub.backend.security.JwtTokenService;
+import com.english_hub.backend.infrastructure.security.JwtTokenService;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
