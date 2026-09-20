@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import { Search, Bell, HelpCircle, Menu, Globe } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -5,6 +6,9 @@ import { useAuth } from '../../hooks/useAuth';
 const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { language, toggleLanguage, t } = useLanguage();
   const { user } = useAuth();
+  const location = useLocation();
+
+  const isStudent = location.pathname.startsWith('/student') || user?.role === 'student';
 
   return (
     <header className="topbar">
@@ -19,8 +23,9 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
             type="text"
             className="topbar-search-input"
             placeholder={t('search')}
+            style={isStudent ? { paddingRight: '16px' } : undefined}
           />
-          <kbd className="topbar-search-kbd">⌘K</kbd>
+          {!isStudent && <kbd className="topbar-search-kbd">⌘K</kbd>}
         </div>
       </div>
 
