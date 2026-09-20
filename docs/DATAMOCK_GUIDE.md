@@ -11,7 +11,7 @@ production hoặc database dùng chung.
 - Schema dùng đúng hai migration hiện tại: `V1__init_schema.sql` và
   `V2__update_schema_to_v6.sql`.
 - Toàn bộ mock data viết bằng Java/Spring Data JPA.
-- Seeder nằm trong `com.english_hub.backend.seed` và chạy theo một profile
+- Seeder nằm trong `com.english_hub.core.seed` và chạy theo một profile
   chung là `seed`, không dùng `--seed-task`.
 - Thứ tự chạy được điều khiển bằng `@Order(1)` đến `@Order(9)`.
 - `docs/Datamock/` chỉ là tài liệu tham chiếu cũ, không cần đưa lên Git.
