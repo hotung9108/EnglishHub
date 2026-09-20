@@ -51,6 +51,11 @@ export const commonVi = {
   completed: 'Hoàn thành',
   pending: 'Đang chờ',
   loginError: 'Email không tồn tại. Hãy dùng admin@eh.com, teacher@eh.com, hoặc student@eh.com',
+  sectionOverview: 'TỔNG QUAN',
+  sectionLearning: 'HỌC TẬP',
+  sectionResults: 'KẾT QUẢ & TIẾN ĐỘ',
+  sectionManagement: 'QUẢN TRỊ HỆ THỐNG',
+  sectionTeaching: 'GIẢNG DẠY',
 };
 
 export const commonEn = {
@@ -106,4 +111,9 @@ export const commonEn = {
   completed: 'Completed',
   pending: 'Pending',
   loginError: 'Email does not exist. Please use admin@eh.com, teacher@eh.com, or student@eh.com',
+  sectionOverview: 'OVERVIEW',
+  sectionLearning: 'LEARNING',
+  sectionResults: 'RESULTS & PROGRESS',
+  sectionManagement: 'MANAGEMENT',
+  sectionTeaching: 'TEACHING',
 };
