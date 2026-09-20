@@ -1,6 +1,8 @@
 package com.english_hub.core.common.domain;
 
 import java.time.Instant;
+
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,11 +16,12 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@Data
 public abstract class BaseEntity<TId> {
 
-	private TId id;
+	protected TId id;
 
-	private Instant createdAt;
+	protected Instant createdAt;
 
-	private Instant updatedAt;
+	protected Instant updatedAt;
 }

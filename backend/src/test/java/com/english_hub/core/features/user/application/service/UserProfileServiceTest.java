@@ -3,11 +3,13 @@ package com.english_hub.core.features.user.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
-import com.english_hub.core.features.user.application.command.ChangePasswordCommand;
-import com.english_hub.core.features.user.application.command.UpdateOwnProfileCommand;
-import com.english_hub.core.features.user.application.port.CurrentUserProvider;
-import com.english_hub.core.features.user.domain.model.User;
-import com.english_hub.core.features.user.domain.repository.UserRepository;
+import com.english_hub.core.modules.user.application.command.ChangePasswordCommand;
+import com.english_hub.core.modules.user.application.command.UpdateOwnProfileCommand;
+import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
+import com.english_hub.core.modules.user.application.service.UserProfileService;
+import com.english_hub.core.modules.user.domain.model.User;
+import com.english_hub.core.modules.user.domain.repository.UserRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

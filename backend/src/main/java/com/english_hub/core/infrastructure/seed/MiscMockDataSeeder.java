@@ -21,8 +21,9 @@ import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRe
 import com.english_hub.core.infrastructure.persistence.entity.StudentEvaluation;
 import com.english_hub.core.infrastructure.persistence.repository.StudentEvaluationRepository;
 import com.english_hub.core.common.domain.UserRole;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.User;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
+
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

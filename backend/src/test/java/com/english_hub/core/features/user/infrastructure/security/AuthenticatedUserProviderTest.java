@@ -3,9 +3,11 @@ package com.english_hub.core.features.user.infrastructure.security;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
-import com.english_hub.core.features.user.domain.model.User;
-import com.english_hub.core.features.user.domain.repository.UserRepository;
 import com.english_hub.core.infrastructure.security.JwtPrincipal;
+import com.english_hub.core.modules.user.domain.model.User;
+import com.english_hub.core.modules.user.domain.repository.UserRepository;
+import com.english_hub.core.modules.user.infrastructure.security.AuthenticatedUserProvider;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,7 +60,7 @@ class AuthenticatedUserProviderTest {
 	@Test
 	void rejectsAnUnknownUser() {
 		authenticate(new JwtPrincipal(404L,
-				com.english_hub.core.features.user.domain.model.UserRole.STUDENT));
+				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(404L)).thenReturn(Optional.empty());
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 
@@ -70,7 +72,7 @@ class AuthenticatedUserProviderTest {
 	@Test
 	void rejectsALockedUserEvenWhenTheTokenIsValid() {
 		authenticate(new JwtPrincipal(12L,
-				com.english_hub.core.features.user.domain.model.UserRole.STUDENT));
+				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(user(12L, UserRole.STUDENT, UserStatus.LOCKED, false)));
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 
@@ -82,7 +84,7 @@ class AuthenticatedUserProviderTest {
 	@Test
 	void rejectsASoftDeletedUserEvenWhenTheStatusIsActive() {
 		authenticate(new JwtPrincipal(12L,
-				com.english_hub.core.features.user.domain.model.UserRole.STUDENT));
+				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(user(12L, UserRole.STUDENT, UserStatus.ACTIVE, true)));
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 
@@ -95,7 +97,7 @@ class AuthenticatedUserProviderTest {
 	void returnsAnActiveUserFromTheRepository() {
 		User activeUser = user(12L, UserRole.TEACHER, UserStatus.ACTIVE, false);
 		authenticate(new JwtPrincipal(12L,
-				com.english_hub.core.features.user.domain.model.UserRole.TEACHER));
+				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(activeUser));
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 
@@ -106,7 +108,7 @@ class AuthenticatedUserProviderTest {
 	void allowsOnlyAnActiveAdminThroughTheAdminBoundary() {
 		User admin = user(1L, UserRole.ADMIN, UserStatus.ACTIVE, false);
 		authenticate(new JwtPrincipal(1L,
-				com.english_hub.core.features.user.domain.model.UserRole.ADMIN));
+				com.english_hub.core.modules.user.domain.model.UserRole.ADMIN));
 		when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 
@@ -117,7 +119,7 @@ class AuthenticatedUserProviderTest {
 	void rejectsAnActiveTeacherThroughTheAdminBoundary() {
 		User teacher = user(12L, UserRole.TEACHER, UserStatus.ACTIVE, false);
 		authenticate(new JwtPrincipal(12L,
-				com.english_hub.core.features.user.domain.model.UserRole.TEACHER));
+				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(teacher));
 		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
 

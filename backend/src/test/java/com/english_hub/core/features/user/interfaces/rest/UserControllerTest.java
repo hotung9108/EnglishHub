@@ -2,14 +2,16 @@ package com.english_hub.core.features.user.interfaces.rest;
 
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
-import com.english_hub.core.features.user.application.command.ChangePasswordCommand;
-import com.english_hub.core.features.user.application.command.UpdateOwnProfileCommand;
-import com.english_hub.core.features.user.application.service.UserProfileService;
-import com.english_hub.core.features.user.domain.model.User;
-import com.english_hub.core.features.user.interfaces.rest.dto.ChangePasswordRequest;
-import com.english_hub.core.features.user.interfaces.rest.dto.MessageResponse;
-import com.english_hub.core.features.user.interfaces.rest.dto.UpdateOwnProfileRequest;
-import com.english_hub.core.features.user.interfaces.rest.dto.UserResponse;
+import com.english_hub.core.modules.user.application.command.ChangePasswordCommand;
+import com.english_hub.core.modules.user.application.command.UpdateOwnProfileCommand;
+import com.english_hub.core.modules.user.application.service.UserProfileService;
+import com.english_hub.core.modules.user.domain.model.User;
+import com.english_hub.core.modules.user.presentation.rest.UserController;
+import com.english_hub.core.modules.user.presentation.rest.dto.ChangePasswordRequest;
+import com.english_hub.core.modules.user.presentation.rest.dto.MessageResponse;
+import com.english_hub.core.modules.user.presentation.rest.dto.UpdateOwnProfileRequest;
+import com.english_hub.core.modules.user.presentation.rest.dto.UserResponse;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

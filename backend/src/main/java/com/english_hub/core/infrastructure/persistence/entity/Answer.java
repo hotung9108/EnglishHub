@@ -3,7 +3,6 @@ package com.english_hub.core.infrastructure.persistence.entity;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import com.english_hub.core.infrastructure.persistence.entity.UploadStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

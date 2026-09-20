@@ -444,7 +444,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 		for (JsonNode word : transcript) {
 			if (!word.isObject()
 					|| word.get("word") == null
-					|| !word.get("word").isTextual()
+					|| !word.get("word").isString()
 					|| word.get("start") == null
 					|| !word.get("start").isNumber()
 					|| word.get("end") == null

@@ -16,12 +16,13 @@ import java.util.Set;
 
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.StudentProfile;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.TeacherProfile;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.User;
 import com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
+
 import jakarta.persistence.EntityManager;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;

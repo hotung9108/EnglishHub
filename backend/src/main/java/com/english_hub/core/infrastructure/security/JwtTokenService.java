@@ -1,9 +1,11 @@
 package com.english_hub.core.infrastructure.security;
 
-import com.english_hub.core.features.user.domain.model.UserRole;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.english_hub.core.modules.user.domain.model.UserRole;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;

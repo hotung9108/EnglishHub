@@ -13,10 +13,11 @@ import com.english_hub.core.infrastructure.persistence.entity.ClassStatus;
 import com.english_hub.core.infrastructure.persistence.entity.EnglishClass;
 import com.english_hub.core.infrastructure.persistence.repository.ClassMemberRepository;
 import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRepository;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.StudentProfile;
-import com.english_hub.core.features.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
+
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

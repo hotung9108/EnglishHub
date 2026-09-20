@@ -1,7 +1,9 @@
 package com.english_hub.core.infrastructure.security;
 
-import com.english_hub.core.features.user.domain.model.UserRole;
 import org.junit.jupiter.api.Test;
+
+import com.english_hub.core.modules.user.domain.model.UserRole;
+
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
