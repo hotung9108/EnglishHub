@@ -15,6 +15,11 @@ import Profile from './pages/Profile';
 import TeacherClasses from './pages/TeacherClasses';
 import TeacherDetails from './pages/TeacherDetails';
 import StudentAssignments from './pages/StudentAssignments';
+import StudentClasses from './pages/StudentClasses';
+import StudentClassDetails from './pages/StudentClassDetails';
+import StudentAssignmentWriting from './pages/StudentAssignmentWriting';
+import StudentAssignmentReading from './pages/StudentAssignmentReading';
+import StudentAssignmentListening from './pages/StudentAssignmentListening';
 import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
@@ -67,9 +72,14 @@ function App() {
         {/* Student Routes */}
         <Route element={<ProtectedRoute allowedRoles={['student']} />}>
           <Route path="/student" element={<MainLayout />}>
-            <Route index element={<Navigate to="/student/dashboard" replace />} />
+            <Route index element={<Navigate to="/student/classes" replace />} />
+            <Route path="classes" element={<StudentClasses />} />
+            <Route path="classes/:id" element={<StudentClassDetails />} />
             <Route path="dashboard" element={<div>Student Dashboard (Coming Soon)</div>} />
             <Route path="assignments" element={<StudentAssignments />} />
+            <Route path="assignments/:id" element={<StudentAssignmentWriting />} />
+            <Route path="assignments/reading/:id" element={<StudentAssignmentReading />} />
+            <Route path="assignments/listening/:id" element={<StudentAssignmentListening />} />
           </Route>
         </Route>
       </Routes>

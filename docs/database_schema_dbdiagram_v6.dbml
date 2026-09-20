@@ -1,0 +1,520 @@
+// ============================================================================
+// Website quản lý bài tập & chấm chữa bài tiếng Anh thông minh — Group 4
+// BẢN V6 — dựa trên V5, áp dụng 1 thay đổi:
+//
+//   D) CLASS_MEMBERS: bỏ hoàn toàn enum class_member_type (PRIMARY/SUPPLEMENTARY)
+//      và cột member_type. Thành viên lớp không còn phân loại, chỉ có student_id.
+//
+// ---- Các thay đổi V5 (giữ nguyên ở V6) ----
+// BẢN V5 — dựa trên V4, áp dụng 3 thay đổi theo review (11/09/2026):
+//
+//   A) CLASS_MEMBERS: bỏ cột status (enum class_member_status) + ended_at.
+//      "Kết thúc" tham gia lớp = XÓA CỨNG row, không còn trạng thái ENDED,
+//      không còn lưu lịch sử tham gia/rời lớp.
+//
+//   B) QUESTIONS: thêm lại cột correct_answer (text, JSON) để tách đáp án đúng
+//      ra khỏi content. content giờ LUÔN là plain text đề bài; correct_answer
+//      lưu JSON (kiểu text) chứa đáp án đúng — với MULTIPLE_CHOICE gồm cả
+//      danh sách options, với SHORT_ANSWER là đáp án mẫu.
+//
+//   C) SUBMISSION_MODULES: bỏ cột audio_play_count (không cần đếm số lần nghe).
+//
+// ---- Các thay đổi V4 (giữ nguyên ở V6) ----
+// BẢN V4 — dựa trên V3, áp dụng 3 thay đổi theo yêu cầu (11/09/2026):
+//
+//   1) BỎ TRIGGER + MỌI RÀNG BUỘC NGHIỆP VỤ Ở DB:
+//      Xóa toàn bộ các đoạn CHECK / partial-unique-index (WHERE ...) mà ở V3 phải
+//      viết SQL thủ công ngoài DBML để giả lập trigger/CHECK. Từ V4, DB CHỈ giữ lại
+//      cấu trúc cơ bản: PK, FK, NOT NULL, DEFAULT, UNIQUE cứng (không điều kiện).
+//      MỌI ràng buộc nghiệp vụ (CHECK giá trị, uniqueness có điều kiện, cross-field
+//      validation...) chuyển xuống SERVICE LAYER để dễ quản lý, dễ đọc log lỗi,
+//      không phụ thuộc DB engine.
+//
+//   2) ASSIGNMENTS: XÓA cột teacher_id.
+//      Lý do: assignments đã có class_id, và classes đã có sẵn teacher_id -> cột
+//      teacher_id ở assignments là dữ liệu trùng lặp. Muốn biết giáo viên phụ trách
+//      1 assignment, JOIN qua assignments.class_id -> classes.teacher_id.
+//      (Việc này cũng loại bỏ luôn rủi ro #11 ở V3 — teacher_id lệch với
+//      classes.teacher_id hiện tại — vì không còn cột trùng lặp để lệch nữa.)
+//
+//   3) GỘP question_options + answer_results VÀO content (JSON dạng text):
+//      Bỏ 2 bảng question_options và answer_results, dồn dữ liệu của chúng vào
+//      cột content (kiểu text, lưu chuỗi JSON) của questions và answers:
+//        - questions.content: câu hỏi + toàn bộ lựa chọn & đáp án đúng (khi
+//          question_type = MULTIPLE_CHOICE) hoặc câu hỏi + đáp án đúng (khi
+//          question_type = SHORT_ANSWER). Cột correct_answer cũ bị xóa vì đáp án
+//          đúng giờ nằm trong JSON của content.
+//        - answers.content: câu trả lời học viên chọn/nhập + (sau khi hệ thống tự
+//          chấm AUTO) is_correct, score do service layer set thêm vào JSON — thay
+//          cho bảng answer_results cũ.
+//      Xem chi tiết cấu trúc JSON ở Note của từng bảng bên dưới.
+//
+// 16 bảng (18 V3 − question_options − answer_results)
+// Paste toàn bộ vào https://dbdiagram.io để xem ERD
+// ============================================================================
+
+Enum user_role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+Enum user_status {
+  ACTIVE
+  LOCKED
+}
+
+Enum class_status {
+  ACTIVE
+  INACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+Enum assignment_status {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+Enum module_skill {
+  READING
+  LISTENING
+  WRITING
+  SPEAKING
+}
+
+Enum module_task_type {
+  QUIZ
+  REWRITE
+  RECORDING
+  ESSAY
+}
+
+Enum upload_status {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+Enum question_type {
+  MULTIPLE_CHOICE
+  SHORT_ANSWER
+}
+
+Enum submission_status {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+Enum annotation_source {
+  AI
+  TEACHER
+}
+
+Enum review_status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// V2: bỏ giá trị AI — AI không tự chấm điểm, chỉ chỉ lỗi + nhận xét text
+Enum grading_method {
+  AUTO
+  TEACHER_MANUAL
+}
+
+// V2: +AI_GRADED — "AI đã phân tích/chú thích xong, chờ giáo viên chấm"
+Enum grading_status {
+  PENDING
+  AI_GRADED
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// 1. USERS
+// ---------------------------------------------------------------------------
+
+Table users {
+  id bigint [pk, increment]
+  full_name varchar(150) [not null]
+  email varchar(150) [not null, unique]
+  phone varchar(20)
+  avatar_url varchar(255)
+  password_hash varchar(255) [not null]
+  role user_role [not null]
+  status user_status [not null, default: 'ACTIVE']
+  is_deleted boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    role [name: 'idx_users_role']
+    status [name: 'idx_users_status']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. TEACHER PROFILES
+// ---------------------------------------------------------------------------
+
+Table teacher_profiles {
+  user_id bigint [pk]
+  specialization varchar(150)
+
+  Note: 'V4: không ràng buộc DB đảm bảo user tạo profile đúng role (users.role) và không bị insert vào cả 2 bảng teacher_profiles/student_profiles — validate role khi tạo profile xử lý hoàn toàn ở SERVICE LAYER.'
+}
+
+// ---------------------------------------------------------------------------
+// 3. STUDENT PROFILES
+// ---------------------------------------------------------------------------
+
+Table student_profiles {
+  user_id bigint [pk]
+  student_code varchar(30) [unique]
+  date_of_birth date
+  parent_phone varchar(20)
+}
+
+// ---------------------------------------------------------------------------
+// 4. CLASSES
+// ---------------------------------------------------------------------------
+
+Table classes {
+  id bigint [pk, increment]
+  name varchar(150) [not null]
+  level varchar(50)
+  description text
+  start_date date [not null]
+  end_date date
+  status class_status [not null, default: 'ACTIVE']
+  teacher_id bigint
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    teacher_id [name: 'idx_classes_teacher_id']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. CLASS MEMBERS
+// ---------------------------------------------------------------------------
+
+Table class_members {
+  id bigint [pk, increment]
+  class_id bigint [not null]
+  student_id bigint [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    class_id [name: 'idx_class_members_class_id']
+    student_id [name: 'idx_class_members_student_id']
+  }
+
+  Note: 'V6: bỏ cột member_type (enum class_member_type — PRIMARY/SUPPLEMENTARY) và enum class_member_type. Thành viên lớp không còn phân loại. V5: bỏ cột status (enum class_member_status) và ended_at. Việc học viên "kết thúc" tham gia lớp giờ được thể hiện bằng cách XÓA CỨNG (DELETE) row này — không còn trạng thái ENDED; khi lớp kết thúc (classes.status chuyển COMPLETED/CANCELLED) hoặc học viên ngừng học giữa chừng, service layer xóa row tương ứng thay vì set status. Do đó không còn lưu lịch sử các lần tham gia/kết thúc lớp trước đó. V4: bỏ 2 partial unique index (uq_class_members_active_class_student, uq_class_members_one_active_primary_per_student) và CHECK (status=ACTIVE OR ended_at IS NOT NULL) từng có ở V3 — ràng buộc "1 học viên chỉ có 1 row tồn tại cho 1 lớp" chuyển xuống SERVICE LAYER.'
+}
+
+// ---------------------------------------------------------------------------
+// 6. ASSIGNMENTS
+// ---------------------------------------------------------------------------
+
+Table assignments {
+  id bigint [pk, increment]
+  class_id bigint [not null]
+  title varchar(200) [not null]
+  description text
+  open_at timestamptz [not null]
+  close_at timestamptz [not null]
+  max_submissions int
+  status assignment_status [not null, default: 'DRAFT']
+  is_deleted boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    class_id [name: 'idx_assignments_class_id']
+  }
+
+  Note: 'V4: XÓA cột teacher_id — assignments đã có class_id, và classes đã có teacher_id nên không cần lưu trùng; muốn biết giáo viên phụ trách assignment thì JOIN qua class_id -> classes.teacher_id (cũng tự động giải quyết rủi ro "teacher_id lệch với classes.teacher_id hiện tại" ở V3). Các ràng buộc open_at < close_at, max_submissions > 0 (khi NOT NULL) chuyển xuống SERVICE LAYER, không còn CHECK ở DB.'
+}
+
+// ---------------------------------------------------------------------------
+// 7. MODULES
+// ---------------------------------------------------------------------------
+
+Table modules {
+  id bigint [pk, increment]
+  assignment_id bigint [not null]
+  skill module_skill [not null]
+  task_type module_task_type [not null]
+  order_index int [not null]
+  instructions text
+  ai_instruction text
+  max_score decimal(5,2) [not null, default: 10]
+  source_audio_storage_key varchar(255)
+  source_audio_duration_seconds int
+  source_audio_mime_type varchar(50)
+  source_audio_upload_status upload_status
+
+  indexes {
+    assignment_id [name: 'idx_modules_assignment_id']
+    (assignment_id, order_index) [unique, name: 'uq_modules_assignment_order']
+  }
+
+  Note: 'ai_instruction: prompt tự do giáo viên viết cho AI chấm (không phải rubric cố định). Nullable. V4: bỏ CHECK (max_score > 0) — validate ở SERVICE LAYER.'
+}
+
+// ---------------------------------------------------------------------------
+// 8. QUESTIONS
+// ---------------------------------------------------------------------------
+
+Table questions {
+  id bigint [pk, increment]
+  module_id bigint [not null]
+  content text [not null]
+  correct_answer text [not null]
+  question_type question_type [not null]
+  score decimal(5,2) [not null, default: 1]
+  order_index int [not null]
+
+  indexes {
+    module_id [name: 'idx_questions_module_id']
+    (module_id, order_index) [unique, name: 'uq_questions_module_order']
+  }
+
+  Note: '''V5: thêm lại cột correct_answer (text), tách riêng khỏi content để tránh nhầm lẫn đề bài và đáp án đúng.
+  - content: LUÔN là plain text đề bài (không còn là JSON, không còn chứa danh sách options), áp dụng cho cả MULTIPLE_CHOICE và SHORT_ANSWER.
+  - correct_answer: lưu 1 chuỗi JSON (kiểu text) chứa đáp án đúng, cấu trúc tùy question_type — dùng kiểu text (thay vì JSON có cấu trúc cố định) để linh hoạt lưu nhiều dạng đáp án đúng khác nhau cho các loại câu hỏi khác nhau:
+    - MULTIPLE_CHOICE: {"options": [{"id": 1, "content": "...", "is_correct": true}, {"id": 2, "content": "...", "is_correct": false}]}
+      (danh sách lựa chọn cho học viên chọn cũng nằm ở đây, không còn bảng question_options riêng; có thể có nhiều is_correct=true nếu là checkbox multi-select, hoặc đúng 1 nếu radio single-select — không phân biệt ở DB, service layer tự biết dựa trên số lượng is_correct=true khi cần).
+    - SHORT_ANSWER: {"correct_answer": "..."}
+  CHECK (score >= 0) và mọi validate cấu trúc JSON của correct_answer chuyển xuống SERVICE LAYER.'''
+}
+
+// ---------------------------------------------------------------------------
+// 9. SUBMISSIONS
+// ---------------------------------------------------------------------------
+
+Table submissions {
+  id bigint [pk, increment]
+  assignment_id bigint [not null]
+  student_id bigint [not null]
+  attempt_number int [not null]
+  submitted_at timestamptz
+  status submission_status [not null, default: 'IN_PROGRESS']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    assignment_id [name: 'idx_submissions_assignment_id']
+    student_id [name: 'idx_submissions_student_id']
+    (assignment_id, student_id, attempt_number) [unique, name: 'uq_submissions_assignment_student_attempt']
+  }
+
+  Note: 'V4: bỏ CHECK (status=IN_PROGRESS OR submitted_at NOT NULL) và CHECK (attempt_number > 0) — chuyển xuống SERVICE LAYER.'
+}
+
+// ---------------------------------------------------------------------------
+// 10. SUBMISSION MODULES
+// ---------------------------------------------------------------------------
+
+Table submission_modules {
+  id bigint [pk, increment]
+  submission_id bigint [not null]
+  module_id bigint [not null]
+  status submission_status [not null, default: 'IN_PROGRESS']
+
+  indexes {
+    submission_id [name: 'idx_submission_modules_submission_id']
+    module_id [name: 'idx_submission_modules_module_id']
+    (submission_id, module_id) [unique, name: 'uq_submission_modules_submission_module']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 11. ANSWERS
+// ---------------------------------------------------------------------------
+
+Table answers {
+  id bigint [pk, increment]
+  submission_module_id bigint [not null]
+  question_id bigint
+  content text
+  audio_storage_key varchar(255)
+  audio_duration_seconds int
+  audio_file_size_bytes bigint
+  audio_mime_type varchar(50)
+  audio_upload_status upload_status
+  doc_storage_key varchar(255)
+  doc_mime_type varchar(50)
+  doc_file_size_bytes bigint
+  doc_upload_status upload_status
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    submission_module_id [name: 'idx_answers_submission_module_id']
+    question_id [name: 'idx_answers_question_id']
+  }
+
+  Note: '''V4: gộp bảng answer_results (đã XÓA) vào content. Khi question_id NOT NULL (câu trả lời cho quiz Reading/Listening), content lưu 1 chuỗi JSON (kiểu text):
+  - MULTIPLE_CHOICE: {"selected_option_ids": [1, 3]}
+  - SHORT_ANSWER: {"answer_text": "..."}
+  Sau khi hệ thống tự chấm (grading_method=AUTO), service layer set thêm 2 field vào JSON: "is_correct" (boolean) và "score" (decimal) — ví dụ {"selected_option_ids": [1], "is_correct": true, "score": 1.0}. Đây là dữ liệu trước kia nằm ở bảng answer_results riêng.
+  Khi question_id NULL (Writing/Speaking), content vẫn là text bài viết bình thường (không phải JSON); audio_storage_key/doc_storage_key dùng cho file Speaking/Writing đính kèm.
+  V4: bỏ hết CHECK/partial-unique-index (uq_answers_submodule_question, uq_answers_submodule_no_question, CHECK audio_duration_seconds >= 0, CHECK audio_file_size_bytes >= 0, ràng buộc "đúng 1 trong 3 nguồn dữ liệu" content/audio/doc) — toàn bộ chuyển xuống SERVICE LAYER.'''
+}
+
+// ---------------------------------------------------------------------------
+// 12. ANSWER ANNOTATIONS
+// ---------------------------------------------------------------------------
+
+Table answer_annotations {
+  id bigint [pk, increment]
+  answer_id bigint [not null]
+  source annotation_source [not null]
+  start_offset int [not null]
+  end_offset int [not null]
+  error_type varchar(50)
+  comment text
+  suggested_fix text
+  review_status review_status [not null, default: 'PENDING']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    answer_id [name: 'idx_answer_annotations_answer_id']
+  }
+
+  Note: 'Đây là nơi AI chỉ lỗi (source=AI) — vai trò AI duy nhất, không tự chấm điểm. V4: bỏ CHECK (end_offset >= start_offset). Trường hợp source=TEACHER tự động chuyển review_status=ACCEPTED xử lý ở SERVICE LAYER khi insert (default DB vẫn là PENDING).'
+}
+
+// ---------------------------------------------------------------------------
+// 13. GRADINGS
+// ---------------------------------------------------------------------------
+
+Table gradings {
+  id bigint [pk, increment]
+  submission_module_id bigint [not null, unique]
+  method grading_method [not null]
+  status grading_status [not null, default: 'PENDING']
+  ai_feedback text
+  ai_transcript jsonb
+  ai_instruction_snapshot text
+  final_score decimal(5,2)
+  final_feedback text
+  max_score_snapshot decimal(5,2)
+  reviewed_by bigint
+  reviewed_at timestamptz
+  graded_at timestamptz
+
+  indexes {
+    reviewed_by [name: 'idx_gradings_reviewed_by']
+    status [name: 'idx_gradings_status']
+  }
+
+  Note: 'method=AUTO áp dụng cho Reading/Listening — final_score được service layer CỘNG TỰ ĐỘNG từ các field "score" trong JSON của answers.content, giáo viên chỉ DUYỆT (không gõ tay); method=TEACHER_MANUAL (Writing/Speaking) — giáo viên tự nhập final_score. V4: bỏ CHECK (final_score >= 0 AND final_score <= max_score_snapshot) — chuyển xuống SERVICE LAYER.'
+}
+
+// ---------------------------------------------------------------------------
+// 14. REFRESH TOKENS
+// ---------------------------------------------------------------------------
+
+Table refresh_tokens {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  token_hash varchar(255) [not null, unique]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  user_agent varchar(255)
+  ip_address varchar(45)
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_refresh_tokens_user_id']
+    (user_id, expires_at) [name: 'idx_refresh_tokens_active']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 15. STUDENT EVALUATIONS
+// ---------------------------------------------------------------------------
+
+Table student_evaluations {
+  id bigint [pk, increment]
+  student_id bigint [not null]
+  teacher_id bigint [not null]
+  class_id bigint [not null]
+  content text [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    student_id [name: 'idx_student_evaluations_student_id']
+    teacher_id [name: 'idx_student_evaluations_teacher_id']
+    class_id [name: 'idx_student_evaluations_class_id']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 16. GRADING CHANGE LOGS
+// ---------------------------------------------------------------------------
+
+Table grading_change_logs {
+  id bigint [pk, increment]
+  grading_id bigint [not null]
+  changed_by bigint [not null]
+  old_score decimal(5,2)
+  new_score decimal(5,2)
+  note text
+  changed_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (grading_id, changed_at) [name: 'idx_grading_change_logs_grading_id_changed_at']
+    changed_by [name: 'idx_grading_change_logs_changed_by']
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RELATIONSHIPS (Foreign Keys)
+// V4: bỏ Ref assignments.teacher_id (cột đã xóa), bỏ Ref của question_options và
+// answer_results (2 bảng đã xóa).
+// ---------------------------------------------------------------------------
+
+Ref: teacher_profiles.user_id - users.id
+Ref: student_profiles.user_id - users.id
+
+Ref: classes.teacher_id > teacher_profiles.user_id
+
+Ref: class_members.class_id > classes.id
+Ref: class_members.student_id > student_profiles.user_id
+
+Ref: assignments.class_id > classes.id
+
+Ref: modules.assignment_id > assignments.id [delete: cascade]
+
+Ref: questions.module_id > modules.id [delete: cascade]
+
+Ref: submissions.assignment_id > assignments.id
+Ref: submissions.student_id > student_profiles.user_id
+
+Ref: submission_modules.submission_id > submissions.id [delete: cascade]
+Ref: submission_modules.module_id > modules.id
+
+Ref: answers.submission_module_id > submission_modules.id [delete: cascade]
+Ref: answers.question_id > questions.id
+
+Ref: answer_annotations.answer_id > answers.id [delete: cascade]
+
+Ref: gradings.submission_module_id - submission_modules.id [delete: cascade]
+Ref: gradings.reviewed_by > teacher_profiles.user_id
+
+Ref: refresh_tokens.user_id > users.id
+
+Ref: student_evaluations.student_id > student_profiles.user_id
+Ref: student_evaluations.teacher_id > teacher_profiles.user_id
+Ref: student_evaluations.class_id > classes.id
+
+Ref: grading_change_logs.grading_id > gradings.id
+Ref: grading_change_logs.changed_by > teacher_profiles.user_id

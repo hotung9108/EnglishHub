@@ -24,10 +24,10 @@ Tài liệu quy chuẩn kiến trúc và phát triển Backend cho dự án **En
 
 Hệ thống được tổ chức theo **Bounded Contexts (Modules nghiệp vụ)** thay vì nhóm kỹ thuật thuần túy (package-by-feature / context). 
 
-### 2.1. Cây thư mục chuẩn (`com.english_hub.backend`)
+### 2.1. Cây thư mục chuẩn (`com.english_hub.core`)
 
 ```text
-com.english_hub.backend/
+com.english_hub.core/
 ├── shared/                         # Shared Kernel (dùng chung cho các context)
 │   ├── domain/                     # BaseAggregateRoot, BaseEntity, ValueObject, DomainEvent
 │   ├── application/                # Common DTOs, PagedResult, BaseUseCase
