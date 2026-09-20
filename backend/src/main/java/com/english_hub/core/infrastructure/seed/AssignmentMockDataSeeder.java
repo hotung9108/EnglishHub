@@ -315,7 +315,6 @@ public class AssignmentMockDataSeeder implements CommandLineRunner {
 						data.openAt(),
 						data.closeAt(),
 						data.maxSubmissions(),
-						data.manuallyClosed(),
 						false,
 						data.status()))
 				.toList();
@@ -438,7 +437,6 @@ public class AssignmentMockDataSeeder implements CommandLineRunner {
 						openAt,
 						closeAt,
 						maxSubmissionsFor(assignmentOrdinal),
-						status == AssignmentStatus.CLOSED && assignmentOrdinal % 4 == 0,
 						status));
 				assignmentOrdinal++;
 			}
@@ -604,7 +602,6 @@ public class AssignmentMockDataSeeder implements CommandLineRunner {
 			OffsetDateTime openAt,
 			OffsetDateTime closeAt,
 			Integer maxSubmissions,
-			boolean manuallyClosed,
 			AssignmentStatus status) {
 	}
 

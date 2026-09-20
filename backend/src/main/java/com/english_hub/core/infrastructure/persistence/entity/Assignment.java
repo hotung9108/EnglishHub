@@ -45,9 +45,6 @@ public class Assignment {
 	@Column(name = "max_submissions")
 	private Integer maxSubmissions;
 
-	@Column(name = "is_manually_closed", nullable = false)
-	private boolean manuallyClosed;
-
 	@Column(name = "is_deleted", nullable = false)
 	private boolean deleted;
 
@@ -63,7 +60,6 @@ public class Assignment {
 			OffsetDateTime openAt,
 			OffsetDateTime closeAt,
 			Integer maxSubmissions,
-			boolean manuallyClosed,
 			boolean deleted,
 			AssignmentStatus status) {
 		this.classId = classId;
@@ -72,7 +68,6 @@ public class Assignment {
 		this.openAt = openAt;
 		this.closeAt = closeAt;
 		this.maxSubmissions = maxSubmissions;
-		this.manuallyClosed = manuallyClosed;
 		this.deleted = deleted;
 		this.status = status;
 	}

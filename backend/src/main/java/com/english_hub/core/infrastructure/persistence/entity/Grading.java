@@ -54,12 +54,6 @@ public class Grading {
 	@Column(name = "max_score_snapshot", precision = 5, scale = 2)
 	private BigDecimal maxScoreSnapshot;
 
-	@Column(name = "is_plagiarism_flagged", nullable = false)
-	private boolean plagiarismFlagged;
-
-	@Column(name = "plagiarism_score", precision = 5, scale = 2)
-	private BigDecimal plagiarismScore;
-
 	@Column(name = "reviewed_by")
 	private Long reviewedBy;
 
@@ -84,8 +78,6 @@ public class Grading {
 			BigDecimal finalScore,
 			String finalFeedback,
 			BigDecimal maxScoreSnapshot,
-			boolean plagiarismFlagged,
-			BigDecimal plagiarismScore,
 			Long reviewedBy,
 			OffsetDateTime reviewedAt,
 			OffsetDateTime gradedAt,
@@ -98,8 +90,6 @@ public class Grading {
 		this.finalScore = finalScore;
 		this.finalFeedback = finalFeedback;
 		this.maxScoreSnapshot = maxScoreSnapshot;
-		this.plagiarismFlagged = plagiarismFlagged;
-		this.plagiarismScore = plagiarismScore;
 		this.reviewedBy = reviewedBy;
 		this.reviewedAt = reviewedAt;
 		this.gradedAt = gradedAt;
