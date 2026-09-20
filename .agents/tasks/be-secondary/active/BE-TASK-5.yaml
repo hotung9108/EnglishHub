@@ -1,0 +1,6 @@
+id: BE-TASK-5
+title: "Implement Class APIs (Cluster 3 - APIs #12-#19)"
+assignee: "@be-secondary"
+status: "In Progress"
+priority: "High"
+description: "Implement the 8 class/class-membership endpoints per .agents/private/plans/class_api_implementation_plan.md on branch feat/class-api. Stage 0 (scaffolding) complete: new DDD standalone module com.english_hub.core.modules.classroom with module-owned JPA entities (ClassEntity, ClassMemberEntity), dedicated Spring Data repositories, domain models (EnglishClass, ClassMember, ClassPage), ports (ClassRepository, ClassMemberRepository), adapters, persistence mapper, ClassPageRequest, and ClassService shell. No endpoint business logic or tests yet. Phases 1-3 (read/write/membership services + controllers) and Phase 4 (integration, contract verification, tests) pending. Decisions: role checks skipped (security layer owns 401/403; only #12 data-scoping in service); module-owned persistence; infra ClassStatus enum reused."
