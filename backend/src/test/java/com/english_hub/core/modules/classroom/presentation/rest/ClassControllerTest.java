@@ -1,15 +1,21 @@
 package com.english_hub.core.modules.classroom.presentation.rest;
 
+import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
 import com.english_hub.core.modules.classroom.application.service.ClassService.ClassDetailResult;
+import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.model.TeacherInfo;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.AddClassMemberRequest;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.AddedClassMemberResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassDetailResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassListResponse;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassMemberListResponse;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassMemberResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassSummaryResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.CreatedClassResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.CreateClassRequest;
@@ -134,6 +140,43 @@ class ClassControllerTest {
 		verify(classService).deleteClass(3L);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(new MessageResponse("Xoá lớp học thành công."));
+	}
+
+	@Test
+	void mapsTheClassRosterWithoutPagination() {
+		when(classService.listClassMembers(3L)).thenReturn(List.of(
+				new ClassMemberDetail(7L, 41L, "Trần Tiến Sơn", "HV0012")));
+
+		ResponseEntity<ClassMemberListResponse> response = classController.listClassMembers(3L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		ClassMemberListResponse body = response.getBody();
+		assertThat(body.data()).hasSize(1);
+		ClassMemberResponse item = body.data().getFirst();
+		assertThat(item.memberId()).isEqualTo(7L);
+		assertThat(item.studentId()).isEqualTo(41L);
+		assertThat(item.fullName()).isEqualTo("Trần Tiến Sơn");
+		assertThat(item.studentCode()).isEqualTo("HV0012");
+	}
+
+	@Test
+	void forwardsAnAddMemberRequestAndReturnsCreated() {
+		when(classService.addClassMember(3L, new AddClassMemberCommand(41L))).thenReturn(12L);
+
+		ResponseEntity<AddedClassMemberResponse> response =
+				classController.addClassMember(3L, new AddClassMemberRequest(41L));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+		assertThat(response.getBody()).isEqualTo(new AddedClassMemberResponse("Đã thêm học viên vào lớp.", 12L));
+	}
+
+	@Test
+	void mapsRemoveMemberToTheSuccessMessage() {
+		ResponseEntity<MessageResponse> response = classController.removeClassMember(3L, 7L);
+
+		verify(classService).removeClassMember(3L, 7L);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).isEqualTo(new MessageResponse("Đã xoá học viên khỏi lớp."));
 	}
 
 	private EnglishClass classWithTeacher(long id) {

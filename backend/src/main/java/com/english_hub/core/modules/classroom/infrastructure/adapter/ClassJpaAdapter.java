@@ -37,6 +37,7 @@ public class ClassJpaAdapter implements ClassRepository {
 	private final ClassMemberJpaRepository classMemberJpaRepository;
 	private final com.english_hub.core.infrastructure.persistence.repository.UserRepository userJpaRepository;
 	private final com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository teacherProfileRepository;
+	private final com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository studentProfileRepository;
 	private final com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository assignmentRepository;
 	private final com.english_hub.core.infrastructure.persistence.repository.StudentEvaluationRepository studentEvaluationRepository;
 	private final ClassPersistenceMapper mapper;
@@ -46,6 +47,7 @@ public class ClassJpaAdapter implements ClassRepository {
 			ClassMemberJpaRepository classMemberJpaRepository,
 			com.english_hub.core.infrastructure.persistence.repository.UserRepository userJpaRepository,
 			com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository teacherProfileRepository,
+			com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository studentProfileRepository,
 			com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository assignmentRepository,
 			com.english_hub.core.infrastructure.persistence.repository.StudentEvaluationRepository studentEvaluationRepository,
 			ClassPersistenceMapper mapper) {
@@ -53,6 +55,7 @@ public class ClassJpaAdapter implements ClassRepository {
 		this.classMemberJpaRepository = classMemberJpaRepository;
 		this.userJpaRepository = userJpaRepository;
 		this.teacherProfileRepository = teacherProfileRepository;
+		this.studentProfileRepository = studentProfileRepository;
 		this.assignmentRepository = assignmentRepository;
 		this.studentEvaluationRepository = studentEvaluationRepository;
 		this.mapper = mapper;
@@ -116,6 +119,11 @@ public class ClassJpaAdapter implements ClassRepository {
 	@Override
 	public boolean teacherExists(Long teacherId) {
 		return teacherProfileRepository.existsById(teacherId);
+	}
+
+	@Override
+	public boolean studentExists(Long studentId) {
+		return studentProfileRepository.existsById(studentId);
 	}
 
 	@Transactional(readOnly = true)

@@ -1,9 +1,12 @@
 package com.english_hub.core.modules.classroom.application.service;
 
 import com.english_hub.core.common.ApiException;
+import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassMember;
+import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
@@ -14,6 +17,7 @@ import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,10 @@ public class ClassService {
 			"status phải là ACTIVE, INACTIVE, COMPLETED hoặc CANCELLED.";
 	private static final String DELETE_BLOCKED_MESSAGE =
 			"Không thể xoá: lớp học vẫn còn dữ liệu liên quan.";
+	private static final String MISSING_STUDENT_ID_MESSAGE = "Thiếu mã học viên.";
+	private static final String CLASS_OR_STUDENT_NOT_FOUND_MESSAGE = "Không tìm thấy lớp học hoặc học viên.";
+	private static final String DUPLICATE_STUDENT_MESSAGE = "Học viên đã có trong lớp.";
+	private static final String MEMBER_NOT_FOUND_MESSAGE = "Không tìm thấy thành viên trong lớp.";
 	private static final int NAME_MAX_LENGTH = 150;
 	private static final int LEVEL_MAX_LENGTH = 50;
 
@@ -156,6 +164,39 @@ public class ClassService {
 			throw ApiException.conflict(DELETE_BLOCKED_MESSAGE);
 		}
 		classRepository.deleteById(englishClass.getId());
+	}
+
+	@Transactional(readOnly = true)
+	public List<ClassMemberDetail> listClassMembers(long classId) {
+		requireClassExists(classId);
+		return classMemberRepository.findMembersWithStudentInfo(classId);
+	}
+
+	@Transactional
+	public long addClassMember(long classId, AddClassMemberCommand command) {
+		if (command == null || command.studentId() == null) {
+			throw ApiException.badRequest(MISSING_STUDENT_ID_MESSAGE);
+		}
+		if (!classRepository.existsById(classId) || !classRepository.studentExists(command.studentId())) {
+			throw ApiException.notFound(CLASS_OR_STUDENT_NOT_FOUND_MESSAGE);
+		}
+		if (classMemberRepository.existsByClassIdAndStudentId(classId, command.studentId())) {
+			throw ApiException.conflict(DUPLICATE_STUDENT_MESSAGE);
+		}
+		return classMemberRepository.save(new ClassMember(classId, command.studentId())).getId();
+	}
+
+	@Transactional
+	public void removeClassMember(long classId, long memberId) {
+		ClassMember member = classMemberRepository.findByClassIdAndId(classId, memberId)
+				.orElseThrow(() -> ApiException.notFound(MEMBER_NOT_FOUND_MESSAGE));
+		classMemberRepository.deleteById(member.getId());
+	}
+
+	private void requireClassExists(long classId) {
+		if (!classRepository.existsById(classId)) {
+			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
+		}
 	}
 
 	private boolean hasNoUpdateFields(UpdateClassCommand command) {

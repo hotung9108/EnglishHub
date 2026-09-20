@@ -3,9 +3,12 @@ package com.english_hub.core.modules.classroom.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService.ClassDetailResult;
+import com.english_hub.core.modules.classroom.domain.model.ClassMember;
+import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
@@ -377,6 +380,122 @@ class ClassServiceTest {
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Không thể xoá: lớp học vẫn còn dữ liệu liên quan.");
 		verify(classRepository, never()).deleteById(3L);
+	}
+
+	@Test
+	void listsMembersForAnExistingClass() {
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classMemberRepository.findMembersWithStudentInfo(3L))
+				.thenReturn(List.of(
+						new ClassMemberDetail(7L, 41L, "Trần Tiến Sơn", "HV0012"),
+						new ClassMemberDetail(8L, 42L, "Lê Văn Hùng", "HV0013")));
+
+		List<ClassMemberDetail> members = classService.listClassMembers(3L);
+
+		assertThat(members).hasSize(2);
+		assertThat(members.getFirst().memberId()).isEqualTo(7L);
+		assertThat(members.getFirst().fullName()).isEqualTo("Trần Tiến Sơn");
+		assertThat(members.getFirst().studentCode()).isEqualTo("HV0012");
+	}
+
+	@Test
+	void returnsAnEmptyRosterForAClassWithoutMembers() {
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classMemberRepository.findMembersWithStudentInfo(3L)).thenReturn(List.of());
+
+		assertThat(classService.listClassMembers(3L)).isEmpty();
+	}
+
+	@Test
+	void rejectsListingMembersForAnUnknownClass() {
+		when(classRepository.existsById(404L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.listClassMembers(404L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lớp học.");
+		verify(classMemberRepository, never()).findMembersWithStudentInfo(any(Long.class));
+	}
+
+	@Test
+	void addsAStudentToAClassAndReturnsTheNewMemberId() {
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classRepository.studentExists(41L)).thenReturn(true);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(false);
+		when(classMemberRepository.save(any(ClassMember.class))).thenAnswer(invocation -> {
+			ClassMember member = invocation.getArgument(0);
+			member.setId(12L);
+			return member;
+		});
+
+		long memberId = classService.addClassMember(3L, new AddClassMemberCommand(41L));
+
+		assertThat(memberId).isEqualTo(12L);
+		ArgumentCaptor<ClassMember> captor = ArgumentCaptor.forClass(ClassMember.class);
+		verify(classMemberRepository).save(captor.capture());
+		assertThat(captor.getValue().getClassId()).isEqualTo(3L);
+		assertThat(captor.getValue().getStudentId()).isEqualTo(41L);
+	}
+
+	@Test
+	void rejectsAddingAStudentWithoutAnId() {
+		assertThatThrownBy(() -> classService.addClassMember(3L, new AddClassMemberCommand(null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Thiếu mã học viên.");
+		verify(classMemberRepository, never()).save(any(ClassMember.class));
+	}
+
+	@Test
+	void rejectsAddingAStudentToAnUnknownClass() {
+		when(classRepository.existsById(404L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.addClassMember(404L, new AddClassMemberCommand(41L)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lớp học hoặc học viên.");
+		verify(classMemberRepository, never()).save(any(ClassMember.class));
+	}
+
+	@Test
+	void rejectsAddingAnUnknownStudent() {
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classRepository.studentExists(999L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.addClassMember(3L, new AddClassMemberCommand(999L)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lớp học hoặc học viên.");
+		verify(classMemberRepository, never()).save(any(ClassMember.class));
+	}
+
+	@Test
+	void rejectsAddingADuplicateStudent() {
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classRepository.studentExists(41L)).thenReturn(true);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> classService.addClassMember(3L, new AddClassMemberCommand(41L)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Học viên đã có trong lớp.");
+		verify(classMemberRepository, never()).save(any(ClassMember.class));
+	}
+
+	@Test
+	void removesAMemberFromAClass() {
+		ClassMember member = new ClassMember(3L, 41L);
+		member.setId(7L);
+		when(classMemberRepository.findByClassIdAndId(3L, 7L)).thenReturn(Optional.of(member));
+
+		classService.removeClassMember(3L, 7L);
+
+		verify(classMemberRepository).deleteById(7L);
+	}
+
+	@Test
+	void rejectsRemovingAMemberFromAnotherClass() {
+		when(classMemberRepository.findByClassIdAndId(3L, 7L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> classService.removeClassMember(3L, 7L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy thành viên trong lớp.");
+		verify(classMemberRepository, never()).deleteById(anyLong());
 	}
 
 	private EnglishClass classWithTeacher(long id) {

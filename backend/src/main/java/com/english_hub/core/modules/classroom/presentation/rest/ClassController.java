@@ -1,11 +1,15 @@
 package com.english_hub.core.modules.classroom.presentation.rest;
 
+import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.AddClassMemberRequest;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.AddedClassMemberResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassDetailResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassListResponse;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassMemberListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassSummaryResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.CreateClassRequest;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.CreatedClassResponse;
@@ -83,5 +87,27 @@ public class ClassController {
 	public ResponseEntity<MessageResponse> deleteClass(@PathVariable long id) {
 		classService.deleteClass(id);
 		return ResponseEntity.ok(new MessageResponse("Xoá lớp học thành công."));
+	}
+
+	@GetMapping("/{id}/members")
+	public ResponseEntity<ClassMemberListResponse> listClassMembers(@PathVariable long id) {
+		return ResponseEntity.ok(ClassMemberListResponse.from(classService.listClassMembers(id)));
+	}
+
+	@PostMapping("/{id}/members")
+	public ResponseEntity<AddedClassMemberResponse> addClassMember(
+			@PathVariable long id,
+			@RequestBody AddClassMemberRequest request) {
+		long memberId = classService.addClassMember(id, new AddClassMemberCommand(request.studentId()));
+		return ResponseEntity.status(HttpStatus.CREATED)
+				.body(new AddedClassMemberResponse("Đã thêm học viên vào lớp.", memberId));
+	}
+
+	@DeleteMapping("/{id}/members/{memberId}")
+	public ResponseEntity<MessageResponse> removeClassMember(
+			@PathVariable long id,
+			@PathVariable long memberId) {
+		classService.removeClassMember(id, memberId);
+		return ResponseEntity.ok(new MessageResponse("Đã xoá học viên khỏi lớp."));
 	}
 }

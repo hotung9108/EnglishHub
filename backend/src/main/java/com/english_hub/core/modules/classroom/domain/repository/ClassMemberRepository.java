@@ -2,12 +2,15 @@ package com.english_hub.core.modules.classroom.domain.repository;
 
 import com.english_hub.core.common.persistence.repository.IRepository;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
+import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import java.util.List;
 import java.util.Optional;
 
 public interface ClassMemberRepository extends IRepository<ClassMember, Long> {
 
 	List<ClassMember> findByClassId(Long classId);
+
+	List<ClassMemberDetail> findMembersWithStudentInfo(Long classId);
 
 	long countByClassId(Long classId);
 
