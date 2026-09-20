@@ -1,8 +1,8 @@
-package com.english_hub.core.modules.classroom.application.command;
+package com.english_hub.core.modules.classroom.presentation.rest.dto;
 
 import java.time.LocalDate;
 
-public record CreateClassCommand(
+public record CreateClassRequest(
 		String name,
 		String level,
 		String description,
