@@ -411,7 +411,7 @@ export const StudentWorkspace: React.FC = () => {
                   />
                   <select
                     value={newNoteCategory}
-                    onChange={(e) => setNewNoteCategory(e.target.value as any)}
+                    onChange={(e) => setNewNoteCategory(e.target.value as 'Vocabulary' | 'Speaking' | 'Grammar' | 'General')}
                     style={{
                       flex: 1,
                       padding: '8px 12px',

@@ -32,7 +32,7 @@ export const TeacherAssignments: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
 
-  const assignments: AssignmentItem[] = [
+  const assignments: AssignmentItem[] = useMemo(() => [
     {
       id: '1',
       code: 'HW-01',
@@ -101,7 +101,7 @@ export const TeacherAssignments: React.FC = () => {
       pendingGradingCount: 2,
       status: 'upcoming'
     }
-  ];
+  ], []);
 
   const filteredAssignments = useMemo(() => {
     return assignments.filter(item => {

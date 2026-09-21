@@ -32,7 +32,7 @@ export const TeacherClasses: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('current');
 
-  const classes: TeacherClassItem[] = [
+  const classes: TeacherClassItem[] = useMemo(() => [
     {
       id: '1',
       code: 'ENG-IELTS-6.5A',
@@ -93,7 +93,7 @@ export const TeacherClasses: React.FC = () => {
         avgScore: 7.5
       }
     }
-  ];
+  ], []);
 
   const filteredClasses = useMemo(() => {
     return classes.filter(cls => {

@@ -136,7 +136,7 @@ export const StudentAnalytics: React.FC = () => {
         <div style={{ display: 'flex', gap: '8px' }}>
           <select 
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as any)}
+            onChange={(e) => setTimeRange(e.target.value as 'month' | 'quarter' | 'all')}
             style={{
               padding: '8px 14px',
               fontSize: '13px',
