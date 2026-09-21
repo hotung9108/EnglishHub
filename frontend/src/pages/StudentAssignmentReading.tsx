@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, Search, Bell, BookOpen, 
   Timer, Pause, Save, Send, Bookmark, Highlighter, 
@@ -8,6 +8,7 @@ import {
 
 const StudentAssignmentReading: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   // The id can be used to fetch assignment details. Console log to avoid unused variable warning.
   console.log('Assignment ID:', id);
   
@@ -38,7 +39,10 @@ const StudentAssignmentReading: React.FC = () => {
       {/* Page Header (replaces standard header) */}
       <div style={{ padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}>
+          <button 
+            onClick={() => navigate('/student/assignments')}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}
+          >
             <ArrowLeft size={16} /> Quay lại danh sách bài tập
           </button>
           

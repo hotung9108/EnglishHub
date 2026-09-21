@@ -1,23 +1,41 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage, LanguageProvider } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import type { User } from '../types/auth';
+import { 
+  Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, 
+  ShieldCheck, GraduationCap, Users, BookOpen, 
+  CheckCircle2, Globe, AlertCircle, Award, Star
+} from 'lucide-react';
 
 const MOCK_ACCOUNTS: Record<string, User> = {
   'admin@eh.com': { id: '1', name: 'Nguyễn Văn Hùng (Admin)', email: 'admin@eh.com', role: 'admin' },
-  'teacher@eh.com': { id: '2', name: 'Cô Lan (Teacher)', email: 'teacher@eh.com', role: 'teacher' },
-  'student@eh.com': { id: '3', name: 'Bé Na (Student)', email: 'student@eh.com', role: 'student' },
+  'teacher@eh.com': { id: '2', name: 'Cô Trần Thị Mai Lan (Teacher)', email: 'teacher@eh.com', role: 'teacher' },
+  'student@eh.com': { id: '3', name: 'Alice Johnson (Student)', email: 'student@eh.com', role: 'student' },
 };
 
-const LoginForm = () => {
-  const { t, toggleLanguage } = useLanguage();
+const LoginForm: React.FC = () => {
+  const { language, toggleLanguage } = useLanguage();
+  const isVi = language === 'vi';
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [email, setEmail] = useState('admin@eh.com');
+  const [password, setPassword] = useState('password123');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'teacher' | 'student'>('admin');
+
+  const handleRoleSelect = (role: 'admin' | 'teacher' | 'student') => {
+    setSelectedRole(role);
+    if (role === 'admin') setEmail('admin@eh.com');
+    if (role === 'teacher') setEmail('teacher@eh.com');
+    if (role === 'student') setEmail('student@eh.com');
+    setError('');
+  };
 
   const handleLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -26,10 +44,7 @@ const LoginForm = () => {
     const user = MOCK_ACCOUNTS[email];
     if (user) {
       login(user);
-      
-      // Where did they come from?
       const from = location.state?.from?.pathname || '/';
-      
       if (from === '/') {
         if (user.role === 'admin') navigate('/admin', { replace: true });
         else if (user.role === 'teacher') navigate('/teacher', { replace: true });
@@ -38,177 +53,273 @@ const LoginForm = () => {
         navigate(from, { replace: true });
       }
     } else {
-      setError(t('loginError'));
+      setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác' : 'Invalid email or password credentials');
     }
   };
 
-  const quickLogin = (mockEmail: string) => {
-    setEmail(mockEmail);
-  };
-
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', background: 'var(--background)' }}>
-      <main style={{
-        width: '100%',
-        maxWidth: 'var(--container-max-width)',
-        display: 'flex',
-        flexDirection: 'row',
-        background: 'var(--surface-container-lowest)',
-        borderRadius: 'var(--radius-xl)',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-card)',
-        minHeight: '600px',
-        border: '1px solid rgba(197, 197, 211, 0.3)'
-      }}>
-        {/* Left Side: Illustrative Area */}
-        <div style={{
-          width: '50%',
-          position: 'relative',
-          background: 'var(--surface-container)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end',
-          padding: '48px'
-        }}>
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0, 35, 111, 0.8), transparent)',
-            zIndex: 1
-          }}></div>
-          <div style={{ position: 'relative', zIndex: 2, color: 'var(--on-primary)' }}>
-            <h2 className="headline-lg" style={{ marginBottom: '16px' }}>Focus on Growth</h2>
-            <p className="body-lg" style={{ opacity: 0.9, maxWidth: '400px' }}>
-              Enter your digital sanctuary. A frictionless environment designed for academic achievement.
+    <div className="login-page-wrapper">
+      {/* Background ambient lighting effects */}
+      <div className="login-ambient-orb-1"></div>
+      <div className="login-ambient-orb-2"></div>
+
+      <main className="login-card-container">
+        {/* Left Side: Brand Showcase & Features */}
+        <div className="login-left-showcase">
+          <div>
+            {/* Logo */}
+            <div className="login-brand-logo">
+              <div className="login-logo-icon">
+                <GraduationCap size={26} strokeWidth={2.4} />
+              </div>
+              <div>
+                <div className="login-brand-name">EnglishHub</div>
+                <div className="login-brand-tag">IELTS & Academic Platform</div>
+              </div>
+            </div>
+
+            {/* Hero Copy */}
+            <h1 className="login-hero-title">
+              {isVi ? (
+                <>
+                  Học tập & Đánh giá Tiếng Anh <span>chuẩn Quốc tế cùng AI</span>
+                </>
+              ) : (
+                <>
+                  Next-Generation <span>AI-Assisted</span> English Assessment
+                </>
+              )}
+            </h1>
+            <p className="login-hero-desc">
+              {isVi
+                ? 'Nền tảng đồng bộ dành cho Nhà trường, Giảng viên và Học viên với công nghệ chấm thi AI 4 kỹ năng Listening - Speaking - Reading - Writing.'
+                : 'Comprehensive educational ecosystem powering automated rubric evaluation, real-time acoustics, and targeted remediation.'}
             </p>
+
+            {/* Feature Badges */}
+            <div className="login-features-list">
+              <div className="login-feature-item">
+                <div className="login-feature-icon">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h2 className="login-feature-text-title">
+                    {isVi ? 'AI Chấm Điểm 4 Kỹ Năng' : 'AI Multi-Skill Evaluation'}
+                  </h2>
+                  <p className="login-feature-text-sub">
+                    {isVi ? 'Đánh giá tự động theo chuẩn tiêu chí Band Descriptors của British Council & IDP.' : 'Automated grading calibrated with official IELTS descriptors.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="login-feature-item">
+                <div className="login-feature-icon" style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', color: '#c084fc' }}>
+                  <Award size={18} />
+                </div>
+                <div>
+                  <h2 className="login-feature-text-title">
+                    {isVi ? 'Phân Tích Âm Vị & Ngữ Điệu Thời Gian Thực' : 'Real-Time Acoustic Diagnostic'}
+                  </h2>
+                  <p className="login-feature-text-sub">
+                    {isVi ? 'Nhận diện phát âm sai, nối âm và độ ngắt nghỉ trôi chảy của bài nói Speaking.' : 'Speech-to-text phoneme precision and fluency rhythm tracking.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="login-feature-item">
+                <div className="login-feature-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7' }}>
+                  <CheckCircle2 size={18} />
+                </div>
+                <div>
+                  <h2 className="login-feature-text-title">
+                    {isVi ? 'Lộ Trình Ôn Luyện Cá Nhân Hóa' : 'Adaptive Diagnostic Roadmap'}
+                  </h2>
+                  <p className="login-feature-text-sub">
+                    {isVi ? 'Phát hiện lỗ hổng kiến thức và đề xuất bài tập khắc phục trực tiếp.' : 'Pinpoint cognitive traps and generate customized remedial drills.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Testimonial Quote */}
+          <div className="login-testimonial">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', color: '#facc15' }}>
+              <Star size={13} fill="#facc15" />
+              <Star size={13} fill="#facc15" />
+              <Star size={13} fill="#facc15" />
+              <Star size={13} fill="#facc15" />
+              <Star size={13} fill="#facc15" />
+              <span style={{ fontSize: '11px', color: '#e2e8f0', marginLeft: '6px', fontWeight: 700 }}>5.0 Rating</span>
+            </div>
+            <p style={{ margin: 0, fontStyle: 'italic' }}>
+              {isVi 
+                ? '“Hệ thống gợi ý sửa lỗi phát âm và bài viết IELTS giúp em tăng từ Band 6.5 lên 7.5 chỉ sau 2 tháng luyện tập!”' 
+                : '“The AI sentence annotation and teacher feedback helped me advance from Band 6.5 to 7.5 in 2 months!”'}
+            </p>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', fontWeight: 600 }}>
+              — Alice Johnson (IELTS 8.0 Candidate)
+            </div>
           </div>
         </div>
 
         {/* Right Side: Login Form */}
-        <div style={{
-          width: '50%',
-          padding: '64px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          background: 'var(--surface-container-lowest)'
-        }}>
-          <div style={{ maxWidth: '400px', margin: '0 auto', width: '100%' }}>
-            {/* Brand */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '40px' }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                background: 'var(--primary)',
-                borderRadius: 'var(--radius-default)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '24px',
-                boxShadow: 'var(--shadow-btn)',
-                color: 'var(--on-primary)',
-                fontWeight: 700,
-                fontSize: '24px'
-              }}>
-                EH
-              </div>
-              <h1 className="headline-lg text-primary" style={{ textTransform: 'uppercase', letterSpacing: '-0.02em', marginBottom: '8px' }}>
-                {t('login')}
-              </h1>
-              <p className="body-md text-on-surface-variant">
-                {t('systemSub')}
+        <div className="login-right-form-wrap">
+          <div>
+            {/* Top Bar: Language Switcher */}
+            <div className="login-top-bar">
+              <button
+                type="button"
+                className="login-lang-btn"
+                onClick={toggleLanguage}
+              >
+                <Globe size={14} color="#2563eb" />
+                <span>{isVi ? 'Tiếng Việt (VN)' : 'English (US)'}</span>
+              </button>
+            </div>
+
+            {/* Form Title */}
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                {isVi ? 'Đăng Nhập Tài Khoản' : 'Welcome to EnglishHub'}
+              </h2>
+              <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
+                {isVi 
+                  ? 'Chọn vai trò demo hoặc nhập thông tin đăng nhập của bạn.' 
+                  : 'Select a demo role or enter your credentials to access the portal.'}
               </p>
             </div>
 
-            {/* Quick Login Buttons (Mock) */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', justifyContent: 'center' }}>
-              <button onClick={() => quickLogin('admin@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'admin@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Admin</button>
-              <button onClick={() => quickLogin('teacher@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'teacher@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Teacher</button>
-              <button onClick={() => quickLogin('student@eh.com')} style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--outline-variant)', fontSize: '12px', background: email === 'student@eh.com' ? 'var(--primary-container)' : 'transparent' }}>Student</button>
+            {/* Quick Demo Role Tabs */}
+            <div className="login-role-tabs">
+              <button
+                type="button"
+                className={`login-role-tab ${selectedRole === 'admin' ? 'active' : ''}`}
+                onClick={() => handleRoleSelect('admin')}
+              >
+                <ShieldCheck size={15} />
+                <span>Admin</span>
+              </button>
+              <button
+                type="button"
+                className={`login-role-tab ${selectedRole === 'teacher' ? 'active' : ''}`}
+                onClick={() => handleRoleSelect('teacher')}
+              >
+                <Users size={15} />
+                <span>{isVi ? 'Giáo viên' : 'Teacher'}</span>
+              </button>
+              <button
+                type="button"
+                className={`login-role-tab ${selectedRole === 'student' ? 'active' : ''}`}
+                onClick={() => handleRoleSelect('student')}
+              >
+                <BookOpen size={15} />
+                <span>{isVi ? 'Học viên' : 'Student'}</span>
+              </button>
             </div>
 
-            {/* Divider */}
-            <hr style={{ border: 'none', borderTop: '1px solid rgba(197, 197, 211, 0.5)', marginBottom: '32px' }} />
+            {/* Error Message */}
+            {error && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                color: '#dc2626',
+                fontSize: '13px',
+                marginBottom: '18px'
+              }}>
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+            )}
 
-            {/* Form */}
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {error && <div style={{ color: 'var(--error)', fontSize: '14px', background: 'var(--error-container)', padding: '12px', borderRadius: '8px' }}>{error}</div>}
-              
+            {/* Form Fields */}
+            <form onSubmit={handleLogin}>
               {/* Email */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label className="label-md text-on-surface" style={{ textTransform: 'uppercase' }}>
-                  {t('email')} *
+              <div className="login-input-group">
+                <label className="login-input-label">
+                  <span>{isVi ? 'Địa chỉ Email' : 'Email Address'}</span>
+                  <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 500 }}>
+                    {selectedRole === 'admin' && (isVi ? 'Quyền: Quản trị viên' : 'Role: Administrator')}
+                    {selectedRole === 'teacher' && (isVi ? 'Quyền: Giảng viên' : 'Role: Teacher')}
+                    {selectedRole === 'student' && (isVi ? 'Quyền: Học viên' : 'Role: Student')}
+                  </span>
                 </label>
-                <input
-                  type="email"
-                  className="input"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@eh.com"
-                  required
-                />
+                <div className="login-input-wrapper">
+                  <Mail size={16} className="login-input-icon" />
+                  <input
+                    type="email"
+                    className="login-input-field"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="yourname@eh.com"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Password */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label className="label-md text-on-surface" style={{ textTransform: 'uppercase' }}>
-                  {t('password')} *
-                </label>
-                <div style={{ position: 'relative' }}>
+              <div className="login-input-group">
+                <div className="login-input-label">
+                  <span>{isVi ? 'Mật khẩu' : 'Password'}</span>
+                  <a 
+                    href="#forgot" 
+                    onClick={(e) => { e.preventDefault(); alert(isVi ? 'Vui lòng liên hệ Admin để khôi phục mật khẩu.' : 'Please contact your administrator to reset password.'); }}
+                    style={{ fontSize: '12.5px', color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
+                  >
+                    {isVi ? 'Quên mật khẩu?' : 'Forgot password?'}
+                  </a>
+                </div>
+                <div className="login-input-wrapper">
+                  <Lock size={16} className="login-input-icon" />
                   <input
-                    type="password"
-                    className="input"
-                    defaultValue="password123"
+                    type={showPassword ? 'text' : 'password'}
+                    className="login-input-field"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
                   />
                   <button
                     type="button"
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: 'var(--outline)',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      padding: '4px 8px',
-                      borderRadius: 'var(--radius-sm)'
-                    }}
+                    className="login-pwd-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? (isVi ? 'Ẩn mật khẩu' : 'Hide password') : (isVi ? 'Hiện mật khẩu' : 'Show password')}
                   >
-                    {t('show')}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
-              {/* Remember / Forgot */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                  <input type="checkbox" defaultChecked style={{ accentColor: 'var(--primary)' }} />
-                  <span className="body-md text-on-surface-variant">{t('remember')}</span>
+              {/* Remember Me */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 20px 0' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#475569' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }} 
+                  />
+                  <span>{isVi ? 'Ghi nhớ đăng nhập trên thiết bị này' : 'Remember me on this device'}</span>
                 </label>
-                <a href="#" className="label-md text-primary" style={{ textDecoration: 'none' }}>
-                  {t('forgot')}
-                </a>
               </div>
 
-              {/* Submit */}
-              <div style={{ paddingTop: '8px' }}>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', textTransform: 'uppercase', fontWeight: 700 }}>
-                  {t('loginBtn')} &rarr;
-                </button>
-              </div>
-            </form>
-
-            {/* Language Switcher */}
-            <div style={{ textAlign: 'center', marginTop: '24px' }}>
-              <button
-                onClick={toggleLanguage}
-                className="label-md text-primary"
-                style={{ padding: '8px 16px', borderRadius: 'var(--radius-default)', border: '1px solid var(--outline-variant)' }}
-              >
-                {t('switchLang')}
+              {/* Submit Button */}
+              <button type="submit" className="login-submit-btn">
+                <span>{isVi ? 'ĐĂNG NHẬP HỆ THỐNG' : 'SIGN IN TO PORTAL'}</span>
+                <ArrowRight size={17} />
               </button>
-            </div>
+            </form>
+          </div>
+
+          {/* Footer Security Badge */}
+          <div style={{ marginTop: '32px', paddingTop: '18px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#94a3b8' }}>
+            <ShieldCheck size={14} color="#10b981" />
+            <span>{isVi ? 'Bảo mật chuẩn SSL 256-Bit • Tích hợp AI Chấm Thi EnglishHub' : '256-Bit SSL Encrypted • Powered by EnglishHub AI Engine'}</span>
           </div>
         </div>
       </main>
