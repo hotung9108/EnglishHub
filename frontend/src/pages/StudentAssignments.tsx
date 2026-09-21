@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   PenTool, 
@@ -74,10 +75,25 @@ const MOCK_ASSIGNMENTS: MockAssignment[] = [
 ];
 
 const StudentAssignments: React.FC = () => {
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'not_started' | 'grading' | 'graded'>('all');
+
+  const getAssignmentRoute = (assignment: MockAssignment) => {
+    const typeLower = assignment.type.toLowerCase();
+    if (typeLower.includes('speaking')) {
+      return `/student/assignments/speaking/${assignment.id}`;
+    }
+    if (typeLower.includes('reading')) {
+      return `/student/assignments/reading/${assignment.id}`;
+    }
+    if (typeLower.includes('listening')) {
+      return `/student/assignments/listening/${assignment.id}`;
+    }
+    return `/student/assignments/${assignment.id}`;
+  };
 
   // Filtered by class & search query & status filter
   const filteredAssignments = useMemo(() => {
@@ -513,6 +529,15 @@ const StudentAssignments: React.FC = () => {
             return (
               <div 
                 key={assignment.id} 
+                onClick={() => {
+                  if (assignment.status === 'graded') {
+                    navigate(`/student/assignments/${assignment.id}/result`);
+                  } else if (assignment.status === 'not_started') {
+                    navigate(`/student/assignments/${assignment.id}/overview`);
+                  } else {
+                    navigate(getAssignmentRoute(assignment));
+                  }
+                }}
                 style={{ 
                   backgroundColor: '#FFFFFF', 
                   borderRadius: '16px', 
@@ -525,7 +550,8 @@ const StudentAssignments: React.FC = () => {
                   flexWrap: 'wrap',
                   gap: '16px',
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative'
+                  position: 'relative',
+                  cursor: 'pointer'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -749,6 +775,39 @@ const StudentAssignments: React.FC = () => {
                       {t('studentAssignments.statusNotStarted')}
                     </div>
                   )}
+
+                  {/* Action CTA Button */}
+                  <button
+                    type="button"
+                    style={{
+                      padding: '7px 16px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      border: assignment.status === 'not_started' ? 'none' : '1px solid #CBD5E1',
+                      backgroundColor: assignment.status === 'not_started' ? '#2563EB' : '#FFFFFF',
+                      color: assignment.status === 'not_started' ? '#FFFFFF' : '#334155',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (assignment.status === 'graded') {
+                        navigate(`/student/assignments/${assignment.id}/result`);
+                      } else if (assignment.status === 'not_started') {
+                        navigate(`/student/assignments/${assignment.id}/overview`);
+                      } else {
+                        navigate(getAssignmentRoute(assignment));
+                      }
+                    }}
+                  >
+                    {assignment.status === 'not_started'
+                      ? t('studentAssignments.btnStart')
+                      : assignment.status === 'graded'
+                        ? t('studentAssignments.btnFeedback')
+                        : t('studentAssignments.btnReview')}
+                  </button>
                 </div>
               </div>
             );
