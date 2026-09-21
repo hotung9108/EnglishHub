@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: englishhub-postgres-fullstack-dev
+    container_name: englishhub-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-appdb}
@@ -23,7 +23,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: englishhub-backend-fullstack-dev
+    container_name: englishhub-backend
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: dev
@@ -45,7 +45,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: development
-    container_name: englishhub-frontend-fullstack-dev
+    container_name: englishhub-frontend
     restart: unless-stopped
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
