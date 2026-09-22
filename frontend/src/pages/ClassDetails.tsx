@@ -39,60 +39,59 @@ const ClassDetails = () => {
   return (
     <div>
       {/* Breadcrumb & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div className="flex-between-start mb-24">
         <div>
-          <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="breadcrumb-nav">
             <span>{t('classDetails.breadcrumbAdmin')}</span>
             <span>&rsaquo;</span>
-            <Link to="/admin/classes" style={{ color: '#6B7280', textDecoration: 'none' }}>{t('classDetails.breadcrumbManage')}</Link>
+            <Link to="/admin/classes">{t('classDetails.breadcrumbManage')}</Link>
             <span>&rsaquo;</span>
-            <span style={{ fontWeight: '500', color: '#111827' }}>{t('classDetails.breadcrumbPrefix')}{classData.code}</span>
+            <span className="breadcrumb-current">{t('classDetails.breadcrumbPrefix')}{classData.code}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-            <h1 className="display-sm" style={{ fontSize: '28px' }}>{classData.name}</h1>
-            <span className="badge badge-primary" style={{ backgroundColor: '#EEF2FF', color: '#4F46E5', fontSize: '12px', padding: '4px 8px' }}>
+          <div className="flex items-center gap-16 mb-12">
+            <h1 style={{ fontSize: '28px' }}>{classData.name}</h1>
+            <span className="badge badge-code">
               {classData.code}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <span className="badge" style={{ backgroundColor: '#D1FAE5', color: '#065F46', fontSize: '12px', padding: '4px 8px', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#059669' }}></span>
+          <div className="flex items-center gap-12 mb-8">
+            <span className="badge badge-status-active">
+              <span className="status-dot status-dot-active"></span>
               {t('active')}
             </span>
           </div>
-          <p style={{ color: '#6B7280', fontSize: '14px' }}>{classData.description}</p>
+          <p className="text-on-surface-variant" style={{ fontSize: '14px' }}>{classData.description}</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="flex gap-12">
+          <button className="btn btn-white">
             <ArrowLeft size={16} />
             {t('classDetails.btnBack')}
           </button>
-          <button className="btn" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button className="btn btn-white">
             <Download size={16} />
             {t('classDetails.btnExport')}
           </button>
-
         </div>
       </div>
 
       {/* 2 Info Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: '24px' }}>
+      <div className="grid grid-2 gap-20 mb-24">
         {/* Card 1: Teacher */}
-        <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>{t('classDetails.teacherInCharge')}</span>
-            <div style={{ width: '32px', height: '32px', backgroundColor: '#EFF6FF', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6' }}>
+        <div className="card p-20 flex-col">
+          <div className="flex-between-start mb-12">
+            <span className="info-card-label">{t('classDetails.teacherInCharge')}</span>
+            <div className="info-card-icon">
               <ArrowLeft size={16} style={{ transform: 'rotate(135deg)' }} />
             </div>
           </div>
           <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>{classData.teacher.name}</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 'auto' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#E5E7EB', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', color: '#4B5563' }}>
+          <div className="flex items-center gap-12 mt-auto">
+            <div className="info-card-avatar">
               {classData.teacher.name.charAt(4)}
             </div>
             <div>
-              <span style={{ display: 'inline-block', backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', marginBottom: '4px' }}>
+              <span className="badge-ielts">
                 IELTS {classData.teacher.ielts}
               </span>
               <p style={{ fontSize: '12px', color: '#6B7280' }}>{classData.teacher.title}</p>
@@ -101,74 +100,54 @@ const ClassDetails = () => {
         </div>
 
         {/* Card 2: Students */}
-        <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase' }}>{t('classDetails.currentClassSize')}</span>
-            <div style={{ width: '32px', height: '32px', backgroundColor: '#EFF6FF', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#3B82F6' }}>
+        <div className="card p-20 flex-col">
+          <div className="flex-between-start mb-12">
+            <span className="info-card-label">{t('classDetails.currentClassSize')}</span>
+            <div className="info-card-icon">
               <Users size={16} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
+          <div className="flex items-baseline gap-8 mb-16">
             <span style={{ fontSize: '32px', fontWeight: '700' }}>{classData.studentsCount}</span>
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>/ {classData.studentsMax}{t('classDetails.studentUnit')}</span>
+            <span className="text-on-surface-variant" style={{ fontSize: '14px' }}>/ {classData.studentsMax}{t('classDetails.studentUnit')}</span>
           </div>
-          <div style={{ marginTop: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
+          <div className="mt-auto">
+            <div className="flex-between mb-8" style={{ fontSize: '12px' }}>
               <span style={{ color: '#4B5563', fontWeight: '500' }}>{t('classDetails.occupancyRate')}</span>
               <span style={{ color: '#059669', fontWeight: '600' }}>{Math.round((classData.studentsCount / classData.studentsMax) * 100)}% {t('classDetails.seatsLeftPrefix')}{classData.studentsMax - classData.studentsCount}{t('classDetails.seatsLeftSuffix')}</span>
             </div>
-            <div style={{ height: '6px', backgroundColor: '#E5E7EB', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${(classData.studentsCount / classData.studentsMax) * 100}%`, backgroundColor: '#059669', borderRadius: '3px' }}></div>
+            <div className="progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${(classData.studentsCount / classData.studentsMax) * 100}%` }}></div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', overflowX: 'auto', padding: '0 16px' }}>
+      <div className="card mb-24">
+        <div className="tab-bar">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '16px 20px',
-                backgroundColor: activeTab === tab.id ? '#EFF6FF' : 'transparent',
-                border: 'none',
-                borderBottom: `2px solid ${activeTab === tab.id ? '#2563EB' : 'transparent'}`,
-                color: activeTab === tab.id ? '#1D4ED8' : '#6B7280',
-                fontWeight: activeTab === tab.id ? '600' : '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
             >
               <tab.icon size={18} />
               {tab.label}
               {tab.badge && (
-                <span style={{
-                  backgroundColor: activeTab === tab.id ? '#2563EB' : '#F3F4F6',
-                  color: activeTab === tab.id ? 'white' : '#4B5563',
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}>
+                <span className={`tab-badge ${activeTab === tab.id ? 'tab-badge-active' : 'tab-badge-inactive'}`}>
                   {tab.badge}
                 </span>
               )}
             </button>
           ))}
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', paddingRight: '16px', gap: '8px', fontSize: '12px', color: '#6B7280' }}>
+          <div className="tab-sync-status">
             <CheckCircle2 size={14} color="#059669" /> {t('classDetails.syncStatus')}
           </div>
         </div>
 
         {/* Tab Content Area */}
-        <div style={{ padding: '24px' }}>
+        <div className="tab-content">
           {activeTab === 'students' && <TabStudents />}
           {activeTab === 'assignments' && <TabAssignments />}
           {activeTab === 'settings' && <TabSettings />}

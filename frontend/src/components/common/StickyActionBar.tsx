@@ -8,10 +8,10 @@ interface StickyActionBarProps {
 export const StickyActionBar = ({ leftActions, rightActions }: StickyActionBarProps) => {
   return (
     <div className="sticky-action-bar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="flex items-center gap-12">
         {leftActions}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="flex items-center gap-12">
         {rightActions}
       </div>
     </div>

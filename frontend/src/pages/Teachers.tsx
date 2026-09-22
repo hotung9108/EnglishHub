@@ -48,37 +48,37 @@ const Teachers = () => {
       </div>
 
       {/* Main Container */}
-      <div className="card" style={{ padding: '32px' }}>
+      <div className="card p-32">
         {/* Header Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="flex-between flex-wrap gap-16 mb-32">
           <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('teachers.subtitle')}</h3>
+            <h3 className="headline-md text-on-surface mb-4">{t('teachers.subtitle')}</h3>
             <p className="label-md text-on-surface-variant">{t('teachers.breadcrumb')}</p>
           </div>
-          <button className="btn btn-primary" style={{ backgroundColor: 'var(--inverse-surface)' }} onClick={() => navigate('/admin/teachers/create')}>
+          <button className="btn btn-dark" onClick={() => navigate('/admin/teachers/create')}>
             {t('teachers.addTeacher')}
           </button>
         </div>
 
         {/* Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statTotal')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+        <div className="grid grid-auto-fit-240 gap-24 mb-32">
+          <div className="stat-card">
+            <p className="label-md text-on-surface-variant stat-card-label">{t('teachers.statTotal')}</p>
+            <div className="stat-card-value">
               <span className="display-lg text-primary">18</span>
               <span className="headline-md text-on-surface">{t('teachers.statTotalUnit')}</span>
             </div>
           </div>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statClasses')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <div className="stat-card">
+            <p className="label-md text-on-surface-variant stat-card-label">{t('teachers.statClasses')}</p>
+            <div className="stat-card-value">
               <span className="display-lg text-on-surface">32</span>
               <span className="headline-md text-on-surface">{t('teachers.statClassesUnit')}</span>
             </div>
           </div>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statAvgGrades')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <div className="stat-card">
+            <p className="label-md text-on-surface-variant stat-card-label">{t('teachers.statAvgGrades')}</p>
+            <div className="stat-card-value">
               <span className="display-lg text-on-surface">145</span>
               <span className="headline-md text-on-surface">{t('teachers.statAvgGradesUnit')}</span>
             </div>
@@ -86,29 +86,29 @@ const Teachers = () => {
         </div>
 
         {/* Teacher Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+        <div className="grid grid-auto-fit-360 gap-24">
           {teachers.map(teacher => (
-            <div key={teacher.id} style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px', display: 'flex', flexDirection: 'column' }}>
+            <div key={teacher.id} className="teacher-card-admin">
               {/* Card Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div className="teacher-card-admin-header">
                 <h4 className="headline-md text-on-surface">{teacher.name}</h4>
-                <span className={`badge ${teacher.status === 'Active' ? 'badge-active' : 'badge-onleave'}`} style={{ border: '1px solid var(--outline-variant)' }}>
+                <span className={`badge ${teacher.status === 'Active' ? 'badge-active' : 'badge-onleave'} border`}>
                   {teacher.status}
                 </span>
               </div>
-              <p className="body-md text-on-surface-variant" style={{ marginBottom: '24px' }}>{teacher.certs}</p>
+              <p className="body-md text-on-surface-variant mb-24">{teacher.certs}</p>
 
               {/* Divider */}
-              <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', margin: '0 0 24px 0', opacity: 0.5 }} />
+              <hr className="divider mb-24" />
 
               {/* Stats */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', flex: 1 }}>
+              <div className="teacher-card-admin-stats">
                 <p className="body-md text-on-surface-variant">{teacher.classesCount}{t('teachers.classesCountSuffix')}</p>
                 <p className="body-md text-on-surface-variant">{teacher.pendingGrades}{t('teachers.pendingGradesSuffix')}</p>
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="teacher-card-admin-actions">
                 <button className="btn btn-secondary" onClick={() => navigate(`/admin/teachers/${teacher.id}`)}>{t('teachers.viewProfile')}</button>
                 <button className="btn btn-secondary">{t('teachers.assignClass')}</button>
               </div>

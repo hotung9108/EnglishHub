@@ -18,9 +18,9 @@ const Accounts = () => {
 
       {/* Content Card */}
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="flex-between flex-wrap gap-16 mb-24">
           <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('accounts.subtitle')}</h3>
+            <h3 className="headline-md text-on-surface mb-4">{t('accounts.subtitle')}</h3>
             <p className="label-md text-on-surface-variant">{t('accounts.breadcrumb')}</p>
           </div>
           <button className="btn btn-primary">
@@ -29,7 +29,7 @@ const Accounts = () => {
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div className="filter-bar">
           <input type="text" className="input" placeholder={t('accounts.searchPlaceholder')} style={{ maxWidth: '320px' }} />
           <select className="input" style={{ maxWidth: '200px' }}>
             <option>{t('accounts.filterAllRoles')}</option>
@@ -42,7 +42,7 @@ const Accounts = () => {
             <option>Active</option>
             <option>Blocked</option>
           </select>
-          <span className="label-md text-on-surface-variant" style={{ alignSelf: 'center' }}>{t('accounts.totalAccounts')}{data.length}{t('accounts.totalAccountsSuffix')}</span>
+          <span className="label-md text-on-surface-variant items-center" style={{ alignSelf: 'center' }}>{t('accounts.totalAccounts')}{data.length}{t('accounts.totalAccountsSuffix')}</span>
         </div>
 
         {/* Table */}
@@ -62,7 +62,7 @@ const Accounts = () => {
               {data.map((row, i) => (
                 <tr key={i}>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="avatar-cell">
                       <div className="topbar-avatar">{row.avatar}</div>
                       <span className="label-md text-on-surface-variant">{row.id}</span>
                     </div>
@@ -73,7 +73,7 @@ const Accounts = () => {
                     <div className="label-md text-on-surface-variant">{row.phone}</div>
                   </td>
                   <td>
-                    <span className={row.role === 'Admin' ? 'badge badge-primary' : 'badge'} style={row.role !== 'Admin' ? { border: '1px solid var(--outline-variant)', background: 'var(--surface-container-low)' } : {}}>
+                    <span className={row.role === 'Admin' ? 'badge badge-primary' : 'badge badge-role'}>
                       {row.role}
                     </span>
                   </td>
@@ -83,9 +83,9 @@ const Accounts = () => {
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="label-md text-primary" style={{ padding: '4px 8px', cursor: 'pointer' }}>{t('accounts.actionEdit')}</button>
-                      <button className="label-md text-error" style={{ padding: '4px 8px', cursor: 'pointer' }}>
+                    <div className="cell-actions">
+                      <button className="label-md text-primary action-link">{t('accounts.actionEdit')}</button>
+                      <button className="label-md text-error action-link">
                         {row.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}
                       </button>
                     </div>
@@ -98,9 +98,9 @@ const Accounts = () => {
           {/* Mobile Cards */}
           <div className="mobile-card-list">
             {data.map((row, i) => (
-              <div key={i} className="card" style={{ padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div key={i} className="card p-16">
+                <div className="flex-between mb-12">
+                  <div className="flex items-center gap-12">
                     <div className="topbar-avatar">{row.avatar}</div>
                     <div>
                       <strong>{row.name}</strong>
@@ -109,12 +109,12 @@ const Accounts = () => {
                   </div>
                   <span className={`badge ${row.status === 'Active' ? 'badge-active' : 'badge-blocked'}`}>{row.status}</span>
                 </div>
-                <div className="label-md text-on-surface-variant" style={{ marginBottom: '8px' }}>{row.email} - {row.phone}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className={row.role === 'Admin' ? 'badge badge-primary' : 'badge'} style={row.role !== 'Admin' ? { border: '1px solid var(--outline-variant)' } : {}}>{row.role}</span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>{t('accounts.actionEdit')}</button>
-                    <button className="btn btn-error" style={{ padding: '6px 12px', fontSize: '13px' }}>{row.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}</button>
+                <div className="label-md text-on-surface-variant mb-8">{row.email} - {row.phone}</div>
+                <div className="flex-between">
+                  <span className={row.role === 'Admin' ? 'badge badge-primary' : 'badge badge-role'}>{row.role}</span>
+                  <div className="cell-actions">
+                    <button className="btn btn-secondary btn-sm">{t('accounts.actionEdit')}</button>
+                    <button className="btn btn-error btn-sm">{row.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}</button>
                   </div>
                 </div>
               </div>
@@ -123,14 +123,14 @@ const Accounts = () => {
         </div>
 
         {/* Pagination */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', flexWrap: 'wrap', gap: '8px' }}>
+        <div className="pagination">
           <span className="label-md text-on-surface-variant">{t('accounts.paginationText1')}1 - 4{t('accounts.paginationText2')}{data.length}{t('accounts.paginationText3')}</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button className="btn btn-secondary" style={{ padding: '6px 12px' }}>&lt;</button>
-            <button className="btn btn-primary" style={{ padding: '6px 12px' }}>1</button>
-            <button className="btn btn-secondary" style={{ padding: '6px 12px' }}>2</button>
-            <button className="btn btn-secondary" style={{ padding: '6px 12px' }}>3</button>
-            <button className="btn btn-secondary" style={{ padding: '6px 12px' }}>&gt;</button>
+          <div className="pagination-buttons">
+            <button className="btn btn-secondary btn-page">&lt;</button>
+            <button className="btn btn-primary btn-page">1</button>
+            <button className="btn btn-secondary btn-page">2</button>
+            <button className="btn btn-secondary btn-page">3</button>
+            <button className="btn btn-secondary btn-page">&gt;</button>
           </div>
         </div>
       </div>

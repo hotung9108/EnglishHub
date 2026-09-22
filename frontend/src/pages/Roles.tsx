@@ -34,62 +34,59 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
       </div>
 
       {/* Main Container */}
-      <div className="card" style={{ padding: '32px' }}>
+      <div className="card p-32">
         
         {/* Role Tabs */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
+        <div className="flex gap-16 mb-32 flex-wrap">
           <button 
-            className={`btn ${activeTab === 'admin' ? 'btn-primary' : ''}`} 
-            style={activeTab !== 'admin' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
+            className={`btn ${activeTab === 'admin' ? 'btn-primary' : 'btn-outline'}`} 
             onClick={() => setActiveTab('admin')}
           >
             {t('roles.adminRole')}
           </button>
           <button 
-            className={`btn ${activeTab === 'teacher' ? 'btn-primary' : ''}`}
-            style={activeTab !== 'teacher' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
+            className={`btn ${activeTab === 'teacher' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('teacher')}
           >
             {t('roles.teacherRole')}
           </button>
           <button 
-            className={`btn ${activeTab === 'student' ? 'btn-primary' : ''}`}
-            style={activeTab !== 'student' ? { backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' } : {}}
+            className={`btn ${activeTab === 'student' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('student')}
           >
             {t('roles.studentRole')}
           </button>
         </div>
 
-        <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', marginBottom: '32px', opacity: 0.5 }} />
+        <hr className="divider mb-32" />
 
         {/* Permissions Table Section */}
-        <h3 className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>
+        <h3 className="label-md text-on-surface-variant text-uppercase mb-16 tracking-md">
           {t('roles.permHeading')}
         </h3>
 
-        <div className="data-table-wrapper" style={{ marginBottom: '40px', border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)' }}>
-          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ backgroundColor: 'var(--surface-container-low)' }}>
+        <div className="data-table-wrapper roles-table-wrapper">
+          <table className="data-table data-table-enhanced">
+            <thead>
               <tr>
-                <th style={{ padding: '16px 24px', textAlign: 'left', color: 'var(--on-surface-variant)' }}>{t('roles.colModule')}</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colRead')}</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colWrite')}</th>
-                <th style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>{t('roles.colApprove')}</th>
+                <th className="text-left">{t('roles.colModule')}</th>
+                <th className="text-center">{t('roles.colRead')}</th>
+                <th className="text-center">{t('roles.colWrite')}</th>
+                <th className="text-center">{t('roles.colApprove')}</th>
               </tr>
             </thead>
             <tbody>
               {modules.map((mod, i) => (
                 <tr key={i}>
-                  <td style={{ padding: '16px 24px', fontWeight: 500 }}>{mod}</td>
-                  <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                    <input type="checkbox" checked={perms.read} readOnly style={{ accentColor: 'var(--primary)', width: '18px', height: '18px' }} />
+                  <td className="font-medium">{mod}</td>
+                  <td className="text-center">
+                    <input type="checkbox" checked={perms.read} readOnly className="roles-checkbox" />
                   </td>
-                  <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                    <input type="checkbox" checked={perms.write} readOnly style={{ accentColor: 'var(--primary)', width: '18px', height: '18px' }} />
+                  <td className="text-center">
+                    <input type="checkbox" checked={perms.write} readOnly className="roles-checkbox" />
                   </td>
-                  <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                    <input type="checkbox" checked={perms.approve} readOnly style={{ accentColor: 'var(--primary)', width: '18px', height: '18px' }} />
+                  <td className="text-center">
+                    <input type="checkbox" checked={perms.approve} readOnly className="roles-checkbox" />
                   </td>
                 </tr>
               ))}
@@ -97,15 +94,15 @@ const Roles = ({ role = 'admin' }: { role?: string }) => {
           </table>
         </div>
 
-        <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', marginBottom: '24px', opacity: 0.5 }} />
+        <hr className="divider mb-24" />
 
         {/* Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <span className="body-md text-on-surface-variant" style={{ fontStyle: 'italic' }}>
+        <div className="flex-between flex-wrap gap-16">
+          <span className="body-md text-on-surface-variant text-italic">
             {t('roles.note')}
           </span>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <button className="btn" style={{ backgroundColor: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--outline-variant)' }}>
+          <div className="flex gap-16">
+            <button className="btn btn-outline">
               {t('roles.restoreDefault')}
             </button>
             <button className="btn btn-primary">

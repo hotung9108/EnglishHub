@@ -51,52 +51,42 @@ const Classes = () => {
   ];
 
   const renderClassCard = (cls: ClassItem, isPast = false) => {
-    const cardStyle = isPast ? {
-      backgroundColor: 'var(--surface-container-lowest)',
-      border: '1px solid var(--outline-variant)',
-      opacity: 0.8
-    } : {
-      backgroundColor: 'var(--surface)',
-      border: '1px solid var(--outline-variant)',
-      boxShadow: 'var(--shadow-sm)'
-    };
-
     return (
-      <div key={cls.code} className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', ...cardStyle }}>
+      <div key={cls.code} className={`card class-card ${isPast ? 'past' : 'active-class'}`}>
         {/* Top Badges */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <span className="badge badge-primary" style={isPast ? { backgroundColor: 'var(--surface-container-high)', color: 'var(--on-surface-variant)' } : {}}>{cls.code}</span>
+        <div className="class-card-badges">
+          <span className={`badge badge-primary ${isPast ? 'badge-status-ended' : ''}`}>{cls.code}</span>
           {isPast ? (
-            <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', color: 'var(--on-surface-variant)', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--on-surface-variant)' }}></span>
+            <span className="badge badge-status-ended">
+              <span className="status-dot status-dot-ended"></span>
               {cls.status}
             </span>
           ) : (
-            <span className="badge" style={{ backgroundColor: '#C3E9C8', color: '#006C49', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#006C49' }}></span>
+            <span className="badge badge-status-active">
+              <span className="status-dot status-dot-active"></span>
               {cls.status}
             </span>
           )}
         </div>
 
         {/* Content */}
-        <h3 className="headline-md text-on-surface" style={{ marginBottom: '16px', lineHeight: 1.4, flex: 1 }}>{cls.name}</h3>
+        <h3 className="headline-md text-on-surface mb-16" style={{ lineHeight: 1.4, flex: 1 }}>{cls.name}</h3>
         
-        <p className="body-md text-on-surface-variant" style={{ marginBottom: '16px' }}>
+        <p className="body-md text-on-surface-variant mb-16">
           {t('adminClasses.teacherPrefix')}{cls.teacher}
         </p>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
-          <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>👥</span> {t('adminClasses.studentsPrefix')}{cls.students}{t('adminClasses.studentsSuffix')}
+        <div className="class-card-meta">
+          <p className="body-md text-on-surface-variant class-card-meta-item">
+            <span className="class-card-meta-icon">👥</span> {t('adminClasses.studentsPrefix')}{cls.students}{t('adminClasses.studentsSuffix')}
           </p>
           {isPast ? (
-            <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>📅</span> {t('adminClasses.completedPrefix')}{cls.completedDate}
+            <p className="body-md text-on-surface-variant class-card-meta-item">
+              <span className="class-card-meta-icon">📅</span> {t('adminClasses.completedPrefix')}{cls.completedDate}
             </p>
           ) : (
-            <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'inline-block', width: '20px', textAlign: 'center' }}>🕒</span> {t('adminClasses.schedulePrefix')}{cls.schedule}
+            <p className="body-md text-on-surface-variant class-card-meta-item">
+              <span className="class-card-meta-icon">🕒</span> {t('adminClasses.schedulePrefix')}{cls.schedule}
             </p>
           )}
         </div>
@@ -104,18 +94,7 @@ const Classes = () => {
         {/* Action Button */}
         <Link 
           to={`/admin/classes/${cls.code}`}
-          className="btn" 
-          style={{ 
-            width: '100%', 
-            backgroundColor: isPast ? 'var(--surface-container-lowest)' : 'transparent', 
-            color: 'var(--on-surface)', 
-            border: '1px solid var(--outline-variant)',
-            marginTop: 'auto',
-            textDecoration: 'none',
-            textAlign: 'center',
-            display: 'block',
-            boxSizing: 'border-box'
-          }}
+          className={`btn class-card-action ${isPast ? 'past' : ''}`}
         >
           {isPast ? t('adminClasses.viewDetails') : t('adminClasses.manageClass')}
         </Link>
@@ -126,19 +105,19 @@ const Classes = () => {
   return (
     <div>
       {/* Page Header */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+      <div className="page-header flex-between-start flex-wrap gap-16">
         <div>
           <h2 className="page-title">{t('adminClasses.title')}</h2>
         </div>
-        <Link to="/admin/classes/create" className="btn btn-primary" style={{ padding: '10px 24px', textDecoration: 'none' }}>
+        <Link to="/admin/classes/create" className="btn btn-primary no-decoration" style={{ padding: '10px 24px' }}>
           {t('adminClasses.createClass')}
         </Link>
       </div>
 
-      <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', margin: '0 0 32px 0' }} />
+      <hr className="section-divider" />
 
       {/* Grid container */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+      <div className="grid grid-auto-fill-320 gap-24">
         {activeClasses.map((cls: ClassItem) => renderClassCard(cls, false))}
         {pastClasses.map((cls: ClassItem) => renderClassCard(cls, true))}
       </div>

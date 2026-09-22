@@ -159,13 +159,12 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
                   )}
                 </NavLink>
                 {item.children && (
-                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '22px', borderLeft: '1px solid #F1F5F9' }}>
+                  <div className="sidebar-submenu">
                     {item.children.map((child: MenuChild, cIndex: number) => (
                       <NavLink
                         key={`child-${cIndex}`}
                         to={child.path}
-                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                        style={{ fontSize: '13px', padding: '6px 14px', marginTop: '2px' }}
+                        className={({ isActive }) => `sidebar-link sidebar-submenu-link ${isActive ? 'active' : ''}`}
                       >
                         <span>{child.label}</span>
                       </NavLink>
@@ -185,7 +184,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
           <Settings size={18} strokeWidth={2} />
           <span>{t('settings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link" style={{ color: '#EF4444' }}>
+        <NavLink to="/login" className="sidebar-link text-error">
           <LogOut size={18} strokeWidth={2} />
           <span>{t('logout')}</span>
         </NavLink>

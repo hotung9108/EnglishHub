@@ -113,7 +113,7 @@ const LoginForm: React.FC = () => {
               </div>
 
               <div className="login-feature-item">
-                <div className="login-feature-icon" style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', color: '#c084fc' }}>
+                <div className="login-feature-icon login-feature-icon-purple">
                   <Award size={18} />
                 </div>
                 <div>
@@ -127,7 +127,7 @@ const LoginForm: React.FC = () => {
               </div>
 
               <div className="login-feature-item">
-                <div className="login-feature-icon" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7' }}>
+                <div className="login-feature-icon login-feature-icon-green">
                   <CheckCircle2 size={18} />
                 </div>
                 <div>
@@ -144,20 +144,20 @@ const LoginForm: React.FC = () => {
 
           {/* Testimonial Quote */}
           <div className="login-testimonial">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', color: '#facc15' }}>
+            <div className="login-testimonial-stars">
               <Star size={13} fill="#facc15" />
               <Star size={13} fill="#facc15" />
               <Star size={13} fill="#facc15" />
               <Star size={13} fill="#facc15" />
               <Star size={13} fill="#facc15" />
-              <span style={{ fontSize: '11px', color: '#e2e8f0', marginLeft: '6px', fontWeight: 700 }}>5.0 Rating</span>
+              <span className="login-testimonial-rating">5.0 Rating</span>
             </div>
-            <p style={{ margin: 0, fontStyle: 'italic' }}>
+            <p className="login-testimonial-quote">
               {isVi 
-                ? '“Hệ thống gợi ý sửa lỗi phát âm và bài viết IELTS giúp em tăng từ Band 6.5 lên 7.5 chỉ sau 2 tháng luyện tập!”' 
-                : '“The AI sentence annotation and teacher feedback helped me advance from Band 6.5 to 7.5 in 2 months!”'}
+                ? '"Hệ thống gợi ý sửa lỗi phát âm và bài viết IELTS giúp em tăng từ Band 6.5 lên 7.5 chỉ sau 2 tháng luyện tập!"' 
+                : '"The AI sentence annotation and teacher feedback helped me advance from Band 6.5 to 7.5 in 2 months!"'}
             </p>
-            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', fontWeight: 600 }}>
+            <div className="login-testimonial-author">
               — Alice Johnson (IELTS 8.0 Candidate)
             </div>
           </div>
@@ -179,11 +179,11 @@ const LoginForm: React.FC = () => {
             </div>
 
             {/* Form Title */}
-            <div style={{ marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+            <div className="login-form-title">
+              <h2>
                 {isVi ? 'Đăng Nhập Tài Khoản' : 'Welcome to EnglishHub'}
               </h2>
-              <p style={{ fontSize: '13.5px', color: '#64748b', margin: 0 }}>
+              <p>
                 {isVi 
                   ? 'Chọn vai trò demo hoặc nhập thông tin đăng nhập của bạn.' 
                   : 'Select a demo role or enter your credentials to access the portal.'}
@@ -220,19 +220,8 @@ const LoginForm: React.FC = () => {
 
             {/* Error Message */}
             {error && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#dc2626',
-                fontSize: '13px',
-                marginBottom: '18px'
-              }}>
-                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <div className="login-error-box">
+                <AlertCircle size={18} className="flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -243,7 +232,7 @@ const LoginForm: React.FC = () => {
               <div className="login-input-group">
                 <label className="login-input-label">
                   <span>{isVi ? 'Địa chỉ Email' : 'Email Address'}</span>
-                  <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 500 }}>
+                  <span className="login-role-hint">
                     {selectedRole === 'admin' && (isVi ? 'Quyền: Quản trị viên' : 'Role: Administrator')}
                     {selectedRole === 'teacher' && (isVi ? 'Quyền: Giảng viên' : 'Role: Teacher')}
                     {selectedRole === 'student' && (isVi ? 'Quyền: Học viên' : 'Role: Student')}
@@ -269,7 +258,7 @@ const LoginForm: React.FC = () => {
                   <a 
                     href="#forgot" 
                     onClick={(e) => { e.preventDefault(); alert(isVi ? 'Vui lòng liên hệ Admin để khôi phục mật khẩu.' : 'Please contact your administrator to reset password.'); }}
-                    style={{ fontSize: '12.5px', color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
+                    className="login-forgot-link"
                   >
                     {isVi ? 'Quên mật khẩu?' : 'Forgot password?'}
                   </a>
@@ -296,13 +285,13 @@ const LoginForm: React.FC = () => {
               </div>
 
               {/* Remember Me */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 20px 0' }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#475569' }}>
+              <div className="login-remember-row">
+                <label className="login-remember-label">
                   <input 
                     type="checkbox" 
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }} 
+                    className="login-remember-checkbox"
                   />
                   <span>{isVi ? 'Ghi nhớ đăng nhập trên thiết bị này' : 'Remember me on this device'}</span>
                 </label>
@@ -317,7 +306,7 @@ const LoginForm: React.FC = () => {
           </div>
 
           {/* Footer Security Badge */}
-          <div style={{ marginTop: '32px', paddingTop: '18px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '12px', color: '#94a3b8' }}>
+          <div className="login-footer">
             <ShieldCheck size={14} color="#10b981" />
             <span>{isVi ? 'Bảo mật chuẩn SSL 256-Bit • Tích hợp AI Chấm Thi EnglishHub' : '256-Bit SSL Encrypted • Powered by EnglishHub AI Engine'}</span>
           </div>
