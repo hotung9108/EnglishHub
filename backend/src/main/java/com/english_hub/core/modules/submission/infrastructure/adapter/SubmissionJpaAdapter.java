@@ -44,6 +44,12 @@ public class SubmissionJpaAdapter implements SubmissionRepository {
 
 	@Override
 	@Transactional(readOnly = true)
+	public long countByAssignmentIdAndStudentId(Long assignmentId, Long studentId) {
+		return jpaRepository.countByAssignmentIdAndStudentId(assignmentId, studentId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public SubmissionPage findPage(SubmissionFilter filter, SubmissionPageRequest pageRequest) {
 		Specification<com.english_hub.core.infrastructure.persistence.entity.Submission> specification =
 				buildSpecification(filter);

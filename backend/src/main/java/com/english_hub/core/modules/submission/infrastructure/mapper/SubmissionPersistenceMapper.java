@@ -23,6 +23,8 @@ public class SubmissionPersistenceMapper {
 				source.getSubmittedAt(),
 				SubmissionStatus.valueOf(source.getStatus().name()));
 		target.setId(source.getId());
+		target.setCreatedAt(source.getCreatedAt());
+		target.setUpdatedAt(source.getUpdatedAt());
 		return target;
 	}
 

@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 Persistence Testing Instructions
+# Submissions/Answers API — Phase 1 + Phase 2 Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -13,11 +13,14 @@ submission cluster under `backend/src/main/java/com/english_hub/core/modules/sub
 - `SubmissionRepository.create(assignmentId, studentId, attemptNumber)` — new `IN_PROGRESS` attempt.
 - `SubmissionRepository.findPage(SubmissionFilter{assignmentId?, studentId?, status?}, SubmissionPageRequest)` — paginated.
 - `SubmissionModuleRepository.bulkCreate(submissionId, moduleIds)` — one `IN_PROGRESS` row per module.
-- `GradingRepository.bulkCreate(List<GradingDraft(submissionModuleId, method)>)` — `PENDING` rows; **method is resolved by the caller from the module's task_type** (Phase 2 concern).
+- `GradingRepository.bulkCreate(List<GradingDraft(submissionModuleId, method)>)` — `PENDING` rows.
+- `SubmissionRepository.countByAssignmentIdAndStudentId(assignmentId, studentId)` — used by the max-submissions guard.
 
 No Flyway migration (schema already exists in V1). The shared JPA entities
 `Submission`/`SubmissionModule`/`Grading` gained Lombok `@Setter` to support the
-`save()` update path (id round-trip in `SubmissionPersistenceMapper`).
+`save()` update path (id round-trip in `SubmissionPersistenceMapper`). `Submission` now
+also maps `created_at`/`updated_at` (Instant) via `@PrePersist`/`@PreUpdate` so the
+start-attempt response can return `createdAt`.
 
 ## Run the automated suite
 Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; no local DB needed.
@@ -38,6 +41,57 @@ cd backend
 6. `bulkCreateCreatesPendingGradingsWithResolvedMethod` — `PENDING` rows, method matches draft (`AUTO`/`TEACHER_MANUAL`), `findBySubmissionModuleId`.
 7. `submissionModulesEachHaveOneGrading` — join shape: submission → 2 modules → 1 grading each via `findBySubmissionModuleIds`.
 
-## Next (for whoever picks up Phase 2)
-- `AssignmentRepository` additions (`countSubmissionsByStudent`, `findById`) + `ModuleRepository.findByAssignmentId`.
-- `SubmissionService.startAttempt(...)` → `POST /assignments/{id}/submissions` (API #37), plus the `task_type` → `GradingMethod` derivation that feeds `GradingDraft`.
+## Scope (Phase 2) — API #37 start attempt
+`POST /api/v1/assignments/{assignmentId}/submissions` (role = STUDENT, no body). V4 chapter 6 spec.
+Starts a new attempt: validates role + class membership, assignment `PUBLISHED`, within
+`open_at`–`close_at`, under `max_submissions`; creates the `submissions` row, one
+`submission_modules` row per assignment module, and one `gradings` row per module with
+`method` derived from the module's `task_type` (`QUIZ → AUTO`, else `TEACHER_MANUAL`).
+
+Implementation: read-only submission-context ports + JPA adapters
+(`AssignmentWindowRepository`, `AssignmentModuleRepository`, `StudentClassEnrollmentRepository`
+under the same `modules/submission/` package) so the service never touches shared JPA repos directly.
+
+```bash
+cd backend
+./gradlew test --tests 'com.english_hub.core.modules.submission.application.service.SubmissionServiceTest' \
+               --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
+               --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
+# -> 22 Phase-2 tests, BUILD SUCCESSFUL
+./gradlew test   # full suite: 156 tests (unit + integration), all green
+```
+
+Smoke test (needs a running app with a seeded/local DB and a student bearer token):
+```bash
+curl -s -X POST http://localhost:8080/api/v1/assignments/{assignmentId}/submissions \
+  -H "Authorization: Bearer <studentAccessToken>"
+# 201
+# {
+#   "id": 88, "assignmentId": 5, "attemptNumber": 1, "status": "IN_PROGRESS",
+#   "createdAt": "2026-09-22T...",
+#   "modules": [ { "id": 150, "moduleId": 9, "skill": "LISTENING", "status": "IN_PROGRESS" }, ... ]
+# }
+```
+
+### What the 22 Phase-2 tests cover
+- `SubmissionServiceTest` (11, Mockito): happy path creates submission + modules + grading drafts
+  (`AUTO`, `TEACHER_MANUAL`), attempt number increments, 400 not-published / not-open-yet / closed /
+  limit-reached, unlimited when `max_submissions` null, 404 unknown + soft-deleted, 403 non-student,
+  403 student not in class.
+- `SubmissionControllerTest` (1, Mockito): 201 mapping, exact body fields.
+- `SubmissionApiIntegrationTest` (10, Testcontainers + MockMvc + real JWT): full lifecycle assertion
+  (response JSON incl. `createdAt`, `modules[]` ids/skills/status, DB rows: submission count,
+  submission-modules count, grading methods), second attempt → `attemptNumber: 2`, DRAFT/not-open/
+  closed/limit/unknown/deleted/403 cases with exact V4 error messages.
+
+### Error contract (exact strings)
+| Code | Message |
+|---|---|
+| 400 | `Không thể bắt đầu làm bài tập này lúc này.` (single message for all start preconditions) |
+| 404 | `Không tìm thấy bài tập.` |
+| 403 | `Bạn không có quyền thực hiện thao tác này.` |
+| 401 | `Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.` |
+
+## Next (for whoever picks up Phase 3)
+- APIs #38 `GET /submissions/{id}` and #39 `GET /submissions` (list/detail with modules + gradings) reuse the Phase 1 read ports and the `AssignmentWindow`/`ModuleInfo` read models; add teacher/admin visibility + ownership guards.
+- APIs #40 `POST /submissions/{id}/submit`, #42 `GET /submission-modules/{id}`, #43 `POST /submission-modules/{id}/submit`, #46/#47 presigned-upload URLs.

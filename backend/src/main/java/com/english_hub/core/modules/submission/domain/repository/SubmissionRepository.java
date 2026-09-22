@@ -12,6 +12,9 @@ public interface SubmissionRepository extends IRepository<Submission, Long> {
 	/** Creates a new in-progress attempt for a student on an assignment. */
 	Submission create(Long assignmentId, Long studentId, int attemptNumber);
 
+	/** Counts attempts already taken by a student on an assignment (for max-submissions checks). */
+	long countByAssignmentIdAndStudentId(Long assignmentId, Long studentId);
+
 	/** Paginated listing filtered by optional {@code assignmentId}/{@code studentId}/{@code status}. */
 	SubmissionPage findPage(SubmissionFilter filter, SubmissionPageRequest pageRequest);
 }
