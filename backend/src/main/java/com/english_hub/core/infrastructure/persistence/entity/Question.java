@@ -1,5 +1,7 @@
 package com.english_hub.core.infrastructure.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.math.BigDecimal;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -38,8 +40,14 @@ public class Question {
 	@Column(name = "question_type", nullable = false, columnDefinition = "question_type")
 	private QuestionType questionType;
 
-	@Column(name = "correct_answer", nullable = false, columnDefinition = "TEXT")
-	private String correctAnswer;
+	/*
+	 * Hibernate 7.4.5's default JSON format mapper uses Jackson 2. Using
+	 * tools.jackson.databind.JsonNode here fails during JSONB persistence, so
+	 * this field intentionally uses the com.fasterxml.jackson.databind type.
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "correct_answer", nullable = false, columnDefinition = "jsonb")
+	private JsonNode correctAnswer;
 
 	@Column(nullable = false, precision = 5, scale = 2)
 	private BigDecimal score;
@@ -57,8 +65,12 @@ public class Question {
 		this.moduleId = moduleId;
 		this.content = content;
 		this.questionType = questionType;
-		this.correctAnswer = correctAnswer;
+		this.correctAnswer = JsonbValueCodec.parse(correctAnswer, "correct_answer");
 		this.score = score;
 		this.orderIndex = orderIndex;
+	}
+
+	public String getCorrectAnswer() {
+		return JsonbValueCodec.serialize(correctAnswer);
 	}
 }
