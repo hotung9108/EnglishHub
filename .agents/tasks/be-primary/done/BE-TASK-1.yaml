@@ -1,6 +1,6 @@
 id: BE-TASK-1
 title: "Design Database Schema for EnglishHub"
 assignee: "@be-primary"
-status: "To Do"
+status: "Done"
 priority: "High"
 description: "Design tables for users, classes, assignments, and student submissions."

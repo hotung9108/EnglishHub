@@ -1,0 +1,6 @@
+id: BE-TASK-2
+title: "Implement User APIs"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Implement the eight User-cluster APIs from API_Design.pdf, including authorization, profile management, password changes, admin user management, soft-delete, and account lock/unlock."

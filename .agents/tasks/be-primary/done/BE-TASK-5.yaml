@@ -1,0 +1,6 @@
+id: BE-TASK-5
+title: "Complete User feature common refactor and enum migration"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Refactor backend/features/user services, entities, repositories, mappers, DTOs, page requests, and responses to use base classes/interfaces in backend/common; migrate UserRole/UserStatus production imports to common.domain; remove legacy backend/user/entity enum files; update seed entity imports so CI compilation succeeds. Auth and security remain out of scope and require @be-secondary follow-up."
