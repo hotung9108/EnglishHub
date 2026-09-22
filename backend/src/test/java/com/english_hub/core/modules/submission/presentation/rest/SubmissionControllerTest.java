@@ -1,13 +1,27 @@
 package com.english_hub.core.modules.submission.presentation.rest;
 
 import com.english_hub.core.modules.submission.application.service.SubmissionService;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingSummaryResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleSummaryResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionDetailResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
+import com.english_hub.core.modules.submission.domain.model.GradingMethod;
+import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
+import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -59,5 +73,86 @@ class SubmissionControllerTest {
 		assertThat(body.modules().getFirst().moduleId()).isEqualTo(9L);
 		assertThat(body.modules().getFirst().skill()).isEqualTo("LISTENING");
 		assertThat(body.modules().getFirst().status()).isEqualTo("IN_PROGRESS");
+	}
+
+	@Test
+	void mapsTheDetailResultToAnOkResponse() {
+		SubmissionDetailResult result = new SubmissionDetailResult(
+				88L,
+				5L,
+				41L,
+				1,
+				SubmissionStatus.GRADED,
+				OffsetDateTime.parse("2026-09-22T09:00:00+07:00"),
+				Instant.parse("2026-09-22T08:00:00Z"),
+				List.of(new ModuleDetailResult(
+						150L,
+						9L,
+						ModuleSkill.LISTENING,
+						ModuleTaskType.QUIZ,
+						SubmissionStatus.GRADED,
+						new GradingDetailResult(
+								77L,
+								GradingMethod.AUTO,
+								GradingStatus.COMPLETED,
+								BigDecimal.valueOf(8),
+								BigDecimal.TEN,
+								null,
+								null))));
+		when(submissionService.getById(88L)).thenReturn(result);
+
+		ResponseEntity<SubmissionDetailResponse> response = submissionController.getSubmission(88L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		SubmissionDetailResponse body = response.getBody();
+		assertThat(body.id()).isEqualTo(88L);
+		assertThat(body.assignmentId()).isEqualTo(5L);
+		assertThat(body.studentId()).isEqualTo(41L);
+		assertThat(body.status()).isEqualTo("GRADED");
+		assertThat(body.submittedAt()).isEqualTo(OffsetDateTime.parse("2026-09-22T09:00:00+07:00"));
+		assertThat(body.createdAt()).isEqualTo(Instant.parse("2026-09-22T08:00:00Z"));
+		assertThat(body.modules()).hasSize(1);
+		assertThat(body.modules().getFirst().moduleId()).isEqualTo(9L);
+		assertThat(body.modules().getFirst().skill()).isEqualTo("LISTENING");
+		assertThat(body.modules().getFirst().taskType()).isEqualTo("QUIZ");
+		assertThat(body.modules().getFirst().grading().method()).isEqualTo("AUTO");
+		assertThat(body.modules().getFirst().grading().status()).isEqualTo("COMPLETED");
+		assertThat(body.modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");
+		assertThat(body.modules().getFirst().grading().maxScoreSnapshot()).isEqualByComparingTo("10");
+	}
+
+	@Test
+	void mapsTheListResultToAnOkResponseWithPagination() {
+		SubmissionListResult result = new SubmissionListResult(
+				1,
+				20,
+				1,
+				List.of(new SubmissionListItemResult(
+						88L,
+						41L,
+						1,
+						SubmissionStatus.GRADED,
+						OffsetDateTime.parse("2026-09-22T09:00:00+07:00"),
+						List.of(new ModuleSummaryResult(
+								150L,
+								9L,
+								ModuleSkill.LISTENING,
+								ModuleTaskType.QUIZ,
+								SubmissionStatus.GRADED,
+								new GradingSummaryResult(BigDecimal.valueOf(8), BigDecimal.TEN, GradingStatus.COMPLETED))))));
+		when(submissionService.list(5L, 41L, "GRADED", 2, 10)).thenReturn(result);
+
+		ResponseEntity<SubmissionListResponse> response = submissionController.listSubmissions(5L, 41L, "GRADED", 2, 10);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		SubmissionListResponse body = response.getBody();
+		assertThat(body.pagination().page()).isEqualTo(1);
+		assertThat(body.pagination().limit()).isEqualTo(20);
+		assertThat(body.pagination().total()).isEqualTo(1);
+		assertThat(body.data()).hasSize(1);
+		assertThat(body.data().getFirst().studentId()).isEqualTo(41L);
+		assertThat(body.data().getFirst().status()).isEqualTo("GRADED");
+		assertThat(body.data().getFirst().modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");
+		assertThat(body.data().getFirst().modules().getFirst().grading().status()).isEqualTo("COMPLETED");
 	}
 }

@@ -65,7 +65,9 @@ public class SubmissionPersistenceMapper {
 				GradingMethod.valueOf(source.getMethod().name()),
 				GradingStatus.valueOf(source.getStatus().name()),
 				source.getFinalScore(),
-				source.getMaxScoreSnapshot());
+				source.getMaxScoreSnapshot(),
+				source.getAiFeedback(),
+				source.getFinalFeedback());
 		target.setId(source.getId());
 		return target;
 	}
@@ -76,9 +78,9 @@ public class SubmissionPersistenceMapper {
 				source.getSubmissionModuleId(),
 				com.english_hub.core.infrastructure.persistence.entity.GradingMethod.valueOf(source.getMethod().name()),
 				com.english_hub.core.infrastructure.persistence.entity.GradingStatus.valueOf(source.getStatus().name()),
-				null,
+				source.getAiFeedback(),
 				source.getFinalScore(),
-				null,
+				source.getFinalFeedback(),
 				source.getMaxScoreSnapshot(),
 				null,
 				null,

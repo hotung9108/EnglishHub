@@ -3,20 +3,29 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionDetailResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.submission.domain.model.AssignmentWindow;
+import com.english_hub.core.modules.submission.domain.model.Grading;
 import com.english_hub.core.modules.submission.domain.model.GradingDraft;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
+import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleInfo;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
 import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
+import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
+import com.english_hub.core.modules.submission.domain.repository.ClassTeachingRepository;
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
 import com.english_hub.core.modules.submission.domain.repository.StudentClassEnrollmentRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
@@ -24,6 +33,7 @@ import com.english_hub.core.modules.submission.domain.repository.SubmissionRepos
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -38,6 +48,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +76,9 @@ class SubmissionServiceTest {
 	private StudentClassEnrollmentRepository studentClassEnrollmentRepository;
 
 	@Mock
+	private ClassTeachingRepository classTeachingRepository;
+
+	@Mock
 	private CurrentUserProvider currentUserProvider;
 
 	private SubmissionService submissionService;
@@ -77,6 +92,7 @@ class SubmissionServiceTest {
 				assignmentWindowRepository,
 				assignmentModuleRepository,
 				studentClassEnrollmentRepository,
+				classTeachingRepository,
 				currentUserProvider);
 	}
 
@@ -264,6 +280,268 @@ class SubmissionServiceTest {
 				org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong());
 	}
 
+	@Test
+	void getByIdReturnsOwnSubmissionWithModulesAndGradings() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		SubmissionModule essayModule = module(10L);
+		essayModule.setId(151L);
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L)))
+				.thenReturn(List.of(essayModule, quizModule));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 2),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1)));
+		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.PENDING);
+		quizGrading.setId(77L);
+		when(gradingRepository.findBySubmissionModuleIds(List.of(151L, 150L)))
+				.thenReturn(List.of(quizGrading));
+
+		SubmissionDetailResult result = submissionService.getById(88L);
+
+		assertThat(result.id()).isEqualTo(88L);
+		assertThat(result.assignmentId()).isEqualTo(5L);
+		assertThat(result.studentId()).isEqualTo(41L);
+		assertThat(result.status()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(result.modules()).extracting(ModuleDetailResult::moduleId).containsExactly(10L, 9L);
+		assertThat(result.modules()).extracting(ModuleDetailResult::submissionModuleId).containsExactly(151L, 150L);
+		assertThat(result.modules().getFirst().grading()).isNull();
+		assertThat(result.modules().get(1).grading()).isNotNull();
+		GradingDetailResult grading = result.modules().get(1).grading();
+		assertThat(grading.id()).isEqualTo(77L);
+		assertThat(grading.method()).isEqualTo(GradingMethod.AUTO);
+		assertThat(grading.status()).isEqualTo(GradingStatus.PENDING);
+	}
+
+	@Test
+	void getByIdRejectsAnotherStudentsSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(42L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+
+		assertThatThrownBy(() -> submissionService.getById(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getByIdReturnsNotFoundForUnknownSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionRepository.findById(404L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.getById(404L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lượt làm bài.");
+	}
+
+	@Test
+	void getByIdTeacherOfTheClassCanRead() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(7L, 3L)).thenReturn(true);
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionDetailResult result = submissionService.getById(88L);
+
+		assertThat(result.id()).isEqualTo(88L);
+		assertThat(result.modules()).isEmpty();
+	}
+
+	@Test
+	void getByIdRejectsTeacherWhoDoesNotTeachTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(8L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(8L, 3L)).thenReturn(false);
+
+		assertThatThrownBy(() -> submissionService.getById(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getByIdAdminCanReadAnySubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionDetailResult result = submissionService.getById(88L);
+
+		assertThat(result.studentId()).isEqualTo(41L);
+	}
+
+	@Test
+	void listForcesStudentScopeAndEnrichesResults() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
+		SubmissionModule quizModule = new SubmissionModule(88L, 9L, SubmissionStatus.IN_PROGRESS);
+		quizModule.setId(150L);
+		SubmissionModule essayModule = new SubmissionModule(88L, 10L, SubmissionStatus.IN_PROGRESS);
+		essayModule.setId(151L);
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L)))
+				.thenReturn(List.of(quizModule, essayModule));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2)));
+		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.COMPLETED);
+		quizGrading.setFinalScore(BigDecimal.valueOf(8));
+		quizGrading.setMaxScoreSnapshot(BigDecimal.TEN);
+		when(gradingRepository.findBySubmissionModuleIds(List.of(150L, 151L)))
+				.thenReturn(List.of(quizGrading));
+
+		SubmissionListResult result = submissionService.list(null, null, null, 1, 20);
+
+		assertThat(result.page()).isEqualTo(1);
+		assertThat(result.limit()).isEqualTo(20);
+		assertThat(result.total()).isEqualTo(1);
+		SubmissionListItemResult item = result.data().getFirst();
+		assertThat(item.id()).isEqualTo(88L);
+		assertThat(item.studentId()).isEqualTo(41L);
+		assertThat(item.modules()).hasSize(2);
+		assertThat(item.modules().getFirst().grading().status()).isEqualTo(GradingStatus.COMPLETED);
+		assertThat(item.modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");
+		assertThat(item.modules().get(1).grading()).isNull();
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.studentId().equals(41L) && filter.assignmentId() == null),
+				argThat(request -> request.page() == 1 && request.limit() == 20));
+	}
+
+	@Test
+	void listRejectsAStudentRequestingAnotherStudentsSubmissions() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+
+		assertThatThrownBy(() -> submissionService.list(null, 42L, null, 1, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void listAllowsAStudentToPassTheirOwnStudentId() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionListResult result = submissionService.list(null, 41L, null, 1, 20);
+
+		assertThat(result.total()).isEqualTo(1);
+	}
+
+	@Test
+	void listTeacherRequiresAnAssignmentId() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+
+		assertThatThrownBy(() -> submissionService.list(null, null, null, 1, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("assignmentId là bắt buộc đối với giáo viên.");
+	}
+
+	@Test
+	void listTeacherCanFilterByTheirOwnAssignment() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(7L, 3L)).thenReturn(true);
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionListResult result = submissionService.list(5L, null, null, 1, 20);
+
+		assertThat(result.total()).isEqualTo(1);
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.assignmentId().equals(5L) && filter.studentId() == null),
+				argThat(request -> request.page() == 1 && request.limit() == 20));
+	}
+
+	@Test
+	void listRejectsTeacherForAnAssignmentOutsideTheirClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(8L));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(8L, 3L)).thenReturn(false);
+
+		assertThatThrownBy(() -> submissionService.list(5L, null, null, 1, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void listAdminCanListWithoutScoping() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionListResult result = submissionService.list(null, null, null, 1, 20);
+
+		assertThat(result.total()).isEqualTo(1);
+	}
+
+	@Test
+	void listForwardsAssignmentAndStatusFilters() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 2, 10, 1));
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
+
+		SubmissionListResult result = submissionService.list(5L, 41L, "IN_PROGRESS", 2, 10);
+
+		assertThat(result.page()).isEqualTo(2);
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.assignmentId().equals(5L)
+						&& filter.studentId().equals(41L)
+						&& filter.status() == SubmissionStatus.IN_PROGRESS),
+				argThat(request -> request.page() == 2 && request.limit() == 10));
+	}
+
+	@Test
+	void listRejectsAnInvalidPagination() {
+		assertThatThrownBy(() -> submissionService.list(null, null, null, 0, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dữ liệu không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.list(null, null, null, 1, 101))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dữ liệu không hợp lệ.");
+	}
+
+	@Test
+	void listRejectsAnInvalidStatusFilter() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+
+		assertThatThrownBy(() -> submissionService.list(null, null, "INVALID_STATUS", 1, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("status không hợp lệ.");
+	}
+
 	private AssignmentWindow window(
 			Long assignmentId, OffsetDateTime openAt, OffsetDateTime closeAt, Integer maxSubmissions) {
 		return new AssignmentWindow(assignmentId, 3L, AssignmentStatus.PUBLISHED, openAt, closeAt, maxSubmissions, false);
@@ -287,6 +565,10 @@ class SubmissionServiceTest {
 		return new SubmissionModule(5L, moduleId, SubmissionStatus.IN_PROGRESS);
 	}
 
+	private Grading grading(Long submissionModuleId, GradingMethod method, GradingStatus status) {
+		return new Grading(submissionModuleId, method, status, null, null, null, null);
+	}
+
 	private User student(long id) {
 		return new User(id, "Học viên", "student@example.com", null, null, "hash", UserRole.STUDENT, UserStatus.ACTIVE, false,
 				null, "HV00" + id, null, null);
@@ -295,5 +577,10 @@ class SubmissionServiceTest {
 	private User teacher(long id) {
 		return new User(id, "Giáo viên", "teacher@example.com", null, null, "hash", UserRole.TEACHER, UserStatus.ACTIVE, false,
 				"IELTS", null, null, null);
+	}
+
+	private User admin(long id) {
+		return new User(id, "Quản trị", "admin@example.com", null, null, "hash", UserRole.ADMIN, UserStatus.ACTIVE, false,
+				null, null, null, null);
 	}
 }

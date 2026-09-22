@@ -23,4 +23,8 @@ public class Grading extends BaseEntity<Long> {
 	private BigDecimal finalScore;
 
 	private BigDecimal maxScoreSnapshot;
+
+	private String aiFeedback;
+
+	private String finalFeedback;
 }

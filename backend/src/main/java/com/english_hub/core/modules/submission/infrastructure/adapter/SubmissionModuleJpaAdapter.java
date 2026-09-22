@@ -6,6 +6,7 @@ import com.english_hub.core.modules.submission.domain.repository.SubmissionModul
 import com.english_hub.core.modules.submission.infrastructure.mapper.SubmissionPersistenceMapper;
 import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataSubmissionModuleRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,6 +42,12 @@ public class SubmissionModuleJpaAdapter implements SubmissionModuleRepository {
 	@Transactional(readOnly = true)
 	public List<SubmissionModule> findBySubmissionId(Long submissionId) {
 		return jpaRepository.findBySubmissionId(submissionId).stream().map(mapper::toDomain).toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<SubmissionModule> findBySubmissionIds(Collection<Long> submissionIds) {
+		return jpaRepository.findBySubmissionIdIn(submissionIds).stream().map(mapper::toDomain).toList();
 	}
 
 	@Override
