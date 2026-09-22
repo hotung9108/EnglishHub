@@ -1,0 +1,7 @@
+id: BE-TASK-6
+title: "Implement Submissions and Answers APIs"
+assignee: "@be-secondary"
+status: "In Progress"
+progress: "Phase 1 (persistence) DONE on feat/submissions-answers-api: modules/submission DDD ports+adapters (SubmissionRepository, SubmissionModuleRepository, GradingRepository) with Testcontainers integration test (7 tests, 134 total green). Phase 2 (API #37 start attempt) next."
+priority: "High"
+description: "Implement the submission and answers API cluster following the DDD/service-layer rules and the V6 schema: create student submissions against an open assignment with a student_evaluations linkage, submit answers (listening/speaking/reading/writing) referencing questions and modules, list/get submissions, get submission details with answers, and update/correct answers. Enforce role scoping and ownership (student can only submit within their enrollment/class and only while assignment is OPEN; teacher/admin visibility rules), validate answer payloads, score, and JSON correct_answer at the service layer, use JPA rather than raw SQL/JDBC, add unit/integration tests, and place tester handoff instructions in production_artifacts/be_to_tester/."
