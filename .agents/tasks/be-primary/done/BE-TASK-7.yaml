@@ -1,0 +1,6 @@
+id: BE-TASK-7
+title: "Update database JSONB mappings"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Convert questions.correct_answer and answers.content to JSONB with the V4 migration, update Question/Answer entity mappings and String adapters, and verify JSONB round-trip behavior on PostgreSQL with Testcontainers."

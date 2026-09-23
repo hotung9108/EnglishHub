@@ -97,6 +97,12 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
     ],
     student: [
       {
+        title: t('sectionOverview'),
+        items: [
+          { path: '/student/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
+        ]
+      },
+      {
         title: t('sectionLearning'),
         items: [
           { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },

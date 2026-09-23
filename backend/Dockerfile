@@ -15,17 +15,18 @@ COPY gradle ./gradle
 COPY build.gradle settings.gradle ./
 RUN chmod +x gradlew
 
-# Tải dependencies (cache riêng layer này, chỉ tải lại khi build.gradle đổi)
-RUN ./gradlew --no-daemon dependencies || true
+# Tải trước Gradle wrapper & dependencies (tắt log thừa, chỉ chạy lại khi build.gradle / gradle đổi)
+RUN ./gradlew --no-daemon dependencies -q || true
 
-# Copy source code và build
+# Copy source code và build (bỏ clean, bật biên dịch đa luồng parallel, console plain)
 COPY src ./src
-RUN ./gradlew --no-daemon clean bootJar -x test
+RUN ./gradlew --no-daemon bootJar -x test --parallel --console=plain
 
 # =========================
 # Stage 2: Runtime
+# Dùng Liberica JRE 21 Musl siêu nhẹ (giảm dung lượng image từ 411MB xuống ~250MB)
 # =========================
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM bellsoft/liberica-runtime-container:jre-21-musl AS runtime
 WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring
@@ -34,7 +35,6 @@ USER spring:spring
 COPY --from=build /workspace/build/libs/*.jar app.jar
 
 # Mặc định chạy với profile dev, trỏ về Postgres container ở docker-compose.dev.yml
-# (Postgres cần chạy trên cùng network Docker hoặc dùng host.docker.internal, xem hướng dẫn ở báo cáo)
 ENV SPRING_PROFILES_ACTIVE=dev
 
 EXPOSE 8080

@@ -1,358 +1,554 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
-  UploadCloud, Plus, Mic, BookOpen, 
-  Volume2, PenTool, Clock, Calendar, X
+  Plus, Mic, BookOpen, Headphones, PenTool, Clock, Calendar, 
+  Search, CheckCircle2, AlertCircle, FileText, ArrowRight,
+  UploadCloud, X, Zap
 } from 'lucide-react';
 
-const TeacherAssignments = () => {
+interface AssignmentItem {
+  id: string;
+  code: string;
+  type: 'writing' | 'speaking' | 'reading' | 'listening';
+  typeLabel: string;
+  title: string;
+  className: string;
+  dueDate: string;
+  daysLeft?: number;
+  totalStudents: number;
+  submittedCount: number;
+  pendingGradingCount: number;
+  status: 'open' | 'closed' | 'upcoming';
+}
+
+export const TeacherAssignments: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const [activeFilter, setActiveFilter] = useState('all');
+  const { language } = useLanguage();
+  const isVi = language === 'vi';
+
+  const [selectedClass, setSelectedClass] = useState<string>('ENG-IELTS-6.5A');
+  const [skillFilter, setSkillFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
 
-  const assignments = [
+  const assignments: AssignmentItem[] = useMemo(() => [
     {
-      id: 'HW-01',
+      id: '1',
+      code: 'HW-01',
       type: 'writing',
       typeLabel: 'Writing Task 2',
-      title: 'IELTS Writing Task 2: Renewable Energy Essay',
-      dueDate: '15/09/2026 (23:59)',
-      dueType: 'normal'
+      title: 'IELTS Writing Task 2: Artificial Intelligence & Workforce Evolution',
+      className: 'ENG-IELTS-6.5A',
+      dueDate: '2026-03-22 23:59',
+      daysLeft: 2,
+      totalStudents: 24,
+      submittedCount: 22,
+      pendingGradingCount: 2,
+      status: 'open'
     },
     {
-      id: 'HW-02',
+      id: '2',
+      code: 'HW-02',
       type: 'speaking',
       typeLabel: 'Speaking Part 2',
-      title: 'Speaking Part 2: Describe an environmental problem',
-      dueDate: '14/09/2026 (23:59)',
-      dueType: 'normal',
-      hasProgress: true
+      title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
+      className: 'ENG-IELTS-6.5A',
+      dueDate: '2026-03-20 23:59',
+      daysLeft: 0,
+      totalStudents: 24,
+      submittedCount: 24,
+      pendingGradingCount: 3,
+      status: 'open'
     },
     {
-      id: 'HW-03',
+      id: '3',
+      code: 'HW-03',
       type: 'reading',
-      typeLabel: 'Reading',
-      title: 'Cambridge 18 - Reading Test 1: Full Passage',
-      dueDate: '10/09/2026',
-      dueType: 'normal'
+      typeLabel: 'Reading Mock Test',
+      title: 'Cambridge 19 - Academic Reading Passage: Biomimicry Innovation',
+      className: 'ENG-IELTS-6.5A',
+      dueDate: '2026-03-18 21:00',
+      totalStudents: 24,
+      submittedCount: 24,
+      pendingGradingCount: 0,
+      status: 'closed'
     },
     {
-      id: 'HW-04',
+      id: '4',
+      code: 'HW-04',
       type: 'listening',
-      typeLabel: 'Listening Section 3',
-      title: 'IELTS Listening Section 3: Campus Conversation',
-      dueDate: '08/09/2026',
-      dueType: 'normal'
+      typeLabel: 'Listening Section 3 & 4',
+      title: 'IELTS Listening Practice: Campus Life & Renewable Energy Seminar',
+      className: 'ENG-IELTS-6.5A',
+      dueDate: '2026-03-15 21:00',
+      totalStudents: 24,
+      submittedCount: 23,
+      pendingGradingCount: 0,
+      status: 'closed'
     },
     {
-      id: 'HW-05',
+      id: '5',
+      code: 'HW-05',
       type: 'writing',
       typeLabel: 'Writing Task 1',
-      title: 'IELTS Writing Task 1: Bar Chart Analysis',
-      dueDate: '20/09/2026 (08:00)',
-      dueType: 'upcoming',
-      autoOpen: true
+      title: 'IELTS Writing Task 1: Comparative Bar Chart on Carbon Emissions',
+      className: 'ENG-IELTS-6.5A',
+      dueDate: '2026-03-25 08:00',
+      daysLeft: 5,
+      totalStudents: 24,
+      submittedCount: 8,
+      pendingGradingCount: 2,
+      status: 'upcoming'
     }
-  ];
+  ], []);
 
-  const getBadgeStyle = (type: string) => {
+  const filteredAssignments = useMemo(() => {
+    return assignments.filter(item => {
+      if (skillFilter !== 'all' && item.type !== skillFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return item.title.toLowerCase().includes(q) || item.code.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [assignments, skillFilter, searchQuery]);
+
+  const stats = useMemo(() => {
+    const total = assignments.length;
+    const openCount = assignments.filter(a => a.status === 'open').length;
+    const pendingTotal = assignments.reduce((sum, a) => sum + a.pendingGradingCount, 0);
+    const avgSubmission = Math.round(
+      (assignments.reduce((sum, a) => sum + (a.submittedCount / a.totalStudents), 0) / assignments.length) * 100
+    );
+    return {
+      total,
+      openCount,
+      pendingTotal,
+      avgSubmission
+    };
+  }, [assignments]);
+
+  const getSkillBadge = (type: string) => {
     switch (type) {
       case 'writing':
-        return { bg: '#F3E8FF', color: '#9333EA', icon: <PenTool size={14} /> };
+        return (
+          <span className="std-skill-tag writing">
+            <PenTool size={13} />
+            Writing
+          </span>
+        );
       case 'speaking':
-        return { bg: '#FCE7F3', color: '#DB2777', icon: <Mic size={14} /> };
+        return (
+          <span className="std-skill-tag speaking">
+            <Mic size={13} />
+            Speaking
+          </span>
+        );
       case 'reading':
-        return { bg: '#DCFCE7', color: '#16A34A', icon: <BookOpen size={14} /> };
-      case 'listening':
-        return { bg: '#E0F2FE', color: '#0284C7', icon: <Volume2 size={14} /> };
+        return (
+          <span className="std-skill-tag reading">
+            <BookOpen size={13} />
+            Reading
+          </span>
+        );
       default:
-        return { bg: '#F3F4F6', color: '#4B5563', icon: null };
+        return (
+          <span className="std-skill-tag listening">
+            <Headphones size={13} />
+            Listening
+          </span>
+        );
     }
   };
 
+  const handleSelectSkillToCreate = (skillType: string) => {
+    setShowSkillModal(false);
+    navigate(`/teacher/assignments/create?type=${skillType}`);
+  };
+
   return (
-    <div>
-      {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', paddingBottom: '24px' }}>
+    <div className="teacher-container">
+      {/* Header */}
+      <div className="teacher-header">
         <div>
-          <h1 className="page-title" style={{ margin: '0 0 8px 0', fontSize: '28px' }}>{t('teacherAssignments.title')}</h1>
-          <p className="body-md text-on-surface-variant" style={{ margin: 0, color: '#6B7280' }}>
-            {t('teacherAssignments.subtitle')}
+          <h1 className="teacher-title">
+            <FileText size={28} color="var(--primary)" />
+            {isVi ? 'Quản Lý Bài Tập & Chấm Điểm' : 'Assignment & Grading Management'}
+          </h1>
+          <p className="teacher-subtitle">
+            {isVi
+              ? 'Tạo đề bài mới, theo dõi tiến độ nộp bài của cả lớp và chấm chữa bài nhanh với sự hỗ trợ của AI.'
+              : 'Create homework prompts, monitor submission turnout, and review student drafts with AI assistance.'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <select 
-              style={{
-                appearance: 'none',
-                padding: '8px 36px 8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #D1D5DB',
-                backgroundColor: 'white',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#374151',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option>{t('teacherAssignments.classPrefix')}ENG-IELTS-6.5A (Intensive)</option>
-            </select>
-            <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6B7280' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-          </div>
-          
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #D1D5DB', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
-            <UploadCloud size={18} /> {t('teacherAssignments.btnTemplateBank')}
-          </button>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => setShowSkillModal(true)}
-            style={{ backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', border: 'none', fontWeight: 500, cursor: 'pointer' }}
+
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Class Select Dropdown */}
+          <select
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            style={{
+              padding: '9px 14px',
+              fontSize: '13.5px',
+              borderRadius: 'var(--radius-md, 8px)',
+              border: '1px solid var(--outline-variant)',
+              backgroundColor: 'var(--surface)',
+              color: 'var(--on-surface)',
+              fontWeight: 600,
+              outline: 'none'
+            }}
           >
-            <Plus size={18} /> {t('teacherAssignments.btnCreate')}
+            <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A (Intensive)</option>
+            <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV (Ngữ pháp)</option>
+            <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750 (Cấp tốc)</option>
+          </select>
+
+          <button
+            type="button"
+            className="std-eco-btn-secondary"
+            onClick={() => alert(isVi ? 'Đang mở Ngân hàng đề thi mẫu IELTS Cambridge...' : 'Opening Cambridge Exam Bank...')}
+          >
+            <UploadCloud size={16} />
+            <span>{isVi ? 'Ngân hàng đề thi' : 'Exam Bank'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="std-eco-btn-primary"
+            onClick={() => setShowSkillModal(true)}
+          >
+            <Plus size={16} />
+            <span>{isVi ? 'Giao bài tập mới' : 'Create Assignment'}</span>
           </button>
         </div>
       </div>
 
-      {/* Statistics & Filters Card */}
-      <div className="card" style={{ 
-        background: 'linear-gradient(135deg, #f0f9ff 0%, #eef2ff 50%, #f5f3ff 100%)', 
-        borderRadius: '12px', 
-        border: '1px solid #e0e7ff', 
-        marginBottom: '24px', 
-        overflow: 'hidden',
-        boxShadow: '0 4px 20px -4px rgba(79, 70, 229, 0.05)'
-      }}>
-        <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid rgba(224, 231, 255, 0.6)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: 0 }}>{t('teacherAssignments.libraryTitle')} ENG-IELTS-6.5A</h2>
-              <span style={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontSize: '12px', fontWeight: 500, padding: '4px 10px', borderRadius: '12px' }}>
-                Active Term
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151', fontWeight: 500 }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-                12 <span style={{ color: '#6B7280', fontWeight: 400 }}>{t('teacherAssignments.statOpen')}</span>
-              </div>
-              <div style={{ color: '#D1D5DB' }}>|</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151', fontWeight: 500 }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#9CA3AF' }}></span>
-                3 <span style={{ color: '#6B7280', fontWeight: 400 }}>{t('teacherAssignments.statClosed')}</span>
-              </div>
-              <div style={{ color: '#D1D5DB' }}>|</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#FEF3C7', color: '#D97706', padding: '4px 12px', borderRadius: '16px', fontWeight: 600 }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B' }}></span>
-                {t('teacherAssignments.statNeedsGrading')} 6
-              </div>
-            </div>
+      {/* KPI Stats Grid */}
+      <div className="teacher-stats-grid">
+        <div className="teacher-stat-card">
+          <div className="teacher-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+            <FileText size={22} />
           </div>
-          <p style={{ margin: 0, color: '#6B7280', fontSize: '14px' }}>
-            {t('teacherAssignments.summaryText')} <span style={{ color: '#10B981', fontWeight: 600 }}>88.4%</span>
-          </p>
+          <div>
+            <div className="teacher-stat-num">{stats.total} {isVi ? 'Bài tập' : 'Items'}</div>
+            <div className="teacher-stat-label">{isVi ? 'Tổng bài tập trong học kỳ' : 'Total Course Assignments'}</div>
+          </div>
         </div>
-        
-        {/* Filters */}
-        <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.6)', backdropFilter: 'blur(8px)' }}>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {[
-              { id: 'all', label: `${t('teacherAssignments.filterAll')} (15)` },
-              { id: 'listening', label: 'Listening (4)' },
-              { id: 'speaking', label: 'Speaking (3)' },
-              { id: 'reading', label: 'Reading (4)' },
-              { id: 'writing', label: 'Writing (4)' }
-            ].map(filter => (
-              <button
-                key={filter.id}
-                onClick={() => setActiveFilter(filter.id)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  border: activeFilter === filter.id ? 'none' : '1px solid #E5E7EB',
-                  backgroundColor: activeFilter === filter.id ? '#2563EB' : 'white',
-                  color: activeFilter === filter.id ? 'white' : '#4B5563',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {filter.label}
-              </button>
-            ))}
+
+        <div className="teacher-stat-card">
+          <div className="teacher-stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+            <CheckCircle2 size={22} />
           </div>
-          <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
-            {t('teacherAssignments.showingRecentPrefix')}5{t('teacherAssignments.showingRecentMid')}15{t('teacherAssignments.showingRecentSuffix')}
+          <div>
+            <div className="teacher-stat-num">{stats.openCount} {isVi ? 'Bài đang mở' : 'Active'}</div>
+            <div className="teacher-stat-label">{isVi ? 'Học viên đang làm & nộp bài' : 'Currently Open for Submissions'}</div>
+          </div>
+        </div>
+
+        <div className="teacher-stat-card" style={{ borderColor: stats.pendingTotal > 0 ? '#fde68a' : undefined }}>
+          <div className="teacher-stat-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+            <Clock size={22} />
+          </div>
+          <div>
+            <div className="teacher-stat-num" style={{ color: '#d97706' }}>
+              {stats.pendingTotal} {isVi ? 'Bài cần chấm' : 'To Grade'}
+            </div>
+            <div className="teacher-stat-label">{isVi ? 'Chờ giáo viên nhận xét & chấm điểm' : 'Pending Teacher Evaluation'}</div>
+          </div>
+        </div>
+
+        <div className="teacher-stat-card">
+          <div className="teacher-stat-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }}>
+            <Zap size={22} />
+          </div>
+          <div>
+            <div className="teacher-stat-num">{stats.avgSubmission}%</div>
+            <div className="teacher-stat-label">{isVi ? 'Tỷ lệ nộp bài trung bình' : 'Avg Submission Turnout'}</div>
           </div>
         </div>
       </div>
 
-      {/* Assignment List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-        {assignments.map((item) => {
-          const badge = getBadgeStyle(item.type);
-          
+      {/* Filter and Search Bar */}
+      <div className="teacher-filter-bar">
+        <div className="teacher-pills">
+          <button
+            type="button"
+            className={`teacher-pill ${skillFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setSkillFilter('all')}
+          >
+            {isVi ? 'Tất cả kỹ năng' : 'All Skills'}
+            <span className="teacher-pill-badge">{assignments.length}</span>
+          </button>
+          <button
+            type="button"
+            className={`teacher-pill ${skillFilter === 'writing' ? 'active' : ''}`}
+            onClick={() => setSkillFilter('writing')}
+          >
+            <PenTool size={13} />
+            Writing
+          </button>
+          <button
+            type="button"
+            className={`teacher-pill ${skillFilter === 'speaking' ? 'active' : ''}`}
+            onClick={() => setSkillFilter('speaking')}
+          >
+            <Mic size={13} />
+            Speaking
+          </button>
+          <button
+            type="button"
+            className={`teacher-pill ${skillFilter === 'reading' ? 'active' : ''}`}
+            onClick={() => setSkillFilter('reading')}
+          >
+            <BookOpen size={13} />
+            Reading
+          </button>
+          <button
+            type="button"
+            className={`teacher-pill ${skillFilter === 'listening' ? 'active' : ''}`}
+            onClick={() => setSkillFilter('listening')}
+          >
+            <Headphones size={13} />
+            Listening
+          </button>
+        </div>
+
+        <div className="teacher-search-wrap">
+          <Search size={15} className="teacher-search-icon" />
+          <input
+            type="text"
+            className="teacher-search-input"
+            placeholder={isVi ? 'Tìm bài tập theo tên hoặc mã HW...' : 'Search assignment or HW code...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Assignments List */}
+      <div className="teacher-assignments-list">
+        {filteredAssignments.map((item) => {
+          const submissionPercent = Math.round((item.submittedCount / item.totalStudents) * 100);
+
           return (
-            <div 
-              key={item.id} 
-              onClick={() => navigate(`/teacher/assignments/${item.id}`)}
-              style={{ 
-                backgroundColor: 'white', 
-                border: '1px solid #E5E7EB', 
-                borderRadius: '12px', 
-                padding: '20px 24px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-                cursor: 'pointer'
-              }}
-            >
-              {/* Highlight border left for the second item (warning state) */}
-              {item.dueType === 'warning' && (
-                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', backgroundColor: '#F59E0B' }}></div>
-              )}
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                <div style={{ 
-                  backgroundColor: '#F3F4F6', 
-                  color: '#4B5563', 
-                  fontWeight: 600, 
-                  fontSize: '14px', 
-                  padding: '8px 12px', 
-                  borderRadius: '8px',
-                  minWidth: '60px',
-                  textAlign: 'center'
-                }}>
-                  {item.id}
+            <div key={item.id} className="teacher-assignment-card">
+              {/* Left Column: Skill, Title, Due date */}
+              <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 800, 
+                    padding: '2px 8px', 
+                    borderRadius: '4px', 
+                    backgroundColor: '#0f172a', 
+                    color: '#ffffff' 
+                  }}>
+                    {item.code}
+                  </span>
+                  {getSkillBadge(item.type)}
+                  <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                    {item.typeLabel}
+                  </span>
                 </div>
-                
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+
+                <h3 
+                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
+                  style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 700, 
+                    color: 'var(--on-surface)', 
+                    margin: 0, 
+                    cursor: 'pointer',
+                    lineHeight: 1.4
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--on-surface)')}
+                >
+                  {item.title}
+                </h3>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', color: 'var(--on-surface-variant)', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <Calendar size={13} />
+                    {isVi ? 'Hạn nộp:' : 'Deadline:'} <strong>{item.dueDate}</strong>
+                  </span>
+                  {item.daysLeft !== undefined && (
                     <span style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      backgroundColor: badge.bg, 
-                      color: badge.color, 
-                      padding: '4px 10px', 
-                      borderRadius: '12px', 
-                      fontSize: '12px', 
-                      fontWeight: 600 
+                      fontSize: '11px', 
+                      fontWeight: 700, 
+                      padding: '2px 8px', 
+                      borderRadius: '10px', 
+                      backgroundColor: item.daysLeft <= 1 ? '#fef2f2' : '#f0fdf4',
+                      color: item.daysLeft <= 1 ? '#dc2626' : '#16a34a' 
                     }}>
-                      {item.type !== 'reading' && item.type !== 'writing' ? badge.icon : null}
-                      {item.typeLabel}
+                      {item.daysLeft === 0 
+                        ? (isVi ? 'Hết hạn hôm nay' : 'Due today') 
+                        : (isVi ? `Còn ${item.daysLeft} ngày` : `${item.daysLeft} days left`)}
                     </span>
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>{item.title}</h3>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                    {item.autoOpen ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2563EB', fontWeight: 500 }}>
-                        <Calendar size={14} /> {t('teacherAssignments.autoOpenPrefix')}{item.dueDate}
-                      </span>
-                    ) : (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6B7280' }}>
-                        <Clock size={14} color={item.dueType === 'warning' ? '#4B5563' : '#9CA3AF'} /> 
-                        {t('teacherAssignments.dueDatePrefix')}<span style={{ color: item.dueType === 'warning' ? '#111827' : '#6B7280' }}>{item.dueDate}</span>
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-              
-              {/* Progress Line for HW-02 */}
-              {item.hasProgress && (
-                <div style={{ display: 'flex', alignItems: 'center', width: '200px' }}>
-                  <div style={{ width: '100%', height: '6px', backgroundColor: '#E5E7EB', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: '85%', height: '100%', backgroundColor: '#F59E0B' }}></div>
-                  </div>
+
+              {/* Middle Column: Submission Progress */}
+              <div style={{ flex: 1, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+                  <span style={{ color: 'var(--on-surface-variant)' }}>{isVi ? 'Tiến độ nộp bài:' : 'Turnout:'}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--on-surface)' }}>
+                    {item.submittedCount}/{item.totalStudents} ({submissionPercent}%)
+                  </span>
                 </div>
-              )}
+                <div className="teacher-progress-bar">
+                  <div 
+                    className="teacher-progress-fill" 
+                    style={{ width: `${submissionPercent}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Right Column: Pending grading badge & Action Button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                {item.pendingGradingCount > 0 ? (
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '5px', 
+                    fontSize: '12px', 
+                    fontWeight: 700, 
+                    padding: '4px 10px', 
+                    borderRadius: '12px', 
+                    backgroundColor: '#fffbeb', 
+                    color: '#d97706',
+                    border: '1px solid #fde68a'
+                  }}>
+                    <AlertCircle size={13} />
+                    {item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}
+                  </span>
+                ) : (
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    fontSize: '12px', 
+                    color: '#16a34a', 
+                    fontWeight: 600 
+                  }}>
+                    <CheckCircle2 size={13} />
+                    {isVi ? 'Đã chấm hết' : 'All Graded'}
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  className="std-eco-btn-primary"
+                  style={{ padding: '8px 16px', fontSize: '13px' }}
+                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
+                >
+                  <span>{item.pendingGradingCount > 0 ? (isVi ? 'Chấm bài ngay' : 'Grade Now') : (isVi ? 'Xem kết quả' : 'View Submissions')}</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
           );
         })}
+
+        {filteredAssignments.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 20px', backgroundColor: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--outline-variant)' }}>
+            <FileText size={36} color="var(--on-surface-variant)" style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
+            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
+              {isVi ? 'Không tìm thấy bài tập nào' : 'No assignments found'}
+            </h4>
+            <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+              {isVi ? 'Hãy thử đổi bộ lọc kỹ năng hoặc từ khóa tìm kiếm.' : 'Try adjusting the skill filter or search query.'}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Pagination */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#6B7280', fontSize: '14px' }}>
-        <div>
-          {t('teacherAssignments.paginationPrefix')}<strong>1-5</strong>{t('teacherAssignments.paginationMid')}<strong>15</strong>{t('teacherAssignments.paginationSuffix')}
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#9CA3AF', cursor: 'pointer' }}>{t('teacherAssignments.btnPrev')}</button>
-          <button style={{ padding: '6px 12px', backgroundColor: '#2563EB', border: 'none', borderRadius: '6px', color: 'white', fontWeight: 500, cursor: 'pointer' }}>1</button>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>2</button>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>3</button>
-          <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '6px', color: '#374151', cursor: 'pointer' }}>{t('teacherAssignments.btnNext')}</button>
-        </div>
-      </div>
-
-      {/* Skill Selection Modal */}
+      {/* Skill Picker Modal */}
       {showSkillModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowSkillModal(false)}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '500px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 600, margin: 0, color: '#111827' }}>{t('teacherAssignments.modalSelectSkill')}</h2>
-              <button onClick={() => setShowSkillModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="skill-modal-overlay" onClick={() => setShowSkillModal(false)}>
+          <div className="skill-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--on-surface)' }}>
+                {isVi ? 'Chọn Loại Kỹ Năng Cần Giao Bài' : 'Select Assignment Skill Module'}
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setShowSkillModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+              >
                 <X size={20} />
               </button>
             </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div 
-                onClick={() => navigate('/teacher/assignments/create?skill=listening')}
-                style={{ padding: '20px', border: '1px solid #E0F2FE', borderRadius: '12px', backgroundColor: '#F0F9FF', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-              >
-                <div style={{ padding: '16px', backgroundColor: '#E0F2FE', borderRadius: '50%', color: '#0284C7' }}>
-                  <Volume2 size={28} />
+            <p style={{ fontSize: '13.5px', color: 'var(--on-surface-variant)', margin: '0 0 20px 0' }}>
+              {isVi 
+                ? 'Hệ thống tự động tích hợp rubric chấm điểm chuẩn IELTS và bộ công cụ chẩn đoán AI cho từng kỹ năng.' 
+                : 'Automated IELTS rubrics and AI assessment engines will be calibrated for your assignment.'}
+            </p>
+
+            <div className="skill-card-grid">
+              {/* Writing */}
+              <div className="skill-card-option" onClick={() => handleSelectSkillToCreate('writing')}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <PenTool size={22} />
                 </div>
-                <div style={{ fontWeight: 600, color: '#0369A1', fontSize: '16px' }}>Listening</div>
-              </div>
-              
-              <div 
-                onClick={() => navigate('/teacher/assignments/create?skill=speaking')}
-                style={{ padding: '20px', border: '1px solid #FCE7F3', borderRadius: '12px', backgroundColor: '#FDF2F8', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-              >
-                <div style={{ padding: '16px', backgroundColor: '#FCE7F3', borderRadius: '50%', color: '#DB2777' }}>
-                  <Mic size={28} />
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700 }}>Writing Task 1 & 2</h4>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+                    {isVi ? 'Bài luận học thuật, phân tích biểu đồ kèm bộ đếm từ và chấm điểm tự động.' : 'Academic essays & charts with word counters and auto-grammar check.'}
+                  </p>
                 </div>
-                <div style={{ fontWeight: 600, color: '#BE185D', fontSize: '16px' }}>Speaking</div>
               </div>
-              
-              <div 
-                onClick={() => navigate('/teacher/assignments/create?skill=reading')}
-                style={{ padding: '20px', border: '1px solid #DCFCE7', borderRadius: '12px', backgroundColor: '#F0FDF4', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-              >
-                <div style={{ padding: '16px', backgroundColor: '#DCFCE7', borderRadius: '50%', color: '#16A34A' }}>
-                  <BookOpen size={28} />
+
+              {/* Speaking */}
+              <div className="skill-card-option" onClick={() => handleSelectSkillToCreate('speaking')}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Mic size={22} />
                 </div>
-                <div style={{ fontWeight: 600, color: '#15803D', fontSize: '16px' }}>Reading</div>
-              </div>
-              
-              <div 
-                onClick={() => navigate('/teacher/assignments/create?skill=writing')}
-                style={{ padding: '20px', border: '1px solid #F3E8FF', borderRadius: '12px', backgroundColor: '#FAF5FF', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', transition: 'all 0.2s' }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-              >
-                <div style={{ padding: '16px', backgroundColor: '#F3E8FF', borderRadius: '50%', color: '#9333EA' }}>
-                  <PenTool size={28} />
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700 }}>Speaking Part 1, 2, 3</h4>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+                    {isVi ? 'Thu âm giọng nói trực tiếp, phân tích âm vị phát âm và độ trôi chảy AI.' : 'Audio recordings with AI fluency & phoneme accuracy analysis.'}
+                  </p>
                 </div>
-                <div style={{ fontWeight: 600, color: '#7E22CE', fontSize: '16px' }}>Writing</div>
               </div>
+
+              {/* Reading */}
+              <div className="skill-card-option" onClick={() => handleSelectSkillToCreate('reading')}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <BookOpen size={22} />
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700 }}>Reading Mock Passage</h4>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+                    {isVi ? 'Đề đọc hiểu 3 passage, câu hỏi Matching Headings, True/False/Not Given.' : 'Full reading passages with automated key checking and time tracker.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Listening */}
+              <div className="skill-card-option" onClick={() => handleSelectSkillToCreate('listening')}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f0fdfa', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Headphones size={22} />
+                </div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700 }}>Listening Section 1-4</h4>
+                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+                    {isVi ? 'Tải lên audio bài nghe MP3, câu hỏi điền từ và phát hiện bẫy nghe.' : 'Upload MP3 audio files with transcripts and distractor markers.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button
+                type="button"
+                className="std-eco-btn-secondary"
+                onClick={() => setShowSkillModal(false)}
+              >
+                {isVi ? 'Đóng' : 'Close'}
+              </button>
             </div>
           </div>
         </div>

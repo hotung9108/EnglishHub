@@ -20,6 +20,14 @@ import StudentClassDetails from './pages/StudentClassDetails';
 import StudentAssignmentWriting from './pages/StudentAssignmentWriting';
 import StudentAssignmentReading from './pages/StudentAssignmentReading';
 import StudentAssignmentListening from './pages/StudentAssignmentListening';
+import StudentAssignmentSpeaking from './pages/StudentAssignmentSpeaking';
+import StudentSubmissionResult from './pages/StudentSubmissionResult';
+import StudentAssignmentOverview from './pages/StudentAssignmentOverview';
+import StudentDashboard from './pages/StudentDashboard';
+import StudentWorkspace from './pages/StudentWorkspace';
+import StudentFeedback from './pages/StudentFeedback';
+import StudentGrades from './pages/StudentGrades';
+import StudentAnalytics from './pages/StudentAnalytics';
 import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
@@ -72,14 +80,23 @@ function App() {
         {/* Student Routes */}
         <Route element={<ProtectedRoute allowedRoles={['student']} />}>
           <Route path="/student" element={<MainLayout />}>
-            <Route index element={<Navigate to="/student/classes" replace />} />
+            <Route index element={<Navigate to="/student/dashboard" replace />} />
+            <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="classes" element={<StudentClasses />} />
             <Route path="classes/:id" element={<StudentClassDetails />} />
-            <Route path="dashboard" element={<div>Student Dashboard (Coming Soon)</div>} />
             <Route path="assignments" element={<StudentAssignments />} />
+            <Route path="assignments/:id/overview" element={<StudentAssignmentOverview />} />
+            <Route path="assignments/:id/result" element={<StudentSubmissionResult />} />
+            <Route path="submissions/:id" element={<StudentSubmissionResult />} />
             <Route path="assignments/:id" element={<StudentAssignmentWriting />} />
             <Route path="assignments/reading/:id" element={<StudentAssignmentReading />} />
             <Route path="assignments/listening/:id" element={<StudentAssignmentListening />} />
+            <Route path="assignments/speaking/:id" element={<StudentAssignmentSpeaking />} />
+            <Route path="workspace" element={<StudentWorkspace />} />
+            <Route path="feedback" element={<StudentFeedback />} />
+            <Route path="grades" element={<StudentGrades />} />
+            <Route path="analytics" element={<StudentAnalytics />} />
+            <Route path="status" element={<StudentAssignments />} />
           </Route>
         </Route>
       </Routes>

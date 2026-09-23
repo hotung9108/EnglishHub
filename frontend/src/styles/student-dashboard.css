@@ -1,0 +1,252 @@
+/* EnglishHub Student Portal: Student Dashboard Styles */
+
+.std-dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 40px 24px;
+}
+
+/* Greeting Hero */
+.std-dash-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #2563eb 100%);
+  color: white;
+  border-radius: var(--radius-lg, 16px);
+  padding: 32px;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.15);
+}
+
+.std-dash-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 900px) {
+  .std-dash-hero-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.std-dash-greeting {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.02em;
+}
+
+.std-dash-subgreeting {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0;
+  max-width: 540px;
+  line-height: 1.5;
+}
+
+.std-dash-target-pill {
+  background-color: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px 24px;
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.std-dash-target-val {
+  font-size: 32px;
+  font-weight: 900;
+  color: #60a5fa;
+  line-height: 1;
+}
+
+/* Stat Cards */
+.std-dash-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.std-dash-stat-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 12px);
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.std-dash-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+.std-dash-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.std-dash-stat-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--on-surface);
+  line-height: 1.1;
+}
+
+.std-dash-stat-label {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Main Two-Column Layout */
+.std-dash-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .std-dash-main-grid {
+    grid-template-columns: 1fr 380px;
+    gap: 28px;
+  }
+}
+
+/* Dashboard Section Card */
+.std-dash-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.std-dash-card-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.std-dash-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.std-dash-card-body {
+  padding: 24px;
+}
+
+/* Deadline Item */
+.std-deadline-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--outline-variant);
+  background-color: var(--surface);
+  transition: all 0.2s;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.std-deadline-item:last-child {
+  margin-bottom: 0;
+}
+
+.std-deadline-item:hover {
+  border-color: var(--primary);
+  background-color: #f8faff;
+}
+
+.std-deadline-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0 0 4px 0;
+}
+
+.std-deadline-meta {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 4-Skill Progress Bars */
+.skill-bar-row {
+  margin-bottom: 16px;
+}
+
+.skill-bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.skill-bar-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--on-surface);
+}
+
+.skill-bar-track {
+  height: 8px;
+  background-color: var(--surface-container);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.skill-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.6s ease;
+}
+
+.skill-bar-fill.listening { background-color: #3b82f6; }
+.skill-bar-fill.reading { background-color: #10b981; }
+.skill-bar-fill.writing { background-color: #f59e0b; }
+.skill-bar-fill.speaking { background-color: #8b5cf6; }
+
+/* AI Recommendation Box */
+.ai-recommend-box {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ai-recommend-box:last-child {
+  margin-bottom: 0;
+}

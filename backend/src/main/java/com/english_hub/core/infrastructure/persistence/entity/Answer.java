@@ -1,5 +1,7 @@
 package com.english_hub.core.infrastructure.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -31,8 +33,14 @@ public class Answer {
 	@Column(name = "question_id")
 	private Long questionId;
 
-	@Column(columnDefinition = "TEXT")
-	private String content;
+	/*
+	 * Hibernate 7.4.5's default JSON format mapper uses Jackson 2. Using
+	 * tools.jackson.databind.JsonNode here fails during JSONB persistence, so
+	 * this field intentionally uses the com.fasterxml.jackson.databind type.
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(columnDefinition = "jsonb")
+	private JsonNode content;
 
 	@Column(name = "audio_storage_key", length = 255)
 	private String audioStorageKey;
@@ -80,7 +88,9 @@ public class Answer {
 			UploadStatus docUploadStatus) {
 		this.submissionModuleId = submissionModuleId;
 		this.questionId = questionId;
-		this.content = content;
+		this.content = questionId == null
+				? JsonbValueCodec.text(content)
+				: JsonbValueCodec.parse(content, "content");
 		this.audioStorageKey = audioStorageKey;
 		this.audioDurationSeconds = audioDurationSeconds;
 		this.audioFileSizeBytes = audioFileSizeBytes;
@@ -90,5 +100,14 @@ public class Answer {
 		this.docMimeType = docMimeType;
 		this.docFileSizeBytes = docFileSizeBytes;
 		this.docUploadStatus = docUploadStatus;
+	}
+
+	public String getContent() {
+		if (content == null) {
+			return null;
+		}
+		return questionId == null && content.isTextual()
+				? content.textValue()
+				: JsonbValueCodec.serialize(content);
 	}
 }

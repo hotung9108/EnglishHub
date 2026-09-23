@@ -94,7 +94,12 @@ const StudentClassDetails: React.FC = () => {
         {/* Assignments List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          <div style={{ padding: '20px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div 
+            onClick={() => navigate('/student/assignments/HW-01')}
+            style={{ padding: '20px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: '#FFFFFF' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
             <div>
               <h4 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', color: 'var(--on-surface)' }}>HW-01: Renewable Energy Essay (Writing Task 2)</h4>
               <p style={{ fontSize: '13px', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -103,14 +108,27 @@ const StudentClassDetails: React.FC = () => {
                 <span>{t('studentAssignments.deadlinePrefix')}05/09/2026</span>
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706', fontSize: '14px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#FFFBEB', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706', fontSize: '13px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#FFFBEB', borderRadius: '6px', border: '1px solid #FDE68A' }}>
                 {t('studentAssignments.statusGrading')}
               </div>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+                onClick={(e) => { e.stopPropagation(); navigate('/student/assignments/HW-01'); }}
+              >
+                {t('studentAssignments.btnReview')}
+              </button>
             </div>
           </div>
 
-          <div style={{ padding: '20px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div 
+            onClick={() => navigate('/student/assignments/speaking/HW-02')}
+            style={{ padding: '20px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: '#FFFFFF' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--on-surface)', margin: 0 }}>HW-02: Technology Cue Card (Speaking Part 2)</h4>
@@ -122,14 +140,27 @@ const StudentClassDetails: React.FC = () => {
                 <span>{t('studentAssignments.aiEngine')}</span>
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ color: '#16A34A', fontSize: '14px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#DCFCE7', borderRadius: '4px', border: '1px solid #BBF7D0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ color: '#16A34A', fontSize: '13px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#DCFCE7', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
                 {t('studentAssignments.statusGraded')}
               </div>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+                onClick={(e) => { e.stopPropagation(); navigate('/student/assignments/speaking/HW-02'); }}
+              >
+                {t('studentAssignments.btnReview')}
+              </button>
             </div>
           </div>
 
-          <div style={{ padding: '20px', borderRadius: '8px', border: '1px dashed #CBD5E1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
+          <div 
+            onClick={() => navigate('/student/assignments/speaking/HW-05')}
+            style={{ padding: '20px', borderRadius: '8px', border: '1px dashed #CBD5E1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--on-surface)', margin: 0 }}>HW-05: Environment Problem Solution Discussion (Speaking)</h4>
@@ -141,10 +172,18 @@ const StudentClassDetails: React.FC = () => {
                 <span>{t('studentAssignments.requirePrefix')}Ghi âm tối thiểu 2 phút</span>
               </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ color: '#64748B', fontSize: '14px', fontWeight: 500, padding: '6px 16px', backgroundColor: '#E2E8F0', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ color: '#475569', fontSize: '13px', fontWeight: 500, padding: '6px 14px', backgroundColor: '#E2E8F0', borderRadius: '6px' }}>
                 {t('studentAssignments.statusNotStarted')}
               </div>
+              <button 
+                type="button" 
+                className="btn-primary" 
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+                onClick={(e) => { e.stopPropagation(); navigate('/student/assignments/speaking/HW-05'); }}
+              >
+                {t('studentAssignments.btnStart')}
+              </button>
             </div>
           </div>
 
