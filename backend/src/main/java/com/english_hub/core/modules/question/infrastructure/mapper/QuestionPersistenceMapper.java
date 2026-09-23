@@ -66,8 +66,17 @@ public class QuestionPersistenceMapper {
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> normalizeRoot(String json, boolean toApi) {
 		try {
-			Object parsed = objectMapper.readValue(json, Map.class);
-			Object normalized = normalizeValue(parsed, toApi);
+			Object parsed = objectMapper.readValue(json, Object.class);
+			Object normalized;
+			if (parsed instanceof Map<?, ?>) {
+				normalized = normalizeValue(parsed, toApi);
+			} else if (parsed instanceof List<?> || parsed instanceof byte[]) {
+				throw new IllegalArgumentException("correct_answer must be a JSON object or scalar");
+			} else {
+				Map<String, Object> wrapped = new LinkedHashMap<>();
+				wrapped.put("correct_answer", String.valueOf(parsed));
+				normalized = normalizeValue(wrapped, toApi);
+			}
 			if (!(normalized instanceof Map<?, ?> map)) {
 				throw new IllegalArgumentException("correct_answer must be a JSON object");
 			}
