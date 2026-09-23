@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
@@ -230,7 +231,9 @@ class QuestionServiceTest {
 	}
 
 	private void givenModuleAndOwner(Long moduleId, Long assignmentId, Long classId, Long teacherId) {
-		when(moduleRepository.findById(moduleId)).thenReturn(Optional.of(module(moduleId, assignmentId)));
+		Module value = module(moduleId, assignmentId);
+		when(moduleRepository.findById(moduleId)).thenReturn(Optional.of(value));
+		lenient().when(moduleRepository.findByIdForUpdate(moduleId)).thenReturn(Optional.of(value));
 		when(assignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment(assignmentId, classId)));
 		when(classRepository.findById(classId)).thenReturn(Optional.of(englishClass(classId, teacherId)));
 	}

@@ -10,6 +10,8 @@ public interface ModuleRepository {
 
 	Optional<Module> findById(Long id);
 
+	Optional<Module> findByIdForUpdate(Long id);
+
 	Module save(Module module);
 
 	boolean existsByAssignmentIdAndOrderIndex(Long assignmentId, int orderIndex);

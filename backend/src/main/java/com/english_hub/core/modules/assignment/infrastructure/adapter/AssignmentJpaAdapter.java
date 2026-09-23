@@ -45,6 +45,13 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 	}
 
 	@Override
+	public Optional<Assignment> findByIdForUpdate(Long id) {
+		return jpaRepository.findByIdForUpdate(id)
+				.filter(entity -> !entity.isDeleted())
+				.map(mapper::toDomain);
+	}
+
+	@Override
 	public List<Assignment> findAll() {
 		return jpaRepository.findAll().stream()
 				.filter(entity -> !entity.isDeleted())

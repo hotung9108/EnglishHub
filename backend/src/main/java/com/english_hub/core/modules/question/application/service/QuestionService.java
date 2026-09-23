@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ public class QuestionService {
 	private static final String CREATE_ORDER_CONFLICT_MESSAGE = "orderIndex đã được sử dụng trong module này.";
 	private static final String UPDATE_ORDER_CONFLICT_MESSAGE = "orderIndex đã được sử dụng.";
 	private static final String ANSWER_REFERENCE_MESSAGE = "Không thể xoá câu hỏi đã có câu trả lời.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final BigDecimal DEFAULT_SCORE = BigDecimal.ONE;
 
 	private final QuestionRepository questionRepository;
@@ -77,6 +79,7 @@ public class QuestionService {
 		Assignment assignment = requireAssignment(module.assignmentId());
 		requireTeacherOwnsAssignment(assignment, caller);
 		validateCreateCommand(command);
+		lockModule(moduleId);
 		if (questionRepository.existsByModuleIdAndOrderIndex(moduleId, command.orderIndex())) {
 			throw ApiException.badRequest(CREATE_ORDER_CONFLICT_MESSAGE);
 		}
@@ -129,6 +132,7 @@ public class QuestionService {
 		BigDecimal score = command.score() == null ? question.score() : command.score();
 		int orderIndex = command.orderIndex() == null ? question.orderIndex() : command.orderIndex();
 		validateScoreAndOrder(score, orderIndex);
+		lockModule(question.moduleId());
 		if (questionRepository.existsByModuleIdAndOrderIndexAndIdNot(
 				question.moduleId(), orderIndex, question.id())) {
 			throw ApiException.badRequest(UPDATE_ORDER_CONFLICT_MESSAGE);
@@ -203,6 +207,15 @@ public class QuestionService {
 	private Module requireModule(long moduleId) {
 		return moduleRepository.findById(moduleId)
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+	}
+
+	private void lockModule(long moduleId) {
+		try {
+			moduleRepository.findByIdForUpdate(moduleId)
+					.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private Assignment requireAssignment(long assignmentId) {

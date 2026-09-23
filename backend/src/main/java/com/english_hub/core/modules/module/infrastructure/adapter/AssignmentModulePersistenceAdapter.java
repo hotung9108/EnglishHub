@@ -39,6 +39,11 @@ public class AssignmentModulePersistenceAdapter implements ModuleRepository {
 	}
 
 	@Override
+	public Optional<Module> findByIdForUpdate(Long id) {
+		return assignmentModuleRepository.findByIdForUpdate(id).map(mapper::toDomain);
+	}
+
+	@Override
 	public Module save(Module module) {
 		AssignmentModule saved;
 		if (module.id() == null) {

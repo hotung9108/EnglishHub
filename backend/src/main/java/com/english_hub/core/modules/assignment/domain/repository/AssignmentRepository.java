@@ -7,8 +7,11 @@ import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSumm
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import java.util.List;
+import java.util.Optional;
 
 public interface AssignmentRepository extends IRepository<Assignment, Long> {
+
+	Optional<Assignment> findByIdForUpdate(Long id);
 
 	AssignmentPage findPage(Long classId, AssignmentStatus status, AssignmentPageRequest pageRequest);
 

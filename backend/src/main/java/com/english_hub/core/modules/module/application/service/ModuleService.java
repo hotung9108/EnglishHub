@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,6 +41,7 @@ public class ModuleService {
 	private static final String INVALID_MODULE_DATA_MESSAGE = "Dữ liệu module không hợp lệ.";
 	private static final String INVALID_PAIR_MESSAGE = "Skill và taskType không hợp lệ.";
 	private static final String SUBMISSION_REFERENCE_MESSAGE = "Không thể xoá module đã có bài nộp.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final String AUDIO_NOT_SUPPORTED_MESSAGE = "Module này không hỗ trợ upload audio.";
 	private static final String INVALID_AUDIO_MESSAGE = "File audio không hợp lệ.";
 	private static final long MAX_AUDIO_BYTES = 25L * 1024 * 1024;
@@ -92,6 +94,7 @@ public class ModuleService {
 		Assignment assignment = requireAssignment(assignmentId);
 		requireTeacherOwnsAssignment(assignment, caller);
 		validateCreateCommand(command);
+		lockAssignment(assignmentId);
 		if (moduleRepository.existsByAssignmentIdAndOrderIndex(assignmentId, command.orderIndex())) {
 			throw ApiException.badRequest(ORDER_CONFLICT_CREATE_MESSAGE);
 		}
@@ -133,6 +136,7 @@ public class ModuleService {
 		}
 
 		int orderIndex = command.orderIndex() == null ? module.orderIndex() : command.orderIndex();
+		lockAssignment(module.assignmentId());
 		if (moduleRepository.existsByAssignmentIdAndOrderIndexAndIdNot(
 				module.assignmentId(), orderIndex, module.id())) {
 			throw ApiException.badRequest(ORDER_CONFLICT_UPDATE_MESSAGE);
@@ -222,6 +226,15 @@ public class ModuleService {
 	private Assignment requireAssignment(long assignmentId) {
 		return assignmentRepository.findById(assignmentId)
 				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+	}
+
+	private void lockAssignment(long assignmentId) {
+		try {
+			assignmentRepository.findByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private Module requireModule(long moduleId) {
