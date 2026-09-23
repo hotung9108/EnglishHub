@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 Testing Instructions
+# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -29,7 +29,7 @@ Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.persistence.SubmissionPersistenceIntegrationTest'
 # -> 7 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 190 tests (unit + integration), all green
+./gradlew test   # full suite: 214 tests (unit + integration), all green
 ```
 
 ## What the 7 Phase-1 tests cover
@@ -58,7 +58,7 @@ cd backend
                --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
                --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
 # -> Phase 2 + Phase 3 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 190 tests (unit + integration), all green
+./gradlew test   # full suite: 214 tests (unit + integration), all green
 ```
 
 Smoke test (needs a running app with a seeded/local DB and a student bearer token):
@@ -154,9 +154,71 @@ curl -s "http://localhost:8080/api/v1/submissions?assignmentId=5&status=IN_PROGR
 | 400 | `Dữ liệu không hợp lệ.` (#39, invalid page/limit) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#38/#39 role/ownership checks) |
 
-## Next (for whoever picks up Phase 4)
-- API #43 (Quiz/Short Answer submit, `POST /submission-modules/{id}/submit`): `AnswerRepository`
-  (`bulkCreate`, `findBySubmissionModuleId`), `SubmissionModuleRepository.updateStatus`, service
-  validations (IN_PROGRESS only, questionId belongs to module), then 400/404 cases.
-- Then #40 `POST /submissions/{id}/submit` (final submit + auto-grading), #42
-  `GET /submission-modules/{id}`, #46/#47 presigned-upload URLs, #43 Writing/Speaking.
+## Scope (Phase 4) — API #43 submit one submission_module (Quiz / Short Answer)
+`POST /api/v1/submission-modules/{submissionModuleId}/submit` (role = STUDENT, JSON body), V4 chapter 6 spec.
+Submits all answers of one module in a single request; only allowed while the module is `IN_PROGRESS`
+(each module submits exactly once). After a successful submit the server persists one `answers` row per
+payload item and flips `submission_modules.status → SUBMITTED`.
+
+Request body (Quiz = MULTIPLE_CHOICE questions, Short Answer = SHORT_ANSWER questions):
+```json
+{ "answers": [ { "questionId": 21, "content": { "selectedOptionIds": [1] } },
+               { "questionId": 22, "content": { "text": "The answer is..." } } ] }
+```
+
+Flow routing: **QUIZ** and **REWRITE** task types use the answers-array flow. **ESSAY/RECORDING**
+currently return 400 `Loại phần làm bài này chưa được hỗ trợ.` — their R2 submit lands in Phase 8.
+
+Implementation notes:
+- New domain `Answer` (submissionModuleId, questionId, content-as-JSON-string) + `AnswerRepository`
+  port (`bulkCreate`, `findBySubmissionModuleId`); new `ModuleQuestion` read model +
+  `ModuleQuestionRepository` port (`findByModuleIdOrderByOrderIndexAsc`) wrapping the shared
+  `questions` entity. `SubmissionPersistenceMapper` maps `Answer` both ways.
+- Per-question-type content validation: `MULTIPLE_CHOICE` ⇒ `content.selectedOptionIds` must be an
+  array; `SHORT_ANSWER` ⇒ `content.text` must be a non-blank string. Missing/empty `answers`, null
+  `questionId`/`content`, duplicate `questionId`, or wrong content shape → 400.
+- Guard order: role = STUDENT (403) → module exists (404) → module `IN_PROGRESS` (400 if not) →
+  submission exists (404) → submission owner (403) → task type supported (400) → payload valid.
+- Response: `200 { "message": "Đã nộp phần làm bài.", "submissionModuleId": 150, "status": "SUBMITTED",
+  "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }`.
+
+Smoke tests (running app, seeded DB incl. questions for the quiz module, bearer tokens):
+```bash
+# success — student submits their own quiz module
+curl -s -X POST http://localhost:8080/api/v1/submission-modules/{submissionModuleId}/submit \
+  -H "Authorization: Bearer <studentAccessToken>" -H "Content-Type: application/json" \
+  -d '{"answers":[{"questionId":21,"content":{"selectedOptionIds":[1]}}]}'
+
+# already submitted / not IN_PROGRESS -> 400 "Phần làm bài này đã được nộp."
+# missing or malformed answers -> 400 "Nội dung câu trả lời không hợp lệ."
+# questionId not in the module -> 404 "Không tìm thấy phần làm bài hoặc câu hỏi."
+# another student / teacher -> 403 "Bạn không có quyền thực hiện thao tác này."
+# essay module stub -> 400 "Loại phần làm bài này chưa được hỗ trợ."
+```
+
+### What the Phase-4 tests cover (+14 service + 1 controller + 9 API integration)
+- `SubmissionServiceTest` (+14, Mockito): quiz happy path (answers persisted, module flipped to
+  `SUBMITTED`), REWRITE/SHORT_ANSWER happy path, non-student 403, unknown module 404, already-submitted 400,
+  another student 403, missing submission 404, missing/empty answers 400, null questionId/content 400,
+  duplicate questionId 400, unknown question 404, wrong shape for quiz 400, wrong shape for short answer 400,
+  essay stub 400.
+- `SubmissionControllerTest` (+1): 200 mapping of submit result (message, submissionModuleId, status, answers[]).
+- `SubmissionApiIntegrationTest` (+9, Testcontainers + MockMvc + real JWT, seeded `questions` rows for the
+  quiz module): success (response JSON + `answers` rows in DB + module status `SUBMITTED`), resubmit 400,
+  unknown question 404, missing/empty answers 400, malformed quiz content 400, duplicate questionId 400,
+  foreign student 403, teacher 403, essay stub 400.
+
+### Error contract (Phase 4 additions)
+| Code | Message |
+|---|---|
+| 400 | `Phần làm bài này đã được nộp.` (module already submitted / status ≠ IN_PROGRESS) |
+| 400 | `Nội dung câu trả lời không hợp lệ.` (missing/empty answers, null questionId/content, duplicate, wrong shape) |
+| 404 | `Không tìm thấy phần làm bài hoặc câu hỏi.` (module, submission, or question not found) |
+| 400 | `Loại phần làm bài này chưa được hỗ trợ.` (ESSAY/RECORDING until Phase 8) |
+| 403 | `Bạn không có quyền thực hiện thao tác này.` (#43 non-student / not the owner) |
+
+## Next (for whoever picks up Phase 5)
+- #40 `POST /submissions/{id}/submit` (final submit + auto-grading for Quiz), #42
+  `GET /submission-modules/{id}` (detail incl. questions + answers + grading, reuse the Phase 4
+  answer/question reads), #46/#47 presigned-upload URLs, #43 Writing/Speaking (R2 flow replaces the
+  Phase 4 essay/recording 400 stub).

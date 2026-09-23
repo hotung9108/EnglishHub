@@ -3,6 +3,7 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
+import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.submission.domain.model.AssignmentWindow;
 import com.english_hub.core.modules.submission.domain.model.Grading;
@@ -10,17 +11,21 @@ import com.english_hub.core.modules.submission.domain.model.GradingDraft;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleInfo;
+import com.english_hub.core.modules.submission.domain.model.ModuleQuestion;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
 import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
+import com.english_hub.core.modules.submission.domain.model.QuestionType;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionFilter;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
 import com.english_hub.core.modules.submission.domain.repository.ClassTeachingRepository;
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
+import com.english_hub.core.modules.submission.domain.repository.ModuleQuestionRepository;
 import com.english_hub.core.modules.submission.domain.repository.StudentClassEnrollmentRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
@@ -31,14 +36,19 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import tools.jackson.databind.JsonNode;
 
 @Service
 public class SubmissionService {
@@ -50,6 +60,11 @@ public class SubmissionService {
 	private static final String INVALID_PARAM_MESSAGE = "Dữ liệu không hợp lệ.";
 	private static final String INVALID_STATUS_MESSAGE = "status không hợp lệ.";
 	private static final String TEACHER_ASSIGNMENT_REQUIRED_MESSAGE = "assignmentId là bắt buộc đối với giáo viên.";
+	private static final String ALREADY_SUBMITTED_MESSAGE = "Phần làm bài này đã được nộp.";
+	private static final String INVALID_ANSWER_CONTENT_MESSAGE = "Nội dung câu trả lời không hợp lệ.";
+	private static final String MODULE_OR_QUESTION_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài hoặc câu hỏi.";
+	private static final String UNSUPPORTED_MODULE_MESSAGE = "Loại phần làm bài này chưa được hỗ trợ.";
+	private static final String SUBMITTED_MESSAGE = "Đã nộp phần làm bài.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -58,6 +73,8 @@ public class SubmissionService {
 	private final AssignmentModuleRepository assignmentModuleRepository;
 	private final StudentClassEnrollmentRepository studentClassEnrollmentRepository;
 	private final ClassTeachingRepository classTeachingRepository;
+	private final AnswerRepository answerRepository;
+	private final ModuleQuestionRepository moduleQuestionRepository;
 	private final CurrentUserProvider currentUserProvider;
 
 	public SubmissionService(
@@ -68,6 +85,8 @@ public class SubmissionService {
 			AssignmentModuleRepository assignmentModuleRepository,
 			StudentClassEnrollmentRepository studentClassEnrollmentRepository,
 			ClassTeachingRepository classTeachingRepository,
+			AnswerRepository answerRepository,
+			ModuleQuestionRepository moduleQuestionRepository,
 			CurrentUserProvider currentUserProvider) {
 		this.submissionRepository = submissionRepository;
 		this.submissionModuleRepository = submissionModuleRepository;
@@ -76,6 +95,8 @@ public class SubmissionService {
 		this.assignmentModuleRepository = assignmentModuleRepository;
 		this.studentClassEnrollmentRepository = studentClassEnrollmentRepository;
 		this.classTeachingRepository = classTeachingRepository;
+		this.answerRepository = answerRepository;
+		this.moduleQuestionRepository = moduleQuestionRepository;
 		this.currentUserProvider = currentUserProvider;
 	}
 
@@ -175,6 +196,101 @@ public class SubmissionService {
 		SubmissionPage result = submissionRepository.findPage(
 				new SubmissionFilter(assignmentId, scopedStudentId, status), pageRequest);
 		return composeList(result);
+	}
+
+	@Transactional
+	public SubmitModuleResult submitModule(long submissionModuleId, List<AnswerPayload> payloads) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
+		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
+		}
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
+		if (!submission.getStudentId().equals(caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+
+		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
+		ModuleTaskType taskType = moduleInfo == null ? null : moduleInfo.taskType();
+		if (taskType != ModuleTaskType.QUIZ && taskType != ModuleTaskType.REWRITE) {
+			throw ApiException.badRequest(UNSUPPORTED_MODULE_MESSAGE);
+		}
+
+		Map<Long, ModuleQuestion> questionById = moduleQuestionRepository.findByModuleId(submissionModule.getModuleId())
+				.stream()
+				.collect(Collectors.toMap(ModuleQuestion::id, Function.identity()));
+		List<AnswerPayload> validatedPayloads = validatedAnswerPayloads(payloads, questionById);
+
+		List<Answer> persisted = answerRepository.bulkCreate(
+				submissionModuleId,
+				validatedPayloads.stream()
+						.map(payload -> new Answer(submissionModuleId, payload.questionId(), payload.content().toString()))
+						.toList());
+		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+		submissionModuleRepository.save(submissionModule);
+
+		List<AnswerResult> answerResults = IntStream.range(0, validatedPayloads.size())
+				.mapToObj(index -> new AnswerResult(
+						persisted.get(index).getId(),
+						validatedPayloads.get(index).questionId(),
+						validatedPayloads.get(index).content()))
+				.toList();
+		return new SubmitModuleResult(
+				SUBMITTED_MESSAGE,
+				submissionModuleId,
+				SubmissionStatus.SUBMITTED,
+				answerResults);
+	}
+
+	private List<AnswerPayload> validatedAnswerPayloads(
+			List<AnswerPayload> payloads, Map<Long, ModuleQuestion> questionById) {
+		if (payloads == null || payloads.isEmpty()) {
+			throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+		}
+		Set<Long> seenQuestionIds = new HashSet<>();
+		for (AnswerPayload payload : payloads) {
+			if (payload.questionId() == null || payload.content() == null) {
+				throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+			}
+			if (!seenQuestionIds.add(payload.questionId())) {
+				throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+			}
+			ModuleQuestion question = questionById.get(payload.questionId());
+			if (question == null) {
+				throw ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE);
+			}
+			validateAnswerContentShape(question.questionType(), payload.content());
+		}
+		return payloads;
+	}
+
+	private void validateAnswerContentShape(QuestionType questionType, JsonNode content) {
+		switch (questionType) {
+			case MULTIPLE_CHOICE -> {
+				if (!content.isObject()) {
+					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+				}
+				JsonNode selectedOptionIds = content.get("selectedOptionIds");
+				if (selectedOptionIds == null || !selectedOptionIds.isArray()) {
+					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+				}
+			}
+			case SHORT_ANSWER -> {
+				if (!content.isObject()) {
+					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+				}
+				JsonNode text = content.get("text");
+				if (text == null || !text.isString() || text.stringValue().isBlank()) {
+					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+				}
+			}
+			default -> throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+		}
 	}
 
 	private void verifyReadAccess(Submission submission, User caller) {
@@ -418,5 +534,18 @@ public class SubmissionService {
 			BigDecimal finalScore,
 			BigDecimal maxScoreSnapshot,
 			GradingStatus status) {
+	}
+
+	public record SubmitModuleResult(
+			String message,
+			Long submissionModuleId,
+			SubmissionStatus status,
+			List<AnswerResult> answers) {
+	}
+
+	public record AnswerResult(Long id, Long questionId, JsonNode content) {
+	}
+
+	public record AnswerPayload(Long questionId, JsonNode content) {
 	}
 }

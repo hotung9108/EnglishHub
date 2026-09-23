@@ -3,6 +3,8 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
@@ -10,6 +12,8 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
+import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.submission.domain.model.AssignmentWindow;
 import com.english_hub.core.modules.submission.domain.model.Grading;
@@ -17,16 +21,20 @@ import com.english_hub.core.modules.submission.domain.model.GradingDraft;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleInfo;
+import com.english_hub.core.modules.submission.domain.model.ModuleQuestion;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
 import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
+import com.english_hub.core.modules.submission.domain.model.QuestionType;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
 import com.english_hub.core.modules.submission.domain.repository.ClassTeachingRepository;
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
+import com.english_hub.core.modules.submission.domain.repository.ModuleQuestionRepository;
 import com.english_hub.core.modules.submission.domain.repository.StudentClassEnrollmentRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
@@ -46,10 +54,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,7 +92,15 @@ class SubmissionServiceTest {
 	private ClassTeachingRepository classTeachingRepository;
 
 	@Mock
+	private AnswerRepository answerRepository;
+
+	@Mock
+	private ModuleQuestionRepository moduleQuestionRepository;
+
+	@Mock
 	private CurrentUserProvider currentUserProvider;
+
+	private static final JsonMapper JSON_READER = new JsonMapper();
 
 	private SubmissionService submissionService;
 
@@ -93,6 +114,8 @@ class SubmissionServiceTest {
 				assignmentModuleRepository,
 				studentClassEnrollmentRepository,
 				classTeachingRepository,
+				answerRepository,
+				moduleQuestionRepository,
 				currentUserProvider);
 	}
 
@@ -540,6 +563,304 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.list(null, null, "INVALID_STATUS", 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("status không hợp lệ.");
+	}
+
+	@Test
+	void submitsQuizAnswersAndFlipsTheModuleToSubmitted() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1),
+				new ModuleQuestion(22L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 2)));
+		when(answerRepository.bulkCreate(eq(100L), anyList())).thenAnswer(invocation -> {
+			List<Answer> incoming = invocation.getArgument(1);
+			return incoming.stream().map(answer -> {
+				Answer saved = new Answer(answer.getSubmissionModuleId(), answer.getQuestionId(), answer.getContent());
+				saved.setId(answer.getQuestionId() * 15);
+				return saved;
+			}).toList();
+		});
+
+		SubmitModuleResult result = submissionService.submitModule(100L, List.of(
+				new AnswerPayload(21L, multipleChoice(1)),
+				new AnswerPayload(22L, multipleChoice(3))));
+
+		assertThat(result.message()).isEqualTo("Đã nộp phần làm bài.");
+		assertThat(result.submissionModuleId()).isEqualTo(100L);
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.answers()).hasSize(2);
+		AnswerResult first = result.answers().get(0);
+		assertThat(first.id()).isEqualTo(21L * 15);
+		assertThat(first.questionId()).isEqualTo(21L);
+		assertThat(first.content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+		verify(submissionModuleRepository).save(argThat(saved ->
+				saved.getId() == 100L && saved.getStatus() == SubmissionStatus.SUBMITTED));
+	}
+
+	@Test
+	void submitsShortAnswerForARewriteModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule rewriteModule = module(10L);
+		rewriteModule.setId(101L);
+		when(submissionModuleRepository.findById(101L)).thenReturn(Optional.of(rewriteModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.REWRITE)));
+		when(moduleQuestionRepository.findByModuleId(10L))
+				.thenReturn(List.of(new ModuleQuestion(30L, 10L, QuestionType.SHORT_ANSWER, BigDecimal.ONE, 1)));
+		when(answerRepository.bulkCreate(eq(101L), anyList())).thenAnswer(invocation -> {
+			List<Answer> incoming = invocation.getArgument(1);
+			return incoming.stream().map(answer -> {
+				Answer saved = new Answer(answer.getSubmissionModuleId(), answer.getQuestionId(), answer.getContent());
+				saved.setId(30L * 15);
+				return saved;
+			}).toList();
+		});
+
+		SubmitModuleResult result = submissionService.submitModule(101L,
+				List.of(new AnswerPayload(30L, shortAnswer("The answer is..."))));
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.answers()).hasSize(1);
+		assertThat(result.answers().get(0).content().path("text").asText()).isEqualTo("The answer is...");
+	}
+
+	@Test
+	void submitModuleRejectsANonStudentCaller() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(8L));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void submitModuleRejectsAnUnknownModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionModuleRepository.findById(500L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.submitModule(500L, List.of()))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài hoặc câu hỏi.");
+	}
+
+	@Test
+	void submitModuleRejectsAnAlreadySubmittedModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule closed = module(9L);
+		closed.setId(100L);
+		closed.setStatus(SubmissionStatus.SUBMITTED);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(closed));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
+						new AnswerPayload(21L, multipleChoice(1)))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Phần làm bài này đã được nộp.");
+	}
+
+	@Test
+	void submitModuleRejectsAnotherStudentsModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void submitModuleRejectsAMissingSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		when(submissionRepository.findById(5L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài hoặc câu hỏi.");
+	}
+
+	@Test
+	void submitModuleRejectsMissingOrEmptyAnswers() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of()))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsAnAnswerWithoutQuestionIdOrContent() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(new AnswerPayload(null, multipleChoice(1)))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(new AnswerPayload(21L, null))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsDuplicateQuestionIds() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
+						new AnswerPayload(21L, multipleChoice(1)),
+						new AnswerPayload(21L, multipleChoice(2)))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsAnUnknownQuestion() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(new AnswerPayload(999L, multipleChoice(1)))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài hoặc câu hỏi.");
+	}
+
+	@Test
+	void submitModuleRejectsWrongContentShapeForQuiz() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(new AnswerPayload(21L, shortAnswer("no selections")))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(new AnswerPayload(21L, plainObject()))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsWrongContentShapeForShortAnswer() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule rewriteModule = module(10L);
+		rewriteModule.setId(101L);
+		when(submissionModuleRepository.findById(101L)).thenReturn(Optional.of(rewriteModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.REWRITE)));
+		when(moduleQuestionRepository.findByModuleId(10L))
+				.thenReturn(List.of(new ModuleQuestion(30L, 10L, QuestionType.SHORT_ANSWER, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(101L,
+						List.of(new AnswerPayload(30L, multipleChoice(1)))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.submitModule(101L,
+						List.of(new AnswerPayload(30L, shortAnswer("   ")))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsAnEssayModuleForNow() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule essayModule = module(11L);
+		essayModule.setId(102L);
+		when(submissionModuleRepository.findById(102L)).thenReturn(Optional.of(essayModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(11L, ModuleTaskType.ESSAY)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(102L, List.of()))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Loại phần làm bài này chưa được hỗ trợ.");
+	}
+
+	private ModuleInfo moduleInfo(Long moduleId, ModuleTaskType taskType) {
+		return new ModuleInfo(moduleId, 5L, ModuleSkill.READING, taskType, 1);
+	}
+
+	private JsonNode multipleChoice(int optionId) {
+		tools.jackson.databind.node.ObjectNode node = JSON_READER.createObjectNode();
+		node.putArray("selectedOptionIds").add(optionId);
+		return node;
+	}
+
+	private JsonNode shortAnswer(String text) {
+		return JSON_READER.createObjectNode().put("text", text);
+	}
+
+	private JsonNode plainObject() {
+		return JSON_READER.createObjectNode();
 	}
 
 	private AssignmentWindow window(

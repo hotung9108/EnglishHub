@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.submission.infrastructure.mapper;
 
+import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.Grading;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
@@ -56,6 +57,33 @@ public class SubmissionPersistenceMapper {
 				source.getModuleId(),
 				com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus.valueOf(source.getStatus().name()));
 		target.setId(source.getId());
+		return target;
+	}
+
+	public Answer toDomain(com.english_hub.core.infrastructure.persistence.entity.Answer source) {
+		Answer target = new Answer(
+				source.getSubmissionModuleId(),
+				source.getQuestionId(),
+				source.getContent());
+		target.setId(source.getId());
+		return target;
+	}
+
+	public com.english_hub.core.infrastructure.persistence.entity.Answer toEntity(Answer source) {
+		com.english_hub.core.infrastructure.persistence.entity.Answer target =
+				new com.english_hub.core.infrastructure.persistence.entity.Answer(
+				source.getSubmissionModuleId(),
+				source.getQuestionId(),
+				source.getContent(),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
 		return target;
 	}
 

@@ -10,10 +10,13 @@ import com.english_hub.core.infrastructure.persistence.entity.ClassStatus;
 import com.english_hub.core.infrastructure.persistence.entity.EnglishClass;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleTaskType;
+import com.english_hub.core.infrastructure.persistence.entity.Question;
+import com.english_hub.core.infrastructure.persistence.entity.QuestionType;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository;
 import com.english_hub.core.infrastructure.persistence.repository.ClassMemberRepository;
 import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRepository;
+import com.english_hub.core.infrastructure.persistence.repository.QuestionRepository;
 import com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
@@ -21,9 +24,11 @@ import com.english_hub.core.infrastructure.security.JwtTokenService;
 import com.english_hub.core.modules.submission.domain.model.Grading;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
+import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
@@ -44,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,7 +64,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -114,6 +119,12 @@ class SubmissionApiIntegrationTest {
 	@Autowired
 	private GradingRepository gradingRepository;
 
+	@Autowired
+	private AnswerRepository answerRepository;
+
+	@Autowired
+	private QuestionRepository questionRepository;
+
 	private Long teacherId;
 	private Long teacherOtherId;
 	private Long adminId;
@@ -124,6 +135,8 @@ class SubmissionApiIntegrationTest {
 	private Long publishedAssignmentId;
 	private Long quizModuleId;
 	private Long essayModuleId;
+	private Long quizQuestionOne;
+	private Long quizQuestionTwo;
 
 	@BeforeEach
 	void setUp() {
@@ -166,6 +179,22 @@ class SubmissionApiIntegrationTest {
 				false);
 		quizModuleId = module(publishedAssignmentId, ModuleSkill.READING, ModuleTaskType.QUIZ, 1);
 		essayModuleId = module(publishedAssignmentId, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2);
+		quizQuestionOne = questionRepository.save(new Question(
+				quizModuleId,
+				"Which word best describes...?",
+				QuestionType.MULTIPLE_CHOICE,
+				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"isCorrect\":true},"
+						+ "{\"id\":2,\"content\":\"Option B\",\"isCorrect\":false}]}",
+				BigDecimal.ONE,
+				1)).getId();
+		quizQuestionTwo = questionRepository.save(new Question(
+				quizModuleId,
+				"What is the main idea...?",
+				QuestionType.MULTIPLE_CHOICE,
+				"{\"options\":[{\"id\":3,\"content\":\"X\",\"isCorrect\":true},"
+						+ "{\"id\":4,\"content\":\"Y\",\"isCorrect\":false}]}",
+				BigDecimal.ONE,
+				2)).getId();
 	}
 
 	@Test
@@ -519,12 +548,191 @@ class SubmissionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("status không hợp lệ."));
 	}
 
+	@Test
+	void submitsQuizAnswersAndPersistsAnswersAndSubmitsModule() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}},"
+				+ "{\"questionId\":" + quizQuestionTwo + ",\"content\":{\"selectedOptionIds\":[3]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Đã nộp phần làm bài."))
+				.andExpect(jsonPath("$.submissionModuleId").value(submissionModuleId))
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers", hasSize(2)))
+				.andExpect(jsonPath("$.answers[0].id").isNumber())
+				.andExpect(jsonPath("$.answers[0].questionId").value(quizQuestionOne))
+				.andExpect(jsonPath("$.answers[0].content.selectedOptionIds[0]").value(1))
+				.andExpect(jsonPath("$.answers[1].questionId").value(quizQuestionTwo));
+
+		List<Answer> answers = answerRepository.findBySubmissionModuleId(submissionModuleId);
+		assertThat(answers).hasSize(2);
+		assertThat(answers).extracting(Answer::getQuestionId)
+				.containsExactlyInAnyOrder(quizQuestionOne, quizQuestionTwo);
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+	}
+
+	@Test
+	void submitModuleRejectsResubmission() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}}"
+				+ "]}";
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Phần làm bài này đã được nộp."));
+	}
+
+	@Test
+	void submitModuleRejectsAnUnknownQuestion() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":99999999,\"content\":{\"selectedOptionIds\":[1]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài hoặc câu hỏi."));
+	}
+
+	@Test
+	void submitModuleRejectsMissingOrEmptyAnswers() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}")
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Nội dung câu trả lời không hợp lệ."));
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"answers\":[]}")
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Nội dung câu trả lời không hợp lệ."));
+	}
+
+	@Test
+	void submitModuleRejectsMalformedQuizContent() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"text\":\"not a selection\"}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Nội dung câu trả lời không hợp lệ."));
+	}
+
+	@Test
+	void submitModuleRejectsDuplicateQuestionIds() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}},"
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[2]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Nội dung câu trả lời không hợp lệ."));
+	}
+
+	@Test
+	void submitModuleRejectsAnotherStudentsModule() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentOtherId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void submitModuleRejectsANonStudentCaller() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void submitModuleRejectsAnEssayModuleForNow() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
+		long essaySubmissionModuleId = submissionModules.stream()
+				.filter(module -> module.getModuleId().equals(essayModuleId))
+				.findFirst()
+				.orElseThrow()
+				.getId();
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}")
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Loại phần làm bài này chưa được hỗ trợ."));
+	}
+
 	private long startSubmissionAsStudentMember() throws Exception {
 		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return jsonLong(response, "id");
+	}
+
+	private long quizSubmissionModuleId(long submissionId) {
+		return submissionModuleRepository.findBySubmissionId(submissionId).stream()
+				.filter(module -> module.getModuleId().equals(quizModuleId))
+				.findFirst()
+				.orElseThrow()
+				.getId();
 	}
 
 	private void grade(long submissionId) {

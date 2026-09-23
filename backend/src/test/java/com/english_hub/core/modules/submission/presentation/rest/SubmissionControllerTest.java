@@ -1,6 +1,8 @@
 package com.english_hub.core.modules.submission.presentation.rest;
 
 import com.english_hub.core.modules.submission.application.service.SubmissionService;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingSummaryResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
@@ -10,6 +12,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
@@ -18,6 +21,8 @@ import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -32,7 +37,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -154,5 +164,30 @@ class SubmissionControllerTest {
 		assertThat(body.data().getFirst().status()).isEqualTo("GRADED");
 		assertThat(body.data().getFirst().modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");
 		assertThat(body.data().getFirst().modules().getFirst().grading().status()).isEqualTo("COMPLETED");
+	}
+
+	@Test
+	void mapsTheSubmitModuleResultToAnOkResponse() {
+		JsonNode content = new JsonMapper().readTree("{\"selectedOptionIds\":[1]}");
+		SubmitModuleResult result = new SubmitModuleResult(
+				"Đã nộp phần làm bài.",
+				150L,
+				SubmissionStatus.SUBMITTED,
+				List.of(new AnswerResult(340L, 21L, content)));
+		when(submissionService.submitModule(eq(150L), anyList())).thenReturn(result);
+
+		ResponseEntity<SubmitModuleResponse> response = submissionController.submitModule(
+				150L,
+				new SubmitModuleRequest(List.of(new SubmitModuleRequest.AnswerPayload(21L, content))));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		SubmitModuleResponse body = response.getBody();
+		assertThat(body.message()).isEqualTo("Đã nộp phần làm bài.");
+		assertThat(body.submissionModuleId()).isEqualTo(150L);
+		assertThat(body.status()).isEqualTo("SUBMITTED");
+		assertThat(body.answers()).hasSize(1);
+		assertThat(body.answers().getFirst().id()).isEqualTo(340L);
+		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
+		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
 	}
 }
