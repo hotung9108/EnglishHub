@@ -356,7 +356,7 @@ class ModuleApiIntegrationTest {
 	}
 
 	@Test
-	void listeningAudioUploadReturnsProcessingAndNonListeningIsRejected() throws Exception {
+	void listeningAudioUploadReturnsReadyAndNonListeningIsRejected() throws Exception {
 		MockMultipartFile audio = new MockMultipartFile(
 				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
 
@@ -366,7 +366,7 @@ class ModuleApiIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.message").value("Upload audio thành công."))
 				.andExpect(jsonPath("$.sourceAudioStorageKey").value(startsWith("modules/")))
-				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("PROCESSING"));
+				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("READY"));
 
 		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
 					.file(audio)

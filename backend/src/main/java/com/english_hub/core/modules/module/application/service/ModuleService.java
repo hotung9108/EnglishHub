@@ -9,6 +9,7 @@ import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepos
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
+import com.english_hub.core.modules.module.application.port.AudioStorageException;
 import com.english_hub.core.modules.module.application.port.AudioStoragePort;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
@@ -177,19 +178,40 @@ public class ModuleService {
 		}
 		validateAudioFile(file);
 
-		AudioStoragePort.StoredAudio storedAudio = audioStoragePort.store(moduleId, file);
+		AudioStoragePort.StoredAudio storedAudio;
+		try {
+			storedAudio = audioStoragePort.store(moduleId, file);
+		} catch (AudioStorageException exception) {
+			markAudioUploadFailed(module, exception);
+			if (INVALID_AUDIO_MESSAGE.equals(exception.getMessage())) {
+				throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
+			}
+			throw exception;
+		}
 		Module updated = module.withAudio(
 				storedAudio.storageKey(),
 				storedAudio.durationSeconds(),
 				storedAudio.mimeType() == null ? file.getContentType() : storedAudio.mimeType(),
-				ModuleUploadStatus.PROCESSING);
+				ModuleUploadStatus.READY);
 		try {
 			moduleRepository.save(updated);
 		} catch (RuntimeException exception) {
 			audioStoragePort.delete(storedAudio.storageKey());
 			throw exception;
 		}
-		return new AudioUploadResult(storedAudio.storageKey(), ModuleUploadStatus.PROCESSING.name());
+		return new AudioUploadResult(storedAudio.storageKey(), ModuleUploadStatus.READY.name());
+	}
+
+	private void markAudioUploadFailed(Module module, RuntimeException originalException) {
+		try {
+			moduleRepository.save(module.withAudio(
+					module.sourceAudioStorageKey(),
+					module.sourceAudioDurationSeconds(),
+					module.sourceAudioMimeType(),
+					ModuleUploadStatus.FAILED));
+		} catch (RuntimeException failureSaveException) {
+			originalException.addSuppressed(failureSaveException);
+		}
 	}
 
 	private User requireTeacher() {

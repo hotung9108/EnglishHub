@@ -287,7 +287,7 @@ class ModuleServiceTest {
 	}
 
 	@Test
-	void teacherOwnerCanUploadListeningAudioAndKeepProcessingStatus() {
+	void teacherOwnerCanUploadListeningAudioAndMarkItReady() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
@@ -300,7 +300,7 @@ class ModuleServiceTest {
 		ModuleService.AudioUploadResult result = moduleService.uploadAudio(9L, file);
 
 		assertThat(result.storageKey()).isEqualTo("modules/9/audio/test.mp3");
-		assertThat(result.uploadStatus()).isEqualTo("PROCESSING");
+		assertThat(result.uploadStatus()).isEqualTo("READY");
 		verify(moduleRepository).save(any(Module.class));
 	}
 

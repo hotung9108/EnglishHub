@@ -99,13 +99,13 @@ class ModuleControllerTest {
 		MockMultipartFile file = new MockMultipartFile(
 				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'});
 		when(moduleService.uploadAudio(9L, file))
-				.thenReturn(new ModuleService.AudioUploadResult("modules/9/audio/source.mp3", "PROCESSING"));
+				.thenReturn(new ModuleService.AudioUploadResult("modules/9/audio/source.mp3", "READY"));
 
 		var response = moduleController.uploadAudio(9L, file);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody().sourceAudioStorageKey()).isEqualTo("modules/9/audio/source.mp3");
-		assertThat(response.getBody().sourceAudioUploadStatus()).isEqualTo("PROCESSING");
+		assertThat(response.getBody().sourceAudioUploadStatus()).isEqualTo("READY");
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {
