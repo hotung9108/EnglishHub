@@ -26,8 +26,18 @@ public class GlobalExceptionHandler {
 				.body(new ApiError("Bạn không có quyền thực hiện thao tác này."));
 	}
 
-	@ExceptionHandler({MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class})
-	public ResponseEntity<ApiError> handleInvalidRequest() {
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<ApiError> handleInvalidRequest(MethodArgumentNotValidException exception) {
+		String message = exception.getBindingResult().getAllErrors().stream()
+				.map(error -> error.getDefaultMessage())
+				.filter(value -> value != null && !value.isBlank())
+				.findFirst()
+				.orElse("Dữ liệu không hợp lệ.");
+		return ResponseEntity.badRequest().body(new ApiError(message));
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ApiError> handleTypeMismatch() {
 		return ResponseEntity.badRequest().body(new ApiError("Dữ liệu không hợp lệ."));
 	}
 

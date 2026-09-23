@@ -73,4 +73,15 @@ public class Question {
 	public String getCorrectAnswer() {
 		return JsonbValueCodec.serialize(correctAnswer);
 	}
+
+	public void updateFrom(
+			String content,
+			String correctAnswer,
+			BigDecimal score,
+			int orderIndex) {
+		this.content = content;
+		this.correctAnswer = JsonbValueCodec.parse(correctAnswer, "correct_answer");
+		this.score = score;
+		this.orderIndex = orderIndex;
+	}
 }

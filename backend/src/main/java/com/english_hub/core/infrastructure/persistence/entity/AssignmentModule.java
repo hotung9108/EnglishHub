@@ -90,4 +90,26 @@ public class AssignmentModule {
 		this.sourceAudioUploadStatus = sourceAudioUploadStatus;
 		this.aiInstruction = aiInstruction;
 	}
+
+	public void updateDetails(
+			int orderIndex,
+			String instructions,
+			BigDecimal maxScore,
+			String aiInstruction) {
+		this.orderIndex = orderIndex;
+		this.instructions = instructions;
+		this.maxScore = maxScore;
+		this.aiInstruction = aiInstruction;
+	}
+
+	public void updateAudioMetadata(
+			String storageKey,
+			Integer durationSeconds,
+			String mimeType,
+			UploadStatus uploadStatus) {
+		this.sourceAudioStorageKey = storageKey;
+		this.sourceAudioDurationSeconds = durationSeconds;
+		this.sourceAudioMimeType = mimeType;
+		this.sourceAudioUploadStatus = uploadStatus;
+	}
 }
