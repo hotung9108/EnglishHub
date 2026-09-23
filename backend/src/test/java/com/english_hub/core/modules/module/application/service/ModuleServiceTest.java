@@ -3,7 +3,9 @@ package com.english_hub.core.modules.module.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
@@ -37,8 +39,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 @ExtendWith(MockitoExtension.class)
 class ModuleServiceTest {
@@ -305,6 +309,56 @@ class ModuleServiceTest {
 	}
 
 	@Test
+	void databaseMetadataFailureCleansUpFileAndBestEffortPersistsFailedStatus() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
+		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
+				"modules/9/audio/failed.mp3", "audio/mpeg", null));
+		DataAccessResourceFailureException databaseException =
+				new DataAccessResourceFailureException("metadata save failed");
+		when(moduleRepository.save(any(Module.class)))
+				.thenThrow(databaseException)
+				.thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertThatThrownBy(() -> moduleService.uploadAudio(9L, file))
+				.isSameAs(databaseException);
+
+		ArgumentCaptor<Module> savedModules = ArgumentCaptor.forClass(Module.class);
+		verify(moduleRepository, org.mockito.Mockito.times(2)).save(savedModules.capture());
+		assertThat(savedModules.getAllValues().get(0).sourceAudioUploadStatus())
+				.isEqualTo(ModuleUploadStatus.READY);
+		assertThat(savedModules.getAllValues().get(1).sourceAudioUploadStatus())
+				.isEqualTo(ModuleUploadStatus.FAILED);
+		verify(audioStoragePort).delete("modules/9/audio/failed.mp3");
+	}
+
+	@Test
+	void cleanupFailureIsLoggedAndDoesNotReplaceDatabaseException() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Module module = module(9L, 5L, ModuleSkill.LISTENING, 2);
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
+		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
+				"modules/9/audio/cleanup-failure.mp3", "audio/mpeg", null));
+		DataAccessResourceFailureException databaseException =
+				new DataAccessResourceFailureException("metadata save failed");
+		when(moduleRepository.save(any(Module.class))).thenThrow(databaseException);
+		RuntimeException cleanupException = new RuntimeException("cleanup failed");
+		doThrow(cleanupException).when(audioStoragePort).delete("modules/9/audio/cleanup-failure.mp3");
+
+		assertThatThrownBy(() -> moduleService.uploadAudio(9L, file))
+				.isSameAs(databaseException)
+				.satisfies(exception -> assertThat(exception.getSuppressed()).contains(cleanupException));
+		verify(audioStoragePort).delete("modules/9/audio/cleanup-failure.mp3");
+	}
+
+	@Test
 	void nonListeningModuleCannotReceiveAudio() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.READING, 1)));
@@ -324,6 +378,103 @@ class ModuleServiceTest {
 				() -> moduleService.uploadAudio(9L, new MockMultipartFile(
 						"file", "question.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'})),
 				"Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void acceptsAudioAtExactTwentyFiveMiBBoundary() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "boundary.mp3", "audio/mpeg", audioBytes(25 * 1024 * 1024, 'I', 'D', '3'));
+		givenStoredAudio(file);
+
+		ModuleService.AudioUploadResult result = moduleService.uploadAudio(9L, file);
+
+		assertThat(result.uploadStatus()).isEqualTo("READY");
+		verify(audioStoragePort).store(9L, file);
+	}
+
+	@Test
+	void rejectsAudioOneByteOverTwentyFiveMiBBoundary() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "too-large.mp3", "audio/mpeg", audioBytes(25 * 1024 * 1024 + 1, 'I', 'D', '3'));
+
+		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
+		verify(audioStoragePort, never()).store(anyLong(), any());
+	}
+
+	@Test
+	void rejectsAudioFilenameWithoutExtension() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "audio", "audio/mpeg", audioBytes(6, 'I', 'D', '3'));
+
+		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
+		verify(audioStoragePort, never()).store(anyLong(), any());
+	}
+
+	@Test
+	void acceptsUppercaseAudioExtension() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "SOURCE.MP3", "audio/mpeg", audioBytes(6, 'I', 'D', '3'));
+		givenStoredAudio(file);
+
+		moduleService.uploadAudio(9L, file);
+
+		verify(audioStoragePort).store(9L, file);
+	}
+
+	@Test
+	void acceptsAudioWithNullMimeTypeWhenSignatureAndExtensionAreValid() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "source.mp3", null, audioBytes(6, 'I', 'D', '3'));
+		givenStoredAudio(file);
+
+		moduleService.uploadAudio(9L, file);
+
+		verify(audioStoragePort).store(9L, file);
+	}
+
+	@Test
+	void rejectsMp3MagicBytesWithWavExtension() {
+		givenListeningModule();
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "source.wav", "audio/wav", audioBytes(6, 'I', 'D', '3'));
+
+		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
+		verify(audioStoragePort, never()).store(anyLong(), any());
+	}
+
+	@Test
+	void rejectsWavMagicBytesWithMp3Extension() {
+		givenListeningModule();
+		byte[] wavHeader = new byte[] {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E'};
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "source.mp3", "audio/mpeg", wavHeader);
+
+		assertApiException(() -> moduleService.uploadAudio(9L, file), "File audio không hợp lệ.");
+		verify(audioStoragePort, never()).store(anyLong(), any());
+	}
+
+	private void givenListeningModule() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2)));
+		givenAssignmentAndClass(5L, 3L, 10L);
+	}
+
+	private void givenStoredAudio(MockMultipartFile file) {
+		when(audioStoragePort.store(9L, file)).thenReturn(new AudioStoragePort.StoredAudio(
+				"modules/9/audio/test.mp3", "audio/mpeg", null));
+	}
+
+	private byte[] audioBytes(int size, char... header) {
+		byte[] bytes = new byte[size];
+		for (int index = 0; index < header.length; index++) {
+			bytes[index] = (byte) header[index];
+		}
+		return bytes;
 	}
 
 	private void givenAssignment(Long assignmentId, Long classId) {

@@ -1,9 +1,15 @@
 package com.english_hub.core.modules.module.presentation.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.english_hub.core.common.GlobalExceptionHandler;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
 import com.english_hub.core.modules.module.application.service.ModuleService;
@@ -16,11 +22,15 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class ModuleControllerTest {
@@ -106,6 +116,21 @@ class ModuleControllerTest {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody().sourceAudioStorageKey()).isEqualTo("modules/9/audio/source.mp3");
 		assertThat(response.getBody().sourceAudioUploadStatus()).isEqualTo("READY");
+	}
+
+	@Test
+	void mapsAudioMetadataDatabaseFailureToServerErrorInsteadOfReadyResponse() throws Exception {
+		MockMultipartFile file = new MockMultipartFile(
+				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3'});
+		when(moduleService.uploadAudio(eq(9L), any(MultipartFile.class)))
+				.thenThrow(new DataAccessResourceFailureException("metadata save failed"));
+		MockMvc mockMvc = MockMvcBuilders.standaloneSetup(moduleController)
+				.setControllerAdvice(new GlobalExceptionHandler())
+				.build();
+
+		mockMvc.perform(multipart("/api/v1/modules/{moduleId}/audio", 9L).file(file))
+				.andExpect(status().isInternalServerError())
+				.andExpect(jsonPath("$.error").value("Lỗi máy chủ."));
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

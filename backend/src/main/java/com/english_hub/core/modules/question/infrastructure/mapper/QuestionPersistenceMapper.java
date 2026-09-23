@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.question.infrastructure.mapper;
 
+import com.english_hub.core.common.ApiException;
 import com.english_hub.core.modules.question.domain.model.Question;
 import com.english_hub.core.modules.question.domain.model.QuestionType;
 import java.util.LinkedHashMap;
@@ -13,6 +14,9 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class QuestionPersistenceMapper {
 
+	private static final String INVALID_CORRECT_ANSWER_MESSAGE =
+			"Cấu trúc correctAnswer trong dữ liệu lưu trữ không hợp lệ.";
+
 	private final ObjectMapper objectMapper;
 
 	public QuestionPersistenceMapper(ObjectMapper objectMapper) {
@@ -20,12 +24,13 @@ public class QuestionPersistenceMapper {
 	}
 
 	public Question toDomain(com.english_hub.core.infrastructure.persistence.entity.Question source) {
+		QuestionType questionType = QuestionType.valueOf(source.getQuestionType().name());
 		return new Question(
 				source.getId(),
 				source.getModuleId(),
 				source.getContent(),
-				QuestionType.valueOf(source.getQuestionType().name()),
-				toApiCorrectAnswer(source.getCorrectAnswer()),
+				questionType,
+				toApiCorrectAnswer(source.getCorrectAnswer(), questionType),
 				source.getScore(),
 				source.getOrderIndex());
 	}
@@ -51,8 +56,8 @@ public class QuestionPersistenceMapper {
 				source.orderIndex());
 	}
 
-	private Map<String, Object> toApiCorrectAnswer(String json) {
-		return normalizeRoot(json, true);
+	private Map<String, Object> toApiCorrectAnswer(String json, QuestionType questionType) {
+		return normalizeRoot(json, true, questionType == QuestionType.SHORT_ANSWER);
 	}
 
 	private String toPersistenceCorrectAnswer(Map<String, Object> correctAnswer) {
@@ -64,26 +69,33 @@ public class QuestionPersistenceMapper {
 	}
 
 	@SuppressWarnings("unchecked")
-	private Map<String, Object> normalizeRoot(String json, boolean toApi) {
+	private Map<String, Object> normalizeRoot(String json, boolean toApi, boolean allowLegacyScalarString) {
+		if (json == null || json.isBlank()) {
+			throw invalidCorrectAnswer();
+		}
 		try {
 			Object parsed = objectMapper.readValue(json, Object.class);
 			Object normalized;
 			if (parsed instanceof Map<?, ?>) {
 				normalized = normalizeValue(parsed, toApi);
-			} else if (parsed instanceof List<?> || parsed instanceof byte[]) {
-				throw new IllegalArgumentException("correct_answer must be a JSON object or scalar");
-			} else {
+			} else if (allowLegacyScalarString && parsed instanceof String text) {
 				Map<String, Object> wrapped = new LinkedHashMap<>();
-				wrapped.put("correct_answer", String.valueOf(parsed));
+				wrapped.put("correct_answer", text);
 				normalized = normalizeValue(wrapped, toApi);
+			} else {
+				throw invalidCorrectAnswer();
 			}
 			if (!(normalized instanceof Map<?, ?> map)) {
-				throw new IllegalArgumentException("correct_answer must be a JSON object");
+				throw invalidCorrectAnswer();
 			}
 			return (Map<String, Object>) map;
 		} catch (JacksonException exception) {
-			throw new IllegalArgumentException("correct_answer must contain valid JSON", exception);
+			throw invalidCorrectAnswer();
 		}
+	}
+
+	private ApiException invalidCorrectAnswer() {
+		return ApiException.badRequest(INVALID_CORRECT_ANSWER_MESSAGE);
 	}
 
 	private Object normalizeValue(Object value, boolean toApi) {

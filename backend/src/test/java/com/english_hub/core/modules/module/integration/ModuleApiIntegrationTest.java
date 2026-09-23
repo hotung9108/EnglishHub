@@ -272,10 +272,17 @@ class ModuleApiIntegrationTest {
 	@Test
 	void updateAndDeleteRequireOwningTeacher() throws Exception {
 		mockMvc.perform(put("/api/v1/modules/{id}", readingModuleId)
-					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
-					.contentType(MediaType.APPLICATION_JSON)
-					.content("{\"instructions\":\"Updated\",\"maxScore\":20,\"orderIndex\":1}"))
-				.andExpect(status().isOk());
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"instructions\":\"Updated\",\"maxScore\":20,\"orderIndex\":1}"))
+			.andExpect(status().isOk());
+		moduleRepository.flush();
+		entityManager.clear();
+		AssignmentModule persistedUpdate = moduleRepository.findById(readingModuleId).orElseThrow();
+		assertThat(persistedUpdate.getInstructions()).isEqualTo("Updated");
+		assertThat(persistedUpdate.getMaxScore()).isEqualByComparingTo("20.00");
+		assertThat(persistedUpdate.getOrderIndex()).isEqualTo(1);
+		assertThat(persistedUpdate.getAiInstruction()).isEqualTo("Grade reading");
 
 		mockMvc.perform(put("/api/v1/modules/{id}", readingModuleId)
 					.header("Authorization", bearer(otherTeacherId, UserRole.TEACHER))
@@ -367,6 +374,12 @@ class ModuleApiIntegrationTest {
 				.andExpect(jsonPath("$.message").value("Upload audio thành công."))
 				.andExpect(jsonPath("$.sourceAudioStorageKey").value(startsWith("modules/")))
 				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("READY"));
+		moduleRepository.flush();
+		entityManager.clear();
+		AssignmentModule persistedAudio = moduleRepository.findById(listeningModuleId).orElseThrow();
+		assertThat(persistedAudio.getSourceAudioStorageKey()).startsWith("modules/");
+		assertThat(persistedAudio.getSourceAudioMimeType()).isEqualTo("audio/mpeg");
+		assertThat(persistedAudio.getSourceAudioUploadStatus()).isEqualTo(UploadStatus.READY);
 
 		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
 					.file(audio)

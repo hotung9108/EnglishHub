@@ -26,12 +26,16 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ModuleService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(ModuleService.class);
 
 	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy module.";
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
@@ -195,9 +199,10 @@ public class ModuleService {
 				ModuleUploadStatus.READY);
 		try {
 			moduleRepository.save(updated);
-		} catch (RuntimeException exception) {
-			audioStoragePort.delete(storedAudio.storageKey());
-			throw exception;
+		} catch (RuntimeException databaseException) {
+			markAudioUploadFailed(module, databaseException);
+			cleanupStoredAudio(storedAudio.storageKey(), databaseException);
+			throw databaseException;
 		}
 		return new AudioUploadResult(storedAudio.storageKey(), ModuleUploadStatus.READY.name());
 	}
@@ -210,7 +215,23 @@ public class ModuleService {
 					module.sourceAudioMimeType(),
 					ModuleUploadStatus.FAILED));
 		} catch (RuntimeException failureSaveException) {
-			originalException.addSuppressed(failureSaveException);
+			LOGGER.error("Không thể cập nhật trạng thái FAILED cho module audio.", failureSaveException);
+			addSuppressedIfDifferent(originalException, failureSaveException);
+		}
+	}
+
+	private void cleanupStoredAudio(String storageKey, RuntimeException originalException) {
+		try {
+			audioStoragePort.delete(storageKey);
+		} catch (RuntimeException cleanupException) {
+			LOGGER.error("Không thể cleanup file audio sau khi lưu metadata thất bại: {}", storageKey, cleanupException);
+			addSuppressedIfDifferent(originalException, cleanupException);
+		}
+	}
+
+	private void addSuppressedIfDifferent(RuntimeException originalException, RuntimeException secondaryException) {
+		if (originalException != secondaryException) {
+			originalException.addSuppressed(secondaryException);
 		}
 	}
 
