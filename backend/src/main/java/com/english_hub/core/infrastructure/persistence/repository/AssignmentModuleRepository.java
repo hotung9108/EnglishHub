@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AssignmentModuleRepository extends JpaRepository<AssignmentModule, Long> {
 
 	List<AssignmentModule> findByAssignmentIdOrderByOrderIndexAsc(Long assignmentId);
+
+	boolean existsByAssignmentIdAndOrderIndex(Long assignmentId, int orderIndex);
+
+	boolean existsByAssignmentIdAndOrderIndexAndIdNot(Long assignmentId, int orderIndex, Long id);
 }

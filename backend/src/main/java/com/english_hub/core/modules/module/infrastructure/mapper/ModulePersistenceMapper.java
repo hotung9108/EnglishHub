@@ -3,15 +3,15 @@ package com.english_hub.core.modules.module.infrastructure.mapper;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleTaskType;
 import com.english_hub.core.infrastructure.persistence.entity.UploadStatus;
+import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.model.ModuleUploadStatus;
-import com.english_hub.core.modules.module.infrastructure.persistence.entity.ModuleJpaEntity;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ModulePersistenceMapper {
 
-	public Module toDomain(ModuleJpaEntity source) {
+	public Module toDomain(AssignmentModule source) {
 		return new Module(
 				source.getId(),
 				source.getAssignmentId(),
@@ -27,8 +27,8 @@ public class ModulePersistenceMapper {
 				source.getAiInstruction());
 	}
 
-	public ModuleJpaEntity toNewEntity(Module source) {
-		return new ModuleJpaEntity(
+	public AssignmentModule toNewEntity(Module source) {
+		return new AssignmentModule(
 				source.assignmentId(),
 				ModuleSkill.valueOf(source.skill().name()),
 				ModuleTaskType.valueOf(source.taskType().name()),
@@ -42,7 +42,7 @@ public class ModulePersistenceMapper {
 				source.aiInstruction());
 	}
 
-	public void updateEntity(ModuleJpaEntity target, Module source) {
+	public void updateEntity(AssignmentModule target, Module source) {
 		target.updateDetails(
 				source.orderIndex(),
 				source.instructions(),

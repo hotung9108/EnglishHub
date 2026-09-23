@@ -1,60 +1,60 @@
 package com.english_hub.core.modules.module.infrastructure.adapter;
 
+import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
+import com.english_hub.core.infrastructure.persistence.repository.AssignmentModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.repository.ModuleRepository;
 import com.english_hub.core.modules.module.infrastructure.mapper.ModulePersistenceMapper;
-import com.english_hub.core.modules.module.infrastructure.persistence.entity.ModuleJpaEntity;
-import com.english_hub.core.modules.module.infrastructure.persistence.repository.ModuleJpaRepository;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class ModuleJpaAdapter implements ModuleRepository {
+public class AssignmentModulePersistenceAdapter implements ModuleRepository {
 
-	private final ModuleJpaRepository moduleJpaRepository;
+	private final AssignmentModuleRepository assignmentModuleRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
 	private final ModulePersistenceMapper mapper;
 
-	public ModuleJpaAdapter(
-			ModuleJpaRepository moduleJpaRepository,
+	public AssignmentModulePersistenceAdapter(
+			AssignmentModuleRepository assignmentModuleRepository,
 			SubmissionModuleRepository submissionModuleRepository,
 			ModulePersistenceMapper mapper) {
-		this.moduleJpaRepository = moduleJpaRepository;
+		this.assignmentModuleRepository = assignmentModuleRepository;
 		this.submissionModuleRepository = submissionModuleRepository;
 		this.mapper = mapper;
 	}
 
 	@Override
 	public List<Module> findByAssignmentIdOrderByOrderIndexAsc(Long assignmentId) {
-		return moduleJpaRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).stream()
+		return assignmentModuleRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).stream()
 				.map(mapper::toDomain)
 				.toList();
 	}
 
 	@Override
 	public Optional<Module> findById(Long id) {
-		return moduleJpaRepository.findById(id).map(mapper::toDomain);
+		return assignmentModuleRepository.findById(id).map(mapper::toDomain);
 	}
 
 	@Override
 	public Module save(Module module) {
-		ModuleJpaEntity saved;
+		AssignmentModule saved;
 		if (module.id() == null) {
-			saved = moduleJpaRepository.save(mapper.toNewEntity(module));
+			saved = assignmentModuleRepository.save(mapper.toNewEntity(module));
 		} else {
-			ModuleJpaEntity target = moduleJpaRepository.findById(module.id())
+			AssignmentModule target = assignmentModuleRepository.findById(module.id())
 					.orElseThrow(() -> new IllegalArgumentException("Module not found: " + module.id()));
 			mapper.updateEntity(target, module);
-			saved = moduleJpaRepository.save(target);
+			saved = assignmentModuleRepository.save(target);
 		}
 		return mapper.toDomain(saved);
 	}
 
 	@Override
 	public boolean existsByAssignmentIdAndOrderIndex(Long assignmentId, int orderIndex) {
-		return moduleJpaRepository.existsByAssignmentIdAndOrderIndex(assignmentId, orderIndex);
+		return assignmentModuleRepository.existsByAssignmentIdAndOrderIndex(assignmentId, orderIndex);
 	}
 
 	@Override
@@ -62,7 +62,7 @@ public class ModuleJpaAdapter implements ModuleRepository {
 			Long assignmentId,
 			int orderIndex,
 			Long moduleId) {
-		return moduleJpaRepository.existsByAssignmentIdAndOrderIndexAndIdNot(assignmentId, orderIndex, moduleId);
+		return assignmentModuleRepository.existsByAssignmentIdAndOrderIndexAndIdNot(assignmentId, orderIndex, moduleId);
 	}
 
 	@Override
@@ -72,6 +72,6 @@ public class ModuleJpaAdapter implements ModuleRepository {
 
 	@Override
 	public void deleteById(Long id) {
-		moduleJpaRepository.deleteById(id);
+		assignmentModuleRepository.deleteById(id);
 	}
 }
