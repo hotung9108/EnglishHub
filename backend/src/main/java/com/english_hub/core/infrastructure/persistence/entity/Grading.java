@@ -19,11 +19,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-<<<<<<< HEAD
 import lombok.Setter;
-=======
-import com.fasterxml.jackson.databind.JsonNode;
->>>>>>> 4273431 (feat(grading): complete API cluster 6)
 
 @Entity
 @Table(name = "gradings")
@@ -109,10 +105,10 @@ public class Grading {
 		this.aiInstructionSnapshot = aiInstructionSnapshot;
 	}
 
-<<<<<<< HEAD
 	public String getAiTranscript() {
 		return JsonbValueCodec.serialize(aiTranscript);
-=======
+	}
+
 	public void updateTeacherGrade(
 			BigDecimal finalScore,
 			String finalFeedback,
@@ -125,6 +121,5 @@ public class Grading {
 		this.reviewedBy = reviewedBy;
 		this.reviewedAt = reviewedAt;
 		this.gradedAt = reviewedAt;
->>>>>>> 4273431 (feat(grading): complete API cluster 6)
 	}
 }

@@ -822,8 +822,8 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 			}
 			if (grading.getAiTranscript() != null) {
 				try {
-					validateTranscript(objectMapper.readTree(grading.getAiTranscript()));
-				} catch (JacksonException exception) {
+					validateTranscript(AI_TRANSCRIPT_OBJECT_MAPPER.readTree(grading.getAiTranscript()));
+				} catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
 					throw new IllegalStateException(
 							"Persisted ai_transcript is not valid JSON: " + grading.getId(), exception);
 				}
