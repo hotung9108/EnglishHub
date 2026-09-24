@@ -7,9 +7,11 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleSummaryResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.QuestionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
@@ -17,10 +19,12 @@ import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
 import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
+import com.english_hub.core.modules.submission.domain.model.QuestionType;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionModuleDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
@@ -205,5 +209,44 @@ class SubmissionControllerTest {
 		assertThat(body.message()).isEqualTo("Nộp bài thành công.");
 		assertThat(body.status()).isEqualTo("SUBMITTED");
 		assertThat(body.submittedAt()).isEqualTo(submittedAt);
+	}
+
+	@Test
+	void mapsTheModuleDetailResultToAnOkResponse() {
+		JsonNode correctAnswer = new JsonMapper().readTree(
+				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"is_correct\":true}]}");
+		JsonNode answerContent = new JsonMapper().readTree("{\"selectedOptionIds\":[1]}");
+		SubmissionModuleDetailResult result = new SubmissionModuleDetailResult(
+				150L,
+				9L,
+				ModuleSkill.READING,
+				ModuleTaskType.QUIZ,
+				SubmissionStatus.GRADED,
+				new GradingDetailResult(77L, GradingMethod.AUTO, GradingStatus.COMPLETED,
+						BigDecimal.valueOf(8), BigDecimal.TEN, null, null),
+				List.of(new QuestionDetailResult(21L, "Which word best describes...?",
+						QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1, correctAnswer)),
+				List.of(new AnswerResult(340L, 21L, answerContent)));
+		when(submissionService.getModuleDetail(150L)).thenReturn(result);
+
+		ResponseEntity<SubmissionModuleDetailResponse> response = submissionController.getSubmissionModuleDetail(150L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		SubmissionModuleDetailResponse body = response.getBody();
+		assertThat(body.id()).isEqualTo(150L);
+		assertThat(body.moduleId()).isEqualTo(9L);
+		assertThat(body.skill()).isEqualTo("READING");
+		assertThat(body.taskType()).isEqualTo("QUIZ");
+		assertThat(body.status()).isEqualTo("GRADED");
+		assertThat(body.grading().method()).isEqualTo("AUTO");
+		assertThat(body.grading().status()).isEqualTo("COMPLETED");
+		assertThat(body.grading().finalScore()).isEqualByComparingTo("8");
+		assertThat(body.questions()).hasSize(1);
+		assertThat(body.questions().getFirst().id()).isEqualTo(21L);
+		assertThat(body.questions().getFirst().questionType()).isEqualTo("MULTIPLE_CHOICE");
+		assertThat(body.questions().getFirst().correctAnswer().get("options").get(0).get("id").asInt()).isEqualTo(1);
+		assertThat(body.answers()).hasSize(1);
+		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
+		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
 	}
 }

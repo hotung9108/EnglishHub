@@ -5,6 +5,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionModuleDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
@@ -67,5 +68,10 @@ public class SubmissionController {
 	@PostMapping("/submissions/{id}/submit")
 	public ResponseEntity<SubmitResponse> submit(@PathVariable long id) {
 		return ResponseEntity.ok(SubmitResponse.from(submissionService.submit(id)));
+	}
+
+	@GetMapping("/submission-modules/{id}")
+	public ResponseEntity<SubmissionModuleDetailResponse> getSubmissionModuleDetail(@PathVariable long id) {
+		return ResponseEntity.ok(SubmissionModuleDetailResponse.from(submissionService.getModuleDetail(id)));
 	}
 }

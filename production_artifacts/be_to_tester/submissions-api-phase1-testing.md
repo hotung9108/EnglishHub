@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 Testing Instructions
+# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -29,7 +29,7 @@ Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.persistence.SubmissionPersistenceIntegrationTest'
 # -> 7 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 229 tests (unit + integration), all green
+./gradlew test   # full suite: 248 tests (unit + integration), all green
 ```
 
 ## What the 7 Phase-1 tests cover
@@ -58,7 +58,7 @@ cd backend
                --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
                --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
 # -> Phase 2 + Phase 3 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 229 tests (unit + integration), all green
+./gradlew test   # full suite: 248 tests (unit + integration), all green
 ```
 
 Smoke test (needs a running app with a seeded/local DB and a student bearer token):
@@ -260,10 +260,62 @@ curl -s -X POST http://localhost:8080/api/v1/submissions/{submissionId}/submit \
 | 404 | `Không tìm thấy lượt làm bài.` (#40, unknown submission) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#40 non-student / not the owner) |
 
+## Scope (Phase 6) — API #42 read one submission_module detail
+`GET /api/v1/submission-modules/{submissionModuleId}` (bearer token), V4 chapter 6 spec.
+Reads one module of an attempt: skill/taskType/status, its `grading` detail, its `questions`
+(prompt + type + score + orderIndex), and its `answers`. **`correctAnswer` is revealed per question
+only when `submission_module.status = GRADED`; otherwise it is null/absent.** For Essay/Speaking
+modules `questions` and `answers` are empty arrays (the file-metadata answer shape from V4 lands with
+the Phase 8 upload feature).
+
+Visibility (same rule as #38, reuse `verifyReadAccess`): STUDENT sees only their own module (else 403),
+TEACHER only classes they teach (else 403), ADMIN any, other roles 403. Unknown module id or a module
+whose parent submission is missing → `404 "Không tìm thấy phần làm bài."`.
+
+Response (module Quiz, đã chấm example):
+```json
+{ "id": 150, "moduleId": 9, "skill": "READING", "taskType": "QUIZ", "status": "GRADED",
+  "grading": { "id": 77, "method": "AUTO", "status": "COMPLETED", "finalScore": 8.0,
+               "maxScoreSnapshot": 10.0, "aiFeedback": null, "finalFeedback": null },
+  "questions": [ { "id": 21, "content": "Which word best describes...?",
+                   "questionType": "MULTIPLE_CHOICE", "score": 1.0, "orderIndex": 1,
+                   "correctAnswer": { "options": [ { "id": 1, "content": "Option A", "isCorrect": true }, ... ] } } ],
+  "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }
+```
+
+Smoke tests (running app, seeded DB incl. quiz questions, bearer tokens):
+```bash
+# student reads their own quiz module (IN_PROGRESS -> correctAnswer absent)
+curl -s http://localhost:8080/api/v1/submission-modules/{submissionModuleId} \
+  -H "Authorization: Bearer <studentAccessToken>"
+
+# another student / teacher of another class -> 403 "Bạn không có quyền thực hiện thao tác này."
+# unknown id -> 404 "Không tìm thấy phần làm bài."
+```
+
+### What the Phase-6 tests cover (+11 service + 1 controller + 7 API integration)
+- `SubmissionServiceTest` (+11, Mockito): quiz IN_PROGRESS detail (grading PENDING, questions with
+  content/type/score/orderIndex + `correctAnswer` null, answers re-parsed to JSON), quiz GRADED
+  (`correctAnswer` populated), SUBMITTED (`correctAnswer` still null), no-grading-row → `grading` null,
+  essay module (empty questions/answers + TEACHER_MANUAL grading), foreign student 403, class-teacher ok,
+  foreign-class teacher 403, admin ok, unknown module 404, orphaned parent submission 404.
+- `SubmissionControllerTest` (+1): 200 full-body mapping (grading detail, questions + correctAnswer,
+  answers content).
+- `SubmissionApiIntegrationTest` (+7, Testcontainers + MockMvc + real JWT, seeded `Question` rows):
+  IN_PROGRESS quiz introspection (questions fields, answers empty, grading PENDING), GRADED quiz via
+  `grade()` helper (correctAnswer options revealed, grading COMPLETED 8.0/10.0), SUBMITTED quiz with
+  #43 answers (answers echoed, correctAnswer hidden), essay module (empty questions/answers,
+  TEACHER_MANUAL PENDING), foreign student + foreign teacher 403, class-teacher + admin 200, unknown id 404.
+
+### Error contract (Phase 6 additions)
+| Code | Message |
+|---|---|
+| 404 | `Không tìm thấy phần làm bài.` (#42, unknown module / missing parent submission) |
+| 403 | `Bạn không có quyền thực hiện thao tác này.` (#42 non-owner student / non-teaching teacher / other roles) |
+
 ## Next (for whoever picks up the next feature)
-- Auto-grading of Quiz answers on submit (per Phase-5 decisions: read `is_correct` snake_case from
-  `correct_answer`, promote graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question
-  scores, exact-set multiple-choice + trimmed short-answer matching, unanswered → 0).
-- #42 `GET /submission-modules/{id}` (detail incl. questions + answers + grading, reuse the Phase 4
-  answer/question reads), #46/#47 presigned-upload URLs, #43 Writing/Speaking (R2 flow replaces the
-  Phase 4 essay/recording 400 stub).
+- Auto-grading of Quiz answers on submit (read `is_correct` snake_case from `correct_answer`, promote
+  graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question scores, exact-set
+  multiple-choice + trimmed short-answer matching, unanswered → 0).
+- #46/#47 presigned R2 upload URLs + #43 Writing/Speaking R2 submit (which then also fills the
+  Essay/Speaking `answers` file metadata in #42), per the Phase 8 flow.

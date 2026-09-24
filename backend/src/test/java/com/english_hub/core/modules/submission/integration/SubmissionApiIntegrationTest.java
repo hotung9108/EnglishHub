@@ -846,6 +846,137 @@ class SubmissionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không tìm thấy lượt làm bài."));
 	}
 
+	@Test
+	void getSubmissionModuleDetailIntrospectsAnInProgressQuiz() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(submissionModuleId))
+				.andExpect(jsonPath("$.moduleId").value(quizModuleId))
+				.andExpect(jsonPath("$.skill").value("READING"))
+				.andExpect(jsonPath("$.taskType").value("QUIZ"))
+				.andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+				.andExpect(jsonPath("$.grading.method").value("AUTO"))
+				.andExpect(jsonPath("$.grading.status").value("PENDING"))
+				.andExpect(jsonPath("$.questions", hasSize(2)))
+				.andExpect(jsonPath("$.questions[0].id").value(quizQuestionOne))
+				.andExpect(jsonPath("$.questions[0].content").value("Which word best describes...?"))
+				.andExpect(jsonPath("$.questions[0].questionType").value("MULTIPLE_CHOICE"))
+				.andExpect(jsonPath("$.questions[0].score").value(1.0))
+				.andExpect(jsonPath("$.questions[0].orderIndex").value(1))
+				.andExpect(jsonPath("$.questions[0].correctAnswer").doesNotExist())
+				.andExpect(jsonPath("$.questions[1].id").value(quizQuestionTwo))
+				.andExpect(jsonPath("$.answers", hasSize(0)));
+	}
+
+	@Test
+	void getSubmissionModuleDetailRevealsCorrectAnswerAfterGrading() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		grade(submissionId);
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("GRADED"))
+				.andExpect(jsonPath("$.grading.status").value("COMPLETED"))
+				.andExpect(jsonPath("$.grading.finalScore").value(8.0))
+				.andExpect(jsonPath("$.grading.maxScoreSnapshot").value(10.0))
+				.andExpect(jsonPath("$.questions[0].correctAnswer.options[0].id").value(1))
+				.andExpect(jsonPath("$.questions[0].correctAnswer.options[0].isCorrect").value(true))
+				.andExpect(jsonPath("$.questions[0].correctAnswer.options[1].isCorrect").value(false))
+				.andExpect(jsonPath("$.questions[1].correctAnswer.options[0].id").value(3));
+	}
+
+	@Test
+	void getSubmissionModuleDetailHidesCorrectAnswerForASubmittedModule() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}},"
+				+ "{\"questionId\":" + quizQuestionTwo + ",\"content\":{\"selectedOptionIds\":[3]}}"
+				+ "]}";
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.questions[0].correctAnswer").doesNotExist())
+				.andExpect(jsonPath("$.answers", hasSize(2)))
+				.andExpect(jsonPath("$.answers[0].questionId").value(quizQuestionOne))
+				.andExpect(jsonPath("$.answers[0].content.selectedOptionIds[0]").value(1));
+	}
+
+	@Test
+	void getSubmissionModuleDetailReturnsEmptyQuestionsForAnEssayModule() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
+		long essaySubmissionModuleId = submissionModules.stream()
+				.filter(module -> module.getModuleId().equals(essayModuleId))
+				.findFirst()
+				.orElseThrow()
+				.getId();
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.moduleId").value(essayModuleId))
+				.andExpect(jsonPath("$.skill").value("WRITING"))
+				.andExpect(jsonPath("$.taskType").value("ESSAY"))
+				.andExpect(jsonPath("$.questions", hasSize(0)))
+				.andExpect(jsonPath("$.answers", hasSize(0)))
+				.andExpect(jsonPath("$.grading.method").value("TEACHER_MANUAL"))
+				.andExpect(jsonPath("$.grading.status").value("PENDING"));
+	}
+
+	@Test
+	void getSubmissionModuleDetailRejectsAnotherStudentAndAForeignTeacher() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(studentOtherId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(teacherOtherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void getSubmissionModuleDetailAllowsTheClassTeacherAndAnAdmin() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.moduleId").value(quizModuleId));
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
+						.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.moduleId").value(quizModuleId));
+	}
+
+	@Test
+	void getSubmissionModuleDetailReturnsNotFoundForUnknownModule() throws Exception {
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", 99999999L)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài."));
+	}
+
 	private long startSubmissionAsStudentMember() throws Exception {
 		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))

@@ -2,6 +2,7 @@ package com.english_hub.core.modules.submission.infrastructure.adapter;
 
 import com.english_hub.core.infrastructure.persistence.entity.Question;
 import com.english_hub.core.modules.submission.domain.model.ModuleQuestion;
+import com.english_hub.core.modules.submission.domain.model.QuestionDetail;
 import com.english_hub.core.modules.submission.domain.model.QuestionType;
 import com.english_hub.core.modules.submission.domain.repository.ModuleQuestionRepository;
 import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataQuestionRepository;
@@ -29,6 +30,14 @@ public class ModuleQuestionJpaAdapter implements ModuleQuestionRepository {
 				.toList();
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public List<QuestionDetail> findDetailsByModuleId(Long moduleId) {
+		return jpaRepository.findByModuleIdOrderByOrderIndexAsc(moduleId).stream()
+				.map(this::toDetail)
+				.toList();
+	}
+
 	private ModuleQuestion toDomain(Question source) {
 		return new ModuleQuestion(
 				source.getId(),
@@ -36,5 +45,16 @@ public class ModuleQuestionJpaAdapter implements ModuleQuestionRepository {
 				QuestionType.valueOf(source.getQuestionType().name()),
 				source.getScore(),
 				source.getOrderIndex());
+	}
+
+	private QuestionDetail toDetail(Question source) {
+		return new QuestionDetail(
+				source.getId(),
+				source.getModuleId(),
+				QuestionType.valueOf(source.getQuestionType().name()),
+				source.getScore(),
+				source.getOrderIndex(),
+				source.getContent(),
+				source.getCorrectAnswer());
 	}
 }

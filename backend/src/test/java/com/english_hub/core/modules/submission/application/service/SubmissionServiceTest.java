@@ -8,10 +8,12 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.QuestionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
 import com.english_hub.core.modules.submission.domain.model.Answer;
@@ -25,6 +27,7 @@ import com.english_hub.core.modules.submission.domain.model.ModuleInfo;
 import com.english_hub.core.modules.submission.domain.model.ModuleQuestion;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
 import com.english_hub.core.modules.submission.domain.model.ModuleTaskType;
+import com.english_hub.core.modules.submission.domain.model.QuestionDetail;
 import com.english_hub.core.modules.submission.domain.model.QuestionType;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
@@ -117,7 +120,8 @@ class SubmissionServiceTest {
 				classTeachingRepository,
 				answerRepository,
 				moduleQuestionRepository,
-				currentUserProvider);
+				currentUserProvider,
+				JSON_READER);
 	}
 
 	@Test
@@ -961,6 +965,255 @@ class SubmissionServiceTest {
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bài làm này đã được nộp.");
 		verify(submissionRepository, never()).save(any());
+	}
+
+	@Test
+	void getModuleDetailHidesCorrectAnswersUntilGraded() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.PENDING);
+		quizGrading.setId(77L);
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(quizGrading));
+		when(moduleQuestionRepository.findDetailsByModuleId(9L))
+				.thenReturn(List.of(questionDetail(21L)));
+		Answer answer = new Answer(150L, 21L, "{\"selectedOptionIds\":[1]}");
+		answer.setId(340L);
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(answer));
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.id()).isEqualTo(150L);
+		assertThat(result.moduleId()).isEqualTo(9L);
+		assertThat(result.skill()).isEqualTo(ModuleSkill.READING);
+		assertThat(result.taskType()).isEqualTo(ModuleTaskType.QUIZ);
+		assertThat(result.status()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(result.grading()).isNotNull();
+		assertThat(result.grading().id()).isEqualTo(77L);
+		assertThat(result.grading().method()).isEqualTo(GradingMethod.AUTO);
+		assertThat(result.grading().status()).isEqualTo(GradingStatus.PENDING);
+		QuestionDetailResult question = result.questions().getFirst();
+		assertThat(question.id()).isEqualTo(21L);
+		assertThat(question.content()).isEqualTo("Which word best describes...?");
+		assertThat(question.questionType()).isEqualTo(QuestionType.MULTIPLE_CHOICE);
+		assertThat(question.score()).isEqualByComparingTo("1");
+		assertThat(question.orderIndex()).isEqualTo(1);
+		assertThat(question.correctAnswer()).isNull();
+		AnswerResult answerResult = result.answers().getFirst();
+		assertThat(answerResult.id()).isEqualTo(340L);
+		assertThat(answerResult.questionId()).isEqualTo(21L);
+		assertThat(answerResult.content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+	}
+
+	@Test
+	void getModuleDetailRevealsCorrectAnswersWhenGraded() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule gradedModule = module(9L);
+		gradedModule.setId(150L);
+		gradedModule.setStatus(SubmissionStatus.GRADED);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(gradedModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+		when(moduleQuestionRepository.findDetailsByModuleId(9L))
+				.thenReturn(List.of(questionDetail(21L)));
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.GRADED);
+		JsonNode correctAnswer = result.questions().getFirst().correctAnswer();
+		assertThat(correctAnswer).isNotNull();
+		assertThat(correctAnswer.get("options").get(0).get("id").asInt()).isEqualTo(1);
+		assertThat(correctAnswer.get("options").get(0).get("is_correct").asBoolean()).isTrue();
+	}
+
+	@Test
+	void getModuleDetailKeepsCorrectAnswerHiddenWhenSubmitted() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule submittedModule = module(9L);
+		submittedModule.setId(150L);
+		submittedModule.setStatus(SubmissionStatus.SUBMITTED);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(submittedModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+		when(moduleQuestionRepository.findDetailsByModuleId(9L))
+				.thenReturn(List.of(questionDetail(21L)));
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.questions().getFirst().correctAnswer()).isNull();
+	}
+
+	@Test
+	void getModuleDetailReturnsNullGradingWhenAbsent() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+		when(moduleQuestionRepository.findDetailsByModuleId(9L)).thenReturn(List.of());
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.grading()).isNull();
+		assertThat(result.questions()).isEmpty();
+		assertThat(result.answers()).isEmpty();
+	}
+
+	@Test
+	void getModuleDetailReturnsEmptyQuestionsAndAnswersForEssay() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule essayModule = module(10L);
+		essayModule.setId(151L);
+		when(submissionModuleRepository.findById(151L)).thenReturn(Optional.of(essayModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.ESSAY)));
+		Grading essayGrading = grading(151L, GradingMethod.TEACHER_MANUAL, GradingStatus.PENDING);
+		essayGrading.setId(78L);
+		when(gradingRepository.findBySubmissionModuleId(151L)).thenReturn(List.of(essayGrading));
+		when(moduleQuestionRepository.findDetailsByModuleId(10L)).thenReturn(List.of());
+		when(answerRepository.findBySubmissionModuleId(151L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(151L);
+
+		assertThat(result.taskType()).isEqualTo(ModuleTaskType.ESSAY);
+		assertThat(result.questions()).isEmpty();
+		assertThat(result.answers()).isEmpty();
+		assertThat(result.grading().method()).isEqualTo(GradingMethod.TEACHER_MANUAL);
+	}
+
+	@Test
+	void getModuleDetailRejectsAnotherStudentsModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getModuleDetailAllowsTheClassTeacher() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(7L, 3L)).thenReturn(true);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.REWRITE)));
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+		when(moduleQuestionRepository.findDetailsByModuleId(9L)).thenReturn(List.of());
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.moduleId()).isEqualTo(9L);
+	}
+
+	@Test
+	void getModuleDetailRejectsATeacherWhoDoesNotTeachTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(8L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(classTeachingRepository.isTeacherOfClass(8L, 3L)).thenReturn(false);
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getModuleDetailAllowsAnAdmin() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+		when(moduleQuestionRepository.findDetailsByModuleId(9L)).thenReturn(List.of());
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+
+		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
+
+		assertThat(result.id()).isEqualTo(150L);
+	}
+
+	@Test
+	void getModuleDetailReturnsNotFoundForUnknownModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionModuleRepository.findById(650L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(650L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài.");
+	}
+
+	@Test
+	void getModuleDetailReturnsNotFoundWhenParentSubmissionIsMissing() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		when(submissionRepository.findById(5L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài.");
+	}
+
+	private QuestionDetail questionDetail(Long id) {
+		return new QuestionDetail(
+				id,
+				9L,
+				QuestionType.MULTIPLE_CHOICE,
+				BigDecimal.ONE,
+				1,
+				"Which word best describes...?",
+				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"is_correct\":true},"
+						+ "{\"id\":2,\"content\":\"Option B\",\"is_correct\":false}]}");
 	}
 
 	private ModuleInfo moduleInfo(Long moduleId, ModuleTaskType taskType) {

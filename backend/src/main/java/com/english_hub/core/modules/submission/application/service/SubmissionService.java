@@ -49,6 +49,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class SubmissionService {
@@ -67,6 +68,7 @@ public class SubmissionService {
 	private static final String SUBMITTED_MESSAGE = "Đã nộp phần làm bài.";
 	private static final String ALREADY_FINISHED_MESSAGE = "Bài làm này đã được nộp.";
 	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
+	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -78,6 +80,7 @@ public class SubmissionService {
 	private final AnswerRepository answerRepository;
 	private final ModuleQuestionRepository moduleQuestionRepository;
 	private final CurrentUserProvider currentUserProvider;
+	private final ObjectMapper objectMapper;
 
 	public SubmissionService(
 			SubmissionRepository submissionRepository,
@@ -89,7 +92,8 @@ public class SubmissionService {
 			ClassTeachingRepository classTeachingRepository,
 			AnswerRepository answerRepository,
 			ModuleQuestionRepository moduleQuestionRepository,
-			CurrentUserProvider currentUserProvider) {
+			CurrentUserProvider currentUserProvider,
+			ObjectMapper objectMapper) {
 		this.submissionRepository = submissionRepository;
 		this.submissionModuleRepository = submissionModuleRepository;
 		this.gradingRepository = gradingRepository;
@@ -100,6 +104,7 @@ public class SubmissionService {
 		this.answerRepository = answerRepository;
 		this.moduleQuestionRepository = moduleQuestionRepository;
 		this.currentUserProvider = currentUserProvider;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional
@@ -278,6 +283,67 @@ public class SubmissionService {
 		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
 	}
 
+	@Transactional(readOnly = true)
+	public SubmissionModuleDetailResult getModuleDetail(long submissionModuleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		verifyReadAccess(submission, caller);
+
+		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
+		GradingDetailResult grading = gradingRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.findFirst()
+				.map(this::toGradingDetail)
+				.orElse(null);
+		boolean graded = submissionModule.getStatus() == SubmissionStatus.GRADED;
+		List<QuestionDetailResult> questions = moduleQuestionRepository
+				.findDetailsByModuleId(submissionModule.getModuleId())
+				.stream()
+				.map(question -> new QuestionDetailResult(
+						question.id(),
+						question.content(),
+						question.questionType(),
+						question.score(),
+						question.orderIndex(),
+						graded ? parseContent(question.correctAnswer()) : null))
+				.toList();
+		List<AnswerResult> answers = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.map(answer -> new AnswerResult(
+						answer.getId(),
+						answer.getQuestionId(),
+						parseContent(answer.getContent())))
+				.toList();
+		return new SubmissionModuleDetailResult(
+				submissionModule.getId(),
+				submissionModule.getModuleId(),
+				moduleInfo == null ? null : moduleInfo.skill(),
+				moduleInfo == null ? null : moduleInfo.taskType(),
+				submissionModule.getStatus(),
+				grading,
+				questions,
+				answers);
+	}
+
+	private GradingDetailResult toGradingDetail(Grading grading) {
+		return new GradingDetailResult(
+				grading.getId(),
+				grading.getMethod(),
+				grading.getStatus(),
+				grading.getFinalScore(),
+				grading.getMaxScoreSnapshot(),
+				grading.getAiFeedback(),
+				grading.getFinalFeedback());
+	}
+
+	private JsonNode parseContent(String raw) {
+		if (raw == null || raw.isBlank()) {
+			return null;
+		}
+		return objectMapper.readTree(raw);
+	}
+
 	private List<AnswerPayload> validatedAnswerPayloads(
 			List<AnswerPayload> payloads, Map<Long, ModuleQuestion> questionById) {
 		if (payloads == null || payloads.isEmpty()) {
@@ -412,14 +478,7 @@ public class SubmissionService {
 				moduleInfo == null ? null : moduleInfo.skill(),
 				moduleInfo == null ? null : moduleInfo.taskType(),
 				submissionModule.getStatus(),
-				grading == null ? null : new GradingDetailResult(
-						grading.getId(),
-						grading.getMethod(),
-						grading.getStatus(),
-						grading.getFinalScore(),
-						grading.getMaxScoreSnapshot(),
-						grading.getAiFeedback(),
-						grading.getFinalFeedback()));
+				grading == null ? null : toGradingDetail(grading));
 	}
 
 	private SubmissionListItemResult toListItem(
@@ -578,6 +637,26 @@ public class SubmissionService {
 	}
 
 	public record AnswerPayload(Long questionId, JsonNode content) {
+	}
+
+	public record SubmissionModuleDetailResult(
+			Long id,
+			Long moduleId,
+			ModuleSkill skill,
+			ModuleTaskType taskType,
+			SubmissionStatus status,
+			GradingDetailResult grading,
+			List<QuestionDetailResult> questions,
+			List<AnswerResult> answers) {
+	}
+
+	public record QuestionDetailResult(
+			Long id,
+			String content,
+			QuestionType questionType,
+			BigDecimal score,
+			int orderIndex,
+			JsonNode correctAnswer) {
 	}
 
 	public record SubmitResult(String message, SubmissionStatus status, OffsetDateTime submittedAt) {
