@@ -72,7 +72,7 @@ jobs:
 
       - name: Pre-pull Testcontainers Images
         run: |
-          docker pull quay.io/minio/minio:latest
+          docker pull localstack/localstack:3
           docker pull postgres:16-alpine
 
       - name: Validate Flyway Migrations & Run Tests
