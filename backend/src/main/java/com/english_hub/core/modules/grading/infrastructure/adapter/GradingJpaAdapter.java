@@ -23,7 +23,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-@Repository
+@Repository("gradingApiJpaAdapter")
 public class GradingJpaAdapter implements GradingRepository {
 
 	private final com.english_hub.core.infrastructure.persistence.repository.GradingRepository jpaRepository;
