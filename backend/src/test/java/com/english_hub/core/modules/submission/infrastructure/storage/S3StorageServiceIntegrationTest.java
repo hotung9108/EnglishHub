@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -33,16 +35,20 @@ class S3StorageServiceIntegrationTest {
 	private static final byte[] PAYLOAD = "phase-7-storage-payload".getBytes();
 
 	@Container
-	static final GenericContainer<?> MINIO = new GenericContainer<>("quay.io/minio/minio:latest")
-			.withEnv("MINIO_ROOT_USER", ACCESS_KEY)
-			.withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
-			.withCommand("server /data --address :9000 --console-address :9001")
-			.withExposedPorts(9000);
+	static final GenericContainer<?> S3 = new GenericContainer<>("localstack/localstack:3")
+			.withEnv("SERVICES", "s3")
+			.withEnv("AWS_DEFAULT_REGION", "us-east-1")
+			.withEnv("AWS_ACCESS_KEY_ID", ACCESS_KEY)
+			.withEnv("AWS_SECRET_ACCESS_KEY", SECRET_KEY)
+			.withExposedPorts(4566)
+			.waitingFor(Wait.forHttp("/_localstack/health")
+					.forStatusCode(200)
+					.withStartupTimeout(Duration.ofMinutes(3)));
 
 	static S3StorageService storageService;
 
 	static String endpoint() {
-		return "http://localhost:" + MINIO.getMappedPort(9000);
+		return "http://localhost:" + S3.getMappedPort(4566);
 	}
 
 	@BeforeAll

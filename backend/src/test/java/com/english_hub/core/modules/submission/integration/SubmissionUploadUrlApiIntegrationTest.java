@@ -51,6 +51,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -85,11 +86,15 @@ class SubmissionUploadUrlApiIntegrationTest {
 			.withPassword("test");
 
 	@Container
-	static final GenericContainer<?> MINIO = new GenericContainer<>("quay.io/minio/minio:latest")
-			.withEnv("MINIO_ROOT_USER", ACCESS_KEY)
-			.withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
-			.withCommand("server /data --address :9000 --console-address :9001")
-			.withExposedPorts(9000);
+	static final GenericContainer<?> S3 = new GenericContainer<>("localstack/localstack:3")
+			.withEnv("SERVICES", "s3")
+			.withEnv("AWS_DEFAULT_REGION", "us-east-1")
+			.withEnv("AWS_ACCESS_KEY_ID", ACCESS_KEY)
+			.withEnv("AWS_SECRET_ACCESS_KEY", SECRET_KEY)
+			.withExposedPorts(4566)
+			.waitingFor(Wait.forHttp("/_localstack/health")
+					.forStatusCode(200)
+					.withStartupTimeout(java.time.Duration.ofMinutes(3)));
 
 	@DynamicPropertySource
 	static void registerProperties(DynamicPropertyRegistry registry) {
@@ -97,7 +102,7 @@ class SubmissionUploadUrlApiIntegrationTest {
 		registry.add("spring.datasource.username", POSTGRES::getUsername);
 		registry.add("spring.datasource.password", POSTGRES::getPassword);
 		registry.add("app.storage.s3.enabled", () -> "true");
-		registry.add("app.storage.s3.endpoint", () -> "http://localhost:" + MINIO.getMappedPort(9000));
+		registry.add("app.storage.s3.endpoint", () -> "http://localhost:" + S3.getMappedPort(4566));
 		registry.add("app.storage.s3.region", () -> "us-east-1");
 		registry.add("app.storage.s3.access-key-id", () -> ACCESS_KEY);
 		registry.add("app.storage.s3.secret-access-key", () -> SECRET_KEY);
@@ -152,7 +157,7 @@ class SubmissionUploadUrlApiIntegrationTest {
 	@BeforeAll
 	static void createBucket() {
 		try (S3Client client = S3Client.builder()
-				.endpointOverride(URI.create("http://localhost:" + MINIO.getMappedPort(9000)))
+				.endpointOverride(URI.create("http://localhost:" + S3.getMappedPort(4566)))
 				.region(Region.US_EAST_1)
 				.credentialsProvider(StaticCredentialsProvider.create(
 						AwsBasicCredentials.create(ACCESS_KEY, SECRET_KEY)))
