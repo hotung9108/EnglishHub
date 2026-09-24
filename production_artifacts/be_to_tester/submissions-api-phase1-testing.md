@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 Testing Instructions
+# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 + Phase 7a + Phase 7b Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -29,7 +29,7 @@ Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.persistence.SubmissionPersistenceIntegrationTest'
 # -> 7 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 248 tests (unit + integration), all green
+./gradlew test   # full suite: 276 tests (unit + integration), all green
 ```
 
 ## What the 7 Phase-1 tests cover
@@ -58,7 +58,7 @@ cd backend
                --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
                --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
 # -> Phase 2 + Phase 3 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 248 tests (unit + integration), all green
+./gradlew test   # full suite: 276 tests (unit + integration), all green
 ```
 
 Smoke test (needs a running app with a seeded/local DB and a student bearer token):
@@ -313,9 +313,160 @@ curl -s http://localhost:8080/api/v1/submission-modules/{submissionModuleId} \
 | 404 | `Không tìm thấy phần làm bài.` (#42, unknown module / missing parent submission) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#42 non-owner student / non-teaching teacher / other roles) |
 
+## Scope (Phase 7a) — S3-compatible storage layer (no HTTP endpoints yet)
+Provider-agnostic object-storage layer. Works with **any S3-compatible store** — Cloudflare R2,
+NeonDB Storage, MinIO, AWS S3 — switching provider requires **only** changing the
+`app.storage.s3.*` properties (endpoint + region + access keys + bucket), no code change.
+
+- New port `application/port/StorageService`:
+  - `generatePresignedPutUrl(storageKey, contentType)` → `PresignedUpload(uploadUrl, storageKey, expiresAt)`,
+    presigned URL fixed at **15 minutes**.
+  - `objectExists(storageKey)` → head-object check (consumed later by #43 Writing/Speaking submit).
+- `infrastructure/storage/`:
+  - `StorageProperties` — `app.storage.s3.*` (`enabled`, `endpoint`, `region`, `accessKeyId`,
+    `secretAccessKey`, `bucket`, `pathStyle`).
+  - `S3StorageService` — AWS SDK v2 (`S3Client` + `S3Presigner`), `endpointOverride` +
+    path-style access, `Closeable`.
+  - `S3StorageConfiguration` — conditional beans: `S3StorageService` when
+    `app.storage.s3.enabled=true`; otherwise `UnavailableStorageService` (falls back with a clear
+    `500 "Lưu trữ chưa được cấu hình."` on use) so the app **boots fine without any credentials**.
+- Properties added to `application.properties` / `application-dev.properties` with `STORAGE_S3_*`
+  env-var overrides (default `app.storage.s3.enabled=false`).
+- `build.gradle`: AWS SDK v2 BOM `software.amazon.awssdk:bom:2.55.4` + `software.amazon.awssdk:s3`.
+  (AWS SDK serializes with Jackson 2, already on the classpath via Hibernate JSON — no conflict with
+  the Jackson 3 HTTP mapper.)
+
+### Run the automated suite (no external credentials needed)
+```bash
+cd backend
+./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.storage.*'
+# -> 4 tests, BUILD SUCCESSFUL (minio image: quay.io/minio/minio:latest, pulled automatically)
+./gradlew test   # full suite: 276 tests, all green
+```
+
+### What the 4 Phase-7a tests cover
+- `S3StorageServiceIntegrationTest` (2, MinIO Testcontainers):
+  1. `presignedPutUrl_hasExpectedShape_andAllowsDirectUpload` — presigned PUT URL points at the MinIO
+     endpoint with path-style key (`/englishhub-test/submissions/88/module-150/audio.webm`) + an
+     `X-Amz-Signature`, `expiresAt` ≈ now + 15 min, `objectExists` false before → direct HTTP `PUT`
+     (plain `java.net.http`, no secrets) → `objectExists` true after. This proves the exact flow R2 /
+     NeonDB must support, against any S3-compatible endpoint.
+  2. `objectExists_returnsFalse_forMissingKey`.
+- `UnavailableStorageServiceTest` (2): fallback throws `ApiException` 500 with
+  `Lưu trữ chưa được cấu hình.` for both methods.
+
+### Notes
+- `org.testcontainers:minio` has no 2.x release (stops at 1.21.4), and `docker pull minio/minio:latest`
+  is denied in this environment — MinIO therefore runs via the existing `GenericContainer` (2.0.5)
+  with the `quay.io/minio/minio:latest` image.
+- Real-bucket smoke testing (R2 / NeonDB) is **deferred**: credentials will be added and testing
+  requested by the backend owner later. No storage endpoints exist yet (they land in Phase 7b).
+
+### Neon Storage operational notes (learned during the live smoke, 2026-09-24)
+- **Buckets are branch-scoped.** The S3 endpoint (`https://<branch-id>.storage.c-<N>.<region>.aws.neon.tech`)
+  selects the branch; credentials are scoped to that branch. The same bucket name on a *different* branch
+  is a *different* bucket — the reason a "private `english-hub-dev`" and a "public `english-hub-dev`"
+  appeared to coexist.
+- **Access level is NOT settable via the S3 API.** `PutBucketAcl`/`PutBucketPolicy` return
+  `501 Not Implemented`, and a plain S3 `CreateBucket` always creates a **`private`** bucket.
+  Use the Neon Console (Object storage tab) or the Neon API/CLI
+  (`neon buckets create <name> --access-level public_read`) to set `private` vs `public_read`.
+- **`public_read` means anonymous `GetObject`/`HeadObject`** at
+  `https://<branch-id>.storage.c-<N>.<region>.aws.neon.tech/<bucket>/<key>` — no CDN / custom domain
+  (unlike Cloudflare R2's `r2.dev`). Writes always require credentials, so presigned PUT works on either
+  access level. Object URLs are still "obscure-by-unknown-key", not a fix for sensitive data.
+- **Current decision**: the app targets the **private** `english-hub-dev` bucket on branch
+  `br-blue-tree-b3ldfn4i`. All Phase 7/8 storage operations (presigned PUT, `objectExists`) are
+  authenticated and work fine. Serving files to reviewers is deferred to a future **presigned GET**
+  endpoint (see Next) instead of a public bucket.
+- **Live smoke discovered + fixed**: a `NoSuchBucket` for `english-hub-dev` mid-smoke prompted an S3-API
+  bucket creation (private by construction) and exposed a pre-existing bug — `Grading.aiTranscript` was
+  typed Jackson 3 (`tools.jackson.JsonNode`) while Hibernate 7.4.5's JSONB mapper uses Jackson 2, which
+  crashed `dev,seed` boots at `GradingMockDataSeeder`. Fixed to the String-facing pattern used by
+  `Answer`/`Question` (via `JsonbValueCodec`); suite stays 276 green.
+- **Cleanup (2026-09-24)**: smoke objects removed from `english-hub-dev` (now empty); the leftover typo
+  bucket `englhish-hub-dev` was deleted. `uploads` (empty) left untouched.
+
+## Scope (Phase 7b) — presigned upload URL endpoints (#46, #47)
+`POST /api/v1/submission-modules/{submissionModuleId}/audio-upload-url` and
+`POST /api/v1/submission-modules/{submissionModuleId}/document-upload-url` (role = STUDENT, JSON body
+`{ "mimeType": "..." }`), V4 chapter 6 spec. Both consume the Phase 7a `StorageService` port and return a
+15-minute presigned PUT URL so the client can upload straight to the bucket, then call `#43` to submit.
+
+Guard order (both): role = STUDENT (403) → module exists (404 `Không tìm thấy phần làm bài.`) → parent
+submission exists (404) → owner (403) → module `IN_PROGRESS` (400) → task-type/skill bounds (400).
+Response: `200 { "uploadUrl", "storageKey", "expiresAt" }`.
+
+- **#46 audio**: guard `task_type = RECORDING` **or** `skill = SPEAKING`; MIME whitelist
+  `audio/webm → .webm`, `audio/mpeg → .mp3`, `audio/wav → .wav` (other MIME → 400
+  `Định dạng file không được hỗ trợ.`); 400 for non-Speaking or non-`IN_PROGRESS`:
+  `Không thể upload ghi âm cho phần làm bài này.`; key `submissions/{submissionId}/module-{smId}/audio.{ext}`.
+- **#47 document**: guard `task_type in [ESSAY, REWRITE]`; MIME whitelist `application/pdf → .pdf`,
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document → .docx`; 400 for others:
+  `Định dạng file không được hỗ trợ.`; 400 for non-Writing or non-`IN_PROGRESS`:
+  `Không thể upload tài liệu cho phần làm bài này.`; key `submissions/{submissionId}/module-{smId}/essay.{ext}` (both ESSAY and REWRITE).
+
+Smoke tests (running app, seeded DB with a SPEAKING/RECORDING module + a WRITING/ESSAY module, student bearer token):
+```bash
+# get a speaking upload URL, then PUT a file straight to the bucket
+curl -s -X POST http://localhost:8080/api/v1/submission-modules/{smId}/audio-upload-url \
+  -H "Authorization: Bearer <studentAccessToken>" -H "Content-Type: application/json" \
+  -d '{"mimeType":"audio/mpeg"}'
+# -> 200 {"uploadUrl":"https://<endpoint>/submissions/88/module-150/audio.mp3?...","storageKey":"submissions/88/module-150/audio.mp3","expiresAt":"..."}
+curl -s -T sample.mp3 "<uploadUrl from above>"
+
+# writing document url + PUT a pdf
+curl -s -X POST http://localhost:8080/api/v1/submission-modules/{smId}/document-upload-url \
+  -H "Authorization: Bearer <studentAccessToken>" -H "Content-Type: application/json" \
+  -d '{"mimeType":"application/pdf"}'
+curl -s -T essay.pdf "<uploadUrl>"
+
+# error cases
+# non-Speaking module / already SUBMITTED -> 400 "Không thể upload ghi âm cho phần làm bài này."
+# bad mime (e.g. audio/ogg, text/plain) -> 400 "Định dạng file không được hỗ trợ."
+# non-Writing module / already SUBMITTED -> 400 "Không thể upload tài liệu cho phần làm bài này."
+# unknown id -> 404 "Không tìm thấy phần làm bài."
+# other student / teacher -> 403 "Bạn không có quyền thực hiện thao tác này."
+```
+
+### What the Phase-7b tests cover (+14 service + 2 controller + 8 API integration)
+- `SubmissionServiceTest` (+14, Mockito + mocked `StorageService`): audio happy path (storage key
+  `submissions/88/module-150/audio.webm` forwarded with the MIME), `.mp3`/`.wav` mapping, unsupported MIME 400,
+  non-student 403, unknown module 404, missing parent 404, foreign student 403, module `SUBMITTED` 400,
+  non-Speaking/Recording module 400; document happy path (`essay.pdf`), `.docx` + REWRITE acceptance,
+  `text/plain` 400, non-Writing module 400, `SUBMITTED` 400.
+- `SubmissionControllerTest` (+2): both endpoint mappings → 200 exact body (uploadUrl, storageKey, expiresAt).
+- `SubmissionUploadUrlApiIntegrationTest` (+8, Postgres + **MinIO** containers, dynamic
+  `app.storage.s3.*` → real `S3StorageService` bean): audio/webm and document/pdf **uploadUrl → direct HTTP
+  `PUT` succeeds → injected `StorageService.objectExists(key) == true`**, exact storage-key shapes,
+  unsupported MIME 400, non-Speaking/non-Writing 400, already-`SUBMITTED` 400, foreign student + teacher
+  403, unknown id 404.
+
+### Error contract (Phase 7b additions)
+| Code | Message |
+|---|---|
+| 404 | `Không tìm thấy phần làm bài.` (#46/#47 unknown module or missing parent) |
+| 400 | `Không thể upload ghi âm cho phần làm bài này.` (#46 non-Speaking/Recording, not IN_PROGRESS) |
+| 400 | `Không thể upload tài liệu cho phần làm bài này.` (#47 non-Writing, not IN_PROGRESS) |
+| 400 | `Định dạng file không được hỗ trợ.` (#46/#47 unsupported MIME) |
+| 403 | `Bạn không có quyền thực hiện thao tác này.` (#46/#47 non-student / not the owner) |
+
 ## Next (for whoever picks up the next feature)
 - Auto-grading of Quiz answers on submit (read `is_correct` snake_case from `correct_answer`, promote
   graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question scores, exact-set
   multiple-choice + trimmed short-answer matching, unanswered → 0).
-- #46/#47 presigned R2 upload URLs + #43 Writing/Speaking R2 submit (which then also fills the
-  Essay/Speaking `answers` file metadata in #42), per the Phase 8 flow.
+- **Phase 8** — extend `#43` for Writing/Speaking (`objectExists` on the storage key →
+  `doc/audio_upload_status READY|UPLOADING` + storage key on the `answers` row), which then also fills
+  the Essay/Speaking `answers` file metadata in #42.
+- **Presigned GET serving (approved follow-up, bucket stays private)** — extend the `StorageService`
+  port with `generatePresignedGetUrl(storageKey, ttl)` (e.g. 15 min, matching PUTs) and implement it in
+  `S3StorageService` via `S3Presigner.presignGetObject`. Expose a secured endpoint (student-owner /
+  teacher) so the FE can render `<audio>` / download essays — this is how reviewers read the submitted
+  files on a private bucket (no `public_read` needed). Log it on the task board ahead of the
+  grading/review screens.
+- **Live smoke of #46/#47 against the real provider is DONE** (2026-09-24): with `dev,seed` + a
+  force-opened assignment, student `vo.bao.quynh@gmail.com` uploaded an mp3 and a pdf straight to the
+  `english-hub-dev` bucket via the presigned URLs (200s). Gotcha: the presign signs `content-type`, so
+  the direct PUT must send the exact MIME from the URL call — curl's default
+  `application/x-www-form-urlencoded` returns `403 SignatureDoesNotMatch`. Smoke objects were
+  subsequently cleaned up (bucket now empty).

@@ -3,6 +3,8 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.modules.submission.application.port.StorageService;
+import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
@@ -16,6 +18,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.UploadUrlResult;
 import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.submission.domain.model.AssignmentWindow;
@@ -104,7 +107,12 @@ class SubmissionServiceTest {
 	@Mock
 	private CurrentUserProvider currentUserProvider;
 
+	@Mock
+	private StorageService storageService;
+
 	private static final JsonMapper JSON_READER = new JsonMapper();
+
+	private static final OffsetDateTime EXPIRES_AT = OffsetDateTime.parse("2026-09-24T10:00:00Z");
 
 	private SubmissionService submissionService;
 
@@ -121,7 +129,8 @@ class SubmissionServiceTest {
 				answerRepository,
 				moduleQuestionRepository,
 				currentUserProvider,
-				JSON_READER);
+				JSON_READER,
+				storageService);
 	}
 
 	@Test
@@ -1204,6 +1213,193 @@ class SubmissionServiceTest {
 				.hasMessage("Không tìm thấy phần làm bài.");
 	}
 
+	@Test
+	void getAudioUploadUrl_buildsStorageKeyAndForwardsToStorage() {
+		SubmissionModule module = ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-150/audio.webm", "audio/webm"))
+				.thenReturn(presigned("https://bucket/audio.webm", "submissions/88/module-150/audio.webm"));
+
+		UploadUrlResult result = submissionService.getAudioUploadUrl(150L, "audio/webm");
+
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/audio.webm");
+		assertThat(result.storageKey()).isEqualTo("submissions/88/module-150/audio.webm");
+		assertThat(result.expiresAt()).isEqualTo(EXPIRES_AT);
+		verify(storageService).generatePresignedPutUrl("submissions/88/module-150/audio.webm", "audio/webm");
+	}
+
+	@Test
+	void getAudioUploadUrl_mapsMpegAndWavExtensions() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.READING, ModuleTaskType.RECORDING)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-150/audio.mp3", "audio/mpeg"))
+				.thenReturn(presigned("https://bucket/a.mp3", "submissions/88/module-150/audio.mp3"));
+
+		assertThat(submissionService.getAudioUploadUrl(150L, "audio/mpeg").storageKey())
+				.isEqualTo("submissions/88/module-150/audio.mp3");
+
+		when(storageService.generatePresignedPutUrl("submissions/88/module-150/audio.wav", "audio/wav"))
+				.thenReturn(presigned("https://bucket/a.wav", "submissions/88/module-150/audio.wav"));
+		assertThat(submissionService.getAudioUploadUrl(150L, "audio/wav").storageKey())
+				.isEqualTo("submissions/88/module-150/audio.wav");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsUnsupportedMime() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/ogg"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Định dạng file không được hỗ trợ.");
+		verify(storageService, never()).generatePresignedPutUrl(any(), any());
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsNonStudent() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsUnknownModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionModuleRepository.findById(650L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(650L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsMissingParentSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule module = module(9L);
+		module.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(module));
+		when(submissionRepository.findById(5L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy phần làm bài.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsAnotherStudentsModule() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(42L));
+		SubmissionModule module = module(9L);
+		module.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(module));
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission(5L, 41L, 1)));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsSubmittedModule() {
+		SubmissionModule module = ownedInProgressModule(150L, 88L, 9L);
+		module.setStatus(SubmissionStatus.SUBMITTED);
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload ghi âm cho phần làm bài này.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsNonSpeakingOrRecordingModule() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.READING, ModuleTaskType.QUIZ)));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload ghi âm cho phần làm bài này.");
+	}
+
+	@Test
+	void getDocumentUploadUrl_buildsStorageKeyAndForwardsToStorage() {
+		SubmissionModule module = ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf"))
+				.thenReturn(presigned("https://bucket/essay.pdf", "submissions/88/module-151/essay.pdf"));
+
+		UploadUrlResult result = submissionService.getDocumentUploadUrl(151L, "application/pdf");
+
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
+		assertThat(result.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
+		verify(storageService).generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf");
+	}
+
+	@Test
+	void getDocumentUploadUrl_mapsDocxAndAcceptsRewrite() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.REWRITE)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.docx",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+				.thenReturn(presigned("https://bucket/essay.docx", "submissions/88/module-151/essay.docx"));
+
+		assertThat(submissionService.getDocumentUploadUrl(151L,
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document").storageKey())
+				.isEqualTo("submissions/88/module-151/essay.docx");
+	}
+
+	@Test
+	void getDocumentUploadUrl_rejectsUnsupportedMime() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "text/plain"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Định dạng file không được hỗ trợ.");
+	}
+
+	@Test
+	void getDocumentUploadUrl_rejectsNonWritingModule() {
+		ownedInProgressModule(151L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.READING, ModuleTaskType.QUIZ)));
+
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+	}
+
+	@Test
+	void getDocumentUploadUrl_rejectsSubmittedModule() {
+		SubmissionModule module = ownedInProgressModule(151L, 88L, 10L);
+		module.setStatus(SubmissionStatus.SUBMITTED);
+
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+	}
+
+	private SubmissionModule ownedInProgressModule(long moduleId, long submissionId, long assignmentModuleId) {
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(submissionId);
+		SubmissionModule submissionModule = module(assignmentModuleId);
+		submissionModule.setId(moduleId);
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionModuleRepository.findById(moduleId)).thenReturn(Optional.of(submissionModule));
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		return submissionModule;
+	}
+
+	private PresignedUpload presigned(String url, String key) {
+		return new PresignedUpload(url, key, EXPIRES_AT);
+	}
+
 	private QuestionDetail questionDetail(Long id) {
 		return new QuestionDetail(
 				id,
@@ -1217,7 +1413,11 @@ class SubmissionServiceTest {
 	}
 
 	private ModuleInfo moduleInfo(Long moduleId, ModuleTaskType taskType) {
-		return new ModuleInfo(moduleId, 5L, ModuleSkill.READING, taskType, 1);
+		return moduleInfo(moduleId, ModuleSkill.READING, taskType);
+	}
+
+	private ModuleInfo moduleInfo(Long moduleId, ModuleSkill skill, ModuleTaskType taskType) {
+		return new ModuleInfo(moduleId, 5L, skill, taskType, 1);
 	}
 
 	private JsonNode multipleChoice(int optionId) {

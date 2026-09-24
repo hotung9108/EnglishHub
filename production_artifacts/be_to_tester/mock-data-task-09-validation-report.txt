@@ -1,5 +1,5 @@
 ================ Task 9 Validation Report ================
-Generated at: 2026-09-17T22:08:10.256331+07:00
+Generated at: 2026-09-24T18:54:24.706243374+07:00
 Scope: read-only SELECT validation; no database mutation.
 Latest log rule: ROW_NUMBER() OVER (PARTITION BY grading_id ORDER BY changed_at DESC, id DESC).
 

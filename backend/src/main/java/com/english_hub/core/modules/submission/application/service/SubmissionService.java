@@ -2,6 +2,8 @@ package com.english_hub.core.modules.submission.application.service;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
+import com.english_hub.core.modules.submission.application.port.StorageService;
+import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
 import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
@@ -69,6 +71,9 @@ public class SubmissionService {
 	private static final String ALREADY_FINISHED_MESSAGE = "Bài làm này đã được nộp.";
 	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
 	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài.";
+	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
+	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
+	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -81,6 +86,7 @@ public class SubmissionService {
 	private final ModuleQuestionRepository moduleQuestionRepository;
 	private final CurrentUserProvider currentUserProvider;
 	private final ObjectMapper objectMapper;
+	private final StorageService storageService;
 
 	public SubmissionService(
 			SubmissionRepository submissionRepository,
@@ -93,7 +99,8 @@ public class SubmissionService {
 			AnswerRepository answerRepository,
 			ModuleQuestionRepository moduleQuestionRepository,
 			CurrentUserProvider currentUserProvider,
-			ObjectMapper objectMapper) {
+			ObjectMapper objectMapper,
+			StorageService storageService) {
 		this.submissionRepository = submissionRepository;
 		this.submissionModuleRepository = submissionModuleRepository;
 		this.gradingRepository = gradingRepository;
@@ -105,6 +112,7 @@ public class SubmissionService {
 		this.moduleQuestionRepository = moduleQuestionRepository;
 		this.currentUserProvider = currentUserProvider;
 		this.objectMapper = objectMapper;
+		this.storageService = storageService;
 	}
 
 	@Transactional
@@ -324,6 +332,86 @@ public class SubmissionService {
 				grading,
 				questions,
 				answers);
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
+		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		SubmissionModule submissionModule = context.submissionModule();
+		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
+		}
+		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
+		if (moduleInfo == null
+				|| (moduleInfo.taskType() != ModuleTaskType.RECORDING && moduleInfo.skill() != ModuleSkill.SPEAKING)) {
+			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
+		}
+		String extension = audioExtensionOf(mimeType);
+		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "audio", extension);
+		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
+		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		SubmissionModule submissionModule = context.submissionModule();
+		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
+		}
+		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
+		if (moduleInfo == null
+				|| (moduleInfo.taskType() != ModuleTaskType.ESSAY && moduleInfo.taskType() != ModuleTaskType.REWRITE)) {
+			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
+		}
+		String extension = documentExtensionOf(mimeType);
+		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "essay", extension);
+		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
+	}
+
+	private OwnedModuleContext requireOwnModule(long submissionModuleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		if (!submission.getStudentId().equals(caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		return new OwnedModuleContext(submission, submissionModule);
+	}
+
+	private String audioExtensionOf(String mimeType) {
+		if ("audio/webm".equals(mimeType)) {
+			return "webm";
+		}
+		if ("audio/mpeg".equals(mimeType)) {
+			return "mp3";
+		}
+		if ("audio/wav".equals(mimeType)) {
+			return "wav";
+		}
+		throw ApiException.badRequest(UNSUPPORTED_FILE_MESSAGE);
+	}
+
+	private String documentExtensionOf(String mimeType) {
+		if ("application/pdf".equals(mimeType)) {
+			return "pdf";
+		}
+		if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)) {
+			return "docx";
+		}
+		throw ApiException.badRequest(UNSUPPORTED_FILE_MESSAGE);
+	}
+
+	private String storageKey(long submissionId, long submissionModuleId, String filename, String extension) {
+		return "submissions/" + submissionId + "/module-" + submissionModuleId + "/" + filename + "." + extension;
+	}
+
+	private UploadUrlResult toUploadUrlResult(PresignedUpload presigned) {
+		return new UploadUrlResult(presigned.uploadUrl(), presigned.storageKey(), presigned.expiresAt());
 	}
 
 	private GradingDetailResult toGradingDetail(Grading grading) {
@@ -660,5 +748,11 @@ public class SubmissionService {
 	}
 
 	public record SubmitResult(String message, SubmissionStatus status, OffsetDateTime submittedAt) {
+	}
+
+	public record UploadUrlResult(String uploadUrl, String storageKey, OffsetDateTime expiresAt) {
+	}
+
+	private record OwnedModuleContext(Submission submission, SubmissionModule submissionModule) {
 	}
 }

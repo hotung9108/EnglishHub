@@ -9,6 +9,8 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionM
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlRequest;
+import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlResponse;
 
 import java.util.List;
 
@@ -73,5 +75,19 @@ public class SubmissionController {
 	@GetMapping("/submission-modules/{id}")
 	public ResponseEntity<SubmissionModuleDetailResponse> getSubmissionModuleDetail(@PathVariable long id) {
 		return ResponseEntity.ok(SubmissionModuleDetailResponse.from(submissionService.getModuleDetail(id)));
+	}
+
+	@PostMapping("/submission-modules/{id}/audio-upload-url")
+	public ResponseEntity<UploadUrlResponse> getAudioUploadUrl(
+			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
+		String mimeType = request == null ? null : request.mimeType();
+		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getAudioUploadUrl(id, mimeType)));
+	}
+
+	@PostMapping("/submission-modules/{id}/document-upload-url")
+	public ResponseEntity<UploadUrlResponse> getDocumentUploadUrl(
+			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
+		String mimeType = request == null ? null : request.mimeType();
+		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getDocumentUploadUrl(id, mimeType)));
 	}
 }

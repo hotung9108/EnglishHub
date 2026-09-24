@@ -310,7 +310,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 				completed ? teacherId : null,
 				completed ? gradedAt.minusMinutes(5) : null,
 				gradedAt,
-				transcript,
+				transcript == null ? null : transcript.toString(),
 				module.getAiInstruction());
 		return new GradingSeedData(grading, submissionModule.getStatus(), module.getSkill(), answer);
 	}
@@ -512,7 +512,12 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 						"COMPLETED grading is missing a required final field: " + grading.getId());
 			}
 			if (grading.getAiTranscript() != null) {
-				validateTranscript(grading.getAiTranscript());
+				try {
+					validateTranscript(objectMapper.readTree(grading.getAiTranscript()));
+				} catch (JacksonException exception) {
+					throw new IllegalStateException(
+							"Persisted ai_transcript is not valid JSON: " + grading.getId(), exception);
+				}
 			}
 		}
 		LOGGER.info("AUTO final_score assertion passed for {} gradings", autoCount);

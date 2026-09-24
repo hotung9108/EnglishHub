@@ -15,6 +15,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.UploadUrlResult;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
@@ -28,6 +29,8 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionM
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlRequest;
+import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlResponse;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -248,5 +251,41 @@ class SubmissionControllerTest {
 		assertThat(body.answers()).hasSize(1);
 		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
 		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+	}
+
+	@Test
+	void mapsTheAudioUploadUrlResultToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/audio.webm",
+				"submissions/88/module-150/audio.webm",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getAudioUploadUrl(150L, "audio/webm")).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getAudioUploadUrl(150L, new UploadUrlRequest("audio/webm"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/audio.webm");
+		assertThat(body.storageKey()).isEqualTo("submissions/88/module-150/audio.webm");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+	}
+
+	@Test
+	void mapsTheDocumentUploadUrlResultToAnOkResponse() {
+		UploadUrlResult result = new UploadUrlResult(
+				"https://bucket/essay.pdf",
+				"submissions/88/module-151/essay.pdf",
+				OffsetDateTime.parse("2026-09-24T10:00:00Z"));
+		when(submissionService.getDocumentUploadUrl(151L, "application/pdf")).thenReturn(result);
+
+		ResponseEntity<UploadUrlResponse> response =
+				submissionController.getDocumentUploadUrl(151L, new UploadUrlRequest("application/pdf"));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		UploadUrlResponse body = response.getBody();
+		assertThat(body.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
+		assertThat(body.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:00:00Z"));
 	}
 }
