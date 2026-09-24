@@ -22,6 +22,7 @@ import com.english_hub.core.modules.submission.domain.model.SubmissionFilter;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.model.UploadStatus;
 import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
@@ -232,6 +233,9 @@ public class SubmissionService {
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
 		ModuleTaskType taskType = moduleInfo == null ? null : moduleInfo.taskType();
+		if (taskType == ModuleTaskType.ESSAY || taskType == ModuleTaskType.RECORDING) {
+			return submitFileModule(submission, submissionModule, taskType);
+		}
 		if (taskType != ModuleTaskType.QUIZ && taskType != ModuleTaskType.REWRITE) {
 			throw ApiException.badRequest(UNSUPPORTED_MODULE_MESSAGE);
 		}
@@ -253,13 +257,84 @@ public class SubmissionService {
 				.mapToObj(index -> new AnswerResult(
 						persisted.get(index).getId(),
 						validatedPayloads.get(index).questionId(),
-						validatedPayloads.get(index).content()))
+						validatedPayloads.get(index).content(),
+						persisted.get(index).getDocStorageKey(),
+						persisted.get(index).getDocMimeType(),
+						persisted.get(index).getDocUploadStatus(),
+						persisted.get(index).getAudioStorageKey(),
+						persisted.get(index).getAudioMimeType(),
+						persisted.get(index).getAudioUploadStatus()))
 				.toList();
 		return new SubmitModuleResult(
 				SUBMITTED_MESSAGE,
 				submissionModuleId,
 				SubmissionStatus.SUBMITTED,
 				answerResults);
+	}
+
+	private SubmitModuleResult submitFileModule(
+			Submission submission, SubmissionModule submissionModule, ModuleTaskType taskType) {
+		boolean audio = taskType == ModuleTaskType.RECORDING;
+		String filename = audio ? "audio" : "essay";
+		List<FileCandidate> candidates = audio ? audioCandidates() : documentCandidates();
+		FileCandidate found = candidates.stream()
+				.filter(candidate -> storageService.objectExists(
+						storageKey(submission.getId(), submissionModule.getId(), filename, candidate.extension())))
+				.findFirst()
+				.orElse(null);
+
+		String matchedKey = found == null
+				? null
+				: storageKey(submission.getId(), submissionModule.getId(), filename, found.extension());
+		UploadStatus uploadStatus = found == null ? UploadStatus.UPLOADING : UploadStatus.READY;
+
+		Answer persisted = answerRepository.bulkCreate(
+				submissionModule.getId(),
+				List.of(new Answer(
+						submissionModule.getId(),
+						null,
+						null,
+						audio ? matchedKey : null,
+						audio && found != null ? found.mimeType() : null,
+						audio ? uploadStatus : null,
+						audio ? null : matchedKey,
+						!audio && found != null ? found.mimeType() : null,
+						audio ? null : uploadStatus)))
+				.get(0);
+		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+		submissionModuleRepository.save(submissionModule);
+
+		AnswerResult answerResult = new AnswerResult(
+				persisted.getId(),
+				persisted.getQuestionId(),
+				null,
+				persisted.getDocStorageKey(),
+				persisted.getDocMimeType(),
+				persisted.getDocUploadStatus(),
+				persisted.getAudioStorageKey(),
+				persisted.getAudioMimeType(),
+				persisted.getAudioUploadStatus());
+		return new SubmitModuleResult(
+				SUBMITTED_MESSAGE,
+				submissionModule.getId(),
+				SubmissionStatus.SUBMITTED,
+				List.of(answerResult));
+	}
+
+	private List<FileCandidate> audioCandidates() {
+		return List.of(
+				new FileCandidate("webm", "audio/webm"),
+				new FileCandidate("mp3", "audio/mpeg"),
+				new FileCandidate("wav", "audio/wav"));
+	}
+
+	private List<FileCandidate> documentCandidates() {
+		return List.of(
+				new FileCandidate("pdf", "application/pdf"),
+				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+	}
+
+	private record FileCandidate(String extension, String mimeType) {
 	}
 
 	@Transactional
@@ -321,7 +396,13 @@ public class SubmissionService {
 				.map(answer -> new AnswerResult(
 						answer.getId(),
 						answer.getQuestionId(),
-						parseContent(answer.getContent())))
+						parseContent(answer.getContent()),
+						answer.getDocStorageKey(),
+						answer.getDocMimeType(),
+						answer.getDocUploadStatus(),
+						answer.getAudioStorageKey(),
+						answer.getAudioMimeType(),
+						answer.getAudioUploadStatus()))
 				.toList();
 		return new SubmissionModuleDetailResult(
 				submissionModule.getId(),
@@ -721,7 +802,16 @@ public class SubmissionService {
 			List<AnswerResult> answers) {
 	}
 
-	public record AnswerResult(Long id, Long questionId, JsonNode content) {
+	public record AnswerResult(
+			Long id,
+			Long questionId,
+			JsonNode content,
+			String docStorageKey,
+			String docMimeType,
+			UploadStatus docUploadStatus,
+			String audioStorageKey,
+			String audioMimeType,
+			UploadStatus audioUploadStatus) {
 	}
 
 	public record AnswerPayload(Long questionId, JsonNode content) {

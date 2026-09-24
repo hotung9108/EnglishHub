@@ -7,6 +7,7 @@ import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.model.UploadStatus;
 import org.springframework.stereotype.Component;
 
 /**
@@ -64,7 +65,15 @@ public class SubmissionPersistenceMapper {
 		Answer target = new Answer(
 				source.getSubmissionModuleId(),
 				source.getQuestionId(),
-				source.getContent());
+				source.getContent(),
+				source.getAudioStorageKey(),
+				source.getAudioMimeType(),
+				source.getAudioUploadStatus() == null
+						? null
+						: UploadStatus.valueOf(source.getAudioUploadStatus().name()),
+				source.getDocStorageKey(),
+				source.getDocMimeType(),
+				source.getDocUploadStatus() == null ? null : UploadStatus.valueOf(source.getDocUploadStatus().name()));
 		target.setId(source.getId());
 		return target;
 	}
@@ -75,15 +84,21 @@ public class SubmissionPersistenceMapper {
 				source.getSubmissionModuleId(),
 				source.getQuestionId(),
 				source.getContent(),
+				source.getAudioStorageKey(),
 				null,
 				null,
+				source.getAudioMimeType(),
+				source.getAudioUploadStatus() == null
+						? null
+						: com.english_hub.core.infrastructure.persistence.entity.UploadStatus.valueOf(
+								source.getAudioUploadStatus().name()),
+				source.getDocStorageKey(),
+				source.getDocMimeType(),
 				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null);
+				source.getDocUploadStatus() == null
+						? null
+						: com.english_hub.core.infrastructure.persistence.entity.UploadStatus.valueOf(
+								source.getDocUploadStatus().name()));
 		return target;
 	}
 

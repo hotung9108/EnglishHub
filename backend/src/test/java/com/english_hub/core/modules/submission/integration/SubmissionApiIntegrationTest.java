@@ -702,7 +702,7 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void submitModuleRejectsAnEssayModuleForNow() throws Exception {
+	void submitModuleForEssayModuleRequiresConfiguredStorage() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
 		long essaySubmissionModuleId = submissionModules.stream()
@@ -715,8 +715,8 @@ class SubmissionApiIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{}")
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
-			.andExpect(status().isBadRequest())
-			.andExpect(jsonPath("$.error").value("Loại phần làm bài này chưa được hỗ trợ."));
+			.andExpect(status().isInternalServerError())
+			.andExpect(jsonPath("$.error").value("Lưu trữ chưa được cấu hình."));
 	}
 
 	@Test

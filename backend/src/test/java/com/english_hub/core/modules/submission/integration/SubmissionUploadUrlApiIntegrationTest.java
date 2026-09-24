@@ -61,6 +61,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -316,6 +318,128 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.content("{\"mimeType\":\"application/pdf\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Không thể upload tài liệu cho phần làm bài này."));
+	}
+
+	@Test
+	void submitModule_marksEssayAnswerReadyWhenDocumentUploaded() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url",
+						essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"application/pdf\"}"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", "application/pdf")
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].questionId").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].content").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].docStorageKey")
+						.value("submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.pdf"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value("application/pdf"))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+	}
+
+	@Test
+	void submitModule_marksEssayAnswerUploadingWhenNothingUploaded() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("UPLOADING"));
+	}
+
+	@Test
+	void submitModule_marksRecordingAnswerReadyWhenAudioUploaded() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/audio-upload-url",
+						recordingSubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"audio/webm\"}"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", "audio/webm")
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", recordingSubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.answers[0].questionId").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].content").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].audioStorageKey")
+						.value("submissions/" + submissionId + "/module-" + recordingSubmissionModuleId + "/audio.webm"))
+				.andExpect(jsonPath("$.answers[0].audioMimeType").value("audio/webm"))
+				.andExpect(jsonPath("$.answers[0].audioUploadStatus").value("READY"));
+	}
+
+	@Test
+	void submitModule_marksRecordingAnswerUploadingWhenNoAudioUploaded() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", recordingSubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.answers[0].audioUploadStatus").value("UPLOADING"));
+	}
+
+	@Test
+	void submittedEssayAnswerExposesDocumentMetadataInModuleDetail() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url",
+						essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"application/pdf\"}"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", "application/pdf")
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.answers[0].docStorageKey")
+						.value("submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.pdf"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value("application/pdf"))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
 	}
 
 	@Test

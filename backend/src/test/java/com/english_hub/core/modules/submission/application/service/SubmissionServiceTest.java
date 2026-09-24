@@ -36,6 +36,7 @@ import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.model.UploadStatus;
 import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
@@ -53,6 +54,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -843,20 +845,123 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void submitModuleRejectsAnEssayModuleForNow() {
-		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule essayModule = module(11L);
-		essayModule.setId(102L);
-		when(submissionModuleRepository.findById(102L)).thenReturn(Optional.of(essayModule));
-		Submission submission = submission(5L, 41L, 1);
-		submission.setId(88L);
-		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+	void submitModule_submitsEssayWithReadyStatusWhenFilePresent() {
+		ownedInProgressModule(102L, 88L, 11L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
-				.thenReturn(List.of(moduleInfo(11L, ModuleTaskType.ESSAY)));
+				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.objectExists("submissions/88/module-102/essay.pdf")).thenReturn(true);
+		when(answerRepository.bulkCreate(eq(102L), anyList())).thenAnswer(savedAnswers(1000L));
 
-		assertThatThrownBy(() -> submissionService.submitModule(102L, List.of()))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Loại phần làm bài này chưa được hỗ trợ.");
+		SubmitModuleResult result = submissionService.submitModule(102L, null);
+
+		assertThat(result.message()).isEqualTo("Đã nộp phần làm bài.");
+		assertThat(result.submissionModuleId()).isEqualTo(102L);
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.answers()).hasSize(1);
+		AnswerResult answer = result.answers().get(0);
+		assertThat(answer.id()).isEqualTo(1000L);
+		assertThat(answer.questionId()).isNull();
+		assertThat(answer.content()).isNull();
+		assertThat(answer.docStorageKey()).isEqualTo("submissions/88/module-102/essay.pdf");
+		assertThat(answer.docMimeType()).isEqualTo("application/pdf");
+		assertThat(answer.docUploadStatus()).isEqualTo(UploadStatus.READY);
+		assertThat(answer.audioStorageKey()).isNull();
+		assertThat(answer.audioUploadStatus()).isNull();
+		verify(storageService).objectExists("submissions/88/module-102/essay.pdf");
+		verify(storageService, never()).objectExists("submissions/88/module-102/essay.docx");
+		verify(answerRepository).bulkCreate(eq(102L), argThat(list -> list.size() == 1
+				&& list.get(0).getQuestionId() == null && list.get(0).getContent() == null));
+		verify(submissionModuleRepository).save(argThat(saved ->
+				saved.getId() == 102L && saved.getStatus() == SubmissionStatus.SUBMITTED));
+	}
+
+	@Test
+	void submitModule_probesDocxWhenPdfIsMissing() {
+		ownedInProgressModule(102L, 88L, 11L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.objectExists("submissions/88/module-102/essay.pdf")).thenReturn(false);
+		when(storageService.objectExists("submissions/88/module-102/essay.docx")).thenReturn(true);
+		when(answerRepository.bulkCreate(eq(102L), anyList())).thenAnswer(savedAnswers(1001L));
+
+		AnswerResult answer = submissionService.submitModule(102L, null).answers().get(0);
+
+		assertThat(answer.docStorageKey()).isEqualTo("submissions/88/module-102/essay.docx");
+		assertThat(answer.docMimeType())
+				.isEqualTo("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+		assertThat(answer.docUploadStatus()).isEqualTo(UploadStatus.READY);
+	}
+
+	@Test
+	void submitModule_marksEssayUploadingWhenNoFileExists() {
+		ownedInProgressModule(102L, 88L, 11L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(answerRepository.bulkCreate(eq(102L), anyList())).thenAnswer(savedAnswers(1002L));
+
+		AnswerResult answer = submissionService.submitModule(102L, List.of()).answers().get(0);
+
+		assertThat(answer.docStorageKey()).isNull();
+		assertThat(answer.docMimeType()).isNull();
+		assertThat(answer.docUploadStatus()).isEqualTo(UploadStatus.UPLOADING);
+		verify(storageService).objectExists("submissions/88/module-102/essay.pdf");
+		verify(storageService).objectExists("submissions/88/module-102/essay.docx");
+	}
+
+	@Test
+	void submitModule_submitsRecordingWithReadyStatusWhenAudioExists() {
+		ownedInProgressModule(103L, 88L, 12L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(storageService.objectExists("submissions/88/module-103/audio.webm")).thenReturn(true);
+		when(answerRepository.bulkCreate(eq(103L), anyList())).thenAnswer(savedAnswers(1100L));
+
+		AnswerResult answer = submissionService.submitModule(103L, null).answers().get(0);
+
+		assertThat(answer.audioStorageKey()).isEqualTo("submissions/88/module-103/audio.webm");
+		assertThat(answer.audioMimeType()).isEqualTo("audio/webm");
+		assertThat(answer.audioUploadStatus()).isEqualTo(UploadStatus.READY);
+		assertThat(answer.questionId()).isNull();
+		assertThat(answer.content()).isNull();
+		assertThat(answer.docStorageKey()).isNull();
+		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
+		verify(storageService, never()).objectExists("submissions/88/module-103/audio.mp3");
+	}
+
+	@Test
+	void submitModule_probesAudioExtensionsInOrder() {
+		ownedInProgressModule(103L, 88L, 12L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(storageService.objectExists("submissions/88/module-103/audio.webm")).thenReturn(false);
+		when(storageService.objectExists("submissions/88/module-103/audio.mp3")).thenReturn(true);
+		when(answerRepository.bulkCreate(eq(103L), anyList())).thenAnswer(savedAnswers(1101L));
+
+		AnswerResult answer = submissionService.submitModule(103L, null).answers().get(0);
+
+		assertThat(answer.audioStorageKey()).isEqualTo("submissions/88/module-103/audio.mp3");
+		assertThat(answer.audioMimeType()).isEqualTo("audio/mpeg");
+		assertThat(answer.audioUploadStatus()).isEqualTo(UploadStatus.READY);
+		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
+		verify(storageService).objectExists("submissions/88/module-103/audio.mp3");
+		verify(storageService, never()).objectExists("submissions/88/module-103/audio.wav");
+	}
+
+	@Test
+	void submitModule_marksRecordingUploadingWhenNoAudioExists() {
+		ownedInProgressModule(103L, 88L, 12L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(answerRepository.bulkCreate(eq(103L), anyList())).thenAnswer(savedAnswers(1102L));
+
+		AnswerResult answer = submissionService.submitModule(103L, List.of()).answers().get(0);
+
+		assertThat(answer.audioStorageKey()).isNull();
+		assertThat(answer.audioMimeType()).isNull();
+		assertThat(answer.audioUploadStatus()).isEqualTo(UploadStatus.UPLOADING);
+		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
+		verify(storageService).objectExists("submissions/88/module-103/audio.mp3");
+		verify(storageService).objectExists("submissions/88/module-103/audio.wav");
 	}
 
 	@Test
@@ -1383,6 +1488,27 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+	}
+
+	private org.mockito.stubbing.Answer<List<Answer>> savedAnswers(long firstId) {
+		AtomicLong counter = new AtomicLong(firstId);
+		return invocation -> {
+			List<Answer> incoming = invocation.getArgument(1);
+			return incoming.stream().map(answer -> {
+				Answer saved = new Answer(
+						answer.getSubmissionModuleId(),
+						answer.getQuestionId(),
+						answer.getContent(),
+						answer.getAudioStorageKey(),
+						answer.getAudioMimeType(),
+						answer.getAudioUploadStatus(),
+						answer.getDocStorageKey(),
+						answer.getDocMimeType(),
+						answer.getDocUploadStatus());
+				saved.setId(counter.getAndIncrement());
+				return saved;
+			}).toList();
+		};
 	}
 
 	private SubmissionModule ownedInProgressModule(long moduleId, long submissionId, long assignmentModuleId) {

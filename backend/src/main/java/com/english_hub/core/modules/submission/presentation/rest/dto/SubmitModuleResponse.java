@@ -21,10 +21,28 @@ public record SubmitModuleResponse(
 				result.answers().stream().map(AnswerResponse::from).toList());
 	}
 
-	public record AnswerResponse(Long id, Long questionId, JsonNode content) {
+	public record AnswerResponse(
+			Long id,
+			Long questionId,
+			JsonNode content,
+			String docStorageKey,
+			String docMimeType,
+			String docUploadStatus,
+			String audioStorageKey,
+			String audioMimeType,
+			String audioUploadStatus) {
 
 		public static AnswerResponse from(AnswerResult result) {
-			return new AnswerResponse(result.id(), result.questionId(), result.content());
+			return new AnswerResponse(
+					result.id(),
+					result.questionId(),
+					result.content(),
+					result.docStorageKey(),
+					result.docMimeType(),
+					result.docUploadStatus() == null ? null : result.docUploadStatus().name(),
+					result.audioStorageKey(),
+					result.audioMimeType(),
+					result.audioUploadStatus() == null ? null : result.audioUploadStatus().name());
 		}
 	}
 }

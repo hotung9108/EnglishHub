@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 6 + Phase 7a + Phase 7b Testing Instructions
+# Submissions/Answers API — Phase 1 + 2 + 3 + 4 + 5 + 6 + 7a + 7b + 8 Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -29,7 +29,7 @@ Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.persistence.SubmissionPersistenceIntegrationTest'
 # -> 7 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 276 tests (unit + integration), all green
+./gradlew test   # full suite: 286 tests (unit + integration), all green
 ```
 
 ## What the 7 Phase-1 tests cover
@@ -58,7 +58,7 @@ cd backend
                --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
                --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
 # -> Phase 2 + Phase 3 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 276 tests (unit + integration), all green
+./gradlew test   # full suite: 286 tests (unit + integration), all green
 ```
 
 Smoke test (needs a running app with a seeded/local DB and a student bearer token):
@@ -166,8 +166,8 @@ Request body (Quiz = MULTIPLE_CHOICE questions, Short Answer = SHORT_ANSWER ques
                { "questionId": 22, "content": { "text": "The answer is..." } } ] }
 ```
 
-Flow routing: **QUIZ** and **REWRITE** task types use the answers-array flow. **ESSAY/RECORDING**
-currently return 400 `Loại phần làm bài này chưa được hỗ trợ.` — their R2 submit lands in Phase 8.
+Flow routing: **QUIZ** and **REWRITE** task types use the answers-array flow.
+**ESSAY/RECORDING** use the file flow described in Phase 8 below.
 
 Implementation notes:
 - New domain `Answer` (submissionModuleId, questionId, content-as-JSON-string) + `AnswerRepository`
@@ -193,7 +193,7 @@ curl -s -X POST http://localhost:8080/api/v1/submission-modules/{submissionModul
 # missing or malformed answers -> 400 "Nội dung câu trả lời không hợp lệ."
 # questionId not in the module -> 404 "Không tìm thấy phần làm bài hoặc câu hỏi."
 # another student / teacher -> 403 "Bạn không có quyền thực hiện thao tác này."
-# essay module stub -> 400 "Loại phần làm bài này chưa được hỗ trợ."
+# essay / recording module -> Phase-8 file flow (empty body {}); storage disabled -> 500 "Lưu trữ chưa được cấu hình."
 ```
 
 ### What the Phase-4 tests cover (+14 service + 1 controller + 9 API integration)
@@ -214,7 +214,7 @@ curl -s -X POST http://localhost:8080/api/v1/submission-modules/{submissionModul
 | 400 | `Phần làm bài này đã được nộp.` (module already submitted / status ≠ IN_PROGRESS) |
 | 400 | `Nội dung câu trả lời không hợp lệ.` (missing/empty answers, null questionId/content, duplicate, wrong shape) |
 | 404 | `Không tìm thấy phần làm bài hoặc câu hỏi.` (module, submission, or question not found) |
-| 400 | `Loại phần làm bài này chưa được hỗ trợ.` (ESSAY/RECORDING until Phase 8) |
+| 400 | `Loại phần làm bài này chưa được hỗ trợ.` (task type outside QUIZ/REWRITE/ESSAY/RECORDING) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#43 non-student / not the owner) |
 
 ## Scope (Phase 5) — API #40 final submit of an entire submission
@@ -265,8 +265,9 @@ curl -s -X POST http://localhost:8080/api/v1/submissions/{submissionId}/submit \
 Reads one module of an attempt: skill/taskType/status, its `grading` detail, its `questions`
 (prompt + type + score + orderIndex), and its `answers`. **`correctAnswer` is revealed per question
 only when `submission_module.status = GRADED`; otherwise it is null/absent.** For Essay/Speaking
-modules `questions` and `answers` are empty arrays (the file-metadata answer shape from V4 lands with
-the Phase 8 upload feature).
+modules `questions` stays empty and `answers` surfaces the file-metadata shape `{ id, questionId: null,
+content: null, docStorageKey, docMimeType, docUploadStatus }` (or the `audio*` equivalent) once the
+module is submitted via #43 — see Phase 8.
 
 Visibility (same rule as #38, reuse `verifyReadAccess`): STUDENT sees only their own module (else 403),
 TEACHER only classes they teach (else 403), ADMIN any, other roles 403. Unknown module id or a module
@@ -341,7 +342,7 @@ NeonDB Storage, MinIO, AWS S3 — switching provider requires **only** changing 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.storage.*'
 # -> 4 tests, BUILD SUCCESSFUL (minio image: quay.io/minio/minio:latest, pulled automatically)
-./gradlew test   # full suite: 276 tests, all green
+./gradlew test   # full suite: 286 tests, all green
 ```
 
 ### What the 4 Phase-7a tests cover
@@ -451,22 +452,102 @@ curl -s -T essay.pdf "<uploadUrl>"
 | 400 | `Định dạng file không được hỗ trợ.` (#46/#47 unsupported MIME) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#46/#47 non-student / not the owner) |
 
+## Scope (Phase 8) — API #43 submit for Writing/Speaking (ESSAY / RECORDING)
+The same `POST /api/v1/submission-modules/{submissionModuleId}/submit` now handles **ESSAY** and
+**RECORDING** modules. The client uploads the file via **#46/#47**, then calls #43 with an **empty body
+`{}`** — the server ignores `payload.answers` and inspects storage itself.
+
+- **ESSAY** → probes (in order) `submissions/{submissionId}/module-{smId}/essay.pdf` then `essay.docx`
+  via `StorageService.objectExists`.
+- **RECORDING** → probes `audio.webm`, then `audio.mp3`, then `audio.wav`.
+- First hit wins: creates **one** `answers` row with `question_id` null, `content` null,
+  `doc_storage_key`/`doc_mime_type`/`doc_upload_status = READY` (or the `audio_*` columns) and flips
+  `submission_modules.status → SUBMITTED`.
+- No hit → the same row is created with `upload_status = UPLOADING` and a **null** storage key (file in
+  flight / not uploaded). This means **calling submit without #46/#47 still succeeds** (UPLOADING), it
+  does not block.
+- Response `200`:
+  ```json
+  { "message": "Đã nộp phần làm bài.", "submissionModuleId": 151, "status": "SUBMITTED",
+    "answers": [ { "id": 341, "questionId": null, "content": null,
+                   "docStorageKey": "submissions/88/module-151/essay.pdf",
+                   "docMimeType": "application/pdf", "docUploadStatus": "READY",
+                   "audioStorageKey": null, "audioMimeType": null, "audioUploadStatus": null } ] }
+  ```
+- `#42` module detail now returns the same file-metadata inside `answers` for submitted Essay/Speaking
+  modules.
+- `REWRITE` is **unchanged** (short-answer path) — note: `#47` still allows a REWRITE doc upload, which
+  is currently a non-functional asymmetry (PM follow-up logged in Next).
+- `audio_file_size_bytes` / `doc_file_size_bytes` / `audio_duration_seconds` stay `null` (no size HEAD);
+  an `UPLOADING` answer never auto-flips to `READY` (no background job, V4 semantics).
+
+Smoke tests (running app with storage enabled + seeded SPEAKING/RECORDING + WRITING/ESSAY modules,
+student bearer token; storage keys use the app's bucket):
+```bash
+# 1) upload an audio file, then submit that RECORDING module with an empty body
+curl -s -X POST http://localhost:8080/api/v1/submission-modules/{smId}/audio-upload-url \
+  -H "Authorization: Bearer <studentAccessToken>" -H "Content-Type: application/json" \
+  -d '{"mimeType":"audio/webm"}'                 # -> { uploadUrl, storageKey, expiresAt }
+curl -s -T sample.webm "<uploadUrl>" -H "Content-Type: audio/webm"
+curl -s -X POST http://localhost:8080/api/v1/submission-modules/{smId}/submit \
+  -H "Authorization: Bearer <studentAccessToken>" -H "Content-Type: application/json" -d '{}'
+# -> 200 {"answers":[{"id":...,"questionId":null,"content":null,"audioStorageKey":"submissions/.../audio.webm",
+#        "audioMimeType":"audio/webm","audioUploadStatus":"READY", ...}]}
+
+# 2) submit an ESSAY module WITHOUT uploading anything first
+#    -> 200, but docUploadStatus "UPLOADING" and docStorageKey null (submit is NOT blocked)
+
+# resubmitting the same module -> 400 "Phần làm bài này đã được nộp."
+```
+
+- **Live smoke #43 essay/recording against **real Neon Storage** is DONE** (2026-09-24, right after the full
+  suite went green): bootRun `dev,seed` on :8080, assignment 3 force-opened (was past window), student
+  `vo.bao.quynh@gmail.com` started submission 218. Essay (sm 871): presigned document PUT (`application/pdf`)
+  → 200 → `submit {}` → `docStorageKey submissions/218/module-871/essay.pdf`, `docMimeType application/pdf`,
+  `docUploadStatus READY`, `questionId/content null`. Recording (sm 872): presigned audio PUT (`audio/webm`)
+  → 200 → `submit {}` → `audioStorageKey .../audio.webm`, `audioMimeType audio/webm`, `audioUploadStatus
+  READY`. No-upload case (attempt 2, sm 875): `submit {}` → `docUploadStatus UPLOADING`, `docStorageKey null`
+  (submission not blocked, as designed). Resubmit sm 871 → 400 `Phần làm bài này đã được nộp.`. #42 detail
+  for sm 871 echoes the file metadata. Smoke objects deleted afterwards (bucket empty; boto3 against the same
+  endpoint).
+
+### What the Phase-8 tests cover (+6 service + 0 controller + 5 MinIO API integration, 1 integration converted)
+- `SubmissionServiceTest` (+6, Mockito + mocked `StorageService.objectExists`): essay READY with
+  `essay.pdf` (probes pdf first, never probes docx), probes `essay.docx` when pdf missing, essay
+  `UPLOADING` when nothing exists (both probes called, null key), recording READY with `audio.webm`,
+  probes `audio.mp3` when webm missing, recording `UPLOADING` (all three probes). Each asserts the answer
+  row is created with `questionId` null + `content` null and the module flips to `SUBMITTED`.
+- `SubmissionUploadUrlApiIntegrationTest` (+5, Postgres + MinIO e2e): essay READY after a real presigned
+  PUT → #43 (key + `application/pdf` + READY, null questionId/content), essay UPLOADING when nothing
+  uploaded, recording READY after real PUT (`audio/webm`), recording UPLOADING when nothing uploaded,
+  `#42` module detail echoes the essay metadata after submit.
+- `SubmissionApiIntegrationTest` (1 converted, no MinIO/config): essay submit without storage configured
+  → `500 "Lưu trữ chưa được cấu hình."` (documents the storage dependency of the file flow).
+- Previous "essay stub → 400" tests were removed/replaced (essay is now supported).
+
+### Error contract (Phase 8 additions)
+| Code | Message |
+|---|---|
+| 500 | `Lưu trữ chưa được cấu hình.` (essay/recording submit when `app.storage.s3.enabled=false`) |
+| (unchanged) | #43 guards for QUIZ/REWRITE remain; `Loại phần làm bài này chưa được hỗ trợ.` now only for task types outside QUIZ/REWRITE/ESSAY/RECORDING |
+
 ## Next (for whoever picks up the next feature)
-- Auto-grading of Quiz answers on submit (read `is_correct` snake_case from `correct_answer`, promote
-  graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question scores, exact-set
-  multiple-choice + trimmed short-answer matching, unanswered → 0).
-- **Phase 8** — extend `#43` for Writing/Speaking (`objectExists` on the storage key →
-  `doc/audio_upload_status READY|UPLOADING` + storage key on the `answers` row), which then also fills
-  the Essay/Speaking `answers` file metadata in #42.
 - **Presigned GET serving (approved follow-up, bucket stays private)** — extend the `StorageService`
   port with `generatePresignedGetUrl(storageKey, ttl)` (e.g. 15 min, matching PUTs) and implement it in
   `S3StorageService` via `S3Presigner.presignGetObject`. Expose a secured endpoint (student-owner /
   teacher) so the FE can render `<audio>` / download essays — this is how reviewers read the submitted
   files on a private bucket (no `public_read` needed). Log it on the task board ahead of the
   grading/review screens.
+- **Resolve the REWRITE doc-upload asymmetry (PM decision needed)** — `#47` grants a
+  `document-upload-url` for `REWRITE` modules, but `#43` routes REWRITE to the short-answer path, so a
+  REWRITE document is never persisted/checked. Either keep REWRITE short-answers and narrow `#47` to
+  `ESSAY` only, or let REWRITE submit accept an optional attached document.
+- Auto-grading of Quiz answers on submit (read `is_correct` snake_case from `correct_answer`, promote
+  graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question scores, exact-set
+  multiple-choice + trimmed short-answer matching, unanswered → 0).
 - **Live smoke of #46/#47 against the real provider is DONE** (2026-09-24): with `dev,seed` + a
   force-opened assignment, student `vo.bao.quynh@gmail.com` uploaded an mp3 and a pdf straight to the
   `english-hub-dev` bucket via the presigned URLs (200s). Gotcha: the presign signs `content-type`, so
   the direct PUT must send the exact MIME from the URL call — curl's default
   `application/x-www-form-urlencoded` returns `403 SignatureDoesNotMatch`. Smoke objects were
-  subsequently cleaned up (bucket now empty).
+  subsequently cleaned up (bucket now empty). Phase 8's submit reuses the same probe mechanism.

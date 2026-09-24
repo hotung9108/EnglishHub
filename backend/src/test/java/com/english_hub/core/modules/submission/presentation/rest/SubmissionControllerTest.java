@@ -181,7 +181,7 @@ class SubmissionControllerTest {
 				"Đã nộp phần làm bài.",
 				150L,
 				SubmissionStatus.SUBMITTED,
-				List.of(new AnswerResult(340L, 21L, content)));
+				List.of(new AnswerResult(340L, 21L, content, null, null, null, null, null, null)));
 		when(submissionService.submitModule(eq(150L), anyList())).thenReturn(result);
 
 		ResponseEntity<SubmitModuleResponse> response = submissionController.submitModule(
@@ -229,7 +229,7 @@ class SubmissionControllerTest {
 						BigDecimal.valueOf(8), BigDecimal.TEN, null, null),
 				List.of(new QuestionDetailResult(21L, "Which word best describes...?",
 						QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1, correctAnswer)),
-				List.of(new AnswerResult(340L, 21L, answerContent)));
+				List.of(new AnswerResult(340L, 21L, answerContent, null, null, null, null, null, null)));
 		when(submissionService.getModuleDetail(150L)).thenReturn(result);
 
 		ResponseEntity<SubmissionModuleDetailResponse> response = submissionController.getSubmissionModuleDetail(150L);
