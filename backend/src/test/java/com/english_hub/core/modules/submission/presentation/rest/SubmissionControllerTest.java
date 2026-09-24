@@ -1,7 +1,6 @@
 package com.english_hub.core.modules.submission.presentation.rest;
 
 import com.english_hub.core.modules.submission.application.service.SubmissionService;
-import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingSummaryResult;
@@ -13,6 +12,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
 import com.english_hub.core.modules.submission.domain.model.GradingMethod;
 import com.english_hub.core.modules.submission.domain.model.GradingStatus;
 import com.english_hub.core.modules.submission.domain.model.ModuleSkill;
@@ -23,6 +23,7 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionD
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -189,5 +190,20 @@ class SubmissionControllerTest {
 		assertThat(body.answers().getFirst().id()).isEqualTo(340L);
 		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
 		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+	}
+
+	@Test
+	void mapsTheSubmitResultToAnOkResponse() {
+		OffsetDateTime submittedAt = OffsetDateTime.parse("2026-09-22T09:00:00+07:00");
+		SubmitResult result = new SubmitResult("Nộp bài thành công.", SubmissionStatus.SUBMITTED, submittedAt);
+		when(submissionService.submit(88L)).thenReturn(result);
+
+		ResponseEntity<SubmitResponse> response = submissionController.submit(88L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		SubmitResponse body = response.getBody();
+		assertThat(body.message()).isEqualTo("Nộp bài thành công.");
+		assertThat(body.status()).isEqualTo("SUBMITTED");
+		assertThat(body.submittedAt()).isEqualTo(submittedAt);
 	}
 }

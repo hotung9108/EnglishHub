@@ -13,6 +13,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionStartResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitModuleResult;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmitResult;
 import com.english_hub.core.modules.submission.domain.model.Answer;
 import com.english_hub.core.modules.submission.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.submission.domain.model.AssignmentWindow;
@@ -631,7 +632,7 @@ class SubmissionServiceTest {
 
 		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
 		assertThat(result.answers()).hasSize(1);
-		assertThat(result.answers().get(0).content().path("text").asText()).isEqualTo("The answer is...");
+		assertThat(result.answers().get(0).content().path("text").asString()).isEqualTo("The answer is...");
 	}
 
 	@Test
@@ -843,6 +844,123 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.submitModule(102L, List.of()))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Loại phần làm bài này chưa được hỗ trợ.");
+	}
+
+	@Test
+	void submitLocksTheSubmissionAndFlipsInProgressModules() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		SubmissionModule essayModule = module(10L);
+		essayModule.setId(151L);
+		essayModule.setStatus(SubmissionStatus.SUBMITTED);
+		when(submissionModuleRepository.findBySubmissionId(88L))
+				.thenReturn(List.of(quizModule, essayModule));
+
+		SubmitResult result = submissionService.submit(88L);
+
+		assertThat(result.message()).isEqualTo("Nộp bài thành công.");
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.submittedAt()).isNotNull();
+
+		ArgumentCaptor<Submission> submissionCaptor = ArgumentCaptor.forClass(Submission.class);
+		verify(submissionRepository).save(submissionCaptor.capture());
+		Submission savedSubmission = submissionCaptor.getValue();
+		assertThat(savedSubmission.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(savedSubmission.getSubmittedAt()).isNotNull();
+
+		ArgumentCaptor<SubmissionModule> moduleCaptor = ArgumentCaptor.forClass(SubmissionModule.class);
+		verify(submissionModuleRepository).save(moduleCaptor.capture());
+		SubmissionModule savedModule = moduleCaptor.getValue();
+		assertThat(savedModule.getId()).isEqualTo(150L);
+		assertThat(savedModule.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		verify(submissionModuleRepository, never()).save(argThat(other -> other.getId() == 151L));
+
+		verify(gradingRepository, never()).save(any());
+		verify(gradingRepository, never()).bulkCreate(anyList());
+	}
+
+	@Test
+	void submitWithNoModulesStillLocksTheSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(submissionModuleRepository.findBySubmissionId(88L)).thenReturn(List.of());
+
+		SubmitResult result = submissionService.submit(88L);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		ArgumentCaptor<Submission> captor = ArgumentCaptor.forClass(Submission.class);
+		verify(submissionRepository).save(captor.capture());
+		assertThat(captor.getValue().getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		verify(submissionModuleRepository, never()).save(any());
+	}
+
+	@Test
+	void submitRejectsANonStudentCaller() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+
+		assertThatThrownBy(() -> submissionService.submit(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		verify(submissionRepository, never()).findById(org.mockito.ArgumentMatchers.anyLong());
+	}
+
+	@Test
+	void submitReturnsNotFoundForUnknownSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionRepository.findById(200L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.submit(200L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lượt làm bài.");
+		verify(submissionRepository, never()).save(any());
+	}
+
+	@Test
+	void submitRejectsAnotherStudentsSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.submit(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		verify(submissionRepository, never()).save(any());
+	}
+
+	@Test
+	void submitRejectsAnAlreadySubmittedSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submitted = submission(5L, 41L, 1);
+		submitted.setId(88L);
+		submitted.setStatus(SubmissionStatus.SUBMITTED);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submitted));
+
+		assertThatThrownBy(() -> submissionService.submit(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bài làm này đã được nộp.");
+		verify(submissionRepository, never()).save(any());
+	}
+
+	@Test
+	void submitRejectsAnAlreadyGradedSubmission() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission graded = submission(5L, 41L, 1);
+		graded.setId(88L);
+		graded.setStatus(SubmissionStatus.GRADED);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(graded));
+
+		assertThatThrownBy(() -> submissionService.submit(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bài làm này đã được nộp.");
+		verify(submissionRepository, never()).save(any());
 	}
 
 	private ModuleInfo moduleInfo(Long moduleId, ModuleTaskType taskType) {

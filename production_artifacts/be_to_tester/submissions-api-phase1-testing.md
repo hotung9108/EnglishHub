@@ -1,4 +1,4 @@
-# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 Testing Instructions
+# Submissions/Answers API — Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 Testing Instructions
 
 Delivered by @be-secondary for @tester. Branch: `feat/submissions-answers-api`.
 
@@ -29,7 +29,7 @@ Tests use **Testcontainers** (`postgres:16-alpine`) — Docker must be running; 
 cd backend
 ./gradlew test --tests 'com.english_hub.core.modules.submission.infrastructure.persistence.SubmissionPersistenceIntegrationTest'
 # -> 7 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 214 tests (unit + integration), all green
+./gradlew test   # full suite: 229 tests (unit + integration), all green
 ```
 
 ## What the 7 Phase-1 tests cover
@@ -58,7 +58,7 @@ cd backend
                --tests 'com.english_hub.core.modules.submission.presentation.rest.SubmissionControllerTest' \
                --tests 'com.english_hub.core.modules.submission.integration.SubmissionApiIntegrationTest'
 # -> Phase 2 + Phase 3 tests, BUILD SUCCESSFUL
-./gradlew test   # full suite: 214 tests (unit + integration), all green
+./gradlew test   # full suite: 229 tests (unit + integration), all green
 ```
 
 Smoke test (needs a running app with a seeded/local DB and a student bearer token):
@@ -217,8 +217,53 @@ curl -s -X POST http://localhost:8080/api/v1/submission-modules/{submissionModul
 | 400 | `Loại phần làm bài này chưa được hỗ trợ.` (ESSAY/RECORDING until Phase 8) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#43 non-student / not the owner) |
 
-## Next (for whoever picks up Phase 5)
-- #40 `POST /submissions/{id}/submit` (final submit + auto-grading for Quiz), #42
-  `GET /submission-modules/{id}` (detail incl. questions + answers + grading, reuse the Phase 4
+## Scope (Phase 5) — API #40 final submit of an entire submission
+`POST /api/v1/submissions/{submissionId}/submit` (role = STUDENT, no body), V4 chapter 6 spec.
+Locks the whole attempt: sets `submissions.status → SUBMITTED` + `submitted_at = now()`, and flips every
+`submission_modules.status` still `IN_PROGRESS → SUBMITTED`. Modules already individually submitted via
+#43 are left as-is (their answers persist). This phase implements the **submission mechanics only** —
+auto-grading / scoring / answer-content augmentation is deliberately **out of scope** (separate feature):
+grading rows stay `PENDING` with `final_score` null and the submission stays `SUBMITTED`.
+
+Guard order: role = STUDENT (403) → submission exists (404) → owner (403) → status = `IN_PROGRESS`
+(400 if not). Response:
+`200 { "message": "Nộp bài thành công.", "status": "SUBMITTED", "submittedAt": "<ISO-8601 offset>" }`
+
+Smoke tests (running app, seeded DB, student bearer token):
+```bash
+# success — a student submits their own attempt (nothing else required)
+curl -s -X POST http://localhost:8080/api/v1/submissions/{submissionId}/submit \
+  -H "Authorization: Bearer <studentAccessToken>"
+# -> 200 {"message":"Nộp bài thành công.","status":"SUBMITTED","submittedAt":"..."}
+
+# already submitted / not IN_PROGRESS -> 400 "Bài làm này đã được nộp."
+# unknown submission -> 404 "Không tìm thấy lượt làm bài."
+# another student / teacher -> 403 "Bạn không có quyền thực hiện thao tác này."
+```
+
+### What the Phase-5 tests cover (+7 service + 1 controller + 7 API integration)
+- `SubmissionServiceTest` (+7, Mockito): happy path (submission → `SUBMITTED` with `submittedAt`, all
+  `IN_PROGRESS` modules flipped, already-`SUBMITTED` module untouched, **no grading rows written**
+  `verify(gradingRepository, never()).save/bulkCreate`), no-modules attempt still locks, non-student 403,
+  unknown 404, another student 403, already-`SUBMITTED` 400, already-`GRADED` 400.
+- `SubmissionControllerTest` (+1): 200 mapping (message, status, submittedAt).
+- `SubmissionApiIntegrationTest` (+7, Testcontainers + MockMvc + real JWT): direct #40 on a mixed
+  quiz+essay attempt (submission + both modules `SUBMITTED`, `submittedAt` set, gradings `PENDING` with
+  `finalScore` null in DB), quiz module submitted earlier via #43 keeps its answers while the essay module
+  is force-flipped, essay-only assignment (grading stays `PENDING`), resubmit 400, foreign student 403,
+  teacher 403, unknown submission 404.
+
+### Error contract (Phase 5 additions)
+| Code | Message |
+|---|---|
+| 400 | `Bài làm này đã được nộp.` (#40, submission status ≠ IN_PROGRESS) |
+| 404 | `Không tìm thấy lượt làm bài.` (#40, unknown submission) |
+| 403 | `Bạn không có quyền thực hiện thao tác này.` (#40 non-student / not the owner) |
+
+## Next (for whoever picks up the next feature)
+- Auto-grading of Quiz answers on submit (per Phase-5 decisions: read `is_correct` snake_case from
+  `correct_answer`, promote graded modules/submission to `GRADED`, `max_score_snapshot` = sum of question
+  scores, exact-set multiple-choice + trimmed short-answer matching, unanswered → 0).
+- #42 `GET /submission-modules/{id}` (detail incl. questions + answers + grading, reuse the Phase 4
   answer/question reads), #46/#47 presigned-upload URLs, #43 Writing/Speaking (R2 flow replaces the
   Phase 4 essay/recording 400 stub).

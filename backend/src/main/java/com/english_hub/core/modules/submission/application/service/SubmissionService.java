@@ -65,6 +65,8 @@ public class SubmissionService {
 	private static final String MODULE_OR_QUESTION_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài hoặc câu hỏi.";
 	private static final String UNSUPPORTED_MODULE_MESSAGE = "Loại phần làm bài này chưa được hỗ trợ.";
 	private static final String SUBMITTED_MESSAGE = "Đã nộp phần làm bài.";
+	private static final String ALREADY_FINISHED_MESSAGE = "Bài làm này đã được nộp.";
+	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -245,6 +247,35 @@ public class SubmissionService {
 				submissionModuleId,
 				SubmissionStatus.SUBMITTED,
 				answerResults);
+	}
+
+	@Transactional
+	public SubmitResult submit(long submissionId) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		Submission submission = submissionRepository.findById(submissionId)
+				.orElseThrow(() -> ApiException.notFound(SUBMISSION_NOT_FOUND_MESSAGE));
+		if (!submission.getStudentId().equals(caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
+		OffsetDateTime submittedAt = OffsetDateTime.now();
+		submission.setStatus(SubmissionStatus.SUBMITTED);
+		submission.setSubmittedAt(submittedAt);
+		submissionRepository.save(submission);
+
+		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
+		for (SubmissionModule submissionModule : submissionModules) {
+			if (submissionModule.getStatus() == SubmissionStatus.IN_PROGRESS) {
+				submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+				submissionModuleRepository.save(submissionModule);
+			}
+		}
+		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
 	}
 
 	private List<AnswerPayload> validatedAnswerPayloads(
@@ -547,5 +578,8 @@ public class SubmissionService {
 	}
 
 	public record AnswerPayload(Long questionId, JsonNode content) {
+	}
+
+	public record SubmitResult(String message, SubmissionStatus status, OffsetDateTime submittedAt) {
 	}
 }

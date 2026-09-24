@@ -7,6 +7,7 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionD
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
 
 import java.util.List;
 
@@ -61,5 +62,10 @@ public class SubmissionController {
 						.map(answer -> new AnswerPayload(answer.questionId(), answer.content()))
 						.toList();
 		return ResponseEntity.ok(SubmitModuleResponse.from(submissionService.submitModule(id, payloads)));
+	}
+
+	@PostMapping("/submissions/{id}/submit")
+	public ResponseEntity<SubmitResponse> submit(@PathVariable long id) {
+		return ResponseEntity.ok(SubmitResponse.from(submissionService.submit(id)));
 	}
 }

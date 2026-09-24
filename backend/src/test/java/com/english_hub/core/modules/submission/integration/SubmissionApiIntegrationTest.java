@@ -715,8 +715,135 @@ class SubmissionApiIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{}")
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error").value("Loại phần làm bài này chưa được hỗ trợ."));
+	}
+
+	@Test
+	void submitOfficialLocksTheSubmissionAndFlipsAllModulesToSubmitted() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Nộp bài thành công."))
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.submittedAt").exists());
+
+		Submission submission = submissionRepository.findById(submissionId).orElseThrow();
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(submission.getSubmittedAt()).isNotNull();
+
+		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
+		assertThat(submissionModules).hasSize(2);
+		assertThat(submissionModules).extracting(SubmissionModule::getStatus)
+				.containsOnly(SubmissionStatus.SUBMITTED);
+
+		List<Grading> gradings = gradingRepository.findBySubmissionModuleIds(
+				submissionModules.stream().map(SubmissionModule::getId).toList());
+		assertThat(gradings).hasSize(2);
+		assertThat(gradings).extracting(Grading::getStatus).containsOnly(GradingStatus.PENDING);
+		assertThat(gradings).allSatisfy(grading -> assertThat(grading.getFinalScore()).isNull());
+	}
+
+	@Test
+	void submitOfficialKeepsAlreadySubmittedModulesAndTheirAnswers() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long quizSubmissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}},"
+				+ "{\"questionId\":" + quizQuestionTwo + ",\"content\":{\"selectedOptionIds\":[3]}}"
+				+ "]}";
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", quizSubmissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		assertThat(answerRepository.findBySubmissionModuleId(quizSubmissionModuleId)).hasSize(2);
+		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
+		assertThat(submissionModules).extracting(SubmissionModule::getStatus)
+				.containsOnly(SubmissionStatus.SUBMITTED);
+		List<Grading> gradings = gradingRepository.findBySubmissionModuleIds(
+				submissionModules.stream().map(SubmissionModule::getId).toList());
+		assertThat(gradings).extracting(Grading::getStatus).containsOnly(GradingStatus.PENDING);
+		assertThat(gradings).allSatisfy(grading -> assertThat(grading.getFinalScore()).isNull());
+	}
+
+	@Test
+	void submitOfficialOnAnEssayOnlyAssignmentKeepsGradingPending() throws Exception {
+		long essayAssignmentId = assignment(classId,
+				AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1),
+				OffsetDateTime.now().plusHours(48),
+				2,
+				false);
+		module(essayAssignmentId, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1);
+		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", essayAssignmentId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long submissionId = jsonLong(response, "id");
+		long essaySubmissionModuleId = submissionModuleRepository.findBySubmissionId(submissionId).getFirst().getId();
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		assertThat(submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+		Grading grading =
+				gradingRepository.findBySubmissionModuleIds(List.of(essaySubmissionModuleId)).getFirst();
+		assertThat(grading.getStatus()).isEqualTo(GradingStatus.PENDING);
+		assertThat(grading.getFinalScore()).isNull();
+	}
+
+	@Test
+	void submitOfficialRejectsResubmission() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Loại phần làm bài này chưa được hỗ trợ."));
+				.andExpect(jsonPath("$.error").value("Bài làm này đã được nộp."));
+	}
+
+	@Test
+	void submitOfficialRejectsAnotherStudentsSubmission() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentOtherId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void submitOfficialRejectsANonStudentCaller() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void submitOfficialReturnsNotFoundForUnknownSubmission() throws Exception {
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", 99999999L)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy lượt làm bài."));
 	}
 
 	private long startSubmissionAsStudentMember() throws Exception {
