@@ -1,0 +1,6 @@
+id: BE-TASK-10
+title: "Implement Student Evaluation APIs (Cluster 7, APIs #58-#62)"
+assignee: "@be-primary"
+status: "To Do"
+priority: "High"
+description: "Implement the five student evaluation endpoints in docs/api_v3_design.pdf, cluster 7 (pp. 47-51): list evaluations for a student with optional classId and pagination; create an evaluation for a student who is or was a member of the selected class; read an evaluation; update its non-empty content; and delete an evaluation. Enforce that only the teacher responsible for the class can create evaluations and only the author can edit/delete; preserve the spec's authentication, authorization, validation, not-found, and response contracts. Implement through the backend's DDD/JPA layers, add unit/integration coverage for membership, ownership, pagination, and validation, update relevant docs, and provide tester handoff instructions in production_artifacts/be_to_tester/."
