@@ -1,6 +1,7 @@
 package com.english_hub.core.infrastructure.persistence.repository;
 
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
+import java.util.List;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.List;

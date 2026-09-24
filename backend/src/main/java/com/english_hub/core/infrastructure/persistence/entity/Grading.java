@@ -1,5 +1,7 @@
 package com.english_hub.core.infrastructure.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
@@ -17,11 +19,12 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import tools.jackson.databind.JsonNode;
+import lombok.Setter;
 
 @Entity
 @Table(name = "gradings")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Grading {
 
@@ -63,6 +66,11 @@ public class Grading {
 	@Column(name = "graded_at")
 	private OffsetDateTime gradedAt;
 
+	/*
+	 * Hibernate 7.4.5's default JSON format mapper uses Jackson 2. Using
+	 * tools.jackson.databind.JsonNode here fails during JSONB persistence, so
+	 * this field intentionally uses the com.fasterxml.jackson.databind type.
+	 */
 	@JdbcTypeCode(SqlTypes.JSON)
 	@Column(name = "ai_transcript", columnDefinition = "jsonb")
 	private JsonNode aiTranscript;
@@ -81,7 +89,7 @@ public class Grading {
 			Long reviewedBy,
 			OffsetDateTime reviewedAt,
 			OffsetDateTime gradedAt,
-			JsonNode aiTranscript,
+			String aiTranscript,
 			String aiInstructionSnapshot) {
 		this.submissionModuleId = submissionModuleId;
 		this.method = method;
@@ -93,7 +101,11 @@ public class Grading {
 		this.reviewedBy = reviewedBy;
 		this.reviewedAt = reviewedAt;
 		this.gradedAt = gradedAt;
-		this.aiTranscript = aiTranscript;
+		this.aiTranscript = JsonbValueCodec.parse(aiTranscript, "ai_transcript");
 		this.aiInstructionSnapshot = aiInstructionSnapshot;
+	}
+
+	public String getAiTranscript() {
+		return JsonbValueCodec.serialize(aiTranscript);
 	}
 }
