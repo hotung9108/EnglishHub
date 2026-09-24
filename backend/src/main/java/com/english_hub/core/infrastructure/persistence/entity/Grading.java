@@ -17,7 +17,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import tools.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Entity
 @Table(name = "gradings")
@@ -95,5 +95,19 @@ public class Grading {
 		this.gradedAt = gradedAt;
 		this.aiTranscript = aiTranscript;
 		this.aiInstructionSnapshot = aiInstructionSnapshot;
+	}
+
+	public void updateTeacherGrade(
+			BigDecimal finalScore,
+			String finalFeedback,
+			Long reviewedBy,
+			OffsetDateTime reviewedAt) {
+		this.method = GradingMethod.TEACHER_MANUAL;
+		this.status = GradingStatus.COMPLETED;
+		this.finalScore = finalScore;
+		this.finalFeedback = finalFeedback;
+		this.reviewedBy = reviewedBy;
+		this.reviewedAt = reviewedAt;
+		this.gradedAt = reviewedAt;
 	}
 }

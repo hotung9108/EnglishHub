@@ -1,25 +1,33 @@
 package com.english_hub.core.infrastructure.seed;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.Function;
 
 import com.english_hub.core.infrastructure.persistence.entity.Answer;
 import com.english_hub.core.infrastructure.persistence.repository.AnswerRepository;
 import com.english_hub.core.infrastructure.persistence.entity.Assignment;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
+import com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus;
+import com.english_hub.core.infrastructure.persistence.entity.ClassMember;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.infrastructure.persistence.entity.Question;
+import com.english_hub.core.infrastructure.persistence.entity.QuestionType;
+import com.english_hub.core.infrastructure.persistence.entity.UploadStatus;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository;
 import com.english_hub.core.infrastructure.persistence.repository.QuestionRepository;
 import com.english_hub.core.infrastructure.persistence.entity.EnglishClass;
 import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRepository;
+import com.english_hub.core.infrastructure.persistence.repository.ClassMemberRepository;
 import com.english_hub.core.infrastructure.persistence.entity.AnnotationSource;
 import com.english_hub.core.infrastructure.persistence.entity.AnswerAnnotation;
 import com.english_hub.core.infrastructure.persistence.entity.Grading;
@@ -53,6 +61,8 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(GradingMockDataSeeder.class);
 	private static final long RANDOM_SEED = 42L;
+	private static final com.fasterxml.jackson.databind.ObjectMapper AI_TRANSCRIPT_OBJECT_MAPPER =
+			new com.fasterxml.jackson.databind.ObjectMapper();
 
 	private static final String[] WRITING_AI_FEEDBACK = {
 			"Your response addresses the topic clearly. Review the highlighted grammar points before revising it.",
@@ -91,6 +101,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 	private final QuestionRepository questionRepository;
 	private final AnswerRepository answerRepository;
 	private final EnglishClassRepository englishClassRepository;
+	private final ClassMemberRepository classMemberRepository;
 	private final GradingRepository gradingRepository;
 	private final AnswerAnnotationRepository answerAnnotationRepository;
 	private final ObjectMapper objectMapper;
@@ -104,6 +115,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 			QuestionRepository questionRepository,
 			AnswerRepository answerRepository,
 			EnglishClassRepository englishClassRepository,
+			ClassMemberRepository classMemberRepository,
 			GradingRepository gradingRepository,
 			AnswerAnnotationRepository answerAnnotationRepository,
 			ObjectMapper objectMapper) {
@@ -115,6 +127,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 		this.questionRepository = questionRepository;
 		this.answerRepository = answerRepository;
 		this.englishClassRepository = englishClassRepository;
+		this.classMemberRepository = classMemberRepository;
 		this.gradingRepository = gradingRepository;
 		this.answerAnnotationRepository = answerAnnotationRepository;
 		this.objectMapper = objectMapper;
@@ -137,6 +150,8 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 				Sort.by(Sort.Direction.ASC, "id"));
 		List<EnglishClass> classes = englishClassRepository.findAll(
 				Sort.by(Sort.Direction.ASC, "id"));
+		List<ClassMember> classMembers = classMemberRepository.findAll(
+				Sort.by(Sort.Direction.ASC, "classId", "studentId"));
 
 		validateDependencies(submissionModules, submissions, modules, assignments, questions, answers, classes);
 		Map<Long, Submission> submissionById = indexBy(submissions, Submission::getId);
@@ -223,8 +238,22 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 		List<AnswerAnnotation> savedAnnotations = answerAnnotationRepository.saveAll(annotations);
 		answerAnnotationRepository.flush();
 
+		PendingFixtureData pendingFixture = createPendingWritingAndSpeakingFixture(
+				assignments,
+				modules,
+				questions,
+				classById,
+				classMembers,
+				submissions);
+		List<Grading> savedPendingGradings = gradingRepository.saveAll(pendingFixture.gradings());
+		gradingRepository.flush();
+		List<Grading> allGradings = new ArrayList<>(savedGradings);
+		allGradings.addAll(savedPendingGradings);
+		List<GradingSeedData> allSeedData = new ArrayList<>(seedData);
+		allSeedData.addAll(pendingFixture.seedData());
+
 		assertPersistedData();
-		logSeedResult(savedGradings, savedAnnotations, seedData);
+		logSeedResult(allGradings, savedAnnotations, allSeedData);
 	}
 
 	private void validateDependencies(
@@ -243,6 +272,272 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 		}
 		if (questions.isEmpty() || answers.isEmpty()) {
 			throw new IllegalStateException("Task 6 requires questions and answers from previous tasks");
+		}
+	}
+
+	private PendingFixtureData createPendingWritingAndSpeakingFixture(
+			List<Assignment> assignments,
+			List<AssignmentModule> modules,
+			List<Question> questions,
+			Map<Long, EnglishClass> classById,
+			List<ClassMember> classMembers,
+			List<Submission> submissions) {
+		Map<Long, List<AssignmentModule>> modulesByAssignmentId = groupBy(
+				modules,
+				AssignmentModule::getAssignmentId);
+		Map<Long, List<Long>> studentIdsByClassId = new LinkedHashMap<>();
+		for (ClassMember classMember : classMembers) {
+			studentIdsByClassId.computeIfAbsent(classMember.getClassId(), ignored -> new ArrayList<>())
+					.add(classMember.getStudentId());
+		}
+		Map<SubmissionOwner, Set<Integer>> existingAttempts = new LinkedHashMap<>();
+		for (Submission submission : submissions) {
+			existingAttempts.computeIfAbsent(
+					new SubmissionOwner(submission.getAssignmentId(), submission.getStudentId()),
+					ignored -> new HashSet<>())
+				.add(submission.getAttemptNumber());
+		}
+
+		PendingFixturePlan plan = null;
+		for (Assignment assignment : assignments) {
+			if (assignment.isDeleted() || assignment.getStatus() == AssignmentStatus.DRAFT) {
+				continue;
+			}
+			EnglishClass englishClass = classById.get(assignment.getClassId());
+			if (englishClass == null || englishClass.getTeacherId() == null) {
+				continue;
+			}
+			List<AssignmentModule> assignmentModules = modulesByAssignmentId.getOrDefault(
+					assignment.getId(),
+					List.of());
+			if (!containsAllSkills(assignmentModules)) {
+				continue;
+			}
+			List<Long> studentIds = studentIdsByClassId.getOrDefault(assignment.getClassId(), List.of());
+			for (Long studentId : studentIds) {
+				SubmissionOwner owner = new SubmissionOwner(assignment.getId(), studentId);
+				Set<Integer> attempts = existingAttempts.getOrDefault(owner, Set.of());
+				Integer attemptNumber = nextAvailableAttempt(assignment.getMaxSubmissions(), attempts);
+				if (attemptNumber != null) {
+					plan = new PendingFixturePlan(assignment, assignmentModules, studentId, attemptNumber);
+					break;
+				}
+			}
+			if (plan != null) {
+				break;
+			}
+		}
+		if (plan == null) {
+			throw new IllegalStateException(
+					"Could not find an enrolled student with an available attempt for a Writing/Speaking assignment");
+		}
+
+		Assignment assignment = plan.assignment();
+		OffsetDateTime submittedAt = submissionTime(assignment);
+		Submission submission = submissionRepository.saveAndFlush(new Submission(
+				assignment.getId(),
+				plan.studentId(),
+				plan.attemptNumber(),
+				submittedAt,
+				SubmissionStatus.SUBMITTED));
+
+		List<AssignmentModule> assignmentModules = plan.modules().stream()
+				.sorted((first, second) -> Integer.compare(first.getOrderIndex(), second.getOrderIndex()))
+				.toList();
+		List<SubmissionModule> submissionModules = assignmentModules.stream()
+				.map(module -> new SubmissionModule(submission.getId(), module.getId(), SubmissionStatus.SUBMITTED))
+				.toList();
+		List<SubmissionModule> savedSubmissionModules = submissionModuleRepository.saveAll(submissionModules);
+		submissionModuleRepository.flush();
+		Map<Long, SubmissionModule> submissionModuleByAssignmentModuleId = new LinkedHashMap<>();
+		for (int index = 0; index < assignmentModules.size(); index++) {
+			submissionModuleByAssignmentModuleId.put(
+					assignmentModules.get(index).getId(),
+					savedSubmissionModules.get(index));
+		}
+
+		Map<Long, List<Question>> questionsByModuleId = groupBy(questions, Question::getModuleId);
+		List<Answer> fixtureAnswers = new ArrayList<>();
+		List<Grading> fixtureGradings = new ArrayList<>(2);
+		List<GradingSeedData> fixtureSeedData = new ArrayList<>(2);
+		for (AssignmentModule module : assignmentModules) {
+			SubmissionModule submissionModule = submissionModuleByAssignmentModuleId.get(module.getId());
+			if (module.getSkill() == ModuleSkill.READING || module.getSkill() == ModuleSkill.LISTENING) {
+				List<Question> moduleQuestions = questionsByModuleId.getOrDefault(module.getId(), List.of());
+				if (moduleQuestions.isEmpty()) {
+					throw new IllegalStateException(
+							"Submitted fixture has no questions for module " + module.getId());
+				}
+				for (Question question : moduleQuestions) {
+					fixtureAnswers.add(createSubmittedQuestionAnswer(submissionModule.getId(), question));
+				}
+				continue;
+			}
+
+			Answer answer = module.getSkill() == ModuleSkill.WRITING
+					? createPendingWritingAnswer(submissionModule.getId())
+					: createPendingSpeakingAnswer(submissionModule.getId(), assignment.getId(), plan.studentId());
+			fixtureAnswers.add(answer);
+			Grading grading = new Grading(
+					submissionModule.getId(),
+					GradingMethod.AUTO,
+					GradingStatus.PENDING,
+					null,
+					null,
+					null,
+					module.getMaxScore(),
+					null,
+					null,
+					null,
+					null,
+					module.getAiInstruction());
+			fixtureGradings.add(grading);
+			fixtureSeedData.add(new GradingSeedData(
+					grading,
+					SubmissionStatus.SUBMITTED,
+					module.getSkill(),
+					answer));
+		}
+		answerRepository.saveAll(fixtureAnswers);
+		answerRepository.flush();
+		LOGGER.info(
+				"Added PENDING Writing/Speaking fixtures for assignment {}, student {}, submission {}",
+				assignment.getId(),
+				plan.studentId(),
+				submission.getId());
+		return new PendingFixtureData(fixtureGradings, fixtureSeedData);
+	}
+
+	private boolean containsAllSkills(List<AssignmentModule> modules) {
+		if (modules.size() != 4) {
+			return false;
+		}
+		Set<ModuleSkill> skills = new HashSet<>();
+		for (AssignmentModule module : modules) {
+			skills.add(module.getSkill());
+		}
+		return skills.containsAll(Set.of(
+				ModuleSkill.READING,
+				ModuleSkill.LISTENING,
+				ModuleSkill.WRITING,
+				ModuleSkill.SPEAKING));
+	}
+
+	private Integer nextAvailableAttempt(Integer maxSubmissions, Set<Integer> attempts) {
+		int limit = maxSubmissions == null ? attempts.size() + 1 : maxSubmissions;
+		for (int attempt = 1; attempt <= limit; attempt++) {
+			if (!attempts.contains(attempt)) {
+				return attempt;
+			}
+		}
+		return null;
+	}
+
+	private OffsetDateTime submissionTime(Assignment assignment) {
+		if (assignment.getOpenAt() == null
+				|| assignment.getCloseAt() == null
+				|| !assignment.getOpenAt().isBefore(assignment.getCloseAt())) {
+			throw new IllegalStateException(
+					"Pending fixture requires a valid assignment window: " + assignment.getId());
+		}
+		long seconds = Duration.between(assignment.getOpenAt(), assignment.getCloseAt()).getSeconds();
+		return assignment.getOpenAt().plusSeconds(seconds / 2);
+	}
+
+	private Answer createSubmittedQuestionAnswer(Long submissionModuleId, Question question) {
+		JsonNode correctAnswer = parseObject(question.getCorrectAnswer(), "question " + question.getId());
+		Map<String, Object> answerContent = new LinkedHashMap<>();
+		if (question.getQuestionType() == QuestionType.MULTIPLE_CHOICE) {
+			JsonNode options = correctAnswer.get("options");
+			if (options == null || !options.isArray()) {
+				throw new IllegalStateException(
+						"Multiple-choice question has no options: " + question.getId());
+			}
+			List<Integer> selectedOptionIds = new ArrayList<>();
+			for (JsonNode option : options) {
+				JsonNode isCorrect = option.get("is_correct");
+				JsonNode optionId = option.get("id");
+				if (isCorrect != null && isCorrect.isBoolean() && isCorrect.booleanValue()) {
+					if (optionId == null || !optionId.isNumber()) {
+						throw new IllegalStateException(
+								"Correct option has no numeric id: " + question.getId());
+					}
+					selectedOptionIds.add(optionId.intValue());
+				}
+			}
+			if (selectedOptionIds.isEmpty()) {
+				throw new IllegalStateException(
+						"Multiple-choice question has no correct option: " + question.getId());
+			}
+			answerContent.put("selected_option_ids", selectedOptionIds);
+		} else {
+			JsonNode correctAnswerText = correctAnswer.get("correct_answer");
+			if (correctAnswerText == null || !correctAnswerText.isString()) {
+				throw new IllegalStateException(
+						"Short-answer question has no text answer: " + question.getId());
+			}
+			answerContent.put("answer_text", correctAnswerText.stringValue());
+		}
+		return new Answer(
+				submissionModuleId,
+				question.getId(),
+				serializeAnswerContent(answerContent),
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+	}
+
+	private Answer createPendingWritingAnswer(Long submissionModuleId) {
+		String content = "I think learning a language is easier when students practise a little every day. "
+				+ "I usually review new words after class and try to use them in short conversations. "
+				+ "Studying with classmates is helpful because we can share ideas and correct small mistakes. "
+				+ "Online lessons also give students more flexibility, but it is important to follow a weekly plan. "
+				+ "In my opinion, regular practice and useful feedback help learners become more confident.";
+		return new Answer(
+				submissionModuleId,
+				null,
+				content,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null);
+	}
+
+	private Answer createPendingSpeakingAnswer(Long submissionModuleId, Long assignmentId, Long studentId) {
+		int durationSeconds = 64;
+		return new Answer(
+				submissionModuleId,
+				null,
+				null,
+				"audio/speaking/grading-pending-" + assignmentId + "-" + studentId + ".mp3",
+				durationSeconds,
+				16_000L * durationSeconds,
+				"audio/mpeg",
+				UploadStatus.READY,
+				null,
+				null,
+				null,
+				null);
+	}
+
+	private String serializeAnswerContent(Map<String, Object> content) {
+		try {
+			String serialized = objectMapper.writeValueAsString(content);
+			parseObject(serialized, "submitted fixture answer");
+			return serialized;
+		} catch (JacksonException exception) {
+			throw new IllegalStateException("Could not serialize submitted fixture answer", exception);
 		}
 	}
 
@@ -294,7 +589,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 			Random random) {
 		boolean completed = submissionModule.getStatus() == SubmissionStatus.GRADED;
 		OffsetDateTime gradedAt = completed ? gradingTime(submission.getSubmittedAt(), random) : null;
-		JsonNode transcript = module.getSkill() == ModuleSkill.SPEAKING
+		com.fasterxml.jackson.databind.JsonNode transcript = module.getSkill() == ModuleSkill.SPEAKING
 				? createAndValidateTranscript()
 				: null;
 		Grading grading = new Grading(
@@ -418,29 +713,31 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 		return submittedAt.plusMinutes(30 + random.nextInt(121));
 	}
 
-	private JsonNode createAndValidateTranscript() {
+	private com.fasterxml.jackson.databind.JsonNode createAndValidateTranscript() {
 		List<Map<String, Object>> words = List.of(
 				Map.of("word", "I", "start", 0.0, "end", 0.3, "confidence", 0.95),
 				Map.of("word", "usually", "start", 0.3, "end", 0.8, "confidence", 0.93),
 				Map.of("word", "study", "start", 0.8, "end", 1.2, "confidence", 0.94),
 				Map.of("word", "English", "start", 1.2, "end", 1.8, "confidence", 0.92));
 		try {
-			JsonNode transcript = objectMapper.readTree(objectMapper.writeValueAsString(words));
+			String serializedTranscript = objectMapper.writeValueAsString(words);
+			com.fasterxml.jackson.databind.JsonNode transcript =
+					AI_TRANSCRIPT_OBJECT_MAPPER.readTree(serializedTranscript);
 			validateTranscript(transcript);
 			return transcript;
-		} catch (JacksonException exception) {
+		} catch (JacksonException | com.fasterxml.jackson.core.JsonProcessingException exception) {
 			throw new IllegalStateException("Could not create Speaking transcript", exception);
 		}
 	}
 
-	private void validateTranscript(JsonNode transcript) {
+	private void validateTranscript(com.fasterxml.jackson.databind.JsonNode transcript) {
 		if (transcript == null || !transcript.isArray() || transcript.size() == 0) {
 			throw new IllegalStateException("Speaking ai_transcript must be a non-empty JSON array");
 		}
-		for (JsonNode word : transcript) {
+		for (com.fasterxml.jackson.databind.JsonNode word : transcript) {
 			if (!word.isObject()
 					|| word.get("word") == null
-					|| !word.get("word").isString()
+					|| !word.get("word").isTextual()
 					|| word.get("start") == null
 					|| !word.get("start").isNumber()
 					|| word.get("end") == null
@@ -478,7 +775,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 
 		int autoCount = 0;
 		for (Grading grading : persistedGradings) {
-			if (grading.getMethod() == GradingMethod.AUTO) {
+			if (grading.getMethod() == GradingMethod.AUTO && grading.getStatus() != GradingStatus.PENDING) {
 				autoCount++;
 				BigDecimal expected = sumAnswerScores(
 						answersBySubmissionModuleId.getOrDefault(grading.getSubmissionModuleId(), List.of()));
@@ -509,7 +806,19 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 							|| grading.getReviewedAt() == null
 							|| grading.getGradedAt() == null)) {
 				throw new IllegalStateException(
-						"COMPLETED grading is missing a required final field: " + grading.getId());
+					"COMPLETED grading is missing a required final field: " + grading.getId());
+			}
+			if (grading.getStatus() == GradingStatus.PENDING
+					&& (grading.getMethod() != GradingMethod.AUTO
+							|| grading.getAiFeedback() != null
+							|| grading.getFinalScore() != null
+							|| grading.getFinalFeedback() != null
+							|| grading.getReviewedBy() != null
+							|| grading.getReviewedAt() != null
+							|| grading.getGradedAt() != null
+							|| grading.getAiTranscript() != null)) {
+				throw new IllegalStateException(
+						"PENDING grading contains generated or review data: " + grading.getId());
 			}
 			if (grading.getAiTranscript() != null) {
 				validateTranscript(grading.getAiTranscript());
@@ -530,6 +839,7 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 					grading.getId(),
 					new GradingRuntimeData(
 							data.grading().getSubmissionModuleId(),
+							data.skill(),
 							data.grading().getMethod(),
 							data.grading().getStatus(),
 							data.grading().getFinalScore()));
@@ -578,8 +888,22 @@ public class GradingMockDataSeeder implements CommandLineRunner {
 
 	private record GradingRuntimeData(
 			Long submissionModuleId,
+			ModuleSkill skill,
 			GradingMethod method,
 			GradingStatus status,
 			BigDecimal finalScore) {
+	}
+
+	private record SubmissionOwner(Long assignmentId, Long studentId) {
+	}
+
+	private record PendingFixturePlan(
+			Assignment assignment,
+			List<AssignmentModule> modules,
+			Long studentId,
+			Integer attemptNumber) {
+	}
+
+	private record PendingFixtureData(List<Grading> gradings, List<GradingSeedData> seedData) {
 	}
 }
