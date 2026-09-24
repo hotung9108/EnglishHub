@@ -1,6 +1,6 @@
 id: BE-TASK-8
 title: "Implement Assignment, Module, and Question API cluster"
 assignee: "@be-primary"
-status: "In Progress"
+status: "Done"
 priority: "High"
 description: "Implement API design cluster #20-#36 following docs/API_Design.pdf, docs/api_v3_design.pdf, the V6 schema, and DDD/service-layer rules: list/create assignments under a class; get/update/soft-delete assignments; transition assignment status DRAFT -> PUBLISHED -> CLOSED without reversing; list/create/get/update/delete modules; upload module audio; list/create/get/update/delete questions. Enforce teacher ownership and reject assignment creation when the class has no responsible teacher, keep assignment updates blocked after CLOSED, validate open_at < close_at, max_submissions, module/question ordering, score and JSON correct_answer at the service layer, use JPA rather than raw SQL/JDBC, add unit/integration tests, and place tester handoff instructions in production_artifacts/be_to_tester/."
