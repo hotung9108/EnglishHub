@@ -42,7 +42,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d englishhub_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -70,12 +70,18 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
+      - name: Pre-pull Testcontainers Images
+        run: |
+          docker pull localstack/localstack:3
+          docker pull postgres:16-alpine
+
       - name: Validate Flyway Migrations & Run Tests
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/englishhub_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: testpassword
           SPRING_FLYWAY_ENABLED: true
+          STORAGE_S3_ENABLED: false
         run: ./gradlew test --no-daemon
 
 
