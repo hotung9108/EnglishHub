@@ -1,9 +1,9 @@
-name: Deploy production Backend to VPS/Home-Server
+name: Deploy development Backend to VPS/Home-Server
 
 on:
   pull_request:
     branches:
-      - main
+      - staging
 
 env:
   IMAGE_NAME: ghcr.io/tuanpham21105/english-hub-backend
@@ -58,7 +58,7 @@ jobs:
             docker pull $IMAGE_NAME:$GITHUB_SHA
 
             # Cập nhật BACKEND_IMAGE trong .env để compose dùng đúng tag
-            cd /home/${{ secrets.SERVER_USER }}/englishhub
+            cd /home/${{ secrets.SERVER_USER }}/englishhub-dev
             sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$GITHUB_SHA|" .env
 
             # Thay thế container
