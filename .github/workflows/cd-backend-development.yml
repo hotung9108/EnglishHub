@@ -1,12 +1,12 @@
 name: Deploy development Backend to VPS/Home-Server
 
 on:
-  pull_request:
+  push:
     branches:
       - staging
 
 env:
-  IMAGE_NAME: ghcr.io/tuanpham21105/english-hub-backend
+  IMAGE_NAME: ghcr.io/hotung9108/english-hub-backend
 
 jobs:
   deploy:
