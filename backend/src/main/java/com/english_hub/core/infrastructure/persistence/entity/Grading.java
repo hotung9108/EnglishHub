@@ -108,4 +108,18 @@ public class Grading {
 	public String getAiTranscript() {
 		return JsonbValueCodec.serialize(aiTranscript);
 	}
+
+	public void updateTeacherGrade(
+			BigDecimal finalScore,
+			String finalFeedback,
+			Long reviewedBy,
+			OffsetDateTime reviewedAt) {
+		this.method = GradingMethod.TEACHER_MANUAL;
+		this.status = GradingStatus.COMPLETED;
+		this.finalScore = finalScore;
+		this.finalFeedback = finalFeedback;
+		this.reviewedBy = reviewedBy;
+		this.reviewedAt = reviewedAt;
+		this.gradedAt = reviewedAt;
+	}
 }

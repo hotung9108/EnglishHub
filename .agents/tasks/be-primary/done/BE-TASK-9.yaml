@@ -1,0 +1,6 @@
+id: BE-TASK-9
+title: "Implement Grading, Annotation, and Change Log APIs (Cluster 6, APIs #48-#57)"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Implement the 10 endpoints in docs/api_v3_design.pdf, cluster 6 (pp. 40-47): read grading by submission module and by ID; asynchronously request AI analysis for submitted Writing/Speaking modules (202 response, feedback/transcript and AI annotations, with no AI scoring); set teacher final score/feedback with max-score validation and append a grading_change_logs row only when finalScore changes; list gradings by class/student/status with pagination; list/create/review/delete answer annotations; and list grading change logs newest first for TEACHER/ADMIN. Preserve the spec's PENDING grading lifecycle, teacher authorization, annotation offset/source/review rules, and shared response/error contracts. Implement through the backend's DDD/JPA layers, add unit/integration coverage for business rules and permissions, update relevant docs, and provide tester handoff instructions in production_artifacts/be_to_tester/."

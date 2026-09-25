@@ -71,4 +71,8 @@ public class AnswerAnnotation {
 		this.suggestedFix = suggestedFix;
 		this.reviewStatus = reviewStatus;
 	}
+
+	public void updateReviewStatus(ReviewStatus reviewStatus) {
+		this.reviewStatus = reviewStatus;
+	}
 }
