@@ -3,7 +3,7 @@ name: Deploy production Backend to VPS/Home-Server
 on:
   pull_request:
     branches:
-      - staging
+      - main
 
 env:
   IMAGE_NAME: ghcr.io/tuanpham21105/english-hub-backend
