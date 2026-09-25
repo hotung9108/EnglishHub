@@ -5,3 +5,4 @@
 .agents/private/*
 .codegraphy/*
 *.dbdiagram
+.env.production
