@@ -32,11 +32,61 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-devpassword}
       JWT_SECRET: ${JWT_SECRET:-englishhub-dev-jwt-secret-key-32chars-min}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STORAGE_S3_ENABLED: ${STORAGE_S3_ENABLED:-true}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-auto}
+      STORAGE_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-english-hub-dev}
+      STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    networks:
+      - englishhub_dev_network
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: englishhub-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data_dev:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - englishhub_dev_network
+
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    container_name: englishhub-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc mb --ignore-existing local/$$MINIO_BUCKET &&
+      mc anonymous set download local/$$MINIO_BUCKET
     networks:
       - englishhub_dev_network
 
@@ -67,4 +117,6 @@ networks:
 
 volumes:
   pgdata_fullstack_dev:
+    driver: local
+  minio_data_dev:
     driver: local

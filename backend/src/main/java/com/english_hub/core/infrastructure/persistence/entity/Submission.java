@@ -1,5 +1,6 @@
 package com.english_hub.core.infrastructure.persistence.entity;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -12,14 +13,18 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "submissions")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Submission {
 
@@ -39,6 +44,12 @@ public class Submission {
 	@Column(name = "submitted_at")
 	private OffsetDateTime submittedAt;
 
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private Instant createdAt;
+
+	@Column(name = "updated_at", nullable = false)
+	private Instant updatedAt;
+
 	@Enumerated(EnumType.STRING)
 	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
 	@Column(nullable = false, columnDefinition = "submission_status")
@@ -55,5 +66,21 @@ public class Submission {
 		this.attemptNumber = attemptNumber;
 		this.submittedAt = submittedAt;
 		this.status = status;
+	}
+
+	@PrePersist
+	void onCreate() {
+		Instant now = Instant.now();
+		if (createdAt == null) {
+			createdAt = now;
+		}
+		if (updatedAt == null) {
+			updatedAt = now;
+		}
+	}
+
+	@PreUpdate
+	void onUpdate() {
+		updatedAt = Instant.now();
 	}
 }

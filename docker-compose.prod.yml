@@ -27,6 +27,14 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Giới hạn RAM JVM cho Spring Boot để tối ưu tài nguyên máy tính cá nhân
       JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx768m}"
+      # Cấu hính thông tin S3-Compatible Storage cho backend
+      STORAGE_S3_ENABLED: ${STORAGE_S3_ENABLED:-true}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-}
+      STORAGE_S3_ACCESS_KEY_ID: ${STORAGE_S3_ACCESS_KEY_ID:-}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_ACCESS_KEY:-}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
+      STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
     networks:
       - englishhub_network
     healthcheck:

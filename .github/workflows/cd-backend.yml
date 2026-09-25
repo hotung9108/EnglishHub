@@ -1,0 +1,68 @@
+name: Deploy production Backend to VPS/Home-Server
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: ghcr.io/hotung9108/english-hub-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # context trỏ vào thư mục backend/ nơi có Dockerfile
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME,GITHUB_SHA
+          script: |
+            # Đăng nhập GHCR để pull image
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
+              -u ${{ secrets.SERVER_USER }} --password-stdin
+
+            # Pull image mới về trước
+            docker pull $IMAGE_NAME:$GITHUB_SHA
+
+            # Cập nhật BACKEND_IMAGE trong .env để compose dùng đúng tag
+            cd /home/${{ secrets.SERVER_USER }}/englishhub
+            sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$GITHUB_SHA|" .env
+
+            # Thay thế container
+            docker compose -f docker-compose.prod.yml --profile cloudflare up -d --pull always
+
+            # Xóa image cũ không dùng nữa
+            docker image prune -f
