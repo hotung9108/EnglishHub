@@ -60,7 +60,7 @@ Mỗi vai trò sở hữu thư mục riêng, tuyệt đối không chỉnh sửa
    - Đọc hướng dẫn test, kiểm thử chức năng và AI grading.
    - Thả báo cáo vào `production_artifacts/test_reports/`. Nếu có lỗi, tạo file `.agents/tasks/bugs/BUG-X.yaml`.
 5. **DevOps (`tuanpham21105`, `hotung9108`)**:
-   - Quản lý pipeline GitHub Actions, Docker Compose và triển khai máy chủ theo [`docs/CI_CD_GUIDE.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/CI_CD_GUIDE.md).
+   - Quản lý pipeline GitHub Actions, Docker Compose và triển khai máy chủ theo [`docs/devops/CI_CD_GUIDE.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/devops/CI_CD_GUIDE.md).
 
 ---
 

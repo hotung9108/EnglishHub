@@ -297,5 +297,5 @@ Rất nhiều trường hợp bạn không bật PC 24/7 (tắt máy đi ngủ, 
      - Nếu PC đang tắt: Lần tiếp theo bạn bật máy, PC sẽ **tự động kéo bản mới về và chạy**!
 
 ---
-*Tài liệu được cập nhật và lưu trữ tại [docs/CI_CD_PLAN.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/CI_CD_PLAN.md).*
+*Tài liệu được cập nhật và lưu trữ tại [docs/devops/CI_CD_PLAN.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/devops/CI_CD_PLAN.md).*
 
