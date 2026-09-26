@@ -17,7 +17,7 @@
 2. **Hạ tầng Orchestration & Cấu hình môi trường**:
    - [`docker-compose.prod.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docker-compose.prod.yml): Cấu hình chạy toàn diện Postgres 16, Spring Boot Backend, Frontend qua bridge network và data volume.
    - [`env.production.example`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/env.production.example): Mẫu biến môi trường chuẩn cho Production.
-   - [`docs/CI_CD_GUIDE.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/CI_CD_GUIDE.md): Cẩm nang hướng dẫn cấu hình Secrets và vận hành hệ thống.
+   - [`docs/devops/CI_CD_GUIDE.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/devops/CI_CD_GUIDE.md): Cẩm nang hướng dẫn cấu hình Secrets và vận hành hệ thống.
 
 ---
 
