@@ -1,0 +1,4 @@
+package com.english_hub.core.modules.student_evaluation.application.command;
+
+public record UpdateStudentEvaluationCommand(String content) {
+}
