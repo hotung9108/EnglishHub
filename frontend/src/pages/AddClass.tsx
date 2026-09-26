@@ -1,91 +1,283 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import Step1ClassInfo from '../components/classes/AddClass/Step1ClassInfo';
-import Step2AssignTeacher from '../components/classes/AddClass/Step2AssignTeacher';
-import Step3AddStudents from '../components/classes/AddClass/Step3AddStudents';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  ArrowLeft, ArrowRight, Check, 
+  User, Clock, MapPin
+} from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const AddClass = () => {
-  const { t } = useLanguage();
+export const AddClass: React.FC = () => {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
 
-  const handleNext = () => {
-    if (currentStep < 3) setCurrentStep(currentStep + 1);
-    else navigate('/admin/classes'); // redirect after completion
-  };
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [formData, setFormData] = useState({
+    name: 'IELTS Master Band 7.0+ Intensive',
+    code: 'ENG-IELTS-7.0B',
+    level: 'IELTS 7.0+',
+    room: 'Online Room #05 (Zoom HD)',
+    teacher: 'Cô Trần Thị Mai Lan',
+    schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
+    maxStudents: 24,
+    notes: 'Lớp cam kết đầu ra 7.0+ sau 30 buổi học.'
+  });
 
-  const handlePrev = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  const steps = [
+    { num: 1 as const, title: isVi ? 'Thông tin lớp học' : 'Class Details' },
+    { num: 2 as const, title: isVi ? 'Giáo viên & Lịch học' : 'Instructor & Schedule' },
+    { num: 3 as const, title: isVi ? 'Sĩ số & Hoàn tất' : 'Capacity & Review' },
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert(isVi ? `Khởi tạo lớp học ${formData.name} (${formData.code}) thành công!` : `Class ${formData.name} created!`);
+    navigate('/admin/classes');
   };
 
   return (
-    <div>
-      <div className="pb-24">
-        <Link to="/admin/classes" className="back-link">
-           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-           {t('addClass.backToList')}
-        </Link>
-        <div className="flex-between-start">
-          <div>
-            <h1 className="display-lg page-title-with-step">
-               {t('addClass.title')}
-               <span className="step-counter">{t('addClass.stepProgressPrefix')}{currentStep}/3</span>
-            </h1>
+    <div className="adm-container" style={{ maxWidth: '1100px' }}>
+      {/* Header */}
+      <div className="adm-header">
+        <div className="adm-title-group">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => navigate('/admin/classes')}
+              style={{ padding: '6px 10px' }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <h1 className="adm-title">{t('addClass.title')}</h1>
           </div>
+          <p className="adm-subtitle">
+            {isVi ? 'Thiết lập thông tin khóa học mới với bộ chỉ dẫn từng bước trực quan.' : 'Configure new course cohort with live interactive preview.'}
+          </p>
         </div>
       </div>
 
-      {/* Stepper */}
-      <div className="card p-24 mb-24">
-         <div className="stepper">
-            <div className="stepper-line stepper-line-3step"></div>
-            
-            {[
-               { id: 1, label: t('addClass.step1'), status: currentStep > 1 ? 'completed' : currentStep === 1 ? 'current' : 'pending' },
-               { id: 2, label: t('addClass.step2'), status: currentStep > 2 ? 'completed' : currentStep === 2 ? 'current' : 'pending' },
-               { id: 3, label: t('addClass.step3'), status: currentStep > 3 ? 'completed' : currentStep === 3 ? 'current' : 'pending' },
-            ].map(step => (
-               <div key={step.id} className="stepper-item stepper-item-3">
-                  <div className={`stepper-circle stepper-circle-${step.status}`}>
-                     {step.status === 'completed' ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> : step.id}
-                  </div>
-                  <div className="text-center">
-                     <p className={`stepper-status stepper-status-${step.status}`}>
-                        {t('addClass.stepPrefix')}{step.id}{step.status === 'completed' ? t('addClass.stepCompleted') : step.status === 'current' ? t('addClass.stepCurrent') : ''}
-                     </p>
-                     <p className={`label-md ${step.status === 'pending' ? 'stepper-label-pending' : 'stepper-label-active'}`}>
-                        {step.label}
-                     </p>
-                  </div>
-               </div>
-            ))}
-         </div>
+      {/* Stepper Indicator */}
+      <div className="adm-stepper">
+        {steps.map(s => (
+          <div 
+            key={s.num}
+            className={`adm-step-item ${currentStep === s.num ? 'active' : currentStep > s.num ? 'completed' : ''}`}
+            onClick={() => s.num < currentStep && setCurrentStep(s.num)}
+          >
+            <div className="adm-step-circle">
+              {currentStep > s.num ? <Check size={16} /> : s.num}
+            </div>
+            <span className="adm-step-text">{s.title}</span>
+          </div>
+        ))}
       </div>
 
-      {/* Content */}
-      <div className="mb-32">
-         {currentStep === 1 && <Step1ClassInfo />}
-         {currentStep === 2 && <Step2AssignTeacher />}
-         {currentStep === 3 && <Step3AddStudents />}
-      </div>
+      {/* 2-Column Form & Live Preview */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '28px', alignItems: 'flex-start' }}>
+        {/* Form Box */}
+        <div className="card" style={{ padding: '28px' }}>
+          <form onSubmit={handleSubmit}>
+            {/* Step 1: Basic Info */}
+            {currentStep === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Tên lớp học đầy đủ' : 'Full Class Title'} *</label>
+                  <input 
+                    type="text"
+                    className="input"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
 
-      {/* Footer Actions */}
-      <div className="card p-24 flex-between">
-         <button className="btn btn-secondary" onClick={handlePrev} disabled={currentStep === 1} style={{ opacity: currentStep === 1 ? 0.5 : 1 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            {t('addClass.btnBack')}
-         </button>
-         <div className="flex gap-16">
-            <button className="btn btn-draft">
-               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-               {t('addClass.btnSaveDraft')}
-            </button>
-            <button className="btn btn-primary" onClick={handleNext}>
-               {currentStep < 3 ? (currentStep === 1 ? t('addClass.btnNextStep2') : t('addClass.btnNextStep3')) : t('addClass.btnCreateClass')}
-               {currentStep < 3 && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>}
-            </button>
-         </div>
+                <div className="adm-form-grid">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Mã lớp học' : 'Class Code'} *</label>
+                    <input 
+                      type="text"
+                      className="input font-mono"
+                      value={formData.code}
+                      onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Trình độ / Level' : 'Course Level'}</label>
+                    <select 
+                      className="input"
+                      value={formData.level}
+                      onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                    >
+                      <option value="IELTS 5.5+">IELTS Pre-Int (5.5+)</option>
+                      <option value="IELTS 6.5+">IELTS Intensive (6.5+)</option>
+                      <option value="IELTS 7.0+">IELTS Master (7.0+)</option>
+                      <option value="TOEIC 750+">TOEIC Cấp tốc 750+</option>
+                      <option value="CEFR B2">Tiếng Anh Giao tiếp B2</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Phòng học / Link trực tuyến' : 'Room / Virtual Link'}</label>
+                  <input 
+                    type="text"
+                    className="input"
+                    value={formData.room}
+                    onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => setCurrentStep(2)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <span>{t('addClass.btnNextStep2')}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Teacher & Schedule */}
+            {currentStep === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Giáo viên phụ trách chính' : 'Primary Instructor'} *</label>
+                  <select 
+                    className="input"
+                    value={formData.teacher}
+                    onChange={(e) => setFormData({ ...formData, teacher: e.target.value })}
+                  >
+                    <option value="Cô Trần Thị Mai Lan">Cô Trần Thị Mai Lan (IELTS 8.5 • 4 lớp)</option>
+                    <option value="Thầy Nguyễn Văn Nam">Thầy Nguyễn Văn Nam (Grammar Master • 3 lớp)</option>
+                    <option value="Cô Nguyễn Thu Trang">Cô Nguyễn Thu Trang (TOEIC Specialist • 2 lớp)</option>
+                    <option value="Thầy Mark Reynolds">Thầy Mark Reynolds (Native Speaker • 3 lớp)</option>
+                  </select>
+                </div>
+
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Thời khóa biểu' : 'Class Schedule'} *</label>
+                  <select 
+                    className="input"
+                    value={formData.schedule}
+                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                  >
+                    <option value="T2 - T4 - T6 (18:00 - 20:00)">Thứ 2 - Thứ 4 - Thứ 6 (18:00 - 20:00)</option>
+                    <option value="T3 - T5 - T7 (19:30 - 21:00)">Thứ 3 - Thứ 5 - Thứ 7 (19:30 - 21:00)</option>
+                    <option value="T7 - CN (09:00 - 11:30)">Thứ 7 - Chủ Nhật (09:00 - 11:30)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary"
+                    onClick={() => setCurrentStep(1)}
+                  >
+                    {isVi ? 'Quay lại' : 'Back'}
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => setCurrentStep(3)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <span>{t('addClass.btnNextStep3')}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Capacity & Confirm */}
+            {currentStep === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Sĩ số tối đa' : 'Maximum Capacity'}</label>
+                  <input 
+                    type="number"
+                    className="input"
+                    value={formData.maxStudents}
+                    onChange={(e) => setFormData({ ...formData, maxStudents: parseInt(e.target.value) || 20 })}
+                  />
+                </div>
+
+                <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Ghi chú lớp học' : 'Class Memo'}</label>
+                  <textarea 
+                    className="input"
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary"
+                    onClick={() => setCurrentStep(2)}
+                  >
+                    {isVi ? 'Quay lại' : 'Back'}
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Check size={16} />
+                    <span>{t('addClass.btnCreateClass')}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Live Preview Card (Right Column) */}
+        <div>
+          <div style={{ fontSize: '12.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--on-surface-variant)', marginBottom: '8px' }}>
+            {isVi ? 'XEM TRƯỚC THẺ LỚP HỌC (LIVE PREVIEW)' : 'LIVE CLASS CARD PREVIEW'}
+          </div>
+
+          <div className="card" style={{ padding: '22px', border: '2px solid var(--primary-fixed-dim, #bfdbfe)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span className="badge badge-primary font-mono">{formData.code || 'CODE'}</span>
+                <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', fontSize: '11.5px' }}>{formData.level}</span>
+              </div>
+              <span className="badge badge-active">{isVi ? 'Sắp mở' : 'Upcoming'}</span>
+            </div>
+
+            <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 12px 0', lineHeight: 1.4 }}>
+              {formData.name || 'Tên lớp học...'}
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <User size={15} color="var(--primary)" />
+                <span>{formData.teacher}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={15} />
+                <span>{formData.schedule}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <MapPin size={15} />
+                <span>{formData.room}</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', fontSize: '13px' }}>
+              <span className="text-on-surface-variant">{isVi ? 'Sĩ số tối đa: ' : 'Max Capacity: '}<strong>{formData.maxStudents} {isVi ? 'học viên' : 'students'}</strong></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

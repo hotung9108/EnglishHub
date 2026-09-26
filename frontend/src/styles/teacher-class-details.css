@@ -1,0 +1,908 @@
+/* ==========================================================================
+   Teacher Class Details & Progress Styles - EnglishHub
+   Conforms to convention-fe.md (CSS Variables, No inline styles)
+   ========================================================================== */
+
+.tcd-container {
+  padding: 24px 32px 64px;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: tcdFadeIn 0.3s ease-out;
+}
+
+@keyframes tcdFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   1. Breadcrumbs & Header Hero
+   -------------------------------------------------------------------------- */
+.tcd-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.tcd-breadcrumb-link {
+  color: #64748b;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.tcd-breadcrumb-link:hover {
+  color: #2563eb;
+}
+
+.tcd-breadcrumb-active {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.tcd-hero-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px 32px;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tcd-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.tcd-hero-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 780px;
+}
+
+.tcd-badge-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tcd-class-code-badge {
+  background-color: #0f172a;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+}
+
+.tcd-target-band-badge {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #bfdbfe;
+}
+
+.tcd-status-badge-active {
+  background-color: #f0fdf4;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tcd-class-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.tcd-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.tcd-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tcd-hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tcd-class-select {
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background-color: #f8fafc;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tcd-class-select:hover {
+  background-color: #ffffff;
+  border-color: #94a3b8;
+}
+
+.tcd-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.tcd-btn-primary:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.tcd-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: #ffffff;
+  color: #334155;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tcd-btn-secondary:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Syllabus Lesson Bar */
+.tcd-lesson-progress-wrap {
+  padding-top: 18px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tcd-lesson-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.tcd-lesson-track {
+  width: 100%;
+  height: 8px;
+  background-color: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.tcd-lesson-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  border-radius: 9999px;
+  transition: width 0.4s ease-out;
+}
+
+/* --------------------------------------------------------------------------
+   2. 4 KPI Metrics Grid
+   -------------------------------------------------------------------------- */
+.tcd-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.tcd-kpi-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tcd-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -4px rgba(0, 0, 0, 0.06);
+}
+
+.tcd-kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tcd-kpi-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tcd-kpi-icon.blue { background-color: #eff6ff; color: #2563eb; }
+.tcd-kpi-icon.green { background-color: #f0fdf4; color: #16a34a; }
+.tcd-kpi-icon.purple { background-color: #faf5ff; color: #7e22ce; }
+.tcd-kpi-icon.amber { background-color: #fffbeb; color: #d97706; }
+
+.tcd-kpi-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+
+.tcd-kpi-chip.success { background-color: #f0fdf4; color: #16a34a; }
+.tcd-kpi-chip.warning { background-color: #fef2f2; color: #dc2626; }
+.tcd-kpi-chip.info { background-color: #eff6ff; color: #2563eb; }
+
+.tcd-kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.tcd-kpi-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.tcd-mini-progress {
+  width: 100%;
+  height: 6px;
+  background-color: #f1f5f9;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.tcd-mini-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+}
+
+.tcd-kpi-foot-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+/* --------------------------------------------------------------------------
+   3. Tabbed Navigation Bar
+   -------------------------------------------------------------------------- */
+.tcd-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 2px;
+  overflow-x: auto;
+}
+
+.tcd-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tcd-tab-item:hover {
+  color: #0f172a;
+  background-color: #f8fafc;
+  border-radius: 8px 8px 0 0;
+}
+
+.tcd-tab-item.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+  font-weight: 700;
+}
+
+.tcd-tab-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.tcd-tab-item.active .tcd-tab-count {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+/* --------------------------------------------------------------------------
+   4. Tab 1: Gradebook & Roster
+   -------------------------------------------------------------------------- */
+.tcd-card-section {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tcd-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.tcd-search-wrap {
+  position: relative;
+  min-width: 260px;
+}
+
+.tcd-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.tcd-search-input {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  outline: none;
+  background-color: #f8fafc;
+  color: #0f172a;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.tcd-search-input:focus {
+  border-color: #2563eb;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.tcd-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.tcd-pill-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tcd-pill-btn:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.tcd-pill-btn.active {
+  background-color: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+/* Gradebook Table */
+.tcd-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.tcd-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.tcd-table thead tr {
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tcd-table th {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.tcd-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.tcd-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.tcd-table tbody tr.row-support {
+  background-color: rgba(254, 242, 242, 0.45);
+}
+
+.tcd-table td {
+  padding: 14px 16px;
+  color: #334155;
+  vertical-align: middle;
+}
+
+/* Student column cell */
+.tcd-student-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tcd-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+}
+
+.tcd-student-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tcd-student-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tcd-student-code {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Score Pills */
+.tcd-score-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  min-width: 44px;
+}
+
+.tcd-score-pill.high { background-color: #f0fdf4; color: #16a34a; }
+.tcd-score-pill.medium { background-color: #eff6ff; color: #2563eb; }
+.tcd-score-pill.low { background-color: #fef2f2; color: #dc2626; }
+
+.tcd-overall-score {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Status Chips */
+.tcd-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 12px;
+}
+
+.tcd-status-chip.exceed { background-color: #eff6ff; color: #1d4ed8; }
+.tcd-status-chip.ontime { background-color: #f0fdf4; color: #16a34a; }
+.tcd-status-chip.support { background-color: #fef2f2; color: #dc2626; }
+
+.tcd-btn-action-icon {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.tcd-btn-action-icon:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* --------------------------------------------------------------------------
+   5. Tab 2: Class Assignments
+   -------------------------------------------------------------------------- */
+.tcd-assignments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.tcd-assignment-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.tcd-assignment-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 6px 16px -2px rgba(37, 99, 235, 0.08);
+  transform: translateY(-2px);
+}
+
+.tcd-assignment-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tcd-assignment-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.tcd-assignment-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.tcd-assignment-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+}
+
+.tcd-assignment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   6. Tab 3: 4-Skill Analytics & AI Insights
+   -------------------------------------------------------------------------- */
+.tcd-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.tcd-analytics-skill-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tcd-skill-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tcd-skill-tag-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tcd-skill-score-box {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.tcd-skill-avg-score {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.tcd-skill-target-score {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.tcd-ai-block {
+  background-color: #faf5ff;
+  border: 1px solid #f3e8ff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tcd-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7e22ce;
+}
+
+.tcd-ai-text {
+  font-size: 12.5px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tcd-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tcd-tag-item {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.tcd-tag-item.strength { background-color: #f0fdf4; color: #16a34a; }
+.tcd-tag-item.weakness { background-color: #fef2f2; color: #dc2626; }
+
+/* --------------------------------------------------------------------------
+   7. Tab 4: Syllabus & Class Info
+   -------------------------------------------------------------------------- */
+.tcd-syllabus-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tcd-syllabus-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  background-color: #f8fafc;
+  transition: all 0.15s ease;
+  gap: 16px;
+}
+
+.tcd-syllabus-item.current {
+  border-color: #93c5fd;
+  background-color: #eff6ff;
+}
+
+.tcd-syllabus-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tcd-session-badge {
+  font-size: 12px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e2e8f0;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.tcd-syllabus-item.current .tcd-session-badge {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.tcd-syllabus-item.completed .tcd-session-badge {
+  background-color: #dcfce7;
+  color: #16a34a;
+}
+
+.tcd-syllabus-title-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tcd-syllabus-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* --------------------------------------------------------------------------
+   8. Student Detail Drawer (Modal)
+   -------------------------------------------------------------------------- */
+.tcd-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tcd-drawer-box {
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  background-color: #ffffff;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideLeft 0.25s ease-out;
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.tcd-drawer-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tcd-drawer-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tcd-drawer-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  background-color: #f8fafc;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .tcd-container {
+    padding: 16px;
+    gap: 18px;
+  }
+  .tcd-hero-card {
+    padding: 20px;
+  }
+  .tcd-hero-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

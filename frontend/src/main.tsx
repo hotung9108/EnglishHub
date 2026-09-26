@@ -11,8 +11,13 @@ import './styles/student-result.css'
 import './styles/student-speaking.css'
 import './styles/student-ecosystem.css'
 import './styles/teacher.css'
+import './styles/teacher-assignment-edit.css'
+import './styles/teacher-exam-bank.css'
+import './styles/teacher-dashboard.css'
+import './styles/teacher-class-details.css'
 import './styles/login.css'
 import './styles/admin.css'
+import './styles/admin-modern.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

@@ -140,69 +140,63 @@ export const StudentFeedback: React.FC = () => {
   };
 
   return (
-    <div className="std-eco-container">
+    <div className="container p-24">
       {/* Header */}
-      <div className="std-eco-header">
-        <div>
-          <h1 className="std-eco-title">
-            <MessageSquare size={28} color="var(--primary)" />
-            {isVi ? 'Hòm Thư Nhận Xét & Phản Hồi Chữa Bài' : 'Feedback & Detailed Evaluation Inbox'}
-          </h1>
-          <p className="std-eco-subtitle">
-            {isVi
-              ? 'Tổng hợp lời nhận xét, ghi chú sửa lỗi từng câu từ Giảng viên chuyên môn và Trợ lý AI thông minh.'
-              : 'Review pedagogical feedback, rubric evaluation notes, and sentence-level corrections from instructors and AI.'}
-          </p>
-        </div>
+      <div className="mb-24">
+        <h1 className="flex items-center gap-12 m-0 text-on-surface font-bold mb-8" style={{ fontSize: '28px' }}>
+          <MessageSquare size={28} color="var(--primary)" />
+          {isVi ? 'Hòm Thư Nhận Xét & Phản Hồi Chữa Bài' : 'Feedback & Detailed Evaluation Inbox'}
+        </h1>
+        <p className="m-0 text-on-surface-variant" style={{ fontSize: '15px' }}>
+          {isVi
+            ? 'Tổng hợp lời nhận xét, ghi chú sửa lỗi từng câu từ Giảng viên chuyên môn và Trợ lý AI thông minh.'
+            : 'Review pedagogical feedback, rubric evaluation notes, and sentence-level corrections from instructors and AI.'}
+        </p>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="std-eco-filter-bar">
-        <div className="std-eco-pills">
+      <div className="flex-between items-center bg-white p-12-18 rounded border mb-24">
+        <div className="flex items-center gap-8">
           <button
             type="button"
-            className={`std-eco-pill ${activeFilter === 'all' ? 'active' : ''}`}
+            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'all' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
             onClick={() => setActiveFilter('all')}
+            style={{ fontSize: '13px', borderColor: activeFilter === 'all' ? 'transparent' : '#CBD5E1' }}
           >
             {isVi ? 'Tất cả phản hồi' : 'All Reviews'}
-            <span className="std-eco-pill-badge">{feedbackList.length}</span>
+            <span className={`flex-center rounded-full ${activeFilter === 'all' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{feedbackList.length}</span>
           </button>
 
           <button
             type="button"
-            className={`std-eco-pill ${activeFilter === 'teacher' ? 'active' : ''}`}
+            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'teacher' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
             onClick={() => setActiveFilter('teacher')}
+            style={{ fontSize: '13px', borderColor: activeFilter === 'teacher' ? 'transparent' : '#CBD5E1' }}
           >
             <UserCheck size={14} />
             {isVi ? 'Từ Giảng viên' : 'From Instructors'}
-            <span className="std-eco-pill-badge">{teacherFeedbackCount}</span>
+            <span className={`flex-center rounded-full ${activeFilter === 'teacher' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{teacherFeedbackCount}</span>
           </button>
 
           <button
             type="button"
-            className={`std-eco-pill ${activeFilter === 'ai' ? 'active' : ''}`}
+            className={`flex items-center text-nowrap flex-shrink-0 gap-8 font-medium rounded-full cursor-pointer px-14 py-8 transition-all ${activeFilter === 'ai' ? 'bg-primary text-white border-none' : 'bg-transparent text-on-surface border'}`}
             onClick={() => setActiveFilter('ai')}
+            style={{ fontSize: '13px', borderColor: activeFilter === 'ai' ? 'transparent' : '#CBD5E1' }}
           >
             <Sparkles size={14} />
             {isVi ? 'Từ Trợ lý AI' : 'From AI Diagnostic'}
-            <span className="std-eco-pill-badge">{aiFeedbackCount}</span>
+            <span className={`flex-center rounded-full ${activeFilter === 'ai' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'}`} style={{ fontSize: '11px', padding: '2px 6px' }}>{aiFeedbackCount}</span>
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="flex items-center gap-10">
           {/* Skill Filter Dropdown */}
           <select
             value={skillFilter}
             onChange={(e) => setSkillFilter(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              fontSize: '13px',
-              borderRadius: 'var(--radius-md, 8px)',
-              border: '1px solid var(--outline-variant)',
-              backgroundColor: 'var(--surface)',
-              color: 'var(--on-surface)',
-              outline: 'none'
-            }}
+            className="p-8-16 border rounded bg-white text-on-surface outline-none"
+            style={{ fontSize: '13px' }}
           >
             <option value="all">{isVi ? 'Tất cả kỹ năng' : 'All Skills'}</option>
             <option value="writing">Writing</option>
@@ -212,27 +206,28 @@ export const StudentFeedback: React.FC = () => {
           </select>
 
           {/* Search box */}
-          <div className="std-eco-search-wrap">
-            <Search size={15} className="std-eco-search-icon" />
+          <div className="flex items-center gap-8 bg-surface-container-low border rounded px-12 py-8" style={{ width: '240px' }}>
+            <Search size={15} className="text-on-surface-variant flex-shrink-0" />
             <input
               type="text"
-              className="std-eco-search-input"
+              className="bg-transparent border-none outline-none w-full text-on-surface"
               placeholder={isVi ? 'Tìm nhận xét, bài tập...' : 'Search feedback, teacher...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ fontSize: '13px' }}
             />
           </div>
         </div>
       </div>
 
       {/* Feedback List */}
-      <div>
+      <div className="flex-col gap-20">
         {filtered.map((item) => (
-          <div key={item.id} className="feedback-card">
+          <div key={item.id} className="card bg-white p-24">
             {/* Header */}
-            <div className="feedback-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div className={`feedback-reviewer-avatar ${item.reviewerType}`}>
+            <div className="flex-between items-start mb-20">
+              <div className="flex items-center gap-16">
+                <div className={`flex-center rounded-full text-white ${item.reviewerType === 'teacher' ? 'bg-primary' : 'bg-secondary'}`} style={{ width: 44, height: 44 }}>
                   {item.reviewerType === 'teacher' ? (
                     <UserCheck size={22} />
                   ) : (
@@ -241,16 +236,15 @@ export const StudentFeedback: React.FC = () => {
                 </div>
 
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)' }}>
+                  <div className="flex items-center gap-8 flex-wrap mb-4">
+                    <span className="font-bold text-on-surface" style={{ fontSize: '15px' }}>
                       {item.reviewerName}
                     </span>
                     <span
+                      className="font-bold rounded"
                       style={{
                         fontSize: '11px',
-                        fontWeight: 700,
                         padding: '2px 8px',
-                        borderRadius: '6px',
                         backgroundColor: item.reviewerType === 'teacher' ? '#eff6ff' : '#f0fdf4',
                         color: item.reviewerType === 'teacher' ? '#2563eb' : '#16a34a',
                         border: `1px solid ${item.reviewerType === 'teacher' ? '#bfdbfe' : '#bbf7d0'}`
@@ -260,28 +254,24 @@ export const StudentFeedback: React.FC = () => {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '12.5px', color: 'var(--on-surface-variant)', marginTop: '2px' }}>
-                    {item.className} • <span style={{ color: 'var(--on-surface-variant)' }}>{item.date}</span>
+                  <div className="text-on-surface-variant" style={{ fontSize: '12.5px' }}>
+                    {item.className} • <span>{item.date}</span>
                   </div>
                 </div>
               </div>
 
               {/* Band Score & Skill Tag */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className={`std-skill-tag ${item.skill}`}>
+              <div className="flex items-center gap-12">
+                <span className="flex items-center gap-6 font-semibold text-uppercase rounded text-on-surface bg-surface-container-low" style={{ fontSize: '11px', padding: '4px 10px' }}>
                   {getSkillIcon(item.skill)}
                   {item.skill}
                 </span>
 
                 <span
+                  className="flex items-center gap-6 font-bold rounded-full"
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 12px',
-                    borderRadius: '20px',
+                    padding: '6px 14px',
                     fontSize: '13px',
-                    fontWeight: 800,
                     backgroundColor: '#ecfdf5',
                     color: '#059669',
                     border: '1px solid #a7f3d0'
@@ -294,56 +284,55 @@ export const StudentFeedback: React.FC = () => {
             </div>
 
             {/* Assignment Title */}
-            <div>
-              <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.03em' }}>
+            <div className="mb-20">
+              <span className="font-semibold text-uppercase text-on-surface-variant tracking-wide" style={{ fontSize: '12px' }}>
                 {isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:'}
               </span>
-              <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: 'var(--primary)', margin: '4px 0 0 0' }}>
+              <h3 className="font-bold text-primary m-0 mt-4 leading-snug" style={{ fontSize: '15.5px' }}>
                 {item.assignmentTitle}
               </h3>
             </div>
 
             {/* Quote Box: General Evaluation */}
-            <div className="feedback-quote-box">
-              <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '4px', letterSpacing: '0.04em' }}>
+            <div className="rounded-lg p-20 mb-20 bg-primary-fixed border" style={{ borderColor: 'var(--primary-fixed-dim)' }}>
+              <div className="font-bold text-uppercase text-primary tracking-wide mb-8" style={{ fontSize: '12px' }}>
                 {isVi ? 'Đánh giá tổng quan' : 'General Assessment'}
               </div>
-              <div>{item.summaryComment}</div>
+              <div className="leading-relaxed text-on-surface" style={{ fontSize: '14px' }}>{item.summaryComment}</div>
             </div>
 
             {/* Key Strengths & Suggested Improvements */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+            <div className="grid gap-16 mb-20" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
               {/* Strengths */}
-              <div className="feedback-strengths-box">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#166534', marginBottom: '8px' }}>
+              <div className="rounded-lg p-20 border bg-white" style={{ borderColor: '#BBF7D0' }}>
+                <div className="flex items-center gap-8 font-bold mb-12" style={{ fontSize: '13px', color: '#166534' }}>
                   <CheckCircle2 size={16} />
                   <span>{isVi ? 'Điểm mạnh nổi bật' : 'Key Strengths'}</span>
                 </div>
-                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', lineHeight: 1.5, color: '#14532d' }}>
+                <ul className="m-0 pl-16 leading-relaxed" style={{ fontSize: '13px', color: '#14532d' }}>
                   {item.keyStrengths.map((str, idx) => (
-                    <li key={idx} style={{ marginBottom: '4px' }}>{str}</li>
+                    <li key={idx} className="mb-4">{str}</li>
                   ))}
                 </ul>
               </div>
 
               {/* Weakness / Advice */}
-              <div className="feedback-weakness-box">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 700, color: '#92400e', marginBottom: '8px' }}>
+              <div className="rounded-lg p-20 border bg-white" style={{ borderColor: '#FDE68A' }}>
+                <div className="flex items-center gap-8 font-bold mb-12" style={{ fontSize: '13px', color: '#92400e' }}>
                   <Lightbulb size={16} />
                   <span>{isVi ? 'Gợi ý cần khắc phục' : 'Targeted Improvement'}</span>
                 </div>
-                <div style={{ fontSize: '13px', lineHeight: 1.5, color: '#78350f' }}>
+                <div className="leading-relaxed" style={{ fontSize: '13px', color: '#78350f' }}>
                   {item.suggestedImprovement}
                 </div>
               </div>
             </div>
 
             {/* Action Footer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid var(--outline-variant)' }}>
+            <div className="flex justify-end pt-16 border-t">
               <button
                 type="button"
-                className="std-eco-btn-primary"
-                style={{ padding: '8px 16px', fontSize: '13px' }}
+                className="btn btn-primary"
                 onClick={() => navigate(`/student/assignments/${item.assignmentId}/result`)}
               >
                 <span>{isVi ? 'Xem bài làm & Lời giải chi tiết' : 'Review Full Submission & Corrections'}</span>
@@ -354,12 +343,12 @@ export const StudentFeedback: React.FC = () => {
         ))}
 
         {filtered.length === 0 && (
-          <div className="std-eco-card" style={{ textAlign: 'center', padding: '48px 20px' }}>
-            <AlertCircle size={36} color="var(--on-surface-variant)" style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
-            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
+          <div className="card text-center py-48">
+            <AlertCircle size={36} className="mx-auto mb-16 text-on-surface-variant opacity-50" />
+            <h4 className="m-0 font-bold mb-8 text-on-surface" style={{ fontSize: '15px' }}>
               {isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
             </h4>
-            <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <p className="m-0 text-on-surface-variant" style={{ fontSize: '13px' }}>
               {isVi ? 'Hãy thử đổi từ khóa tìm kiếm hoặc bỏ bớt bộ lọc.' : 'Try adjusting your search query or active filters.'}
             </p>
           </div>

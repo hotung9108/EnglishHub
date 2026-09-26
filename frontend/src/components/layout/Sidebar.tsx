@@ -12,7 +12,9 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  Layout
+  Layout,
+  History,
+  Library
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -76,16 +78,24 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {
         title: t('sectionResults'),
         items: [
-          { path: '/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/audit/gradings', label: t('auditLogs.title'), icon: History },
         ]
       }
     ],
     teacher: [
       {
+        title: t('sectionOverview'),
+        items: [
+          { path: '/teacher/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
+        ]
+      },
+      {
         title: t('sectionTeaching'),
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+          { path: '/teacher/exam-bank', label: t('menuExamBank'), icon: Library },
         ]
       },
       {
@@ -180,7 +190,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {/* Footer Utility Links */}
       <div className="sidebar-footer">
         <div className="sidebar-divider"></div>
-        <NavLink to="/settings" className="sidebar-link">
+        <NavLink to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} className="sidebar-link">
           <Settings size={18} strokeWidth={2} />
           <span>{t('settings')}</span>
         </NavLink>

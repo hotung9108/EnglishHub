@@ -108,12 +108,16 @@ const TeacherAssignmentDetails = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
-            padding: '8px 16px', borderRadius: '8px', 
-            border: '1px solid #D1D5DB', backgroundColor: 'white', 
-            color: '#374151', fontWeight: 500, cursor: 'pointer' 
-          }}>
+          <button 
+            type="button"
+            onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '8px', 
+              padding: '8px 16px', borderRadius: '8px', 
+              border: '1px solid #D1D5DB', backgroundColor: 'white', 
+              color: '#374151', fontWeight: 500, cursor: 'pointer' 
+            }}
+          >
             <Edit2 size={16} /> {t('assignmentDetails.btnEdit')}
           </button>
           <button style={{ 
@@ -324,12 +328,10 @@ const TeacherAssignmentDetails = () => {
               />
               <Search size={16} color="#9CA3AF" style={{ position: 'absolute', left: '12px', top: '10px' }} />
             </div>
-            <button style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', 
-              padding: '8px 16px', borderRadius: '8px', 
-              border: '1px solid #FCD34D', backgroundColor: '#FFFBEB', 
-              color: '#D97706', fontSize: '14px', fontWeight: 500, cursor: 'pointer' 
-            }}>
+            <button 
+              className="btn btn-secondary btn-sm text-tertiary" 
+              style={{ backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }}
+            >
               <Bell size={16} /> {t('assignmentDetails.btnRemind')} (2{t('assignmentDetails.unitFriends')})
             </button>
           </div>
@@ -412,11 +414,9 @@ const TeacherAssignmentDetails = () => {
                     )}
                     {student.gradingStatus === 'pending' && (
                       <button 
+                        className="btn btn-primary btn-sm"
                         onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.id}`)}
-                        style={{ 
-                        border: 'none', backgroundColor: '#2563EB', color: 'white', 
-                        padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-                      }}>
+                      >
                         {t('assignmentDetails.btnGradeNow')}
                       </button>
                     )}

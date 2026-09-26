@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Plus, Mic, BookOpen, Headphones, PenTool, Clock, Calendar, 
   Search, CheckCircle2, AlertCircle, FileText, ArrowRight,
-  UploadCloud, X, Zap
+  UploadCloud, X, Zap, Edit2
 } from 'lucide-react';
 
 interface AssignmentItem {
@@ -206,8 +206,8 @@ export const TeacherAssignments: React.FC = () => {
 
           <button
             type="button"
-            className="std-eco-btn-secondary"
-            onClick={() => alert(isVi ? 'Đang mở Ngân hàng đề thi mẫu IELTS Cambridge...' : 'Opening Cambridge Exam Bank...')}
+            className="btn btn-secondary bg-white btn-sm"
+            onClick={() => navigate('/teacher/exam-bank')}
           >
             <UploadCloud size={16} />
             <span>{isVi ? 'Ngân hàng đề thi' : 'Exam Bank'}</span>
@@ -215,7 +215,7 @@ export const TeacherAssignments: React.FC = () => {
 
           <button
             type="button"
-            className="std-eco-btn-primary"
+            className="btn btn-primary btn-sm"
             onClick={() => setShowSkillModal(true)}
           >
             <Plus size={16} />
@@ -440,7 +440,21 @@ export const TeacherAssignments: React.FC = () => {
 
                 <button
                   type="button"
-                  className="std-eco-btn-primary"
+                  className="btn btn-secondary bg-white btn-sm"
+                  style={{ padding: '8px 14px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/teacher/assignments/${item.id}/edit`);
+                  }}
+                  title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
+                >
+                  <Edit2 size={14} />
+                  <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
                   style={{ padding: '8px 16px', fontSize: '13px' }}
                   onClick={() => navigate(`/teacher/assignments/${item.id}`)}
                 >
@@ -544,7 +558,7 @@ export const TeacherAssignments: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
               <button
                 type="button"
-                className="std-eco-btn-secondary"
+                className="btn btn-secondary bg-white btn-sm"
                 onClick={() => setShowSkillModal(false)}
               >
                 {isVi ? 'Đóng' : 'Close'}

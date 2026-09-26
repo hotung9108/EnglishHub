@@ -183,25 +183,25 @@ export const StudentWorkspace: React.FC = () => {
     switch (type) {
       case 'writing':
         return (
-          <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="flex justify-center items-center rounded-md text-primary" style={{ width: 44, height: 44, backgroundColor: '#eff6ff' }}>
             <PenTool size={20} />
           </div>
         );
       case 'speaking':
         return (
-          <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="flex justify-center items-center rounded-md" style={{ width: 44, height: 44, backgroundColor: '#faf5ff', color: '#9333ea' }}>
             <Mic size={20} />
           </div>
         );
       case 'reading':
         return (
-          <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="flex justify-center items-center rounded-md" style={{ width: 44, height: 44, backgroundColor: '#fffbeb', color: '#d97706' }}>
             <BookOpen size={20} />
           </div>
         );
       default:
         return (
-          <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#f0fdfa', color: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="flex justify-center items-center rounded-md" style={{ width: 44, height: 44, backgroundColor: '#f0fdfa', color: '#0d9488' }}>
             <Headphones size={20} />
           </div>
         );
@@ -209,25 +209,25 @@ export const StudentWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="std-eco-container">
+    <div className="container p-24">
       {/* Header */}
-      <div className="std-eco-header">
+      <div className="flex-between items-start mb-24">
         <div>
-          <h1 className="std-eco-title">
+          <h1 className="flex items-center gap-12 m-0 text-on-surface font-bold mb-8" style={{ fontSize: '28px' }}>
             <FileEdit size={28} color="var(--primary)" />
             {isVi ? 'Không Gian Học Tập & Tự Luyện (Workspace)' : 'Personal Study & Practice Workspace'}
           </h1>
-          <p className="std-eco-subtitle">
+          <p className="m-0 text-on-surface-variant" style={{ fontSize: '15px' }}>
             {isVi
               ? 'Quản lý bản nháp đang làm dở, sổ tay ghi chú từ vựng/ngữ pháp và tài liệu ôn thi độc quyền.'
               : 'Resume in-progress drafts, manage your vocabulary notebook, and access curated exam materials.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="flex gap-10">
           <button 
             type="button" 
-            className="std-eco-btn-primary"
+            className="btn btn-primary"
             onClick={() => navigate('/student/assignments')}
           >
             <Plus size={16} />
@@ -237,106 +237,108 @@ export const StudentWorkspace: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="std-eco-tabs">
+      <div className="flex items-center gap-12 mb-32 border-b">
         <button
           type="button"
-          className={`std-eco-tab-btn ${activeTab === 'drafts' ? 'active' : ''}`}
+          className={`flex items-center gap-8 font-medium p-12-18 border-none bg-transparent cursor-pointer transition-all ${activeTab === 'drafts' ? 'text-primary' : 'text-on-surface-variant'}`}
+          style={{ borderBottom: activeTab === 'drafts' ? '2px solid var(--primary)' : '2px solid transparent' }}
           onClick={() => setActiveTab('drafts')}
         >
           <Clock size={16} />
           <span>{isVi ? 'Bản nháp đang làm' : 'In-Progress Drafts'}</span>
-          <span className="std-eco-pill-badge">{drafts.length}</span>
+          <span className="flex justify-center items-center rounded-full text-white bg-primary" style={{ fontSize: '11px', padding: '2px 8px', marginLeft: '4px' }}>{drafts.length}</span>
         </button>
 
         <button
           type="button"
-          className={`std-eco-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
+          className={`flex items-center gap-8 font-medium p-12-18 border-none bg-transparent cursor-pointer transition-all ${activeTab === 'notes' ? 'text-primary' : 'text-on-surface-variant'}`}
+          style={{ borderBottom: activeTab === 'notes' ? '2px solid var(--primary)' : '2px solid transparent' }}
           onClick={() => setActiveTab('notes')}
         >
           <BookmarkCheck size={16} />
           <span>{isVi ? 'Sổ tay từ vựng & Ghi chú' : 'Vocabulary & Notes'}</span>
-          <span className="std-eco-pill-badge">{notes.length}</span>
+          <span className="flex justify-center items-center rounded-full text-white bg-primary" style={{ fontSize: '11px', padding: '2px 8px', marginLeft: '4px' }}>{notes.length}</span>
         </button>
 
         <button
           type="button"
-          className={`std-eco-tab-btn ${activeTab === 'resources' ? 'active' : ''}`}
+          className={`flex items-center gap-8 font-medium p-12-18 border-none bg-transparent cursor-pointer transition-all ${activeTab === 'resources' ? 'text-primary' : 'text-on-surface-variant'}`}
+          style={{ borderBottom: activeTab === 'resources' ? '2px solid var(--primary)' : '2px solid transparent' }}
           onClick={() => setActiveTab('resources')}
         >
           <BookOpen size={16} />
           <span>{isVi ? 'Kho tài liệu & Đề mẫu' : 'Curated Resources'}</span>
-          <span className="std-eco-pill-badge">{resources.length}</span>
+          <span className="flex justify-center items-center rounded-full text-white bg-primary" style={{ fontSize: '11px', padding: '2px 8px', marginLeft: '4px' }}>{resources.length}</span>
         </button>
       </div>
 
       {/* TAB 1: DRAFTS */}
       {activeTab === 'drafts' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <span style={{ fontSize: '14px', color: 'var(--on-surface-variant)' }}>
+          <div className="flex-between items-center mb-20">
+            <span className="text-on-surface-variant" style={{ fontSize: '14px' }}>
               {isVi 
                 ? `Bạn có ${drafts.length} bài làm chưa nộp. Tiếp tục hoàn thiện để nộp đúng hạn!` 
                 : `You have ${drafts.length} ongoing drafts. Complete and submit them before the deadline!`}
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '18px' }}>
+          <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' }}>
             {drafts.map((draft) => (
-              <div key={draft.id} className="workspace-draft-card">
+              <div key={draft.id} className="card bg-white p-20 flex-col justify-between">
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '12px' }}>
+                  <div className="flex items-start gap-16 mb-12">
                     {getDraftTypeIcon(draft.type)}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span className={`std-skill-tag ${draft.type}`} style={{ fontSize: '11px', padding: '2px 8px' }}>
+                    <div className="flex-1">
+                      <div className="flex-between items-center">
+                        <span className="font-bold text-uppercase rounded" style={{ fontSize: '11px', padding: '2px 8px', backgroundColor: '#EFF6FF', color: '#2563EB' }}>
                           {draft.type}
                         </span>
                         <button
                           type="button"
                           onClick={(e) => handleDeleteDraft(draft.id, e)}
                           title={isVi ? 'Xóa bản nháp' : 'Delete draft'}
-                          style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer', padding: 4 }}
+                          className="bg-transparent border-none cursor-pointer text-on-surface-variant p-4"
                         >
                           <Trash2 size={15} />
                         </button>
                       </div>
-                      <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', margin: '8px 0 4px 0', lineHeight: 1.4 }}>
+                      <h3 className="font-bold text-on-surface m-0 mt-8 mb-4 leading-snug" style={{ fontSize: '15px' }}>
                         {draft.title}
                       </h3>
-                      <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                      <div className="text-on-surface-variant" style={{ fontSize: '12px' }}>
                         {draft.className}
                       </div>
                     </div>
                   </div>
 
                   {/* Progress & metrics */}
-                  <div style={{ marginTop: '14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)', marginBottom: '6px' }}>
+                  <div className="mt-16">
+                    <div className="flex-between text-on-surface-variant mb-6" style={{ fontSize: '12px' }}>
                       <span>{isVi ? 'Tiến độ hoàn thành' : 'Completion'}</span>
-                      <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{draft.progress}%</span>
+                      <span className="font-bold text-primary">{draft.progress}%</span>
                     </div>
-                    <div className="workspace-progress-bar">
-                      <div className="workspace-progress-fill" style={{ width: `${draft.progress}%` }}></div>
+                    <div className="w-full rounded-full" style={{ height: '6px', backgroundColor: '#E2E8F0' }}>
+                      <div className="rounded-full bg-primary" style={{ height: '100%', width: `${draft.progress}%` }}></div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '12px' }}>
+                  <div className="flex-between items-center mt-12 text-on-surface-variant" style={{ fontSize: '12px' }}>
                     <span>
                       {draft.wordCount && `📝 ${draft.wordCount} ${isVi ? 'từ' : 'words'}`}
                       {draft.duration && `🎙️ ${draft.duration}`}
                     </span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="inline-flex items-center gap-4">
                       <Clock size={12} />
                       {draft.lastSaved}
                     </span>
                   </div>
                 </div>
 
-                <div style={{ paddingTop: '14px', borderTop: '1px solid var(--outline-variant)' }}>
+                <div className="mt-16 pt-16 border-t">
                   <button
                     type="button"
-                    className="std-eco-btn-primary"
-                    style={{ width: '100%' }}
+                    className="btn btn-primary w-full"
                     onClick={() => navigate(draft.route)}
                   >
                     <span>{isVi ? 'Tiếp tục làm bài' : 'Resume Assignment'}</span>
@@ -348,17 +350,17 @@ export const StudentWorkspace: React.FC = () => {
           </div>
 
           {drafts.length === 0 && (
-            <div className="std-eco-card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-              <CheckCircle2 size={40} color="#16a34a" style={{ margin: '0 auto 12px auto' }} />
-              <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 700 }}>
+            <div className="card text-center py-48">
+              <CheckCircle2 size={40} color="#16a34a" className="mx-auto mb-12" />
+              <h3 className="m-0 font-bold mb-6" style={{ fontSize: '16px' }}>
                 {isVi ? 'Không có bản nháp nào đang dở dang!' : 'No unfinished drafts!'}
               </h3>
-              <p style={{ color: 'var(--on-surface-variant)', fontSize: '13.5px', margin: '0 0 18px 0' }}>
+              <p className="text-on-surface-variant m-0 mb-20" style={{ fontSize: '13.5px' }}>
                 {isVi ? 'Tuyệt vời, bạn đã hoàn tất nộp tất cả bài tập.' : 'Great job! You have submitted all assigned work.'}
               </p>
               <button 
                 type="button" 
-                className="std-eco-btn-primary"
+                className="btn btn-primary"
                 onClick={() => navigate('/student/assignments')}
               >
                 {isVi ? 'Khám phá bài tập mới' : 'Browse Assignments'}
@@ -371,19 +373,19 @@ export const StudentWorkspace: React.FC = () => {
       {/* TAB 2: NOTES */}
       {activeTab === 'notes' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div className="flex-between items-center flex-wrap gap-12 mb-20">
             <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--on-surface)' }}>
+              <h3 className="m-0 font-bold text-on-surface" style={{ fontSize: '16px' }}>
                 {isVi ? 'Sổ Tay Học Tập Cá Nhân' : 'Personal Study Notebook'}
               </h3>
-              <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+              <p className="m-0 mt-4 text-on-surface-variant" style={{ fontSize: '13px' }}>
                 {isVi ? 'Lưu trữ các mẫu câu hay, sửa lỗi phát âm và từ vựng band cao dùng cho phòng thi.' : 'Save high-band collocations, grammar patterns, and speaking reminders.'}
               </p>
             </div>
 
             <button
               type="button"
-              className="std-eco-btn-primary"
+              className="btn btn-primary"
               onClick={() => setIsAddingNote(!isAddingNote)}
             >
               <Plus size={16} />
@@ -393,34 +395,26 @@ export const StudentWorkspace: React.FC = () => {
 
           {/* Form thêm ghi chú mới */}
           {isAddingNote && (
-            <div className="std-eco-card" style={{ marginBottom: '22px', border: '2px solid var(--primary-container)' }}>
-              <div className="std-eco-card-header">
-                <span style={{ fontWeight: 700, fontSize: '14px' }}>
+            <div className="card mb-24" style={{ border: '2px solid var(--primary-container)' }}>
+              <div className="mb-16">
+                <span className="font-bold" style={{ fontSize: '14px' }}>
                   {isVi ? 'Tạo ghi chú mới' : 'Create New Study Note'}
                 </span>
               </div>
-              <div className="std-eco-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="flex-col gap-16">
+                <div className="flex flex-wrap gap-12">
                   <input
                     type="text"
-                    className="std-eco-search-input"
+                    className="flex-1 p-12-18 border rounded outline-none"
                     placeholder={isVi ? 'Tiêu đề ghi chú (VD: Idioms for Environment...)' : 'Note title...'}
                     value={newNoteTitle}
                     onChange={(e) => setNewNoteTitle(e.target.value)}
-                    style={{ flex: 2, paddingLeft: 14 }}
                   />
                   <select
                     value={newNoteCategory}
+                    className="p-12 border rounded outline-none"
                     onChange={(e) => setNewNoteCategory(e.target.value as 'Vocabulary' | 'Speaking' | 'Grammar' | 'General')}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: '13px',
-                      borderRadius: 'var(--radius-md, 8px)',
-                      border: '1px solid var(--outline-variant)',
-                      backgroundColor: 'var(--surface)',
-                      color: 'var(--on-surface)'
-                    }}
+                    style={{ fontSize: '13px' }}
                   >
                     <option value="Vocabulary">Vocabulary</option>
                     <option value="Speaking">Speaking</option>
@@ -431,24 +425,24 @@ export const StudentWorkspace: React.FC = () => {
 
                 <textarea
                   rows={4}
-                  className="std-eco-search-input"
+                  className="w-full p-12 border rounded outline-none"
                   placeholder={isVi ? 'Nội dung ghi chú, từ vựng hoặc ví dụ câu...' : 'Write note contents or example sentences...'}
                   value={newNoteContent}
                   onChange={(e) => setNewNoteContent(e.target.value)}
-                  style={{ width: '100%', resize: 'vertical', padding: '10px 14px' }}
+                  style={{ resize: 'vertical' }}
                 />
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <div className="flex justify-end gap-12">
                   <button
                     type="button"
-                    className="std-eco-btn-secondary"
+                    className="btn btn-secondary"
                     onClick={() => setIsAddingNote(false)}
                   >
                     {isVi ? 'Hủy' : 'Cancel'}
                   </button>
                   <button
                     type="button"
-                    className="std-eco-btn-primary"
+                    className="btn btn-primary"
                     onClick={handleAddNote}
                   >
                     {isVi ? 'Lưu ghi chú' : 'Save Note'}
@@ -459,49 +453,39 @@ export const StudentWorkspace: React.FC = () => {
           )}
 
           {/* Danh sách ghi chú */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '18px' }}>
+          <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
             {notes.map((note) => (
-              <div key={note.id} className="note-card">
+              <div key={note.id} className="card bg-white p-20 flex-col justify-between">
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span 
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        backgroundColor: '#eff6ff',
-                        color: '#2563eb'
-                      }}
-                    >
+                  <div className="flex-between items-center mb-8">
+                    <span className="font-bold text-uppercase rounded text-primary" style={{ fontSize: '11px', padding: '3px 8px', backgroundColor: '#EFF6FF' }}>
                       {note.category}
                     </span>
-                    <span style={{ fontSize: '11.5px', color: 'var(--on-surface-variant)' }}>
+                    <span className="text-on-surface-variant" style={{ fontSize: '11.5px' }}>
                       {note.date}
                     </span>
                   </div>
 
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', margin: '0 0 10px 0' }}>
+                  <h4 className="font-bold text-on-surface m-0 mb-12" style={{ fontSize: '15px' }}>
                     {note.title}
                   </h4>
 
-                  <div style={{ fontSize: '13px', lineHeight: 1.6, color: '#334155', whiteSpace: 'pre-line', backgroundColor: 'var(--surface-container-low)', padding: '12px 14px', borderRadius: '8px' }}>
+                  <div className="leading-relaxed text-on-surface-variant p-12 rounded" style={{ fontSize: '13px', whiteSpace: 'pre-line', backgroundColor: '#F3F4F6' }}>
                     {note.content}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--outline-variant)' }}>
+                <div className="flex-between items-center pt-12 mt-16 border-t">
                   <button
                     type="button"
-                    className="std-eco-btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '12px' }}
+                    className="flex items-center gap-6 font-medium bg-transparent border cursor-pointer rounded p-6-12"
+                    style={{ fontSize: '12px', color: copiedNoteId === note.id ? '#16A34A' : '#475569', borderColor: copiedNoteId === note.id ? '#16A34A' : '#E2E8F0' }}
                     onClick={() => handleCopyNote(note)}
                   >
                     {copiedNoteId === note.id ? (
                       <>
                         <Check size={13} color="#16a34a" />
-                        <span style={{ color: '#16a34a' }}>{isVi ? 'Đã sao chép!' : 'Copied!'}</span>
+                        <span>{isVi ? 'Đã sao chép!' : 'Copied!'}</span>
                       </>
                     ) : (
                       <>
@@ -514,7 +498,8 @@ export const StudentWorkspace: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteNote(note.id)}
-                    style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                    className="flex items-center gap-6 font-medium bg-transparent border-none cursor-pointer text-error p-6-12"
+                    style={{ fontSize: '12px' }}
                   >
                     <Trash2 size={13} />
                     <span>{isVi ? 'Xóa' : 'Delete'}</span>
@@ -529,45 +514,44 @@ export const StudentWorkspace: React.FC = () => {
       {/* TAB 3: RESOURCES */}
       {activeTab === 'resources' && (
         <div>
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--on-surface)' }}>
+          <div className="mb-24">
+            <h3 className="m-0 font-bold text-on-surface" style={{ fontSize: '16px' }}>
               {isVi ? 'Thư Viện Tài Liệu & Đề Thi Mẫu' : 'Official IELTS Practice Materials & Guides'}
             </h3>
-            <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <p className="m-0 mt-4 text-on-surface-variant" style={{ fontSize: '13px' }}>
               {isVi ? 'Tài liệu tiêu chuẩn do EnglishHub biên soạn và chọn lọc từ Cambridge & Hội đồng Anh.' : 'Verified academic materials, rubrics, and high-band practice audio files.'}
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '18px' }}>
+          <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))' }}>
             {resources.map((res) => (
-              <div key={res.id} className="resource-card">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div key={res.id} className="flex-between items-start card bg-white p-20 gap-16">
+                <div className="flex items-start gap-16">
+                  <div className="flex-center rounded text-primary flex-shrink-0" style={{ width: 44, height: 44, backgroundColor: '#EFF6FF' }}>
                     <FileText size={22} />
                   </div>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--surface-container-high)', padding: '2px 8px', borderRadius: '4px', color: 'var(--on-surface)' }}>
+                    <div className="flex items-center gap-8 mb-4">
+                      <span className="font-bold text-on-surface rounded" style={{ fontSize: '11px', backgroundColor: '#F3F4F6', padding: '2px 8px' }}>
                         {res.format}
                       </span>
-                      <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                      <span className="text-on-surface-variant" style={{ fontSize: '12px' }}>
                         {res.size} • {res.downloads.toLocaleString()} {isVi ? 'lượt tải' : 'downloads'}
                       </span>
                     </div>
-                    <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--on-surface)', margin: '0 0 6px 0', lineHeight: 1.4 }}>
+                    <h4 className="font-bold text-on-surface m-0 mb-8 leading-snug" style={{ fontSize: '14.5px' }}>
                       {res.title}
                     </h4>
-                    <p style={{ fontSize: '12.5px', color: 'var(--on-surface-variant)', margin: 0, lineHeight: 1.5 }}>
+                    <p className="m-0 leading-normal text-on-surface-variant" style={{ fontSize: '12.5px' }}>
                       {res.description}
                     </p>
                   </div>
                 </div>
 
-                <div style={{ flexShrink: 0 }}>
+                <div className="flex-shrink-0">
                   <button
                     type="button"
-                    className="std-eco-btn-secondary"
-                    style={{ padding: '8px 12px' }}
+                    className="btn btn-secondary bg-white"
                     onClick={() => alert(isVi ? `Đang bắt đầu tải: ${res.title}` : `Downloading: ${res.title}`)}
                   >
                     <Download size={15} />

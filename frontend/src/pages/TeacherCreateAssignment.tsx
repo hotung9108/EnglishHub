@@ -1,422 +1,566 @@
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ArrowLeft, FileText, UploadCloud, CheckCircle, Calendar, Eye,
-  Bold, Link, ChevronDown, Send
+  ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
+  Calendar, Eye, Save, Send, CheckCircle2, Bell
 } from 'lucide-react';
-import { FileItem, StickyActionBar } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import type { 
+  AssignmentEditorData, AssignmentSkill 
+} from '../types/assignment-editor.types';
+import { 
+  SkillWritingEditor, 
+  SkillSpeakingEditor, 
+  SkillReadingEditor, 
+  SkillListeningEditor,
+  AssignmentPreviewModal
+} from '../components/assignments/editor';
+import { StickyActionBar } from '../components/common';
+import '../styles/teacher-assignment-edit.css';
 
-const TeacherCreateAssignment = () => {
+export const TeacherCreateAssignment: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const { language } = useLanguage();
+  const isVi = language === 'vi';
+
+  // Get initial skill from query param ?type=speaking | reading | listening | writing
+  const querySkill = searchParams.get('type') as AssignmentSkill | null;
+  const initialSkill: AssignmentSkill = (querySkill && ['writing', 'speaking', 'reading', 'listening'].includes(querySkill)) 
+    ? querySkill 
+    : 'writing';
+
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>({
+    id: `new-${Date.now()}`,
+    code: initialSkill === 'speaking' ? 'HW-02-NEW' : initialSkill === 'reading' ? 'HW-03-NEW' : initialSkill === 'listening' ? 'HW-04-NEW' : 'HW-06',
+    title: initialSkill === 'speaking' 
+      ? 'Speaking Part 2: Environmental Solutions' 
+      : initialSkill === 'reading' 
+      ? 'IELTS Reading Mock: Emerging Clean Energy Tech' 
+      : initialSkill === 'listening' 
+      ? 'IELTS Listening: Campus Orientation & Library Guide' 
+      : 'HW-06: IELTS Writing Task 2 - Sustainable Urban Development',
+    skill: initialSkill,
+    className: 'ENG-IELTS-6.5A',
+    startDate: new Date().toISOString().slice(0, 16),
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    durationMinutes: initialSkill === 'reading' ? 60 : initialSkill === 'listening' ? 30 : 60,
+    allowLate: true,
+    status: 'active',
+    targetAudience: 'all',
+    notifyStudents: true,
+    maxSubmissions: 3,
+    writing: {
+      taskType: 'task2',
+      promptText: 'As global urbanization accelerates, metropolitan areas encounter significant environmental challenges. Discuss the main issues caused by rapid city growth and suggest practical measures governments and citizens can undertake to achieve sustainable urban development. (Write at least 250 words).',
+      minWords: 250,
+      scale: '9.0',
+      rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
+      enableAi: true,
+      aiInstruction: 'Khắt khe với các lỗi diễn đạt chung chung; gạch chân cấu trúc ngữ pháp Band 7.5+ và collocations cao cấp.',
+      enablePlagiarismCheck: true,
+      modelAnswer: '',
+      attachments: [
+        {
+          id: 'att-new-1',
+          name: 'IELTS_Writing_Task2_Guide.pdf',
+          size: '1.1 MB',
+          extension: 'pdf'
+        }
+      ]
+    },
+    speaking: {
+      partType: 'part2',
+      cueCardTopic: 'Describe an eco-friendly action you took to protect the local environment.',
+      cueCardBullets: [
+        'What the action was',
+        'When and where you took it',
+        'Why you decided to do it',
+        'And explain how you felt after completing this action.'
+      ],
+      prepTimeSeconds: 60,
+      speakingTimeSeconds: 120,
+      maxRetries: 3,
+      examinerSampleAudioUrl: 'https://cdn.englishhub.edu.vn/audio/speaking/sample-hw02.mp3',
+      examinerTranscript: 'You have one minute to prepare your speech on this topic.',
+      followUpQuestions: [
+        {
+          id: 'sq-new-1',
+          order: 1,
+          question: 'Do schools in your country educate students about environmental conservation?',
+          hint: 'Discuss curriculum, extracurricular recycling campaigns, and tree-planting days.'
+        }
+      ],
+      rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
+      enableAi: true,
+      aiModel: 'Whisper V3 Large',
+      aiInstruction: 'Đặc biệt kiểm tra phụ âm cuối /s/, /z/, /t/ và ngữ điệu câu hỏi.'
+    },
+    reading: {
+      passageTitle: 'The Architecture of Green Smart Cities',
+      passageSubtitle: 'Cambridge Academic Reading Section',
+      passageSource: 'Journal of Urban Ecology & Architecture',
+      timeLimitMinutes: 20,
+      enableAiExplanation: true,
+      aiInstruction: 'Cung cấp phân tích chi tiết cho từng phương án bẫy.',
+      paragraphs: [
+        {
+          id: 'p-new-1',
+          label: 'A',
+          title: 'The Rise of Smart Cities',
+          content: 'Smart cities leverage IoT sensors, real-time analytics, and energy-efficient building materials to minimize greenhouse gas emissions and enhance civic infrastructure.'
+        },
+        {
+          id: 'p-new-2',
+          label: 'B',
+          title: 'Renewable Power Integration',
+          content: 'Solar façades and distributed wind micro-turbines now supply substantial electricity directly to high-density commercial districts, reducing reliance on fossil fuels.'
+        }
+      ],
+      questions: [
+        {
+          id: 'rq-new-1',
+          order: 1,
+          type: 'multiple_choice',
+          prompt: 'What is the primary objective of deploying IoT sensors in green smart cities?',
+          options: [
+            'To monitor energy consumption and minimize greenhouse emissions',
+            'To replace human architects with artificial intelligence',
+            'To increase the cost of commercial real estate',
+            'To conduct surveillance on residential neighborhoods'
+          ],
+          correctAnswer: 'To monitor energy consumption and minimize greenhouse emissions',
+          explanation: 'Đoạn A khẳng định: "minimize greenhouse gas emissions and enhance civic infrastructure".',
+          paragraphRef: 'A',
+          points: 1
+        }
+      ]
+    },
+    listening: {
+      audioTitle: 'Campus_Orientation_Eco_Initiatives.mp3',
+      audioUrl: 'https://cdn.englishhub.edu.vn/audio/listening/campus-orientation.mp3',
+      audioDurationSeconds: 1200,
+      playbackLimit: 'single',
+      transcript: `[00:10] Speaker 1: Good morning and welcome to the university environmental seminar.
+[00:30] Speaker 2: We would like to register our student society for the campus recycling initiative.`,
+      hideTranscriptUntilGraded: true,
+      activeSection: 'section1',
+      enableAiDistractorCheck: true,
+      aiInstruction: 'Lưu ý người nói có đính chính ngày nộp đơn đăng ký.',
+      questions: [
+        {
+          id: 'lq-new-1',
+          order: 1,
+          section: 'section1',
+          type: 'form_completion',
+          prompt: 'Society registration name: [ _____ ] Initiative',
+          correctAnswer: 'Campus Recycling',
+          acceptableAnswers: ['campus recycling', 'Campus Recycling Initiative'],
+          timestampClue: '00:30',
+          points: 1
+        }
+      ]
+    }
+  });
+
+  useEffect(() => {
+    if (querySkill && ['writing', 'speaking', 'reading', 'listening'].includes(querySkill)) {
+      setAssignmentData(prev => ({ ...prev, skill: querySkill }));
+    }
+  }, [querySkill]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSaveDraft = () => {
+    showToast(isVi ? 'Đã lưu bản nháp bài tập mới!' : 'Draft assignment saved!');
+  };
+
+  const handlePublish = () => {
+    showToast(isVi ? 'Đã giao bài tập mới thành công!' : 'Assignment created and published successfully!');
+    setTimeout(() => {
+      navigate('/teacher/assignments');
+    }, 1200);
+  };
 
   return (
-    <div style={{ paddingBottom: '80px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* Header Section */}
-      <div style={{ marginBottom: '24px' }}>
+    <div className="assignment-edit-container">
+      {/* Breadcrumb Navigation */}
+      <div className="assignment-edit-breadcrumb">
         <button 
+          type="button"
+          className="assignment-edit-back-btn"
           onClick={() => navigate('/teacher/assignments')}
-          style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: '6px', 
-            color: '#6B7280', 
-            background: 'none', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 600,
-            marginBottom: '8px',
-            padding: 0,
-            transition: 'color 0.2s'
-          }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#2563EB'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#6B7280'}
         >
-          <ArrowLeft size={16} /> {t('createAssignment.backToList')}
+          <ArrowLeft size={16} />
+          <span>{isVi ? 'Quản lý bài tập' : 'Assignments Library'}</span>
         </button>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827', margin: '0 0 4px 0', letterSpacing: '-0.025em' }}>
-              {t('createAssignment.title')}
-            </h1>
-            <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>
-              {t('createAssignment.subtitle')}
-            </p>
+        <span>/</span>
+        <span>{assignmentData.className}</span>
+        <span>/</span>
+        <span style={{ fontWeight: 700, color: 'var(--on-surface, #111827)' }}>
+          {isVi ? 'Giao bài tập mới' : 'Create New Assignment'}
+        </span>
+      </div>
+
+      {/* Header */}
+      <div className="assignment-edit-header">
+        <div className="assignment-edit-title-wrap">
+          <div className="assignment-edit-title-row">
+            <span className="assignment-edit-code-badge" style={{ backgroundColor: '#2563eb' }}>
+              MỚI
+            </span>
+            <input 
+              type="text" 
+              className="assignment-edit-title-input"
+              value={assignmentData.title}
+              onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
+              placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
+            />
           </div>
-          
-          <div style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
-            backgroundColor: 'white', padding: '6px 14px', 
-            borderRadius: '8px', border: '1px solid #E5E7EB', 
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-            alignSelf: 'flex-start'
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-            <span style={{ fontSize: '12px', color: '#6B7280' }}>{t('createAssignment.assigningTo')}</span>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#1F2937' }}>ENG-IELTS-6.5A (Intensive)</span>
-            <button style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', marginLeft: '4px', padding: 0 }}>
-              <ChevronDown size={14} />
-            </button>
-          </div>
+          <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
+            {isVi 
+              ? 'Thiết lập nội dung đề thi theo 4 kỹ năng chuẩn IELTS, đính kèm học liệu và cấu hình chấm điểm AI.'
+              : 'Configure 4 IELTS skill assignment templates, attachments, and automated AI scoring.'}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <select 
+            value={assignmentData.className}
+            onChange={(e) => setAssignmentData({ ...assignmentData, className: e.target.value })}
+            style={{ 
+              padding: '8px 14px', 
+              fontSize: '13px', 
+              borderRadius: '8px', 
+              border: '1px solid #cbd5e1', 
+              backgroundColor: '#ffffff',
+              fontWeight: 600
+            }}
+          >
+            <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A (Intensive)</option>
+            <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV (Ngữ pháp)</option>
+            <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750 (Cấp tốc)</option>
+          </select>
         </div>
       </div>
 
-      {/* Grid Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-        <style>{`
-          @media (min-width: 1024px) {
-            .create-grid { grid-template-columns: 2fr 1fr !important; }
-          }
-          .input-field {
-            width: 100%; padding: 10px 14px; background-color: #F8FAFC; border: 1px solid #E2E8F0;
-            border-radius: 8px; font-size: 14px; color: #1E293B; outline: none; transition: all 0.2s;
-            box-sizing: border-box;
-          }
-          .input-field:focus {
-            background-color: white; border-color: #3B82F6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-          }
-          .label-text {
-            display: block; font-size: 12px; font-weight: 600; color: #334155; 
-            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
-          }
-          .card-wrapper {
-            background-color: white; border-radius: 12px; border: 1px solid #E2E8F0;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); padding: 24px;
-          }
-          .card-header {
-            display: flex; align-items: center; gap: 10px; padding-bottom: 16px; 
-            border-bottom: 1px solid #F1F5F9; margin-bottom: 20px;
-          }
-        `}</style>
-        <div className="create-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-          
-          {/* LEFT COLUMN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* CARD 1: Assignment Details */}
-            <section className="card-wrapper">
-              <div className="card-header">
-                <div style={{ padding: '8px', backgroundColor: '#EFF6FF', color: '#2563EB', borderRadius: '8px' }}>
-                  <FileText size={20} />
+      {/* Skill Tabs Navigation */}
+      <div className="skill-tabs-nav">
+        <button 
+          type="button"
+          className={`skill-tab-btn ${assignmentData.skill === 'writing' ? 'active-writing' : ''}`}
+          onClick={() => setAssignmentData({ ...assignmentData, skill: 'writing' })}
+        >
+          <PenTool size={16} />
+          <span>Writing (Kỹ năng Viết)</span>
+        </button>
+
+        <button 
+          type="button"
+          className={`skill-tab-btn ${assignmentData.skill === 'speaking' ? 'active-speaking' : ''}`}
+          onClick={() => setAssignmentData({ ...assignmentData, skill: 'speaking' })}
+        >
+          <Mic size={16} />
+          <span>Speaking (Kỹ năng Nói)</span>
+        </button>
+
+        <button 
+          type="button"
+          className={`skill-tab-btn ${assignmentData.skill === 'reading' ? 'active-reading' : ''}`}
+          onClick={() => setAssignmentData({ ...assignmentData, skill: 'reading' })}
+        >
+          <BookOpen size={16} />
+          <span>Reading (Kỹ năng Đọc)</span>
+        </button>
+
+        <button 
+          type="button"
+          className={`skill-tab-btn ${assignmentData.skill === 'listening' ? 'active-listening' : ''}`}
+          onClick={() => setAssignmentData({ ...assignmentData, skill: 'listening' })}
+        >
+          <Headphones size={16} />
+          <span>Listening (Kỹ năng Nghe)</span>
+        </button>
+      </div>
+
+      {/* Grid: Skill Workspace (Left) + Settings Sidebar (Right) */}
+      <div className="assignment-edit-grid">
+        {/* LEFT COLUMN: Skill Workspace */}
+        <div>
+          {assignmentData.skill === 'writing' && (
+            <SkillWritingEditor 
+              config={assignmentData.writing}
+              onChange={(updated) => setAssignmentData({ ...assignmentData, writing: updated })}
+            />
+          )}
+
+          {assignmentData.skill === 'speaking' && (
+            <SkillSpeakingEditor 
+              config={assignmentData.speaking}
+              onChange={(updated) => setAssignmentData({ ...assignmentData, speaking: updated })}
+            />
+          )}
+
+          {assignmentData.skill === 'reading' && (
+            <SkillReadingEditor 
+              config={assignmentData.reading}
+              onChange={(updated) => setAssignmentData({ ...assignmentData, reading: updated })}
+            />
+          )}
+
+          {assignmentData.skill === 'listening' && (
+            <SkillListeningEditor 
+              config={assignmentData.listening}
+              onChange={(updated) => setAssignmentData({ ...assignmentData, listening: updated })}
+            />
+          )}
+        </div>
+
+        {/* RIGHT COLUMN: Settings Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Schedule */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <div className="edit-card-header-left">
+                <div className="edit-card-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+                  <Calendar size={18} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card1Title')}</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card1Subtitle')}</p>
+                  <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
+                  <p className="edit-card-desc">{isVi ? 'Thời gian mở và hạn chót' : 'Open & Close dates'}</p>
                 </div>
               </div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            </div>
+
+            <div className="edit-form-group">
+              <label className="edit-form-label">{isVi ? 'Thời gian mở đề (Open at)' : 'Open Time'}</label>
+              <input 
+                type="datetime-local" 
+                className="edit-form-input" 
+                value={assignmentData.startDate}
+                onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
+              />
+            </div>
+
+            <div className="edit-form-group">
+              <label className="edit-form-label">
+                {isVi ? 'Hạn chót nộp bài (Close at)' : 'Due Date'} <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <input 
+                type="datetime-local" 
+                className="edit-form-input" 
+                value={assignmentData.dueDate}
+                onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
+                style={{ fontWeight: 600 }}
+              />
+            </div>
+
+            <div className="edit-form-group">
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={assignmentData.allowLate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, allowLate: e.target.checked })}
+                  style={{ marginTop: '3px', accentColor: '#2563eb' }}
+                />
+                <span style={{ fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
+                  <strong style={{ display: 'block', color: '#0f172a' }}>{isVi ? 'Cho phép nộp muộn' : 'Allow late submissions'}</strong>
+                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                    {isVi ? 'Tối đa trễ 24 giờ sau hạn chót (tự động gắn cờ Nộp muộn).' : 'Max 24h grace period.'}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="edit-form-group" style={{ marginBottom: 0 }}>
+              <label className="edit-form-label">{isVi ? 'Thời lượng làm bài có bấm giờ' : 'Duration Limit'}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="number" 
+                  className="edit-form-input" 
+                  value={assignmentData.durationMinutes || 60}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, durationMinutes: parseInt(e.target.value) || 0 })}
+                  style={{ width: '90px' }}
+                />
+                <span style={{ fontSize: '12.5px', color: '#64748b' }}>
+                  {isVi ? 'phút' : 'minutes'}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Visibility & Status */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <div className="edit-card-header-left">
+                <div className="edit-card-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+                  <Eye size={18} />
+                </div>
                 <div>
-                  <label className="label-text">
-                    {t('createAssignment.fieldTitle')} <span style={{ color: '#EF4444' }}>*</span>
-                  </label>
+                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái & Đối Tượng' : 'Publish & Audience'}</h3>
+                  <p className="edit-card-desc">{isVi ? 'Quyền truy cập của học viên' : 'Student access'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="edit-form-group">
+              <label className="edit-form-label">{isVi ? 'Trạng thái phát hành' : 'Publish Status'}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  style={{ 
+                    padding: '8px 10px', 
+                    borderRadius: '8px', 
+                    border: assignmentData.status === 'active' ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                    backgroundColor: assignmentData.status === 'active' ? '#eff6ff' : '#ffffff',
+                    color: assignmentData.status === 'active' ? '#1d4ed8' : '#64748b',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setAssignmentData({ ...assignmentData, status: 'active' })}
+                >
+                  {isVi ? 'Công khai' : 'Published'}
+                </button>
+                <button
+                  type="button"
+                  style={{ 
+                    padding: '8px 10px', 
+                    borderRadius: '8px', 
+                    border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                    backgroundColor: assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
+                    color: assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setAssignmentData({ ...assignmentData, status: 'draft' })}
+                >
+                  {isVi ? 'Bản nháp' : 'Draft'}
+                </button>
+              </div>
+            </div>
+
+            <div className="edit-form-group">
+              <label className="edit-form-label">{isVi ? 'Phạm vi giao bài' : 'Audience Target'}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
                   <input 
-                    type="text" 
-                    className="input-field" 
-                    placeholder={t('createAssignment.placeholderTitle')} 
-                    defaultValue="HW-06: IELTS Writing Task 2 - Renewable Energy Essay"
-                    style={{ fontWeight: 500 }}
+                    type="radio" 
+                    name="audience" 
+                    checked={assignmentData.targetAudience === 'all'}
+                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
+                    style={{ accentColor: '#2563eb' }}
                   />
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <label className="label-text">{t('createAssignment.fieldSkill')}</label>
-                    <select className="input-field">
-                      <option value="writing">{t('createAssignment.skillWriting')}</option>
-                      <option value="speaking">{t('createAssignment.skillSpeaking')}</option>
-                      <option value="reading">{t('createAssignment.skillReading')}</option>
-                      <option value="listening">{t('createAssignment.skillListening')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-text">{t('createAssignment.fieldType')}</label>
-                    <select className="input-field">
-                      <option value="task2">{t('createAssignment.typeTask2')}</option>
-                      <option value="task1">{t('createAssignment.typeTask1')}</option>
-                      <option value="custom">{t('createAssignment.typeCustom')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="label-text">{t('createAssignment.fieldInstructions')}</label>
-                  <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F8FAFC' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px', backgroundColor: '#F1F5F9', borderBottom: '1px solid #E2E8F0' }}>
-                      <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569', fontWeight: 'bold' }}>B</button>
-                      <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569', fontStyle: 'italic', fontFamily: 'serif' }}>I</button>
-                      <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569', textDecoration: 'underline' }}>U</button>
-                      <div style={{ width: '1px', height: '16px', backgroundColor: '#CBD5E1', margin: '0 4px' }}></div>
-                      <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569' }}><Bold size={14} /></button>
-                      <button style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '4px', color: '#475569' }}><Link size={14} /></button>
-                    </div>
-                    <textarea 
-                      className="input-field" 
-                      style={{ border: 'none', backgroundColor: 'white', borderRadius: 0, resize: 'vertical' }}
-                      rows={4}
-                      defaultValue="The burning of fossil fuels has caused substantial environmental damage over the last century. Some people believe that renewable energy resources should replace fossil fuels entirely, while others argue that doing so is impractical. Discuss both views and give your opinion. (Tối thiểu 250 từ, đảm bảo 4 tiêu chí: TR, CC, LR, GRA)."
-                    ></textarea>
-                  </div>
-                </div>
+                  {isVi ? 'Toàn bộ học viên trong lớp (24 học viên)' : 'All class students (24)'}
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="audience" 
+                    checked={assignmentData.targetAudience === 'specific'}
+                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'specific' })}
+                    style={{ accentColor: '#2563eb' }}
+                  />
+                  {isVi ? 'Chỉ định nhóm học viên cụ thể' : 'Specific student group'}
+                </label>
               </div>
-            </section>
+            </div>
 
-            {/* CARD 2: Import From Files */}
-            <section className="card-wrapper">
-              <div className="card-header" style={{ justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ padding: '8px', backgroundColor: '#EEF2FF', color: '#4F46E5', borderRadius: '8px' }}>
-                    <UploadCloud size={20} />
-                  </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card2Title')}</h2>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card2Subtitle')}</p>
-                  </div>
-                </div>
-                <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>{t('createAssignment.uploadedCount')}</span>
-              </div>
-              
-              <div style={{ 
-                border: '2px dashed #BFDBFE', backgroundColor: 'rgba(239, 246, 255, 0.4)',
-                borderRadius: '12px', padding: '24px', textAlign: 'center', cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}>
-                <div style={{ 
-                  width: '48px', height: '48px', margin: '0 auto 12px', borderRadius: '50%', 
-                  backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  color: '#2563EB' 
-                }}>
-                  <UploadCloud size={24} />
-                </div>
-                <p style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 600, color: '#334155' }}>
-                  {t('createAssignment.dragDropPrefix')}<span style={{ color: '#2563EB', textDecoration: 'underline' }}>{t('createAssignment.dragDropLink')}</span>
-                </p>
-                <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
-                  {t('createAssignment.supportedFormats')}
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
-                <FileItem 
-                  name="De_bai_Writing_Task_2_Renewable_Energy.pdf"
-                  extension="pdf"
-                  size="1.2 MB"
-                  details={t('createAssignment.uploadComplete')}
-                  onView={() => {}}
-                  onRemove={() => {}}
+            <div style={{ paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={assignmentData.notifyStudents}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, notifyStudents: e.target.checked })}
+                  style={{ accentColor: '#2563eb' }}
                 />
-
-                <FileItem 
-                  name="Rubric_IELTS_Writing_Band_Descriptors.pdf"
-                  extension="pdf"
-                  size="450 KB"
-                  details={t('createAssignment.attachedRubric')}
-                  onView={() => {}}
-                  onRemove={() => {}}
-                />
-              </div>
-            </section>
-
-            {/* CARD 3: Answer Keys and Grading */}
-            <section className="card-wrapper">
-              <div className="card-header">
-                <div style={{ padding: '8px', backgroundColor: '#ECFDF5', color: '#059669', borderRadius: '8px' }}>
-                  <CheckCircle size={20} />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card3Title')}</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card3Subtitle')}</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', background: 'linear-gradient(to right, rgba(239, 246, 255, 0.7), rgba(238, 242, 255, 0.7))', borderRadius: '12px', border: '1px solid #DBEAFE' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CheckCircle size={16} />
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B', display: 'block' }}>{t('createAssignment.enableAi')}</span>
-                      <p style={{ margin: 0, fontSize: '11px', color: '#64748B' }}>{t('createAssignment.aiDesc')}</p>
-                    </div>
-                  </div>
-                  <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }} />
-                    <div style={{ width: '44px', height: '24px', backgroundColor: '#2563EB', borderRadius: '9999px', position: 'relative', transition: 'all 0.3s' }}>
-                      <div style={{ position: 'absolute', top: '2px', left: '22px', width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%', transition: 'all 0.3s', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}></div>
-                    </div>
-                  </label>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <label className="label-text">{t('createAssignment.fieldScale')}</label>
-                    <select className="input-field">
-                      <option value="9.0">{t('createAssignment.scale9')}</option>
-                      <option value="10">{t('createAssignment.scale10')}</option>
-                      <option value="100">{t('createAssignment.scale100')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-text">{t('createAssignment.fieldRubric')}</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '8px' }}>
-                      <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>TR: 25%</span>
-                      <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>CC: 25%</span>
-                      <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>LR: 25%</span>
-                      <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', borderRadius: '4px', fontSize: '12px', fontWeight: 500, color: '#475569' }}>GRA: 25%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="label-text">{t('createAssignment.fieldSample')}</label>
-                  <textarea 
-                    className="input-field" 
-                    placeholder={t('createAssignment.placeholderSample')} 
-                    rows={3}
-                  ></textarea>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* CARD 4: Schedule */}
-            <section className="card-wrapper">
-              <div className="card-header">
-                <div style={{ padding: '8px', backgroundColor: '#FFFBEB', color: '#D97706', borderRadius: '8px' }}>
-                  <Calendar size={20} />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card4Title')}</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card4Subtitle')}</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label className="label-text">{t('createAssignment.fieldStartDate')}</label>
-                  <input type="datetime-local" className="input-field" defaultValue="2026-09-10T08:00" />
-                </div>
-                <div>
-                  <label className="label-text">{t('createAssignment.fieldDueDate')} <span style={{ color: '#EF4444' }}>*</span></label>
-                  <input type="datetime-local" className="input-field" defaultValue="2026-09-15T23:59" style={{ fontWeight: 500 }} />
-                </div>
-                
-                <div style={{ paddingTop: '8px', borderTop: '1px solid #F1F5F9' }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked style={{ marginTop: '2px', accentColor: '#2563EB' }} />
-                    <span style={{ fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
-                      <strong style={{ fontWeight: 600, color: '#1E293B', display: 'block' }}>{t('createAssignment.allowLate')}</strong>
-                      <span style={{ color: '#94A3B8', display: 'block', marginTop: '2px' }}>{t('createAssignment.allowLateDesc')}</span>
-                    </span>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="label-text">{t('createAssignment.fieldDuration')}</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input type="number" className="input-field" defaultValue="60" style={{ width: '96px' }} />
-                    <span style={{ fontSize: '12px', color: '#64748B' }}>{t('createAssignment.durationHint')}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* CARD 5: Status & Target */}
-            <section className="card-wrapper">
-              <div className="card-header">
-                <div style={{ padding: '8px', backgroundColor: '#FAF5FF', color: '#9333EA', borderRadius: '8px' }}>
-                  <Eye size={20} />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{t('createAssignment.card5Title')}</h2>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>{t('createAssignment.card5Subtitle')}</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label className="label-text" style={{ marginBottom: '8px' }}>{t('createAssignment.fieldStatus')}</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: '1px solid #3B82F6', backgroundColor: '#EFF6FF', color: '#1D4ED8', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                      <input type="radio" name="publish_status" value="active" defaultChecked style={{ accentColor: '#2563EB' }} />
-                      {t('createAssignment.statusActive')}
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0', backgroundColor: 'white', color: '#475569', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                      <input type="radio" name="publish_status" value="draft" style={{ accentColor: '#2563EB' }} />
-                      {t('createAssignment.statusDraft')}
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="label-text" style={{ marginBottom: '8px' }}>{t('createAssignment.fieldAudience')}</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
-                      <input type="radio" name="audience" defaultChecked style={{ accentColor: '#2563EB' }} />
-                      {t('createAssignment.audienceAll')}
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 500, cursor: 'pointer' }}>
-                      <input type="radio" name="audience" style={{ accentColor: '#2563EB' }} />
-                      {t('createAssignment.audienceSpecific')}
-                    </label>
-                  </div>
-                </div>
-
-                <div style={{ paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked style={{ accentColor: '#2563EB' }} />
-                    <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500 }}>
-                      {t('createAssignment.notifyStudents')}
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </section>
-          </div>
+                <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 600 }}>
+                  <Bell size={13} style={{ display: 'inline', marginRight: 4 }} />
+                  {isVi ? 'Gửi thông báo & email đến học sinh' : 'Send app & email alerts'}
+                </span>
+              </label>
+            </div>
+          </section>
         </div>
       </div>
 
+      {/* Sticky Action Bar */}
       <StickyActionBar 
         leftActions={
           <button 
+            type="button"
             onClick={() => navigate('/teacher/assignments')}
             style={{ 
-              padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#475569', 
-              background: 'none', border: 'none', cursor: 'pointer', borderRadius: '8px' 
+              padding: '8px 16px', 
+              fontSize: '13px', 
+              fontWeight: 600, 
+              color: '#475569', 
+              background: 'none', 
+              border: 'none', 
+              cursor: 'pointer', 
+              borderRadius: '8px' 
             }}
           >
-            {t('createAssignment.btnCancel')}
+            {isVi ? 'Hủy bỏ' : 'Cancel'}
           </button>
         }
         rightActions={
-          <>
-            <button style={{ 
-              padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#334155', 
-              backgroundColor: 'white', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer'
-            }}>
-              {t('createAssignment.btnSaveDraft')}
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button 
-              onClick={() => navigate('/teacher/assignments')}
-              style={{ 
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '8px 24px', fontSize: '12px', fontWeight: 700, color: 'white', 
-                backgroundColor: '#2563EB', border: 'none', borderRadius: '8px', cursor: 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)'
-              }}
+              type="button"
+              className="btn btn-secondary bg-white btn-sm"
+              onClick={() => setShowPreviewModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              {t('createAssignment.btnPublish')}
-              <Send size={14} />
+              <Eye size={14} />
+              <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
             </button>
-          </>
+
+            <button 
+              type="button"
+              className="btn btn-secondary bg-white btn-sm"
+              onClick={handleSaveDraft}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Save size={14} />
+              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
+            </button>
+
+            <button 
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handlePublish}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
+            >
+              <Send size={14} />
+              <span>{isVi ? 'Giao bài tập' : 'Create & Publish'}</span>
+            </button>
+          </div>
         }
       />
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <AssignmentPreviewModal 
+          data={assignmentData} 
+          onClose={() => setShowPreviewModal(false)} 
+        />
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="edit-toast">
+          <CheckCircle2 size={18} color="#4ade80" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

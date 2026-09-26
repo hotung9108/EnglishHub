@@ -150,7 +150,7 @@ export const TeacherClasses: React.FC = () => {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button 
             type="button" 
-            className="std-eco-btn-primary"
+            className="btn btn-primary btn-sm"
             onClick={() => navigate('/teacher/assignments/create')}
           >
             <Plus size={16} />
@@ -375,7 +375,7 @@ export const TeacherClasses: React.FC = () => {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                className="std-eco-btn-primary"
+                className="btn btn-primary btn-sm"
                 style={{ flex: 1, padding: '10px 14px' }}
                 onClick={() => navigate(`/teacher/classes/${cls.code}/progress`)}
               >
@@ -385,7 +385,7 @@ export const TeacherClasses: React.FC = () => {
 
               <button
                 type="button"
-                className="std-eco-btn-secondary"
+                className="btn btn-secondary bg-white btn-sm"
                 style={{ padding: '10px 14px' }}
                 onClick={() => navigate(`/teacher/assignments`)}
                 title={isVi ? 'Quản lý bài tập' : 'Manage Assignments'}
