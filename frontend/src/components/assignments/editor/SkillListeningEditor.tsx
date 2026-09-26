@@ -38,7 +38,11 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
     updateField('questions', [...config.questions, newQ]);
   };
 
-  const handleUpdateQuestion = (index: number, field: keyof ListeningQuestionItem, value: any) => {
+  const handleUpdateQuestion = <K extends keyof ListeningQuestionItem>(
+    index: number, 
+    field: K, 
+    value: ListeningQuestionItem[K]
+  ) => {
     const updated = [...config.questions];
     updated[index] = { ...updated[index], [field]: value };
     updateField('questions', updated);
@@ -281,7 +285,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                       className="edit-form-select"
                       style={{ padding: '3px 8px', fontSize: '12px', width: 'auto' }}
                       value={q.type}
-                      onChange={(e) => handleUpdateQuestion(globalIndex, 'type', e.target.value)}
+                      onChange={(e) => handleUpdateQuestion(globalIndex, 'type', e.target.value as ListeningQuestionItem['type'])}
                     >
                       <option value="form_completion">Form / Note Completion</option>
                       <option value="multiple_choice">Multiple Choice</option>

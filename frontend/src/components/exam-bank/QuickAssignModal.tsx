@@ -13,18 +13,19 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
-  const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
-  const defaultStartDate = new Date().toISOString().slice(0, 16);
-
-  const [form, setForm] = useState<QuickAssignForm>({
-    templateId: exam.id,
-    className: 'ENG-IELTS-6.5A',
-    assignmentTitle: `${exam.title}`,
-    assignmentCode: `HW-${exam.code.replace('EB-', '')}`,
-    startDate: defaultStartDate,
-    dueDate: defaultDueDate,
-    allowLate: true,
-    notifyStudents: true
+  const [form, setForm] = useState<QuickAssignForm>(() => {
+    const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+    const defaultStartDate = new Date().toISOString().slice(0, 16);
+    return {
+      templateId: exam.id,
+      className: 'ENG-IELTS-6.5A',
+      assignmentTitle: `${exam.title}`,
+      assignmentCode: `HW-${exam.code.replace('EB-', '')}`,
+      startDate: defaultStartDate,
+      dueDate: defaultDueDate,
+      allowLate: true,
+      notifyStudents: true
+    };
   });
 
   const handleSubmit = (e: React.FormEvent) => {

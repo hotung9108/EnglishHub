@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
@@ -428,12 +428,13 @@ export const TeacherEditAssignment: React.FC = () => {
     }
   };
 
+  const [prevId, setPrevId] = useState(id);
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => getInitialAssignmentData(id));
 
-  // If id changes, update assignment data
-  useEffect(() => {
+  if (id !== prevId) {
+    setPrevId(id);
     setAssignmentData(getInitialAssignmentData(id));
-  }, [id]);
+  }
 
   const showToast = (msg: string) => {
     setToastMessage(msg);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
@@ -33,7 +33,7 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>({
+  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
     id: `new-${Date.now()}`,
     code: initialSkill === 'speaking' ? 'HW-02-NEW' : initialSkill === 'reading' ? 'HW-03-NEW' : initialSkill === 'listening' ? 'HW-04-NEW' : 'HW-06',
     title: initialSkill === 'speaking' 
@@ -164,13 +164,7 @@ export const TeacherCreateAssignment: React.FC = () => {
         }
       ]
     }
-  });
-
-  useEffect(() => {
-    if (querySkill && ['writing', 'speaking', 'reading', 'listening'].includes(querySkill)) {
-      setAssignmentData(prev => ({ ...prev, skill: querySkill }));
-    }
-  }, [querySkill]);
+  }));
 
   const showToast = (msg: string) => {
     setToastMessage(msg);

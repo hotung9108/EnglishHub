@@ -91,7 +91,11 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
     updateField('questions', [...config.questions, newQuestion]);
   };
 
-  const handleUpdateQuestion = (index: number, field: keyof ReadingQuestionItem, value: any) => {
+  const handleUpdateQuestion = <K extends keyof ReadingQuestionItem>(
+    index: number, 
+    field: K, 
+    value: ReadingQuestionItem[K]
+  ) => {
     const updated = [...config.questions];
     updated[index] = { ...updated[index], [field]: value };
     updateField('questions', updated);
