@@ -33,9 +33,18 @@ public final class ApiRoutePolicy {
 
 			// Classes
 			new RouteRule(HttpMethod.POST, "/api/v1/classes", List.of("ADMIN")),
-			new RouteRule(HttpMethod.GET, "/api/v1/classes", List.of("ADMIN", "TEACHER")),
+			// TẠM — test hiện có cho STUDENT xem danh sách lớp của mình; cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
+			new RouteRule(HttpMethod.GET, "/api/v1/classes", List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}", List.of("ADMIN", "TEACHER")),
 			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}/members", List.of("ADMIN", "TEACHER")),
+			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
+			new RouteRule(HttpMethod.PUT, "/api/v1/classes/{id}", List.of("ADMIN")),
+			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
+			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}", List.of("ADMIN")),
+			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
+			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN")),
+			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
+			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN")),
 
 			// Assignment
 			new RouteRule(

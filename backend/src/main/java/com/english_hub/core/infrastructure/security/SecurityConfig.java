@@ -27,6 +27,14 @@ public class SecurityConfig {
 						.authenticationEntryPoint(authenticationEntryPoint)
 						.accessDeniedHandler(accessDeniedHandler))
 				.authorizeHttpRequests(authorize -> {
+					authorize.requestMatchers(
+							"/actuator/health",
+							"/error",
+							"/swagger-ui.html",
+							"/swagger-ui/**",
+							"/v3/api-docs/**",
+							"/swagger-resources/**",
+							"/webjars/**").permitAll();
 					for (ApiRoutePolicy.RouteRule route : ApiRoutePolicy.routes()) {
 						var requestMatcher = authorize.requestMatchers(route.method(), route.pathPattern());
 						if (route.roles().isEmpty()) {
