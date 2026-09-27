@@ -12,6 +12,8 @@ import './styles/student-speaking.css'
 import './styles/student-ecosystem.css'
 import './styles/teacher.css'
 import './styles/login.css'
+import './styles/forgot-password.css'
+import './styles/error-pages.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

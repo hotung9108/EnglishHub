@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useLanguage, LanguageProvider } from '../contexts/LanguageContext';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import type { User } from '../types/auth';
 import { 
@@ -266,13 +266,12 @@ const LoginForm: React.FC = () => {
               <div className="login-input-group">
                 <div className="login-input-label">
                   <span>{isVi ? 'Mật khẩu' : 'Password'}</span>
-                  <a 
-                    href="#forgot" 
-                    onClick={(e) => { e.preventDefault(); alert(isVi ? 'Vui lòng liên hệ Admin để khôi phục mật khẩu.' : 'Please contact your administrator to reset password.'); }}
-                    style={{ fontSize: '12.5px', color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
+                  <Link 
+                    to="/forgot-password" 
+                    className="login-forgot-link"
                   >
                     {isVi ? 'Quên mật khẩu?' : 'Forgot password?'}
-                  </a>
+                  </Link>
                 </div>
                 <div className="login-input-wrapper">
                   <Lock size={16} className="login-input-icon" />
@@ -328,9 +327,5 @@ const LoginForm: React.FC = () => {
 };
 
 export default function LoginPage() {
-  return (
-    <LanguageProvider>
-      <LoginForm />
-    </LanguageProvider>
-  );
+  return <LoginForm />;
 }

@@ -20,8 +20,18 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Role not authorized, maybe redirect to a generic unauthorized page, or the dashboard
-    return <Navigate to="/" replace />;
+    // Role not authorized: redirect to /403 with detailed route diagnostic state
+    return (
+      <Navigate 
+        to="/403" 
+        state={{ 
+          attemptedPath: location.pathname, 
+          allowedRoles, 
+          currentRole: user.role 
+        }} 
+        replace 
+      />
+    );
   }
 
   return <Outlet />;
