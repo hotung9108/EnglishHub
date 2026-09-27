@@ -107,11 +107,18 @@ option id, blank text ordering, and null content.
 
 ## Manual smoke test
 
+> `GET /api/v1/submission-modules/{id}` now requires the module and its parent submission to be
+> `SUBMITTED`/`GRADED` (see `submissions-state-validation-testing.md`), so it can no longer be used
+> to discover question ids while an attempt is still open. Read the prompts from
+> `GET /api/v1/modules/{moduleId}/questions` instead.
+
 1. `POST /api/v1/assignments/{id}/submissions` as a student, then
-   `GET /api/v1/submission-modules/{id}` to get a `MULTIPLE_CHOICE` question id.
+   `GET /api/v1/modules/{moduleId}/questions` to get a `MULTIPLE_CHOICE` question id
+   (`<mcId>`) and the matching `submissionModuleId` from the start response.
 2. Submit `{"answers":[{"questionId":<mcId>,"content":{"selectedOptionIds":[1]}}]}` → `200`, and the
    response `answers[0].content` is `{"selectedOptionIds":[1]}`.
 3. Submit the same with `{"text":"The answer is..."}` → `400`
    `Nội dung câu trả lời không hợp lệ.`
 4. Submit with `{"answer":"x"}` → `400` with the new shape message.
-5. Re-fetch the module detail and confirm `answers[].content` still round-trips unchanged.
+5. `POST /api/v1/submissions/{id}/submit`, then re-fetch the module detail and confirm
+   `answers[].content` still round-trips unchanged.

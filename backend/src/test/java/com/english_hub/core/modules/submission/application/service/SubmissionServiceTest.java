@@ -71,6 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -713,6 +714,23 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void submitModuleRejectsASubmissionThatIsAlreadySubmitted() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(multipleChoice(21L, 1))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bài làm này đã được nộp.");
+		verify(answerRepository, never()).bulkCreate(anyLong(), any());
+		verify(submissionModuleRepository, never()).save(any());
+	}
+
+	@Test
 	void submitModuleRejectsMissingOrEmptyAnswers() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
@@ -1091,12 +1109,12 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void getModuleDetailHidesCorrectAnswersUntilGraded() {
+	void getModuleDetailHidesCorrectAnswersWhileSubmitted() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule quizModule = module(9L);
+		SubmissionModule quizModule = submittedModule(9L);
 		quizModule.setId(150L);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = submittedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1116,7 +1134,7 @@ class SubmissionServiceTest {
 		assertThat(result.moduleId()).isEqualTo(9L);
 		assertThat(result.skill()).isEqualTo(ModuleSkill.READING);
 		assertThat(result.taskType()).isEqualTo(ModuleTaskType.QUIZ);
-		assertThat(result.status()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
 		assertThat(result.grading()).isNotNull();
 		assertThat(result.grading().id()).isEqualTo(77L);
 		assertThat(result.grading().method()).isEqualTo(GradingMethod.AUTO);
@@ -1135,13 +1153,46 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void getModuleDetailRejectsAModuleThatIsNotSubmittedYet() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Phần làm bài chưa được nộp.");
+		verify(moduleQuestionRepository, never()).findDetailsByModuleId(anyLong());
+		verify(answerRepository, never()).findBySubmissionModuleId(anyLong());
+	}
+
+	@Test
+	void getModuleDetailRejectsASubmissionThatIsNotSubmittedYet() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule submittedModule = submittedModule(9L);
+		submittedModule.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(submittedModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Phần làm bài chưa được nộp.");
+		verify(gradingRepository, never()).findBySubmissionModuleId(anyLong());
+	}
+
+	@Test
 	void getModuleDetailRevealsCorrectAnswersWhenGraded() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule gradedModule = module(9L);
 		gradedModule.setId(150L);
 		gradedModule.setStatus(SubmissionStatus.GRADED);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(gradedModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = gradedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1163,11 +1214,10 @@ class SubmissionServiceTest {
 	@Test
 	void getModuleDetailKeepsCorrectAnswerHiddenWhenSubmitted() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule submittedModule = module(9L);
+		SubmissionModule submittedModule = submittedModule(9L);
 		submittedModule.setId(150L);
-		submittedModule.setStatus(SubmissionStatus.SUBMITTED);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(submittedModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = gradedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1186,10 +1236,10 @@ class SubmissionServiceTest {
 	@Test
 	void getModuleDetailReturnsNullGradingWhenAbsent() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule quizModule = module(9L);
+		SubmissionModule quizModule = submittedModule(9L);
 		quizModule.setId(150L);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = submittedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1208,10 +1258,10 @@ class SubmissionServiceTest {
 	@Test
 	void getModuleDetailReturnsEmptyQuestionsAndAnswersForEssay() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule essayModule = module(10L);
+		SubmissionModule essayModule = submittedModule(10L);
 		essayModule.setId(151L);
 		when(submissionModuleRepository.findById(151L)).thenReturn(Optional.of(essayModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = submittedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1248,10 +1298,10 @@ class SubmissionServiceTest {
 	@Test
 	void getModuleDetailAllowsTheClassTeacher() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
-		SubmissionModule quizModule = module(9L);
+		SubmissionModule quizModule = submittedModule(9L);
 		quizModule.setId(150L);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = submittedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
@@ -1287,10 +1337,10 @@ class SubmissionServiceTest {
 	@Test
 	void getModuleDetailAllowsAnAdmin() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
-		SubmissionModule quizModule = module(9L);
+		SubmissionModule quizModule = submittedModule(9L);
 		quizModule.setId(150L);
 		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(quizModule));
-		Submission submission = submission(5L, 41L, 1);
+		Submission submission = submittedSubmission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1428,6 +1478,16 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void getAudioUploadUrl_rejectsAnAlreadySubmittedSubmission() {
+		ownedModule(150L, 88L, 9L, SubmissionStatus.SUBMITTED);
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload ghi âm cho phần làm bài này.");
+		verify(storageService, never()).generatePresignedPutUrl(any(), any());
+	}
+
+	@Test
 	void getAudioUploadUrl_rejectsNonSpeakingOrRecordingModule() {
 		ownedInProgressModule(150L, 88L, 9L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1479,6 +1539,16 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void getDocumentUploadUrl_rejectsAnAlreadySubmittedSubmission() {
+		ownedModule(151L, 88L, 10L, SubmissionStatus.SUBMITTED);
+
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+		verify(storageService, never()).generatePresignedPutUrl(any(), any());
+	}
+
+	@Test
 	void getDocumentUploadUrl_rejectsNonWritingModule() {
 		ownedInProgressModule(151L, 88L, 9L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -1521,8 +1591,14 @@ class SubmissionServiceTest {
 	}
 
 	private SubmissionModule ownedInProgressModule(long moduleId, long submissionId, long assignmentModuleId) {
+		return ownedModule(moduleId, submissionId, assignmentModuleId, SubmissionStatus.IN_PROGRESS);
+	}
+
+	private SubmissionModule ownedModule(
+			long moduleId, long submissionId, long assignmentModuleId, SubmissionStatus submissionStatus) {
 		Submission submission = submission(5L, 41L, 1);
 		submission.setId(submissionId);
+		submission.setStatus(submissionStatus);
 		SubmissionModule submissionModule = module(assignmentModuleId);
 		submissionModule.setId(moduleId);
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
@@ -1583,8 +1659,27 @@ class SubmissionServiceTest {
 		return submission;
 	}
 
+	private Submission submittedSubmission(Long assignmentId, Long studentId, int attemptNumber) {
+		Submission submission = submission(assignmentId, studentId, attemptNumber);
+		submission.setStatus(SubmissionStatus.SUBMITTED);
+		submission.setSubmittedAt(OffsetDateTime.now());
+		return submission;
+	}
+
+	private Submission gradedSubmission(Long assignmentId, Long studentId, int attemptNumber) {
+		Submission submission = submittedSubmission(assignmentId, studentId, attemptNumber);
+		submission.setStatus(SubmissionStatus.GRADED);
+		return submission;
+	}
+
 	private SubmissionModule module(Long moduleId) {
 		return new SubmissionModule(5L, moduleId, SubmissionStatus.IN_PROGRESS);
+	}
+
+	private SubmissionModule submittedModule(Long moduleId) {
+		SubmissionModule submissionModule = module(moduleId);
+		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+		return submissionModule;
 	}
 
 	private Grading grading(Long submissionModuleId, GradingMethod method, GradingStatus status) {

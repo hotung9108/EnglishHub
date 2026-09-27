@@ -76,6 +76,7 @@ public class SubmissionService {
 	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
+	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -231,6 +232,9 @@ public class SubmissionService {
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
+		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
 		ModuleTaskType taskType = moduleInfo == null ? null : moduleInfo.taskType();
@@ -375,6 +379,9 @@ public class SubmissionService {
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
 		verifyReadAccess(submission, caller);
+		if (!isSubmittedOrGraded(submissionModule.getStatus()) || !isSubmittedOrGraded(submission.getStatus())) {
+			throw ApiException.badRequest(NOT_SUBMITTED_YET_MESSAGE);
+		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
 		GradingDetailResult grading = gradingRepository.findBySubmissionModuleId(submissionModuleId).stream()
@@ -418,7 +425,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
-		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
 		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
@@ -435,7 +442,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
-		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
 		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
@@ -463,6 +470,18 @@ public class SubmissionService {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		return new OwnedModuleContext(submission, submissionModule);
+	}
+
+	private OwnedModuleContext requireEditableModule(long submissionModuleId, String message) {
+		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		if (context.submission().getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(message);
+		}
+		return context;
+	}
+
+	private boolean isSubmittedOrGraded(SubmissionStatus status) {
+		return status == SubmissionStatus.SUBMITTED || status == SubmissionStatus.GRADED;
 	}
 
 	private String audioExtensionOf(String mimeType) {
