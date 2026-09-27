@@ -129,6 +129,7 @@ class SubmissionApiIntegrationTest {
 	private Long teacherOtherId;
 	private Long adminId;
 	private Long studentMemberId;
+	private Long studentClassmateId;
 	private Long studentOtherId;
 	private Long classId;
 	private Long otherClassId;
@@ -144,11 +145,14 @@ class SubmissionApiIntegrationTest {
 		teacherOtherId = user(UserRole.TEACHER, "Giáo viên khác");
 		adminId = user(UserRole.ADMIN, "Quản trị");
 		studentMemberId = user(UserRole.STUDENT, "Học viên chính thức");
+		studentClassmateId = user(UserRole.STUDENT, "Bạn học cùng lớp");
 		studentOtherId = user(UserRole.STUDENT, "Học viên ngoài lớp");
 		teacherProfileRepository.save(new TeacherProfile(user(teacherId), "IELTS"));
 		teacherProfileRepository.save(new TeacherProfile(user(teacherOtherId), "TOEFL"));
 		studentProfileRepository.save(new StudentProfile(user(studentMemberId), "HV0001",
 				LocalDate.of(2004, 4, 1), "0912345678"));
+		studentProfileRepository.save(new StudentProfile(user(studentClassmateId), "HV0003",
+				LocalDate.of(2004, 6, 3), "0912345680"));
 		studentProfileRepository.save(new StudentProfile(user(studentOtherId), "HV0002",
 				LocalDate.of(2005, 5, 2), "0912345679"));
 
@@ -169,6 +173,7 @@ class SubmissionApiIntegrationTest {
 				ClassStatus.ACTIVE,
 				teacherOtherId)).getId();
 		classMemberRepository.save(new ClassMember(classId, studentMemberId));
+		classMemberRepository.save(new ClassMember(classId, studentClassmateId));
 
 		publishedAssignmentId = assignment(
 				classId,
@@ -349,7 +354,7 @@ class SubmissionApiIntegrationTest {
 		long submissionId = startSubmissionAsStudentMember();
 
 		mockMvc.perform(get("/api/v1/submissions/{id}", submissionId)
-						.header("Authorization", bearer(studentOtherId, UserRole.STUDENT)))
+						.header("Authorization", bearer(studentClassmateId, UserRole.STUDENT)))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 	}
@@ -448,6 +453,15 @@ class SubmissionApiIntegrationTest {
 	@Test
 	void listSubmissionsRequiresAnAssignmentIdForATeacher() throws Exception {
 		mockMvc.perform(get("/api/v1/submissions")
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));
+	}
+
+	@Test
+	void teacherClassIdFilterDoesNotReplaceTheRequiredAssignmentId() throws Exception {
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", String.valueOf(otherClassId))
 						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));

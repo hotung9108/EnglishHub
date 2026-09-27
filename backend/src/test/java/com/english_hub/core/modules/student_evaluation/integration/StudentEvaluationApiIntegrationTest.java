@@ -200,6 +200,7 @@ class StudentEvaluationApiIntegrationTest {
 		long oldestId = saveEvaluation(studentOneId, teacherOneId, classOneId, "Oldest", "2026-09-20T10:00:00Z");
 		long newestId = saveEvaluation(studentOneId, teacherOneId, classOneId, "Newest", "2026-09-22T10:00:00Z");
 		saveEvaluation(studentOneId, teacherOneId, classTwoId, "Other class", "2026-09-21T10:00:00Z");
+		saveEvaluation(studentTwoId, teacherOneId, classTwoId, "Student two evaluation", "2026-09-23T10:00:00Z");
 
 		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
 					.param("classId", Long.toString(classOneId))

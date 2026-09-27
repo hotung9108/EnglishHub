@@ -26,12 +26,25 @@ public class SecurityConfig {
 				.exceptionHandling(exception -> exception
 						.authenticationEntryPoint(authenticationEntryPoint)
 						.accessDeniedHandler(accessDeniedHandler))
-				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers("/actuator/health", "/error",
-								"/api/v1/auth/login", "/api/v1/auth/refresh",
-								"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
-								"/swagger-resources/**", "/webjars/**").permitAll()
-						.anyRequest().authenticated())
+				.authorizeHttpRequests(authorize -> {
+					authorize.requestMatchers(
+							"/actuator/health",
+							"/error",
+							"/swagger-ui.html",
+							"/swagger-ui/**",
+							"/v3/api-docs/**",
+							"/swagger-resources/**",
+							"/webjars/**").permitAll();
+					for (ApiRoutePolicy.RouteRule route : ApiRoutePolicy.routes()) {
+						var requestMatcher = authorize.requestMatchers(route.method(), route.pathPattern());
+						if (route.roles().isEmpty()) {
+							requestMatcher.permitAll();
+						} else {
+							requestMatcher.hasAnyRole(route.roles().toArray(String[]::new));
+						}
+					}
+					authorize.anyRequest().denyAll();
+				})
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
 	}
