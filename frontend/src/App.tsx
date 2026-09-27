@@ -31,8 +31,16 @@ import StudentAnalytics from './pages/StudentAnalytics';
 import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
+import TeacherEditAssignment from './pages/TeacherEditAssignment';
+import TeacherExamBank from './pages/TeacherExamBank';
 import TeacherSubmissionDetails from './pages/TeacherSubmissionDetails';
 import TeacherClassProgress from './pages/TeacherClassProgress';
+import TeacherDashboard from './pages/TeacherDashboard';
+import StudentDetails from './pages/StudentDetails';
+import AdminReports from './pages/AdminReports';
+import AdminSettings from './pages/AdminSettings';
+import AdminGradingAuditLogs from './pages/AdminGradingAuditLogs';
+import AdminClassArchive from './pages/AdminClassArchive';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -53,27 +61,40 @@ function App() {
             <Route path="roles" element={<Roles />} />
             <Route path="classes" element={<Classes />} />
             <Route path="classes/create" element={<AddClass />} />
+            <Route path="classes/archive" element={<AdminClassArchive />} />
             <Route path="classes/:id" element={<ClassDetails />} />
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/create" element={<AddTeacher />} />
             <Route path="teachers/:id" element={<TeacherDetails />} />
             <Route path="students" element={<Students />} />
             <Route path="students/create" element={<AddStudent />} />
-            <Route path="reports" element={<Dashboard />} />
-            <Route path="settings" element={<Dashboard />} />
+            <Route path="students/:id" element={<StudentDetails />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="audit/gradings" element={<AdminGradingAuditLogs />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Route>
+
+        {/* Global Redirects */}
+        <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/progress" element={<Navigate to="/teacher/classes/ENG-IELTS-6.5A/progress" replace />} />
 
         {/* Teacher Routes */}
         <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>
           <Route path="/teacher" element={<MainLayout />}>
-            <Route index element={<Navigate to="/teacher/classes" replace />} />
+            <Route index element={<Navigate to="/teacher/dashboard" replace />} />
+            <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:id" element={<TeacherClassProgress />} />
             <Route path="classes/:id/progress" element={<TeacherClassProgress />} />
             <Route path="assignments" element={<TeacherAssignments />} />
             <Route path="assignments/create" element={<TeacherCreateAssignment />} />
             <Route path="assignments/:id" element={<TeacherAssignmentDetails />} />
+            <Route path="assignments/:id/edit" element={<TeacherEditAssignment />} />
+            <Route path="assignments/edit/:id" element={<TeacherEditAssignment />} />
             <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
+            <Route path="exam-bank" element={<TeacherExamBank />} />
+            <Route path="assignments/templates" element={<Navigate to="/teacher/exam-bank" replace />} />
           </Route>
         </Route>
 

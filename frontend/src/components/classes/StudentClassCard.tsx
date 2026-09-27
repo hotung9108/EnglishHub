@@ -50,16 +50,7 @@ const StudentClassCard: React.FC<StudentClassCardProps> = ({ classInfo, onViewCl
       
       {/* Instructor info */}
       <div className="instructor-info">
-        <div style={{
-          width: 24,
-          height: 24,
-          borderRadius: '50%',
-          backgroundColor: 'var(--surface-dim)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--on-surface-variant)'
-        }}>
+        <div className="flex justify-center items-center rounded-full text-on-surface-variant" style={{ width: '24px', height: '24px', backgroundColor: 'var(--surface-dim)' }}>
           <User size={14} />
         </div>
         <span>{t('studentClasses.instructorPrefix')}<strong>{classInfo.instructorName}</strong></span>
@@ -100,14 +91,14 @@ const StudentClassCard: React.FC<StudentClassCardProps> = ({ classInfo, onViewCl
           </div>
         </div>
       ) : (
-        <div style={{ marginTop: 'auto', marginBottom: '18px' }}>
+        <div className="mt-auto mb-16">
           {classInfo.hasCertificate && (
             <div className="badge-cert-issued">
               <GraduationCap size={15} />
               <span>{t('studentClasses.certIssued')}</span>
             </div>
           )}
-          <div className="student-class-metrics" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: 0 }}>
+          <div className="student-class-metrics grid grid-2 mb-0">
             <div className="student-class-metric-item">
               <span className="metric-label">{t('studentClasses.statsResult')}</span>
               <span className="metric-value highlight-green">{classInfo.stats.result || '-'}</span>

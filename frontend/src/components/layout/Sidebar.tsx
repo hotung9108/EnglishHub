@@ -12,7 +12,9 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  Layout
+  Layout,
+  History,
+  Library
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -76,16 +78,24 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {
         title: t('sectionResults'),
         items: [
-          { path: '/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/audit/gradings', label: t('auditLogs.title'), icon: History },
         ]
       }
     ],
     teacher: [
       {
+        title: t('sectionOverview'),
+        items: [
+          { path: '/teacher/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
+        ]
+      },
+      {
         title: t('sectionTeaching'),
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+          { path: '/teacher/exam-bank', label: t('menuExamBank'), icon: Library },
         ]
       },
       {
@@ -159,13 +169,12 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
                   )}
                 </NavLink>
                 {item.children && (
-                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '22px', borderLeft: '1px solid #F1F5F9' }}>
+                  <div className="sidebar-submenu">
                     {item.children.map((child: MenuChild, cIndex: number) => (
                       <NavLink
                         key={`child-${cIndex}`}
                         to={child.path}
-                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                        style={{ fontSize: '13px', padding: '6px 14px', marginTop: '2px' }}
+                        className={({ isActive }) => `sidebar-link sidebar-submenu-link ${isActive ? 'active' : ''}`}
                       >
                         <span>{child.label}</span>
                       </NavLink>
@@ -181,11 +190,11 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {/* Footer Utility Links */}
       <div className="sidebar-footer">
         <div className="sidebar-divider"></div>
-        <NavLink to="/settings" className="sidebar-link">
+        <NavLink to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} className="sidebar-link">
           <Settings size={18} strokeWidth={2} />
           <span>{t('settings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link" style={{ color: '#EF4444' }}>
+        <NavLink to="/login" className="sidebar-link text-error">
           <LogOut size={18} strokeWidth={2} />
           <span>{t('logout')}</span>
         </NavLink>

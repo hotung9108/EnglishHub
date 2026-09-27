@@ -1,0 +1,794 @@
+/* ==========================================================================
+   Teacher Dashboard Styles - EnglishHub
+   Conforms to convention-fe.md (CSS Variables, No inline styles)
+   ========================================================================== */
+
+.teacher-dashboard-container {
+  padding: 24px 32px 64px;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   1. Hero Banner
+   -------------------------------------------------------------------------- */
+.teacher-dash-hero {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%);
+  border-radius: 20px;
+  padding: 32px 36px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 12px 32px -8px rgba(67, 56, 202, 0.28);
+  position: relative;
+  overflow: hidden;
+}
+
+.teacher-dash-hero::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.teacher-dash-hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 680px;
+  z-index: 1;
+}
+
+.teacher-dash-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e7ff;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.teacher-dash-greeting {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.teacher-dash-subgreeting {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c7d2fe;
+  margin: 0;
+}
+
+.teacher-dash-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  z-index: 1;
+}
+
+.teacher-dash-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #ffffff;
+  color: #312e81;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.teacher-dash-btn-primary:hover {
+  background-color: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.teacher-dash-btn-glass {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+
+.teacher-dash-btn-glass:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+  transform: translateY(-2px);
+}
+
+/* --------------------------------------------------------------------------
+   2. KPI Metrics Grid
+   -------------------------------------------------------------------------- */
+.teacher-dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.teacher-dash-kpi-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: default;
+}
+
+.teacher-dash-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
+}
+
+.teacher-dash-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.teacher-dash-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teacher-dash-kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.teacher-dash-kpi-trend.positive {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.teacher-dash-kpi-trend.neutral {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.teacher-dash-kpi-trend.urgent {
+  background-color: #fef2f2;
+  color: #dc2626;
+  animation: pulseBadge 2s infinite ease-in-out;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.teacher-dash-kpi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teacher-dash-kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.teacher-dash-kpi-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.teacher-dash-kpi-subtext {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   3. Main Dashboard Layout (Columns)
+   -------------------------------------------------------------------------- */
+.teacher-dash-main-cols {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 28px;
+}
+
+/* Section Common Container */
+.teacher-dash-card-section {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.teacher-dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.teacher-dash-section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-dash-section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.teacher-dash-section-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.teacher-dash-section-badge.urgent {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.teacher-dash-link-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f46e5;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.teacher-dash-link-action:hover {
+  color: #3730a3;
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   4. Pending Submissions Queue
+   -------------------------------------------------------------------------- */
+.teacher-dash-skill-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.teacher-dash-skill-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.teacher-dash-skill-tab-btn:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.teacher-dash-skill-tab-btn.active {
+  background-color: #4f46e5;
+  color: #ffffff;
+  border-color: #4f46e5;
+}
+
+.teacher-dash-tab-count {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.teacher-dash-skill-tab-btn.active .teacher-dash-tab-count {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.teacher-dash-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-dash-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+  gap: 16px;
+}
+
+.teacher-dash-queue-item:hover {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
+  transform: translateX(2px);
+}
+
+.teacher-dash-queue-item.high-urgency {
+  border-left: 4px solid #ef4444;
+}
+
+.teacher-dash-student-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-dash-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.teacher-dash-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.teacher-dash-student-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-dash-class-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4f46e5;
+  background-color: #eef2ff;
+  padding: 1px 7px;
+  border-radius: 4px;
+}
+
+.teacher-dash-assignment-title {
+  font-size: 13px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.teacher-dash-meta-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.teacher-dash-ai-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #faf5ff;
+  color: #7e22ce;
+  border: 1px solid #f3e8ff;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.teacher-dash-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.teacher-dash-btn-grade {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  background-color: #4f46e5;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.teacher-dash-btn-grade:hover {
+  background-color: #4338ca;
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   5. 4-Skill Matrix Analytics
+   -------------------------------------------------------------------------- */
+.teacher-dash-skill-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+}
+
+.teacher-dash-skill-box {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.teacher-dash-skill-box-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.teacher-dash-skill-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.teacher-dash-skill-score {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.teacher-dash-skill-benchmark {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.teacher-dash-progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.teacher-dash-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease-out;
+}
+
+.teacher-dash-progress-bar.writing { background-color: #2563eb; }
+.teacher-dash-progress-bar.speaking { background-color: #9333ea; }
+.teacher-dash-progress-bar.reading { background-color: #16a34a; }
+.teacher-dash-progress-bar.listening { background-color: #0d9488; }
+
+.teacher-dash-skill-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   6. Active Classes Grid
+   -------------------------------------------------------------------------- */
+.teacher-dash-classes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.teacher-dash-class-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.teacher-dash-class-card:hover {
+  border-color: #818cf8;
+  box-shadow: 0 6px 16px -3px rgba(79, 70, 229, 0.12);
+  transform: translateY(-2px);
+}
+
+.teacher-dash-class-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.teacher-dash-class-code {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background-color: #eff6ff;
+  color: #2563eb;
+  letter-spacing: 0.04em;
+}
+
+.teacher-dash-class-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.teacher-dash-class-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.teacher-dash-class-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.teacher-dash-class-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+}
+
+.teacher-dash-class-score-pill {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.teacher-dash-class-pending-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+/* --------------------------------------------------------------------------
+   7. Sidebar Widgets: Schedule & Recent Activity
+   -------------------------------------------------------------------------- */
+.teacher-dash-side-widgets {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.teacher-dash-deadline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-dash-deadline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background-color: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.teacher-dash-deadline-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.teacher-dash-deadline-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.teacher-dash-deadline-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.teacher-dash-deadline-class {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.teacher-dash-deadline-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e11d48;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.teacher-dash-activity-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+.teacher-dash-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.teacher-dash-activity-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.teacher-dash-activity-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.teacher-dash-activity-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.teacher-dash-activity-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.teacher-dash-activity-time {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   8. Responsive Adjustments
+   -------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+  .teacher-dash-main-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .teacher-dashboard-container {
+    padding: 16px;
+    gap: 20px;
+  }
+
+  .teacher-dash-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .teacher-dash-queue-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .teacher-dash-queue-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
