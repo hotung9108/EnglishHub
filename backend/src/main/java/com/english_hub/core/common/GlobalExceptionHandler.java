@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import tools.jackson.databind.exc.MismatchedInputException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -41,8 +42,18 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.badRequest().body(new ApiError("Dữ liệu không hợp lệ."));
 	}
 
+	/**
+	 * Jackson wraps a rejected payload shape in {@code MismatchedInputException}, which Spring in
+	 * turn wraps in {@code HttpMessageNotReadableException}. Surface the parser's own message only
+	 * for the question {@code correctAnswer} contract so the client learns which shape is expected,
+	 * and keep the generic message for every other endpoint.
+	 */
 	@ExceptionHandler(HttpMessageNotReadableException.class)
-	public ResponseEntity<ApiError> handleUnreadableRequest() {
+	public ResponseEntity<ApiError> handleUnreadableRequest(HttpMessageNotReadableException exception) {
+		String detail = findCorrectAnswerShapeMessage(exception);
+		if (detail != null) {
+			return ResponseEntity.badRequest().body(new ApiError(detail));
+		}
 		return ResponseEntity.badRequest().body(new ApiError("Dữ liệu không hợp lệ."));
 	}
 
@@ -66,6 +77,20 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ApiError> handleUnexpectedException(Exception exception, HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 				.body(new ApiError("Lỗi máy chủ."));
+	}
+
+	private String findCorrectAnswerShapeMessage(Throwable exception) {
+		Throwable cause = exception;
+		while (cause != null) {
+			if (cause instanceof MismatchedInputException mismatch) {
+				String message = mismatch.getOriginalMessage();
+				if (message != null && message.startsWith("correctAnswer")) {
+					return message;
+				}
+			}
+			cause = cause.getCause();
+		}
+		return null;
 	}
 
 	private boolean containsDuplicateEmail(DataIntegrityViolationException exception) {

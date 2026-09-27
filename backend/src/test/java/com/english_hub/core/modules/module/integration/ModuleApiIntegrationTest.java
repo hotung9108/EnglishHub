@@ -51,16 +51,57 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.mock.web.MockMultipartFile;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.AfterAll;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class ModuleApiIntegrationTest {
+
+	/**
+	 * {@code LocalAudioStorageAdapter} defaults to {@code ./.local/backend-storage}, so an
+	 * unaudited audio upload would drop real files into the repository. Point the adapter at a
+	 * throwaway temp directory and delete it once the class finishes.
+	 */
+	private static final Path LOCAL_STORAGE_ROOT = createLocalStorageRoot();
+
+	private static Path createLocalStorageRoot() {
+		try {
+			return Files.createTempDirectory("englishhub-module-test-storage");
+		} catch (IOException exception) {
+			throw new IllegalStateException("Could not create a temp audio storage root", exception);
+		}
+	}
+
+	@DynamicPropertySource
+	static void registerLocalAudioStorage(DynamicPropertyRegistry registry) {
+		registry.add("app.storage.local-root", () -> LOCAL_STORAGE_ROOT.toAbsolutePath().toString());
+	}
+
+	@AfterAll
+	static void deleteLocalAudioStorage() throws IOException {
+		if (Files.exists(LOCAL_STORAGE_ROOT)) {
+			try (java.util.stream.Stream<Path> paths = Files.walk(LOCAL_STORAGE_ROOT)) {
+				paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+					try {
+						Files.deleteIfExists(path);
+					} catch (IOException exception) {
+						throw new IllegalStateException("Could not delete " + path, exception);
+					}
+				});
+			}
+		}
+	}
 
 	@Autowired
 	private MockMvc mockMvc;
