@@ -17,6 +17,10 @@
 
 **Lưu ý về thay đổi B (ảnh hưởng thiết kế request):** Từ V5, `questions.content` là plain text đề bài; danh sách lựa chọn (options) và đáp án đúng được tách ra cột `correct_answer` (text lưu JSON). Khi tạo hoặc sửa câu hỏi, body phải gửi 2 trường riêng biệt: `content` (chuỗi text) và `correct_answer` (JSON — với MULTIPLE_CHOICE gồm danh sách options + is_correct, với SHORT_ANSWER là đáp án mẫu).
 
+> **Cập nhật:** Ở API hiện tại, client gửi `correctAnswer` (camelCase) — giá trị là 1 trong 2 shape đã định kiểu. Chi tiết contract và các ràng buộc 400: xem mục "Hợp đồng `correctAnswer`" trong CỤM 4.
+>
+> **Cập nhật:** tương tự, `content` của câu trả lời nộp bài cũng đã được định kiểu thành 2 shape theo `questionType`. Xem mục "Hợp đồng `content`" trong CỤM 5.
+
 ---
 
 ## Changelog từ các bản trước (giữ lại để tham chiếu)
@@ -75,7 +79,7 @@
 
 ## CỤM 4 — Cấu trúc bài tập: Assignment / Module / Question (17 endpoint)
 
-*Từ V3 (schema V5): `questions.content` là plain text đề bài thuần tuý. Danh sách lựa chọn (options) và đáp án đúng được tách ra cột `correct_answer` (JSON dạng text) — không còn gộp chung vào `content` như V4. Khi tạo/sửa câu hỏi, client gửi 2 trường riêng biệt: `content` (text) và `correct_answer` (JSON). Vẫn không có endpoint riêng cho option.*
+*Từ V3 (schema V5): `questions.content` là plain text đề bài thuần tuý. Danh sách lựa chọn (options) và đáp án đúng được tách ra cột `correct_answer` (JSONB) — không còn gộp chung vào `content` như V4. Khi tạo/sửa câu hỏi, client gửi 2 trường riêng biệt: `content` (text) và `correctAnswer` (đối tượng đã định kiểu — xem mục "Hợp đồng `correctAnswer`" bên dưới). Vẫn không có endpoint riêng cho option.*
 
 | # | Method + Endpoint | Mục đích |
 |---|---|---|
@@ -92,10 +96,55 @@
 | 30 | DELETE /modules/{id} | Xoá module (cascade luôn questions) |
 | 31 | POST /modules/{id}/audio | Upload file audio đề bài (Listening) lên R2 |
 | 32 | GET /modules/{id}/questions | Danh sách câu hỏi trong module (kèm `correct_answer` nếu là trắc nghiệm) |
-| 33 | POST /modules/{id}/questions | Tạo câu hỏi mới — gửi `content` (plain text) + `correct_answer` (JSON options + đáp án nếu trắc nghiệm) |
-| 34 | GET /questions/{id} | Xem chi tiết câu hỏi (kèm `correct_answer`) |
-| 35 | PUT /questions/{id} | Sửa câu hỏi — sửa/thêm/xoá option = gửi lại toàn bộ `correct_answer` |
+| 33 | POST /modules/{id}/questions | Tạo câu hỏi mới — gửi `content` (plain text) + `correctAnswer` (đối tượng đã định kiểu, xem bên dưới) |
+| 34 | GET /questions/{id} | Xem chi tiết câu hỏi (kèm `correctAnswer`) |
+| 35 | PUT /questions/{id} | Sửa câu hỏi — sửa/thêm/xoá option = gửi lại toàn bộ `correctAnswer` |
 | 36 | DELETE /questions/{id} | Xoá câu hỏi |
+
+### Hợp đồng `correctAnswer` (endpoint #33, #35)
+
+`correctAnswer` là **sealed interface** với đúng 2 shape, chọn theo cấu trúc payload (không có field
+discriminator). Trường bắt buộc, sai shape trả **400**.
+
+**MULTIPLE_CHOICE** — `{"options": [...]}`:
+
+```json
+{
+  "content": "Choose the correct option.",
+  "questionType": "MULTIPLE_CHOICE",
+  "correctAnswer": {
+    "options": [
+      { "id": 1, "content": "Option A", "isCorrect": true },
+      { "id": 2, "content": "Option B", "isCorrect": false },
+      { "id": 3, "content": "Option C", "isCorrect": false },
+      { "id": 4, "content": "Option D", "isCorrect": false }
+    ]
+  },
+  "score": 1.00,
+  "orderIndex": 1
+}
+```
+
+Ràng buộc: đúng **4** options; mỗi `id` là số nguyên dương **không trùng lặp**; `content` không
+để trống; `isCorrect` là boolean; **đúng 1** option có `isCorrect: true`.
+
+**SHORT_ANSWER** — `{"correctAnswer": "..."}`:
+
+```json
+{
+  "content": "What subject do you study?",
+  "questionType": "SHORT_ANSWER",
+  "correctAnswer": { "correctAnswer": "English" },
+  "orderIndex": 2
+}
+```
+
+Ràng buộc: `correctAnswer` là chuỗi **không để trống**.
+
+**Lưu ý tương thích:** API nhận cả khoá camelCase (`isCorrect`, `correctAnswer`) lẫn khoá
+snake_case legacy (`is_correct`, `correct_answer`). Server tự chuyển sang snake_case khi ghi vào
+cột JSONB `correct_answer`; khi đọc lại lại trả về camelCase. Học viên không bao giờ thấy
+`correctAnswer` trong response của endpoint #32/#34.
 
 ---
 
@@ -114,6 +163,44 @@
 | 45 | GET /answers/{id} | Xem chi tiết 1 câu trả lời (kèm kết quả chấm tự động nếu có) |
 | 46 | POST /answers/{id}/audio | Upload file ghi âm (Speaking) |
 | 47 | POST /answers/{id}/document | Upload file bài viết .docx/.pdf (Writing) |
+
+### Hợp đồng `content` (endpoint #43)
+
+`content` của mỗi câu trả lời là **sealed interface** với đúng 2 shape, chọn theo cấu trúc payload
+(không có field discriminator). Trường bắt buộc, sai shape trả **400**.
+
+**MULTIPLE_CHOICE** — `{"selectedOptionIds": [...]}`:
+
+```json
+{
+  "answers": [
+    { "questionId": 21, "content": { "selectedOptionIds": [1, 3] } }
+  ]
+}
+```
+
+Ràng buộc: `selectedOptionIds` bắt buộc, **không rỗng**, mỗi phần tử là số nguyên **dương**.
+
+**SHORT_ANSWER** — `{"text": "..."}`:
+
+```json
+{
+  "answers": [
+    { "questionId": 23, "content": { "text": "The answer is..." } }
+  ]
+}
+```
+
+Ràng buộc: `text` là chuỗi **không để trống**.
+
+Shape phải khớp với `questionType` của câu hỏi được gửi kèm: gửi `text` cho câu
+`MULTIPLE_CHOICE` (hoặc ngược lại) trả **400** `Nội dung câu trả lời không hợp lệ.`. Shape không
+nhận diện được (ví dụ `{"answer": "..."}`) hoặc `content` thiếu/null trả **400** ngay tầng parse,
+chưa tới service.
+
+> **Cập nhật:** wire format **không đổi** so với trước — cùng shape, cùng key. Thay đổi chỉ nằm ở
+> việc shape được định kiểp và validate tường minh thay vì đoán bằng `JsonNode`. Chi tiết các
+> message 400: xem `production_artifacts/be_to_tester/submissions-answer-content-testing-instructions.md`.
 
 ---
 

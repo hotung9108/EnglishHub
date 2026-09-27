@@ -99,7 +99,7 @@
 
 ## 6.5 #42. Xem chi tiết 1 phần làm bài (submission_module)
 
-**Mô tả:** Xem chi tiết 1 `submission_module` kèm danh sách `questions`, `answers` và `gradings`. Nếu `status = GRADED`, trường `correctAnswer` trong mỗi question sẽ được trả về; ngược lại để `null`. Với module Essay/Speaking (không có câu hỏi), `questions` là mảng rỗng, `answers` chứa thông tin file.
+**Mô tả:** Xem chi tiết 1 `submission_module` kèm danh sách `questions`, `answers` và `gradings`. Chỉ đọc được khi **cả `submission_module` và `submission` cha đều đã ở trạng thái `SUBMITTED` hoặc `GRADED`** — module hoặc lượt làm bài còn `IN_PROGRESS` sẽ bị từ chối `400`. Nếu `status = GRADED`, trường `correctAnswer` trong mỗi question sẽ được trả về; ngược lại để `null`. Với module Essay/Speaking (không có câu hỏi), `questions` là mảng rỗng, `answers` chứa thông tin file.
 
 **Method - Path:** `GET /submission-modules/{id}`
 
@@ -113,7 +113,8 @@
 |:---|:---:|:---|
 | Tìm thấy — module Quiz, đã chấm. | `200` | `{ "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "GRADED", "grading": { "id": 77, "method": "AUTO", "status": "COMPLETED", "finalScore": 8.0, "maxScoreSnapshot": 10.0, "finalFeedback": null }, "questions": [ { "id": 21, "content": "Which word best describes...?", "questionType": "MULTIPLE_CHOICE", "score": 1.0, "orderIndex": 1, "correctAnswer": { "options": [ { "id": 1, "content": "Option A", "isCorrect": true }, { "id": 2, "content": "Option B", "isCorrect": false } ] } } ], "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1], "isCorrect": true, "score": 1.0 } } ] }` |
 | Tìm thấy — module Essay, đã chấm. | `200` | `{ "id": 151, "moduleId": 10, "skill": "WRITING", "taskType": "ESSAY", "status": "GRADED", "grading": { "id": 78, "method": "TEACHER_MANUAL", "status": "COMPLETED", "finalScore": 7.5, "maxScoreSnapshot": 10.0, "aiFeedback": "Bài viết có cấu trúc tốt...", "finalFeedback": "Cần cải thiện phần kết." }, "questions": [], "answers": [ { "id": 341, "questionId": null, "content": null, "docStorageKey": "submissions/88/module-10/essay.pdf", "docMimeType": "application/pdf", "docUploadStatus": "READY" } ] }` |
-| Tìm thấy — module đang làm (chưa graded, không lộ đáp án). | `200` | `{ "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "IN_PROGRESS", "grading": null, "questions": [ { "id": 21, "content": "Which word best describes...?", "questionType": "MULTIPLE_CHOICE", "score": 1.0, "orderIndex": 1, "correctAnswer": null } ], "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
+| Tìm thấy — module Quiz, đã nộp nhưng chưa chấm (không lộ đáp án). | `200` | `{ "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "SUBMITTED", "grading": { "id": 77, "method": "AUTO", "status": "PENDING" }, "questions": [ { "id": 21, "content": "Which word best describes...?", "questionType": "MULTIPLE_CHOICE", "score": 1.0, "orderIndex": 1, "correctAnswer": null } ], "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
+| Module hoặc `submission` cha còn `IN_PROGRESS` (chưa nộp). | `400` | `{ "error": "Phần làm bài chưa được nộp." }` |
 | Không tìm thấy. | `404` | `{ "error": "Không tìm thấy phần làm bài." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Không có quyền xem. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |
@@ -123,7 +124,7 @@
 
 ## 6.6 #43. Submit toàn bộ answers của 1 submission_module
 
-**Mô tả:** Học viên nộp tất cả câu trả lời cho 1 module trong một request. Chỉ được gọi khi `submission_module.status = IN_PROGRESS` — mỗi module chỉ submit được 1 lần duy nhất. Sau khi submit, server đổi `submission_module.status → SUBMITTED`.
+**Mô tả:** Học viên nộp tất cả câu trả lời cho 1 module trong một request. Chỉ được gọi khi `submission_module.status = IN_PROGRESS` **và `submission` cha cũng còn `IN_PROGRESS`** — mỗi module chỉ submit được 1 lần duy nhất. Sau khi submit, server đổi `submission_module.status → SUBMITTED`.
 
 Với **Quiz / Short Answer**: truyền mảng `answers` kèm `questionId` và `content`.
 
@@ -154,13 +155,30 @@ Với **Speaking / Recording**: tương tự Essay nhưng kiểm tra `audio_stor
 {}
 ```
 
+**Contract `content` (đã định kiểu):** `content` là sealed interface với 2 shape, chọn theo cấu
+trúc payload — **không có field discriminator**, wire format không đổi so với thiết kế ban đầu.
+
+| `questionType` của câu hỏi | Shape `content` | Ràng buộc |
+|---|---|---|
+| `MULTIPLE_CHOICE` | `{"selectedOptionIds": [1]}` | bắt buộc, không rỗng, mỗi phần tử là số nguyên dương |
+| `SHORT_ANSWER` | `{"text": "The answer is..."}` | chuỗi không để trống |
+
+Shape phải khớp `questionType` của câu hỏi được gửi kèm. Ràng buộc trên shape được kiểm tra ở tầng
+parse/validate, **trước** khi service đối chiếu `questionType`.
+
 **Response:**
 
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Submit thành công. | `200` | `{ "message": "Đã nộp phần làm bài.", "submissionModuleId": 150, "status": "SUBMITTED", "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
 | Module đã được submit trước đó. | `400` | `{ "error": "Phần làm bài này đã được nộp." }` |
-| Thiếu answers hoặc sai định dạng content. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| `submission` cha đã được nộp (`SUBMITTED`/`GRADED`) trong khi module vẫn `IN_PROGRESS`. | `400` | `{ "error": "Bài làm này đã được nộp." }` |
+| Thiếu answers. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| Shape `content` không khớp `questionType` của câu hỏi. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| `content` thiếu hoặc `null`. | `400` | `{ "error": "content là bắt buộc." }` |
+| `content` không thuộc 2 shape đã biết. | `400` | `{ "error": "Nội dung câu trả lời phải là {\"selectedOptionIds\": [...]} cho MULTIPLE_CHOICE hoặc {\"text\": \"...\"} cho SHORT_ANSWER." }` |
+| `selectedOptionIds` rỗng / chứa giá trị không dương. | `400` | `{ "error": "selectedOptionIds không được để trống." }` hoặc `{ "error": "selectedOptionIds phải là số nguyên dương." }` |
+| `text` rỗng hoặc chỉ chứa khoảng trắng. | `400` | `{ "error": "text không được để trống." }` |
 | Không tìm thấy phần làm bài hoặc câu hỏi. | `404` | `{ "error": "Không tìm thấy phần làm bài hoặc câu hỏi." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Không có quyền. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |
@@ -172,7 +190,7 @@ Với **Speaking / Recording**: tương tự Essay nhưng kiểm tra `audio_stor
 
 **Mô tả:** Client gọi trước khi submit submission_module. Server tạo 1 presigned URL trỏ thẳng lên Cloudflare R2 với key quy ước theo `submissionModuleId`. Client dùng URL này để PUT file âm thanh trực tiếp lên R2. Sau khi upload xong, client gọi `#43` để submit module — server sẽ tự kiểm tra key trên R2.
 
-Ràng buộc: `submission_module` phải thuộc skill `SPEAKING` / task type `RECORDING` và đang `IN_PROGRESS`.
+Ràng buộc: `submission_module` phải thuộc skill `SPEAKING` / task type `RECORDING` và đang `IN_PROGRESS`, **và `submission` cha cũng phải còn `IN_PROGRESS`**.
 
 **Method - Path:** `POST /submission-modules/{id}/audio-upload-url`
 
@@ -188,7 +206,7 @@ Ràng buộc: `submission_module` phải thuộc skill `SPEAKING` / task type `R
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Tạo presigned URL thành công. | `200` | `{ "uploadUrl": "https://r2.example.com/submissions/88/module-150/audio.webm?X-Amz-Signature=...", "storageKey": "submissions/88/module-150/audio.webm", "expiresAt": "..." }` |
-| Module không thuộc skill Speaking/Recording hoặc đã SUBMITTED. | `400` | `{ "error": "Không thể upload ghi âm cho phần làm bài này." }` |
+| Module không thuộc skill Speaking/Recording, module đã `SUBMITTED`, hoặc `submission` cha đã được nộp. | `400` | `{ "error": "Không thể upload ghi âm cho phần làm bài này." }` |
 | Không tìm thấy phần làm bài. | `404` | `{ "error": "Không tìm thấy phần làm bài." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Không có quyền. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |
@@ -200,7 +218,7 @@ Ràng buộc: `submission_module` phải thuộc skill `SPEAKING` / task type `R
 
 **Mô tả:** Tương tự #46 nhưng dành cho module Writing / Essay. Server tạo presigned URL để client PUT file `.docx` hoặc `.pdf` thẳng lên R2. Sau khi upload, client gọi `#43` để submit module.
 
-Ràng buộc: `submission_module` phải thuộc skill `WRITING` / task type `ESSAY` hoặc `REWRITE` và đang `IN_PROGRESS`.
+Ràng buộc: `submission_module` phải thuộc skill `WRITING` / task type `ESSAY` hoặc `REWRITE` và đang `IN_PROGRESS`, **và `submission` cha cũng phải còn `IN_PROGRESS`**.
 
 **Method - Path:** `POST /submission-modules/{id}/document-upload-url`
 
@@ -216,7 +234,7 @@ Ràng buộc: `submission_module` phải thuộc skill `WRITING` / task type `ES
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Tạo presigned URL thành công. | `200` | `{ "uploadUrl": "https://r2.example.com/submissions/88/module-151/essay.pdf?X-Amz-Signature=...", "storageKey": "submissions/88/module-151/essay.pdf", "expiresAt": "..." }` |
-| Module không thuộc skill Writing hoặc đã SUBMITTED. | `400` | `{ "error": "Không thể upload tài liệu cho phần làm bài này." }` |
+| Module không thuộc skill Writing, module đã `SUBMITTED`, hoặc `submission` cha đã được nộp. | `400` | `{ "error": "Không thể upload tài liệu cho phần làm bài này." }` |
 | Định dạng file không được hỗ trợ (không phải `.docx`/`.pdf`). | `400` | `{ "error": "Định dạng file không được hỗ trợ." }` |
 | Không tìm thấy phần làm bài. | `404` | `{ "error": "Không tìm thấy phần làm bài." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |

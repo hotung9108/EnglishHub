@@ -437,6 +437,9 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{}"))
 				.andExpect(status().isOk());
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk());
 
 		mockMvc.perform(get("/api/v1/submission-modules/{id}", essaySubmissionModuleId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
@@ -445,6 +448,57 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.value("submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.pdf"))
 				.andExpect(jsonPath("$.answers[0].docMimeType").value("application/pdf"))
 				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+	}
+
+	@Test
+	void audioUploadUrl_isRejectedWhenTheSubmissionIsAlreadySubmitted() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
+		submitOfficialAsStudentMember(submissionId);
+
+		assertThat(submissionModuleRepository.findById(recordingSubmissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/audio-upload-url", recordingSubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"audio/webm\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Không thể upload ghi âm cho phần làm bài này."));
+	}
+
+	@Test
+	void documentUploadUrl_isRejectedWhenTheSubmissionIsAlreadySubmitted() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		submitOfficialAsStudentMember(submissionId);
+
+		assertThat(submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"application/pdf\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Không thể upload tài liệu cho phần làm bài này."));
+	}
+
+	@Test
+	void submitModule_isRejectedWhenTheSubmissionIsAlreadySubmitted() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		submitOfficialAsStudentMember(submissionId);
+		SubmissionModule submissionModule = submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow();
+		submissionModule.setStatus(SubmissionStatus.IN_PROGRESS);
+		submissionModuleRepository.save(submissionModule);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Bài làm này đã được nộp."));
 	}
 
 	@Test
@@ -473,6 +527,13 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.content(audioBody))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài."));
+	}
+
+	private void submitOfficialAsStudentMember(long submissionId) throws Exception {
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
 	}
 
 	private long startSubmissionAsStudentMember() throws Exception {

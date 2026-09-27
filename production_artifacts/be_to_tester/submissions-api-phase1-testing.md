@@ -263,7 +263,10 @@ curl -s -X POST http://localhost:8080/api/v1/submissions/{submissionId}/submit \
 ## Scope (Phase 6) — API #42 read one submission_module detail
 `GET /api/v1/submission-modules/{submissionModuleId}` (bearer token), V4 chapter 6 spec.
 Reads one module of an attempt: skill/taskType/status, its `grading` detail, its `questions`
-(prompt + type + score + orderIndex), and its `answers`. **`correctAnswer` is revealed per question
+(prompt + type + score + orderIndex), and its `answers`. Only readable once the module **and** its
+parent submission are `SUBMITTED`/`GRADED` — an `IN_PROGRESS` module or attempt answers `400
+"Phần làm bài chưa được nộp."` (see `submissions-state-validation-testing.md`).
+**`correctAnswer` is revealed per question
 only when `submission_module.status = GRADED`; otherwise it is null/absent.** For Essay/Speaking
 modules `questions` stays empty and `answers` surfaces the file-metadata shape `{ id, questionId: null,
 content: null, docStorageKey, docMimeType, docUploadStatus }` (or the `audio*` equivalent) once the
@@ -286,24 +289,28 @@ Response (module Quiz, đã chấm example):
 
 Smoke tests (running app, seeded DB incl. quiz questions, bearer tokens):
 ```bash
-# student reads their own quiz module (IN_PROGRESS -> correctAnswer absent)
+# module or attempt still IN_PROGRESS -> 400 "Phần làm bài chưa được nộp."
 curl -s http://localhost:8080/api/v1/submission-modules/{submissionModuleId} \
   -H "Authorization: Bearer <studentAccessToken>"
 
+# after POST /submissions/{id}/submit -> 200, correctAnswer still absent
 # another student / teacher of another class -> 403 "Bạn không có quyền thực hiện thao tác này."
 # unknown id -> 404 "Không tìm thấy phần làm bài."
 ```
 
 ### What the Phase-6 tests cover (+11 service + 1 controller + 7 API integration)
-- `SubmissionServiceTest` (+11, Mockito): quiz IN_PROGRESS detail (grading PENDING, questions with
+- `SubmissionServiceTest` (+11, Mockito): quiz SUBMITTED detail (grading PENDING, questions with
   content/type/score/orderIndex + `correctAnswer` null, answers re-parsed to JSON), quiz GRADED
-  (`correctAnswer` populated), SUBMITTED (`correctAnswer` still null), no-grading-row → `grading` null,
+  (`correctAnswer` populated), SUBMITTED under a GRADED attempt (`correctAnswer` still null),
+  no-grading-row → `grading` null,
   essay module (empty questions/answers + TEACHER_MANUAL grading), foreign student 403, class-teacher ok,
   foreign-class teacher 403, admin ok, unknown module 404, orphaned parent submission 404.
+  Rewritten by BE-TASK-12: the `IN_PROGRESS` fixtures are now `SUBMITTED`/`GRADED` because
+  #42 rejects an unsubmitted module/attempt.
 - `SubmissionControllerTest` (+1): 200 full-body mapping (grading detail, questions + correctAnswer,
   answers content).
 - `SubmissionApiIntegrationTest` (+7, Testcontainers + MockMvc + real JWT, seeded `Question` rows):
-  IN_PROGRESS quiz introspection (questions fields, answers empty, grading PENDING), GRADED quiz via
+  SUBMITTED quiz introspection (questions fields, answers after #43 + #40, grading PENDING), GRADED quiz via
   `grade()` helper (correctAnswer options revealed, grading COMPLETED 8.0/10.0), SUBMITTED quiz with
   #43 answers (answers echoed, correctAnswer hidden), essay module (empty questions/answers,
   TEACHER_MANUAL PENDING), foreign student + foreign teacher 403, class-teacher + admin 200, unknown id 404.
@@ -313,6 +320,7 @@ curl -s http://localhost:8080/api/v1/submission-modules/{submissionModuleId} \
 |---|---|
 | 404 | `Không tìm thấy phần làm bài.` (#42, unknown module / missing parent submission) |
 | 403 | `Bạn không có quyền thực hiện thao tác này.` (#42 non-owner student / non-teaching teacher / other roles) |
+| 400 | `Phần làm bài chưa được nộp.` (#42, module or parent submission not `SUBMITTED`/`GRADED` — added by BE-TASK-12) |
 
 ## Scope (Phase 7a) — S3-compatible storage layer (no HTTP endpoints yet)
 Provider-agnostic object-storage layer. Works with **any S3-compatible store** — Cloudflare R2,

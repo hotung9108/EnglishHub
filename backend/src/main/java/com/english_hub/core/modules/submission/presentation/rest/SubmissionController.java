@@ -14,6 +14,8 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlRe
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,11 +60,14 @@ public class SubmissionController {
 
 	@PostMapping("/submission-modules/{id}/submit")
 	public ResponseEntity<SubmitModuleResponse> submitModule(
-			@PathVariable long id, @RequestBody(required = false) SubmitModuleRequest request) {
+			@PathVariable long id, @Valid @RequestBody(required = false) SubmitModuleRequest request) {
 		List<AnswerPayload> payloads = request == null || request.answers() == null
 				? null
 				: request.answers().stream()
-						.map(answer -> new AnswerPayload(answer.questionId(), answer.content()))
+						.map(answer -> new AnswerPayload(
+								answer.questionId(),
+								answer.content().questionType(),
+								answer.content().toMap()))
 						.toList();
 		return ResponseEntity.ok(SubmitModuleResponse.from(submissionService.submitModule(id, payloads)));
 	}

@@ -51,6 +51,7 @@ import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -75,6 +76,7 @@ public class SubmissionService {
 	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
+	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -230,6 +232,9 @@ public class SubmissionService {
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
+		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
 		ModuleTaskType taskType = moduleInfo == null ? null : moduleInfo.taskType();
@@ -248,7 +253,7 @@ public class SubmissionService {
 		List<Answer> persisted = answerRepository.bulkCreate(
 				submissionModuleId,
 				validatedPayloads.stream()
-						.map(payload -> new Answer(submissionModuleId, payload.questionId(), payload.content().toString()))
+						.map(payload -> new Answer(submissionModuleId, payload.questionId(), toJson(payload.content())))
 						.toList());
 		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
 		submissionModuleRepository.save(submissionModule);
@@ -257,7 +262,7 @@ public class SubmissionService {
 				.mapToObj(index -> new AnswerResult(
 						persisted.get(index).getId(),
 						validatedPayloads.get(index).questionId(),
-						validatedPayloads.get(index).content(),
+						objectMapper.valueToTree(validatedPayloads.get(index).content()),
 						persisted.get(index).getDocStorageKey(),
 						persisted.get(index).getDocMimeType(),
 						persisted.get(index).getDocUploadStatus(),
@@ -374,6 +379,9 @@ public class SubmissionService {
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
 		verifyReadAccess(submission, caller);
+		if (!isSubmittedOrGraded(submissionModule.getStatus()) || !isSubmittedOrGraded(submission.getStatus())) {
+			throw ApiException.badRequest(NOT_SUBMITTED_YET_MESSAGE);
+		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());
 		GradingDetailResult grading = gradingRepository.findBySubmissionModuleId(submissionModuleId).stream()
@@ -417,7 +425,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
-		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
 		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
@@ -434,7 +442,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
-		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
 		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
@@ -462,6 +470,18 @@ public class SubmissionService {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		return new OwnedModuleContext(submission, submissionModule);
+	}
+
+	private OwnedModuleContext requireEditableModule(long submissionModuleId, String message) {
+		OwnedModuleContext context = requireOwnModule(submissionModuleId);
+		if (context.submission().getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(message);
+		}
+		return context;
+	}
+
+	private boolean isSubmittedOrGraded(SubmissionStatus status) {
+		return status == SubmissionStatus.SUBMITTED || status == SubmissionStatus.GRADED;
 	}
 
 	private String audioExtensionOf(String mimeType) {
@@ -513,6 +533,14 @@ public class SubmissionService {
 		return objectMapper.readTree(raw);
 	}
 
+	private String toJson(Map<String, Object> content) {
+		try {
+			return objectMapper.writeValueAsString(content);
+		} catch (JacksonException exception) {
+			throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+		}
+	}
+
 	private List<AnswerPayload> validatedAnswerPayloads(
 			List<AnswerPayload> payloads, Map<Long, ModuleQuestion> questionById) {
 		if (payloads == null || payloads.isEmpty()) {
@@ -530,32 +558,19 @@ public class SubmissionService {
 			if (question == null) {
 				throw ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE);
 			}
-			validateAnswerContentShape(question.questionType(), payload.content());
+			validateAnswerContentType(question.questionType(), payload.questionType());
 		}
 		return payloads;
 	}
 
-	private void validateAnswerContentShape(QuestionType questionType, JsonNode content) {
-		switch (questionType) {
-			case MULTIPLE_CHOICE -> {
-				if (!content.isObject()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-				JsonNode selectedOptionIds = content.get("selectedOptionIds");
-				if (selectedOptionIds == null || !selectedOptionIds.isArray()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-			}
-			case SHORT_ANSWER -> {
-				if (!content.isObject()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-				JsonNode text = content.get("text");
-				if (text == null || !text.isString() || text.stringValue().isBlank()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-			}
-			default -> throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+	/**
+	 * Rejects an answer whose content shape does not match the type of the question it was sent for.
+	 * The shape itself is already guaranteed by the presentation-layer {@code AnswerContent} sealed
+	 * type, so only the mismatch is left to enforce here.
+	 */
+	private void validateAnswerContentType(QuestionType questionType, QuestionType answerContentType) {
+		if (answerContentType == null || answerContentType != questionType) {
+			throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
 		}
 	}
 
@@ -814,7 +829,7 @@ public class SubmissionService {
 			UploadStatus audioUploadStatus) {
 	}
 
-	public record AnswerPayload(Long questionId, JsonNode content) {
+	public record AnswerPayload(Long questionId, QuestionType questionType, Map<String, Object> content) {
 	}
 
 	public record SubmissionModuleDetailResult(

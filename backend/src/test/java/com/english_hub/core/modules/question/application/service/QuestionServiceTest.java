@@ -32,7 +32,6 @@ import com.english_hub.core.modules.user.domain.model.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -138,26 +137,21 @@ class QuestionServiceTest {
 	}
 
 	@Test
-	void multipleChoiceMustHaveFourOptionsAndExactlyOneCorrectOption() {
+	void createRejectsMissingCorrectAnswer() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		givenModuleAndOwner(9L, 5L, 3L, 10L);
-
-		Map<String, Object> invalid = new LinkedHashMap<>();
-		invalid.put("options", List.of(
-				Map.of("id", 1, "content", "A", "isCorrect", true),
-				Map.of("id", 2, "content", "B", "isCorrect", false)));
 
 		assertApiException(
 				() -> questionService.createQuestion(
 						9L,
 						new CreateQuestionCommand(
-								"Choose one", QuestionType.MULTIPLE_CHOICE, invalid, BigDecimal.ONE, 1)),
-				"Cấu trúc correctAnswer không hợp lệ.");
+								"Choose one", QuestionType.MULTIPLE_CHOICE, null, BigDecimal.ONE, 1)),
+				"Dữ liệu câu hỏi không hợp lệ.");
 		verify(questionRepository, never()).save(any(Question.class));
 	}
 
 	@Test
-	void shortAnswerRequiresNonBlankCorrectAnswerText() {
+	void createRejectsBlankContent() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		givenModuleAndOwner(9L, 5L, 3L, 10L);
 
@@ -165,8 +159,33 @@ class QuestionServiceTest {
 				() -> questionService.createQuestion(
 						9L,
 						new CreateQuestionCommand(
-								"Answer", QuestionType.SHORT_ANSWER, Map.of("correctAnswer", " "), BigDecimal.ONE, 1)),
-				"Cấu trúc correctAnswer không hợp lệ.");
+								"   ", QuestionType.MULTIPLE_CHOICE, multipleChoiceAnswer(), BigDecimal.ONE, 1)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+		verify(questionRepository, never()).save(any(Question.class));
+	}
+
+	/**
+	 * The answer structure is validated by the typed request DTOs, not by the service, so the
+	 * service forwards whatever shape the boundary produced without inspecting it.
+	 */
+	@Test
+	void createForwardsAnswerShapeWithoutInspectingIt() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenModuleAndOwner(9L, 5L, 3L, 10L);
+		Question saved = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		when(questionRepository.save(any(Question.class))).thenReturn(saved);
+		Map<String, Object> twoOptions = Map.of("options", List.of(
+				Map.of("id", 1, "content", "A", "isCorrect", true),
+				Map.of("id", 2, "content", "B", "isCorrect", false)));
+
+		questionService.createQuestion(
+				9L,
+				new CreateQuestionCommand(
+						"Choose one", QuestionType.MULTIPLE_CHOICE, twoOptions, BigDecimal.ONE, 1));
+
+		org.mockito.ArgumentCaptor<Question> captor = org.mockito.ArgumentCaptor.forClass(Question.class);
+		verify(questionRepository).save(captor.capture());
+		assertThat(captor.getValue().correctAnswer()).isEqualTo(twoOptions);
 	}
 
 	@Test
