@@ -26,9 +26,21 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
 			HttpServletRequest request,
 			HttpServletResponse response,
 			AuthenticationException authException) throws IOException, ServletException {
+		if (!ApiRoutePolicy.contains(request)) {
+			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+			response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+			response.setCharacterEncoding("UTF-8");
+			objectMapper.writeValue(
+					response.getWriter(),
+					new ApiError("Bạn không có quyền thực hiện thao tác này."));
+			return;
+		}
+
 		response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		response.setCharacterEncoding("UTF-8");
-		objectMapper.writeValue(response.getWriter(), new ApiError("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
+		objectMapper.writeValue(
+				response.getWriter(),
+				new ApiError("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
 	}
 }

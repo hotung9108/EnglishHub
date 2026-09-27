@@ -240,6 +240,53 @@ class ModuleApiIntegrationTest {
 	}
 
 	@Test
+	void teacherAndStudentFromOneClassCannotReadModulesFromAnotherClass() throws Exception {
+		ClassEntity foreignClass = classRepository.save(new ClassEntity(
+				"Foreign module class " + uniqueSuffix(),
+				"Advanced",
+				"Module resource-scope fixture",
+				LocalDate.of(2026, 9, 15),
+				null,
+				ClassStatus.ACTIVE,
+				otherTeacherId));
+		Assignment foreignAssignment = assignmentRepository.save(new Assignment(
+				foreignClass.getId(),
+				"Foreign module assignment " + uniqueSuffix(),
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				2,
+				false,
+				AssignmentStatus.DRAFT));
+		AssignmentModule foreignModule = moduleRepository.save(new AssignmentModule(
+				foreignAssignment.getId(),
+				ModuleSkill.READING,
+				ModuleTaskType.QUIZ,
+				1,
+				"Foreign reading module",
+				BigDecimal.TEN,
+				null,
+				null,
+				null,
+				null,
+				"Grade reading"));
+
+		mockMvc.perform(get("/api/v1/assignments/{id}/modules", foreignAssignment.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/assignments/{id}/modules", foreignAssignment.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/v1/modules/{id}", foreignModule.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/modules/{id}", foreignModule.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void createAllowsOwnerAndBlocksStudentOtherTeacherAndAdmin() throws Exception {
 		String body = "{\"skill\":\"WRITING\",\"taskType\":\"ESSAY\","
 				+ "\"orderIndex\":3,\"instructions\":\"Write\",\"maxScore\":20}";

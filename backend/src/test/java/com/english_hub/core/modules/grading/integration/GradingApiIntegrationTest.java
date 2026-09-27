@@ -218,6 +218,35 @@ class GradingApiIntegrationTest {
 	}
 
 	@Test
+	void otherTeacherCannotPostAiAnalysisForAnotherTeachersContext() throws Exception {
+		Grading target = gradingRepository.findAll().stream()
+				.filter(grading -> grading.getStatus() == GradingStatus.AI_GRADED)
+				.findFirst()
+				.orElseThrow();
+
+		mockMvc.perform(post(
+						"/api/v1/submission-modules/{id}/grading/ai-analyze",
+						target.getSubmissionModuleId())
+					.header("Authorization", bearer(otherTeacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").isString());
+	}
+
+	@Test
+	void studentCannotReadAnotherStudentsGrading() throws Exception {
+		Grading target = gradingRepository.findAll().stream()
+				.filter(grading -> grading.getStatus() == GradingStatus.AI_GRADED)
+				.findFirst()
+				.orElseThrow();
+		long otherStudentId = createUser(UserRole.STUDENT, "Another grading API student");
+
+		mockMvc.perform(get("/api/v1/gradings/{id}", target.getId())
+					.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").isString());
+	}
+
+	@Test
 	void aiAnalysisAcceptsPendingWritingAndSpeakingWithoutChangingPersistedData() throws Exception {
 		List<Grading> pendingGradings = gradingRepository.findAll().stream()
 				.filter(grading -> grading.getStatus() == GradingStatus.PENDING)

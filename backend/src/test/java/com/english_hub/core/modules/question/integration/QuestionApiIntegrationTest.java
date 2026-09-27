@@ -219,7 +219,61 @@ class QuestionApiIntegrationTest {
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("{\"content\":\"Blocked\"}"))
 				.andExpect(status().isForbidden());
- 	}
+	}
+
+	@Test
+	void teacherAndStudentFromOneClassCannotReadQuestionsFromAnotherClass() throws Exception {
+		ClassEntity foreignClass = classRepository.save(new ClassEntity(
+				"Foreign question class " + uniqueSuffix(),
+				"Advanced",
+				"Question resource-scope fixture",
+				LocalDate.of(2026, 9, 15),
+				null,
+				ClassStatus.ACTIVE,
+				otherTeacherId));
+		Assignment foreignAssignment = assignmentRepository.save(new Assignment(
+				foreignClass.getId(),
+				"Foreign question assignment " + uniqueSuffix(),
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				2,
+				false,
+				AssignmentStatus.DRAFT));
+		AssignmentModule foreignModule = moduleRepository.save(new AssignmentModule(
+				foreignAssignment.getId(),
+				ModuleSkill.READING,
+				ModuleTaskType.QUIZ,
+				1,
+				"Foreign question module",
+				BigDecimal.TEN,
+				null,
+				null,
+				null,
+				null,
+				"Grade reading"));
+		Question foreignQuestion = questionRepository.save(new Question(
+				foreignModule.getId(),
+				"Foreign question",
+				QuestionType.SHORT_ANSWER,
+				"{\"correct_answer\":\"English\"}",
+				BigDecimal.ONE,
+				1));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", foreignModule.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", foreignModule.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/v1/questions/{id}", foreignQuestion.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/questions/{id}", foreignQuestion.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+	}
 
 	@Test
 	void createUpdateAndDeleteQuestionUseCamelCaseApi() throws Exception {
