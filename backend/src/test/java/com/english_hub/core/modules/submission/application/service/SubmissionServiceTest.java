@@ -53,6 +53,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -605,8 +606,8 @@ class SubmissionServiceTest {
 		});
 
 		SubmitModuleResult result = submissionService.submitModule(100L, List.of(
-				new AnswerPayload(21L, multipleChoice(1)),
-				new AnswerPayload(22L, multipleChoice(3))));
+				multipleChoice(21L, 1),
+				multipleChoice(22L, 3)));
 
 		assertThat(result.message()).isEqualTo("Đã nộp phần làm bài.");
 		assertThat(result.submissionModuleId()).isEqualTo(100L);
@@ -643,7 +644,7 @@ class SubmissionServiceTest {
 		});
 
 		SubmitModuleResult result = submissionService.submitModule(101L,
-				List.of(new AnswerPayload(30L, shortAnswer("The answer is..."))));
+				List.of(shortAnswer(30L, "The answer is...")));
 
 		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
 		assertThat(result.answers()).hasSize(1);
@@ -678,7 +679,7 @@ class SubmissionServiceTest {
 		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(closed));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
-						new AnswerPayload(21L, multipleChoice(1)))))
+						multipleChoice(21L, 1))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Phần làm bài này đã được nộp.");
 	}
@@ -746,11 +747,11 @@ class SubmissionServiceTest {
 				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L,
-						List.of(new AnswerPayload(null, multipleChoice(1)))))
+						List.of(multipleChoice(null, 1))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Nội dung câu trả lời không hợp lệ.");
 		assertThatThrownBy(() -> submissionService.submitModule(100L,
-						List.of(new AnswerPayload(21L, null))))
+						List.of(new AnswerPayload(21L, QuestionType.MULTIPLE_CHOICE, null))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Nội dung câu trả lời không hợp lệ.");
 	}
@@ -770,8 +771,8 @@ class SubmissionServiceTest {
 				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
-						new AnswerPayload(21L, multipleChoice(1)),
-						new AnswerPayload(21L, multipleChoice(2)))))
+						multipleChoice(21L, 1),
+						multipleChoice(21L, 2))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Nội dung câu trả lời không hợp lệ.");
 	}
@@ -791,13 +792,49 @@ class SubmissionServiceTest {
 				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L,
-						List.of(new AnswerPayload(999L, multipleChoice(1)))))
+						List.of(multipleChoice(999L, 1))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Không tìm thấy phần làm bài hoặc câu hỏi.");
 	}
 
+	/**
+	 * The payload shape itself is fixed by the presentation-layer {@code AnswerContent} sealed type,
+	 * so the only rule left for the service is that the shape matches the question type. An
+	 * unrecognised or malformed shape is rejected earlier, by the deserializer.
+	 */
 	@Test
-	void submitModuleRejectsWrongContentShapeForQuiz() {
+	void submitModuleRejectsAnAnswerWhoseShapeDoesNotMatchTheQuestionType() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule quizModule = module(9L);
+		quizModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		SubmissionModule rewriteModule = module(10L);
+		rewriteModule.setId(101L);
+		when(submissionModuleRepository.findById(101L)).thenReturn(Optional.of(rewriteModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(
+						moduleInfo(9L, ModuleTaskType.QUIZ),
+						moduleInfo(10L, ModuleTaskType.REWRITE)));
+		when(moduleQuestionRepository.findByModuleId(9L)).thenReturn(List.of(
+				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
+		when(moduleQuestionRepository.findByModuleId(10L))
+				.thenReturn(List.of(new ModuleQuestion(30L, 10L, QuestionType.SHORT_ANSWER, BigDecimal.ONE, 1)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L,
+						List.of(shortAnswer(21L, "no selections"))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+		assertThatThrownBy(() -> submissionService.submitModule(101L,
+						List.of(multipleChoice(30L, 1))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Nội dung câu trả lời không hợp lệ.");
+	}
+
+	@Test
+	void submitModuleRejectsAnAnswerWithNoClaimedQuestionType() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -811,35 +848,7 @@ class SubmissionServiceTest {
 				new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, BigDecimal.ONE, 1)));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L,
-						List.of(new AnswerPayload(21L, shortAnswer("no selections")))))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Nội dung câu trả lời không hợp lệ.");
-		assertThatThrownBy(() -> submissionService.submitModule(100L,
-						List.of(new AnswerPayload(21L, plainObject()))))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Nội dung câu trả lời không hợp lệ.");
-	}
-
-	@Test
-	void submitModuleRejectsWrongContentShapeForShortAnswer() {
-		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		SubmissionModule rewriteModule = module(10L);
-		rewriteModule.setId(101L);
-		when(submissionModuleRepository.findById(101L)).thenReturn(Optional.of(rewriteModule));
-		Submission submission = submission(5L, 41L, 1);
-		submission.setId(88L);
-		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
-				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.REWRITE)));
-		when(moduleQuestionRepository.findByModuleId(10L))
-				.thenReturn(List.of(new ModuleQuestion(30L, 10L, QuestionType.SHORT_ANSWER, BigDecimal.ONE, 1)));
-
-		assertThatThrownBy(() -> submissionService.submitModule(101L,
-						List.of(new AnswerPayload(30L, multipleChoice(1)))))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Nội dung câu trả lời không hợp lệ.");
-		assertThatThrownBy(() -> submissionService.submitModule(101L,
-						List.of(new AnswerPayload(30L, shortAnswer("   ")))))
+						List.of(new AnswerPayload(21L, null, Map.of("selectedOptionIds", List.of(1L))))))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Nội dung câu trả lời không hợp lệ.");
 	}
@@ -1546,18 +1555,13 @@ class SubmissionServiceTest {
 		return new ModuleInfo(moduleId, 5L, skill, taskType, 1);
 	}
 
-	private JsonNode multipleChoice(int optionId) {
-		tools.jackson.databind.node.ObjectNode node = JSON_READER.createObjectNode();
-		node.putArray("selectedOptionIds").add(optionId);
-		return node;
+	private AnswerPayload multipleChoice(Long questionId, int optionId) {
+		return new AnswerPayload(
+				questionId, QuestionType.MULTIPLE_CHOICE, Map.of("selectedOptionIds", List.of((long) optionId)));
 	}
 
-	private JsonNode shortAnswer(String text) {
-		return JSON_READER.createObjectNode().put("text", text);
-	}
-
-	private JsonNode plainObject() {
-		return JSON_READER.createObjectNode();
+	private AnswerPayload shortAnswer(Long questionId, String text) {
+		return new AnswerPayload(questionId, QuestionType.SHORT_ANSWER, Map.of("text", text));
 	}
 
 	private AssignmentWindow window(

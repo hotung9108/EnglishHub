@@ -154,13 +154,29 @@ Với **Speaking / Recording**: tương tự Essay nhưng kiểm tra `audio_stor
 {}
 ```
 
+**Contract `content` (đã định kiểu):** `content` là sealed interface với 2 shape, chọn theo cấu
+trúc payload — **không có field discriminator**, wire format không đổi so với thiết kế ban đầu.
+
+| `questionType` của câu hỏi | Shape `content` | Ràng buộc |
+|---|---|---|
+| `MULTIPLE_CHOICE` | `{"selectedOptionIds": [1]}` | bắt buộc, không rỗng, mỗi phần tử là số nguyên dương |
+| `SHORT_ANSWER` | `{"text": "The answer is..."}` | chuỗi không để trống |
+
+Shape phải khớp `questionType` của câu hỏi được gửi kèm. Ràng buộc trên shape được kiểm tra ở tầng
+parse/validate, **trước** khi service đối chiếu `questionType`.
+
 **Response:**
 
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Submit thành công. | `200` | `{ "message": "Đã nộp phần làm bài.", "submissionModuleId": 150, "status": "SUBMITTED", "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
 | Module đã được submit trước đó. | `400` | `{ "error": "Phần làm bài này đã được nộp." }` |
-| Thiếu answers hoặc sai định dạng content. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| Thiếu answers. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| Shape `content` không khớp `questionType` của câu hỏi. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
+| `content` thiếu hoặc `null`. | `400` | `{ "error": "content là bắt buộc." }` |
+| `content` không thuộc 2 shape đã biết. | `400` | `{ "error": "Nội dung câu trả lời phải là {\"selectedOptionIds\": [...]} cho MULTIPLE_CHOICE hoặc {\"text\": \"...\"} cho SHORT_ANSWER." }` |
+| `selectedOptionIds` rỗng / chứa giá trị không dương. | `400` | `{ "error": "selectedOptionIds không được để trống." }` hoặc `{ "error": "selectedOptionIds phải là số nguyên dương." }` |
+| `text` rỗng hoặc chỉ chứa khoảng trắng. | `400` | `{ "error": "text không được để trống." }` |
 | Không tìm thấy phần làm bài hoặc câu hỏi. | `404` | `{ "error": "Không tìm thấy phần làm bài hoặc câu hỏi." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Không có quyền. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |

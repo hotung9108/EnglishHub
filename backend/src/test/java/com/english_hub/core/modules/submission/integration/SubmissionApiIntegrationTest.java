@@ -652,9 +652,95 @@ class SubmissionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Nội dung câu trả lời không hợp lệ."));
 	}
 
+	/** The deserializer owns the shape contract, so an unrecognised shape never reaches the service. */
 	@Test
-	void submitModuleRejectsDuplicateQuestionIds() throws Exception {
+	void submitModuleRejectsAnUnrecognisedAnswerContentShape() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"answer\":\"not a known shape\"}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						"Nội dung câu trả lời phải là {\"selectedOptionIds\": [...]} cho MULTIPLE_CHOICE "
+								+ "hoặc {\"text\": \"...\"} cho SHORT_ANSWER."));
+
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+	}
+
+	@Test
+	void submitModuleRejectsAnEmptySelection() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("selectedOptionIds không được để trống."));
+	}
+
+	@Test
+	void submitModuleRejectsANonPositiveOptionId() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[0]}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("selectedOptionIds phải là số nguyên dương."));
+	}
+
+	/**
+	 * Bean validation runs before the service, so an unusable value is reported with its own
+	 * field-level message rather than the coarser question-type mismatch error.
+	 */
+	@Test
+	void submitModuleRejectsBlankShortAnswerTextBeforeCheckingTheQuestionType() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":["
+				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"text\":\"   \"}}"
+				+ "]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("text không được để trống."));
+	}
+
+	@Test
+	void submitModuleRejectsAnAnswerWithoutContent() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String body = "{\"answers\":[{\"questionId\":" + quizQuestionOne + ",\"content\":null}]}";
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("content là bắt buộc."));
+	}
+
+	@Test
+	void submitModuleRejectsDuplicateQuestionIds() throws Exception {		long submissionId = startSubmissionAsStudentMember();
 		long submissionModuleId = quizSubmissionModuleId(submissionId);
 		String body = "{\"answers\":["
 				+ "{\"questionId\":" + quizQuestionOne + ",\"content\":{\"selectedOptionIds\":[1]}},"

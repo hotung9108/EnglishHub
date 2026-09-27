@@ -51,6 +51,7 @@ import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -248,7 +249,7 @@ public class SubmissionService {
 		List<Answer> persisted = answerRepository.bulkCreate(
 				submissionModuleId,
 				validatedPayloads.stream()
-						.map(payload -> new Answer(submissionModuleId, payload.questionId(), payload.content().toString()))
+						.map(payload -> new Answer(submissionModuleId, payload.questionId(), toJson(payload.content())))
 						.toList());
 		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
 		submissionModuleRepository.save(submissionModule);
@@ -257,7 +258,7 @@ public class SubmissionService {
 				.mapToObj(index -> new AnswerResult(
 						persisted.get(index).getId(),
 						validatedPayloads.get(index).questionId(),
-						validatedPayloads.get(index).content(),
+						objectMapper.valueToTree(validatedPayloads.get(index).content()),
 						persisted.get(index).getDocStorageKey(),
 						persisted.get(index).getDocMimeType(),
 						persisted.get(index).getDocUploadStatus(),
@@ -513,6 +514,14 @@ public class SubmissionService {
 		return objectMapper.readTree(raw);
 	}
 
+	private String toJson(Map<String, Object> content) {
+		try {
+			return objectMapper.writeValueAsString(content);
+		} catch (JacksonException exception) {
+			throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+		}
+	}
+
 	private List<AnswerPayload> validatedAnswerPayloads(
 			List<AnswerPayload> payloads, Map<Long, ModuleQuestion> questionById) {
 		if (payloads == null || payloads.isEmpty()) {
@@ -530,32 +539,19 @@ public class SubmissionService {
 			if (question == null) {
 				throw ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE);
 			}
-			validateAnswerContentShape(question.questionType(), payload.content());
+			validateAnswerContentType(question.questionType(), payload.questionType());
 		}
 		return payloads;
 	}
 
-	private void validateAnswerContentShape(QuestionType questionType, JsonNode content) {
-		switch (questionType) {
-			case MULTIPLE_CHOICE -> {
-				if (!content.isObject()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-				JsonNode selectedOptionIds = content.get("selectedOptionIds");
-				if (selectedOptionIds == null || !selectedOptionIds.isArray()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-			}
-			case SHORT_ANSWER -> {
-				if (!content.isObject()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-				JsonNode text = content.get("text");
-				if (text == null || !text.isString() || text.stringValue().isBlank()) {
-					throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
-				}
-			}
-			default -> throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
+	/**
+	 * Rejects an answer whose content shape does not match the type of the question it was sent for.
+	 * The shape itself is already guaranteed by the presentation-layer {@code AnswerContent} sealed
+	 * type, so only the mismatch is left to enforce here.
+	 */
+	private void validateAnswerContentType(QuestionType questionType, QuestionType answerContentType) {
+		if (answerContentType == null || answerContentType != questionType) {
+			throw ApiException.badRequest(INVALID_ANSWER_CONTENT_MESSAGE);
 		}
 	}
 
@@ -814,7 +810,7 @@ public class SubmissionService {
 			UploadStatus audioUploadStatus) {
 	}
 
-	public record AnswerPayload(Long questionId, JsonNode content) {
+	public record AnswerPayload(Long questionId, QuestionType questionType, Map<String, Object> content) {
 	}
 
 	public record SubmissionModuleDetailResult(

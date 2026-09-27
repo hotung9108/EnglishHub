@@ -1,6 +1,7 @@
 package com.english_hub.core.common;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,14 @@ import tools.jackson.databind.exc.MismatchedInputException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	/**
+	 * Leading phrases of the rejection messages raised by the typed payload deserializers, keyed by
+	 * the contract they belong to. Kept as literals so this common-layer advice does not depend on
+	 * any module's presentation package.
+	 */
+	private static final List<String> SHAPE_MESSAGE_PREFIXES =
+			List.of("correctAnswer", "Nội dung câu trả lời");
 
 	@ExceptionHandler(ApiException.class)
 	public ResponseEntity<ApiError> handleApiException(ApiException exception) {
@@ -45,12 +54,13 @@ public class GlobalExceptionHandler {
 	/**
 	 * Jackson wraps a rejected payload shape in {@code MismatchedInputException}, which Spring in
 	 * turn wraps in {@code HttpMessageNotReadableException}. Surface the parser's own message only
-	 * for the question {@code correctAnswer} contract so the client learns which shape is expected,
-	 * and keep the generic message for every other endpoint.
+	 * for the typed payload contracts (the question {@code correctAnswer} and the submission
+	 * {@code content}) so the client learns which shape is expected, and keep the generic message
+	 * for every other endpoint.
 	 */
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ApiError> handleUnreadableRequest(HttpMessageNotReadableException exception) {
-		String detail = findCorrectAnswerShapeMessage(exception);
+		String detail = findShapeMessage(exception);
 		if (detail != null) {
 			return ResponseEntity.badRequest().body(new ApiError(detail));
 		}
@@ -79,12 +89,12 @@ public class GlobalExceptionHandler {
 				.body(new ApiError("Lỗi máy chủ."));
 	}
 
-	private String findCorrectAnswerShapeMessage(Throwable exception) {
+	private String findShapeMessage(Throwable exception) {
 		Throwable cause = exception;
 		while (cause != null) {
 			if (cause instanceof MismatchedInputException mismatch) {
 				String message = mismatch.getOriginalMessage();
-				if (message != null && message.startsWith("correctAnswer")) {
+				if (message != null && SHAPE_MESSAGE_PREFIXES.stream().anyMatch(message::startsWith)) {
 					return message;
 				}
 			}
