@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
-import type { Role, User } from '../types/auth';
+import type { Role } from '../types/auth';
 import type { SettingsTab, ActiveSession, NotificationSettings, PreferenceSettings } from '../types/settings.types';
 import '../styles/settings.css';
 
@@ -107,7 +107,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   // User form state
   const currentRole: Role = user?.role || 'admin';
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    name: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
     code: user?.code || (currentRole === 'admin' ? 'AD-2026-001' : currentRole === 'teacher' ? 'GV-2026-088' : 'HV-2026-402'),
@@ -248,7 +248,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   const handleSaveProfile = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     updateUser({
-      name: formData.name,
+      fullName: formData.name,
       email: formData.email,
       phone: formData.phone,
       code: formData.code,
@@ -265,45 +265,18 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     showToast(t('settings.savedSuccess'));
   };
 
-  const handleRoleSwitch = (newRole: Role) => {
-    const mockAccounts: Record<Role, User> = {
-      admin: {
-        id: '1',
-        name: 'Nguyễn Văn Hùng (Admin)',
-        email: 'admin@eh.com',
-        role: 'admin',
-        code: 'AD-2026-001',
-        phone: '0901 234 567',
-        department: 'Ban Quản trị Hệ thống',
-        joinedDate: '15/01/2025',
-      },
-      teacher: {
-        id: '2',
-        name: 'Cô Trần Thị Mai Lan (Teacher)',
-        email: 'teacher@eh.com',
-        role: 'teacher',
-        code: 'GV-2026-088',
-        phone: '0987 654 321',
-        specialization: 'IELTS Academic & Speaking/Writing',
-        bio: '8.5 IELTS Overall (Speaking 8.5, Writing 8.0). Hơn 7 năm kinh nghiệm giảng dạy IELTS chuyên sâu tại EnglishHub.',
-        meetingUrl: 'https://meet.google.com/eh-lan-ielts',
-        joinedDate: '01/08/2024',
-      },
-      student: {
-        id: '3',
-        name: 'Alice Johnson (Student)',
-        email: 'student@eh.com',
-        role: 'student',
-        code: 'HV-2026-402',
-        phone: '0912 888 999',
-        currentClass: 'IELTS Intensive K24',
-        targetBand: '7.5+ IELTS',
-        school: 'Đại học Quốc Gia Hà Nội',
-        dateOfBirth: '2005-06-15',
-        joinedDate: '10/02/2026',
-      },
+  const handleRoleSwitch = async (newRole: Role) => {
+    const roleEmails: Record<Role, string> = {
+      admin: 'admin@eh.com',
+      teacher: 'teacher@eh.com',
+      student: 'student@eh.com',
     };
-    login(mockAccounts[newRole]);
+
+    try {
+      await login({ email: roleEmails[newRole], password: 'password123' });
+    } catch {
+      // Login failed, keep current user
+    }
   };
 
   const getRoleTitle = () => {
@@ -816,7 +789,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                 onClick={() => {
                   if (user) {
                     setFormData({
-                      name: user.name,
+                      name: user.fullName,
                       email: user.email,
                       phone: user.phone || '',
                       code: user.code || '',
