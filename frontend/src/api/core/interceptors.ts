@@ -8,6 +8,8 @@ import type { RequestConfig } from '../../types/api.types';
 import { tokenService } from './tokenService';
 import { normalizeError } from './errorHandler';
 
+import { envConfig } from '../../config/env';
+
 interface QueueItem {
   resolve: (token: string) => void;
   reject: (error: unknown) => void;
@@ -51,10 +53,13 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
 
       // Attach client language preference
       try {
-        const lang = localStorage.getItem('eh_language') || localStorage.getItem('language') || 'vi';
+        const lang =
+          localStorage.getItem('eh_language') ||
+          localStorage.getItem('language') ||
+          envConfig.DEFAULT_LANGUAGE;
         config.headers.set('Accept-Language', lang);
       } catch {
-        config.headers.set('Accept-Language', 'vi');
+        config.headers.set('Accept-Language', envConfig.DEFAULT_LANGUAGE);
       }
 
       // Ensure JSON header if sending standard body
@@ -90,10 +95,11 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
       const requestUrl = originalRequest.url || '';
 
       // Skip refresh attempt for public endpoints or if already retried
+      const authEndpoints = envConfig.ENDPOINTS.AUTH;
       const isAuthEndpoint =
-        requestUrl.includes('/auth/login') ||
-        requestUrl.includes('/auth/refresh') ||
-        requestUrl.includes('/auth/register');
+        requestUrl.includes(authEndpoints.LOGIN) ||
+        requestUrl.includes(authEndpoints.REFRESH) ||
+        requestUrl.includes(authEndpoints.REGISTER);
 
       if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
         const refreshToken = tokenService.getRefreshToken();
@@ -121,9 +127,10 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
           try {
             // Use a clean axios instance to avoid recursive interceptor calls
             const baseURL = axiosInstance.defaults.baseURL || '';
+            const refreshPath = envConfig.ENDPOINTS.AUTH.REFRESH.replace(/^\/+/, '');
             const refreshEndpoint = baseURL.endsWith('/')
-              ? `${baseURL}auth/refresh`
-              : `${baseURL}/auth/refresh`;
+              ? `${baseURL}${refreshPath}`
+              : `${baseURL}/${refreshPath}`;
 
             const refreshResponse = await axios.post<{
               accessToken?: string;
@@ -134,7 +141,7 @@ export function setupInterceptors(axiosInstance: AxiosInstance): void {
               { refreshToken },
               {
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 10000,
+                timeout: envConfig.AUTH_REFRESH_TIMEOUT,
               }
             );
 

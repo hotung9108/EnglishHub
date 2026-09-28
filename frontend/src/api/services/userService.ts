@@ -1,4 +1,5 @@
 import { BaseCrudService } from '../core/BaseService';
+import { envConfig } from '../../config/env';
 import type { User } from '../../types/auth';
 import type { PaginationParams } from '../../types/api.types';
 
@@ -19,21 +20,21 @@ export interface ChangePasswordDto {
  */
 export class UserService extends BaseCrudService<User, Partial<User>, Partial<User>, UserQueryParams> {
   constructor() {
-    super('/users');
+    super(envConfig.ENDPOINTS.USERS.BASE);
   }
 
   /**
    * Retrieves profile of currently authenticated user.
    */
   public async getMe(): Promise<User> {
-    return this.http.get<User>(this.buildUrl('me'));
+    return this.http.get<User>(envConfig.ENDPOINTS.USERS.ME);
   }
 
   /**
    * Updates profile details of currently authenticated user.
    */
   public async updateProfile(profileData: Partial<User>): Promise<User> {
-    return this.http.put<User, Partial<User>>(this.buildUrl('me/profile'), profileData);
+    return this.http.put<User, Partial<User>>(envConfig.ENDPOINTS.USERS.PROFILE, profileData);
   }
 
   /**
@@ -41,7 +42,7 @@ export class UserService extends BaseCrudService<User, Partial<User>, Partial<Us
    */
   public async changePassword(dto: ChangePasswordDto): Promise<{ message: string }> {
     return this.http.post<{ message: string }, ChangePasswordDto>(
-      this.buildUrl('me/change-password'),
+      envConfig.ENDPOINTS.USERS.CHANGE_PASSWORD,
       dto
     );
   }

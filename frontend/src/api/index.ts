@@ -1,3 +1,7 @@
+// Configuration
+export { envConfig, loadEnvConfig } from '../config/env';
+export type { EnvConfig } from '../config/env';
+
 // Core HTTP & Client
 export { axiosClient, createApiClient, getDefaultBaseUrl } from './core/client';
 export { BaseHttpClient, httpClient } from './core/BaseHttpClient';

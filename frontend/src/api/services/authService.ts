@@ -1,5 +1,6 @@
 import { BaseService } from '../core/BaseService';
 import { tokenService } from '../core/tokenService';
+import { envConfig } from '../../config/env';
 import type { User, Role } from '../../types/auth';
 
 export interface LoginDto {
@@ -38,7 +39,7 @@ export interface LogoutResponse {
  */
 export class AuthService extends BaseService {
   constructor() {
-    super('/auth');
+    super(envConfig.ENDPOINTS.AUTH.BASE);
   }
 
   /**
@@ -46,7 +47,7 @@ export class AuthService extends BaseService {
    */
   public async login(credentials: LoginDto): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const response = await this.http.post<LoginResponse>(
-      this.buildUrl('login'),
+      envConfig.ENDPOINTS.AUTH.LOGIN,
       credentials,
       { skipAuth: true }
     );
@@ -83,7 +84,7 @@ export class AuthService extends BaseService {
     }
 
     const response = await this.http.post<RefreshResponse>(
-      this.buildUrl('refresh'),
+      envConfig.ENDPOINTS.AUTH.REFRESH,
       { refreshToken },
       { skipAuth: true }
     );
@@ -100,7 +101,7 @@ export class AuthService extends BaseService {
     try {
       if (refreshToken) {
         await this.http.post<LogoutResponse>(
-          this.buildUrl('logout'),
+          envConfig.ENDPOINTS.AUTH.LOGOUT,
           { refreshToken }
         );
       }
@@ -113,7 +114,7 @@ export class AuthService extends BaseService {
    * Retrieves the current authenticated user's profile from `/users/me`.
    */
   public async getCurrentUser(): Promise<User> {
-    const backendUser = await this.http.get<BackendAuthUser>('/users/me');
+    const backendUser = await this.http.get<BackendAuthUser>(envConfig.ENDPOINTS.USERS.ME);
     return {
       id: String(backendUser.id),
       name: backendUser.fullName,

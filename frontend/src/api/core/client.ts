@@ -2,23 +2,17 @@ import axios from 'axios';
 import type { AxiosInstance, CreateAxiosDefaults } from 'axios';
 import { setupInterceptors } from './interceptors';
 
+import { envConfig } from '../../config/env';
+
 export interface CreateClientConfig extends CreateAxiosDefaults {
   enableInterceptors?: boolean;
 }
 
 /**
- * Resolves the default API base URL using Vite environment variables.
- * Falls back to '/api/v1' for reverse proxy / dev setups.
+ * Resolves the default API base URL using centralized envConfig.
  */
 export function getDefaultBaseUrl(): string {
-  const env = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
-  const envUrl =
-    env?.VITE_API_BASE_URL ||
-    env?.VITE_BACKEND_BASE_URL ||
-    '/api/v1';
-
-  // Ensure trailing slashes are cleanly handled if needed, or return trimmed
-  return envUrl.replace(/\/+$/, '');
+  return envConfig.API_BASE_URL;
 }
 
 /**
@@ -30,7 +24,7 @@ export function createApiClient(customConfig: CreateClientConfig = {}): AxiosIns
 
   const instance = axios.create({
     baseURL: getDefaultBaseUrl(),
-    timeout: 20000,
+    timeout: envConfig.API_TIMEOUT,
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',

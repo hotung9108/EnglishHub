@@ -299,6 +299,20 @@ async function runTests() {
   assert.strictEqual(typeof hooksModule.useAuth, 'function');
   console.log('✓ Hooks interface and barrel exports verified');
 
+  // Test 8: Verify Environment Configuration & Externalized API Endpoints
+  console.log('\n[Test 8] Testing EnvConfig & Externalized Endpoints...');
+  const { envConfig } = await import('../src/config/env');
+  assert.ok(envConfig.API_BASE_URL.length > 0, 'API_BASE_URL must not be empty');
+  assert.strictEqual(typeof envConfig.API_TIMEOUT, 'number');
+  assert.strictEqual(typeof envConfig.AUTH_REFRESH_TIMEOUT, 'number');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.AUTH.LOGIN, 'string');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.AUTH.REFRESH, 'string');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.AUTH.LOGOUT, 'string');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.USERS.ME, 'string');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.USERS.PROFILE, 'string');
+  assert.strictEqual(typeof envConfig.ENDPOINTS.USERS.CHANGE_PASSWORD, 'string');
+  console.log(`✓ EnvConfig verified (Base URL: ${envConfig.API_BASE_URL}, Timeout: ${envConfig.API_TIMEOUT}ms)`);
+
   console.log('\n=========================================');
   console.log('ALL TESTS PASSED SUCCESSFULLY! (100% OK)');
   console.log('=========================================');
