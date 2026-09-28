@@ -57,6 +57,19 @@ export const commonVi = {
   sectionResults: 'KẾT QUẢ & TIẾN ĐỘ',
   sectionManagement: 'QUẢN TRỊ HỆ THỐNG',
   sectionTeaching: 'GIẢNG DẠY',
+
+  // Error 404 & 403 Strings
+  error404Badge: 'ERROR 404 • KHÔNG TÌM THẤY TRANG',
+  error404Title: 'Trang bạn tìm kiếm không tồn tại',
+  error404Desc: 'Đường dẫn bạn yêu cầu không tồn tại hoặc đã được di chuyển. Vui lòng quay về trang chủ để tiếp tục.',
+  error404AttemptedUrl: 'Đường dẫn đã truy cập',
+  error404BackHome: 'Quay về trang chủ',
+  error404BackPrev: 'Quay lại trang trước',
+
+  error403Badge: 'ERROR 403 • TRUY CẬP BỊ TỪ CHỐI',
+  error403Title: 'Bạn không có quyền truy cập vào trang này',
+  error403Desc: 'Bạn không thể truy cập vào trang này. Vui lòng quay về trang chủ để tiếp tục.',
+  error403BackHome: 'Quay về trang chủ',
 };
 
 export const commonEn = {
@@ -118,4 +131,17 @@ export const commonEn = {
   sectionResults: 'RESULTS & PROGRESS',
   sectionManagement: 'MANAGEMENT',
   sectionTeaching: 'TEACHING',
+
+  // Error 404 & 403 Strings
+  error404Badge: 'ERROR 404 • PAGE NOT FOUND',
+  error404Title: 'The page you are looking for does not exist',
+  error404Desc: 'The page you are looking for does not exist or has been moved. Please return to the homepage to continue.',
+  error404AttemptedUrl: 'Attempted URL',
+  error404BackHome: 'Back to Homepage',
+  error404BackPrev: 'Go Back',
+
+  error403Badge: 'ERROR 403 • ACCESS FORBIDDEN',
+  error403Title: 'You do not have permission to access this page',
+  error403Desc: 'Your account does not have sufficient permissions to access this page. Please return to the homepage to continue.',
+  error403BackHome: 'Back to Homepage',
 };

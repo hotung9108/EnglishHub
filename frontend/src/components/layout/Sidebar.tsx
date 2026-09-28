@@ -190,11 +190,14 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {/* Footer Utility Links */}
       <div className="sidebar-footer">
         <div className="sidebar-divider"></div>
-        <NavLink to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} className="sidebar-link">
+        <NavLink 
+          to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} 
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
           <Settings size={18} strokeWidth={2} />
           <span>{t('settings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link text-error">
+        <NavLink to="/login" className="sidebar-link sidebar-link-logout text-error">
           <LogOut size={18} strokeWidth={2} />
           <span>{t('logout')}</span>
         </NavLink>
