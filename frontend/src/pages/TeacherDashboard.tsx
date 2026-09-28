@@ -24,7 +24,7 @@ export const TeacherDashboard: React.FC = () => {
   const isVi = language === 'vi';
   const { user } = useAuth();
 
-  const teacherName = user?.name || (isVi ? 'Cô Trần Thị Mai Lan' : 'Ms. Trần Thị Mai Lan');
+  const teacherName = user?.fullName || (isVi ? 'Cô Trần Thị Mai Lan' : 'Ms. Trần Thị Mai Lan');
 
   // Filter for pending submissions queue
   const [selectedSkill, setSelectedSkill] = useState<string>('all');

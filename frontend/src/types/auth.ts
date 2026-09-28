@@ -8,6 +8,15 @@ export interface User {
   avatar?: string;
   phone?: string;
   specialization?: string;
+  code?: string;
+  department?: string;
+  bio?: string;
+  meetingUrl?: string;
+  targetBand?: string;
+  currentClass?: string;
+  dateOfBirth?: string;
+  school?: string;
+  joinedDate?: string;
 }
 
 export interface AuthState {
@@ -19,4 +28,5 @@ export interface AuthState {
 export interface AuthContextType extends AuthState {
   login: (payload: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (data: Partial<User>) => void;
 }

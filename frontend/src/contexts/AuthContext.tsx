@@ -1,8 +1,22 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthContextType, User } from '../types/auth';
+import type { AuthContextType, Role, User } from '../types/auth';
 import { authService, tokenStorage, AUTH_EVENTS } from '@/api';
+import type { AuthUserData } from '@/api/services/auth.service';
+
+const ROLES: Role[] = ['admin', 'teacher', 'student'];
+
+const toUser = (data: AuthUserData | null): User | null => {
+  if (!data) return null;
+  const role = data.role?.toLowerCase() as Role;
+  return {
+    ...data,
+    fullName: data.fullName ?? '',
+    email: data.email ?? '',
+    role: ROLES.includes(role) ? role : 'student',
+  };
+};
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -16,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authService.isAuthenticated()) {
           const savedUser = authService.getSavedUser();
           if (savedUser) {
-            setUser(savedUser);
+            setUser(toUser(savedUser));
           }
         }
       } catch {
@@ -41,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (payload: { email: string; password: string }) => {
     const response = await authService.login(payload);
-    setUser(response.user);
+    setUser(toUser(response.user));
   };
 
   const logout = async () => {

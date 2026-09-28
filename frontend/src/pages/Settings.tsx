@@ -80,7 +80,7 @@ const INITIAL_SESSIONS: ActiveSession[] = [
 ];
 
 const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, login } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -107,7 +107,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   // User form state
   const currentRole: Role = user?.role || 'admin';
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    name: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
     code: user?.code || (currentRole === 'admin' ? 'AD-2026-001' : currentRole === 'teacher' ? 'GV-2026-088' : 'HV-2026-402'),
@@ -248,7 +248,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   const handleSaveProfile = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     updateUser({
-      name: formData.name,
+      fullName: formData.name,
       email: formData.email,
       phone: formData.phone,
       code: formData.code,
@@ -273,8 +273,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     };
 
     try {
-      await authService.login({ email: roleEmails[newRole], password: 'password123' });
-      setUser(authService.getSavedUser() || null);
+      await login({ email: roleEmails[newRole], password: 'password123' });
     } catch {
       // Login failed, keep current user
     }
@@ -790,7 +789,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                 onClick={() => {
                   if (user) {
                     setFormData({
-                      name: user.name,
+                      name: user.fullName,
                       email: user.email,
                       phone: user.phone || '',
                       code: user.code || '',
