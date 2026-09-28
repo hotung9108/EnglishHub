@@ -1,120 +1,266 @@
-import { useLanguage } from '../contexts/LanguageContext';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { 
+  GraduationCap, UserPlus, Search, 
+  Award, BookOpen, Clock, 
+  ArrowRight
+} from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
-const Teachers = () => {
-  const { t } = useLanguage();
+interface TeacherItem {
+  id: string;
+  code: string;
+  name: string;
+  avatar: string;
+  email: string;
+  phone: string;
+  certs: string;
+  activeClasses: number;
+  pendingGradings: number;
+  avgTurnaround: number; // in hours
+  status: 'Active' | 'OnLeave';
+}
+
+export const Teachers: React.FC = () => {
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
+  const isVi = language === 'vi';
 
-  const teachers = [
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterExpertise, setFilterExpertise] = useState<'All' | 'IELTS' | 'TOEIC' | 'Grammar'>('All');
+
+  const teachers: TeacherItem[] = [
     {
-      id: 1,
-      name: 'Trần Thị Mai Lan',
-      status: 'Active',
-      certs: 'IELTS 8.5 / TESOL Certified',
-      classesCount: 4,
-      pendingGrades: 24
+      id: '1',
+      code: 'GV-088',
+      name: 'Cô Trần Thị Mai Lan',
+      avatar: 'TL',
+      email: 'teacher.lan@center.edu.vn',
+      phone: '0987 654 321',
+      certs: 'IELTS 8.5 • TESOL Certified',
+      activeClasses: 4,
+      pendingGradings: 2,
+      avgTurnaround: 14.5,
+      status: 'Active'
     },
     {
-      id: 2,
-      name: 'Mark Reynolds',
-      status: 'Active',
-      certs: 'Native Speaker / CELTA',
-      classesCount: 3,
-      pendingGrades: 8
+      id: '2',
+      code: 'GV-042',
+      name: 'Thầy Nguyễn Văn Nam',
+      avatar: 'VN',
+      email: 'nam.nv@center.edu.vn',
+      phone: '0912 888 999',
+      certs: 'IELTS 8.0 • MA Applied Linguistics',
+      activeClasses: 3,
+      pendingGradings: 0,
+      avgTurnaround: 18.2,
+      status: 'Active'
     },
     {
-      id: 3,
-      name: 'Nguyễn Thu Trang',
-      status: 'Active',
-      certs: 'TOEIC 990 / MA Linguistics',
-      classesCount: 5,
-      pendingGrades: 19
+      id: '3',
+      code: 'GV-019',
+      name: 'Thầy David Miller',
+      avatar: 'DM',
+      email: 'david.miller@center.edu.vn',
+      phone: '0933 777 666',
+      certs: 'Native Speaker • CELTA Certified',
+      activeClasses: 2,
+      pendingGradings: 1,
+      avgTurnaround: 12.0,
+      status: 'Active'
     },
     {
-      id: 4,
-      name: 'Hoàng Minh Đức',
-      status: 'On Leave',
-      certs: 'IELTS 8.0 / Writing Specialist',
-      classesCount: 2,
-      pendingGrades: 0
+      id: '4',
+      code: 'GV-033',
+      name: 'Cô Nguyễn Thu Trang',
+      avatar: 'TT',
+      email: 'trang.nt@center.edu.vn',
+      phone: '0944 333 222',
+      certs: 'TOEIC 990/990 • 6 năm luyện thi',
+      activeClasses: 3,
+      pendingGradings: 3,
+      avgTurnaround: 20.4,
+      status: 'Active'
     }
   ];
 
+  const filtered = teachers.filter(tc => {
+    if (filterExpertise !== 'All' && !tc.certs.toLowerCase().includes(filterExpertise.toLowerCase())) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        tc.name.toLowerCase().includes(q) ||
+        tc.code.toLowerCase().includes(q) ||
+        tc.email.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
   return (
-    <div>
-      {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title">{t('teachers.title')}</h1>
+    <div className="adm-container">
+      {/* Header */}
+      <div className="adm-header">
+        <div className="adm-title-group">
+          <h1 className="adm-title">
+            <GraduationCap size={28} color="var(--primary)" />
+            {t('teachers.title')}
+            <span className="adm-title-badge">{teachers.length} {isVi ? 'giảng viên' : 'faculty'}</span>
+          </h1>
+          <p className="adm-subtitle">
+            {isVi 
+              ? 'Hồ sơ chuyên môn đội ngũ giảng viên, phân công lớp học và theo dõi hiệu suất chấm chữa bài tập.' 
+              : 'Faculty directory, academic qualifications, classroom workload, and grading SLA telemetry.'}
+          </p>
+        </div>
+
+        <button 
+          className="btn btn-primary"
+          onClick={() => navigate('/admin/teachers/create')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <UserPlus size={16} />
+          <span>{t('teachers.addTeacher')}</span>
+        </button>
       </div>
 
-      {/* Main Container */}
-      <div className="card" style={{ padding: '32px' }}>
-        {/* Header Section */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '4px' }}>{t('teachers.subtitle')}</h3>
-            <p className="label-md text-on-surface-variant">{t('teachers.breadcrumb')}</p>
-          </div>
-          <button className="btn btn-primary" style={{ backgroundColor: 'var(--inverse-surface)' }} onClick={() => navigate('/admin/teachers/create')}>
-            {t('teachers.addTeacher')}
-          </button>
-        </div>
-
-        {/* Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statTotal')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span className="display-lg text-primary">18</span>
-              <span className="headline-md text-on-surface">{t('teachers.statTotalUnit')}</span>
+      {/* KPI Stats Strip */}
+      <div className="adm-kpi-grid">
+        <div className="adm-kpi-card">
+          <div className="adm-kpi-header">
+            <div>
+              <div className="adm-kpi-label">{isVi ? 'TỔNG ĐỘI NGŨ GIẢNG VIÊN' : 'TOTAL FACULTY'}</div>
+              <div className="adm-kpi-value">45</div>
+            </div>
+            <div className="adm-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+              <GraduationCap size={22} />
             </div>
           </div>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statClasses')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span className="display-lg text-on-surface">32</span>
-              <span className="headline-md text-on-surface">{t('teachers.statClassesUnit')}</span>
-            </div>
-          </div>
-          <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-            <p className="label-md text-on-surface-variant" style={{ textTransform: 'uppercase', marginBottom: '8px' }}>{t('teachers.statAvgGrades')}</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span className="display-lg text-on-surface">145</span>
-              <span className="headline-md text-on-surface">{t('teachers.statAvgGradesUnit')}</span>
-            </div>
+          <div className="adm-kpi-footer text-on-surface-variant">
+            <span>100% đạt chuẩn TESOL / CELTA</span>
           </div>
         </div>
 
-        {/* Teacher Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
-          {teachers.map(teacher => (
-            <div key={teacher.id} style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-lg)', padding: '24px', display: 'flex', flexDirection: 'column' }}>
-              {/* Card Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <h4 className="headline-md text-on-surface">{teacher.name}</h4>
-                <span className={`badge ${teacher.status === 'Active' ? 'badge-active' : 'badge-onleave'}`} style={{ border: '1px solid var(--outline-variant)' }}>
-                  {teacher.status}
-                </span>
-              </div>
-              <p className="body-md text-on-surface-variant" style={{ marginBottom: '24px' }}>{teacher.certs}</p>
-
-              {/* Divider */}
-              <hr style={{ borderTop: '1px solid var(--outline-variant)', borderBottom: 'none', margin: '0 0 24px 0', opacity: 0.5 }} />
-
-              {/* Stats */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', flex: 1 }}>
-                <p className="body-md text-on-surface-variant">{teacher.classesCount}{t('teachers.classesCountSuffix')}</p>
-                <p className="body-md text-on-surface-variant">{teacher.pendingGrades}{t('teachers.pendingGradesSuffix')}</p>
-              </div>
-
-              {/* Actions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <button className="btn btn-secondary" onClick={() => navigate(`/admin/teachers/${teacher.id}`)}>{t('teachers.viewProfile')}</button>
-                <button className="btn btn-secondary">{t('teachers.assignClass')}</button>
-              </div>
+        <div className="adm-kpi-card">
+          <div className="adm-kpi-header">
+            <div>
+              <div className="adm-kpi-label">{isVi ? 'LỚP ĐANG GIẢNG DẠY' : 'ASSIGNED CLASSES'}</div>
+              <div className="adm-kpi-value">32</div>
             </div>
+            <div className="adm-kpi-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+              <BookOpen size={22} />
+            </div>
+          </div>
+          <div className="adm-kpi-footer">
+            <span className="adm-kpi-delta pos">TB 2.4 lớp/GV</span>
+          </div>
+        </div>
+
+        <div className="adm-kpi-card">
+          <div className="adm-kpi-header">
+            <div>
+              <div className="adm-kpi-label">{isVi ? 'TỐC ĐỘ TRẢ BÀI TB' : 'AVG TURNAROUND'}</div>
+              <div className="adm-kpi-value">15.8 <span style={{ fontSize: '16px', fontWeight: 500 }}>giờ</span></div>
+            </div>
+            <div className="adm-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+              <Clock size={22} />
+            </div>
+          </div>
+          <div className="adm-kpi-footer">
+            <span className="adm-kpi-delta pos">Đạt chuẩn SLA &lt; 24h</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="adm-filter-bar">
+        <div className="adm-pills">
+          {(['All', 'IELTS', 'TOEIC', 'Grammar'] as const).map(exp => (
+            <button
+              key={exp}
+              onClick={() => setFilterExpertise(exp)}
+              className={`adm-pill ${filterExpertise === exp ? 'active' : ''}`}
+            >
+              <span>{exp === 'All' ? (isVi ? 'Tất cả chuyên môn' : 'All Qualifications') : exp}</span>
+            </button>
           ))}
         </div>
+
+        <div className="adm-search-wrap">
+          <Search size={16} className="adm-search-icon" />
+          <input 
+            type="text" 
+            className="adm-search-input"
+            placeholder={isVi ? 'Tìm tên giáo viên, mã GV, chứng chỉ...' : 'Search teachers...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Modern Teacher Bento Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '22px' }}>
+        {filtered.map(tc => (
+          <div 
+            key={tc.id} 
+            className="card"
+            style={{ 
+              padding: '24px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              justifyContent: 'space-between', 
+              gap: '16px',
+              border: '1px solid var(--outline-variant)'
+            }}
+          >
+            <div>
+              {/* Header with Avatar and Status */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#2563eb' }}>
+                    {tc.avatar}
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 2px 0' }}>{tc.name}</h3>
+                    <span className="font-mono text-primary font-semibold" style={{ fontSize: '12px' }}>{tc.code}</span>
+                  </div>
+                </div>
+
+                <span className="badge badge-active">{tc.status}</span>
+              </div>
+
+              {/* Certs Pill */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: 'var(--radius-full)', background: 'var(--surface-container-high)', fontSize: '12px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '16px' }}>
+                <Award size={14} color="var(--primary)" />
+                <span>{tc.certs}</span>
+              </div>
+
+              {/* Workload Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', fontSize: '12.5px' }}>
+                <div>
+                  <span className="text-on-surface-variant">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
+                  <strong>{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
+                </div>
+                <div>
+                  <span className="text-on-surface-variant">{isVi ? 'Tốc độ chấm: ' : 'SLA Speed: '}</span>
+                  <strong className="text-primary">{tc.avgTurnaround}h</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Action */}
+            <div style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: '14px', display: 'flex', gap: '10px' }}>
+              <button 
+                onClick={() => navigate(`/admin/teachers/${tc.id}`)}
+                className="btn btn-secondary flex-1"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+              >
+                <span>{t('teachers.viewProfile')}</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

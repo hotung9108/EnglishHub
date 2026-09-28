@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.submission.presentation.rest;
 
 import com.english_hub.core.modules.submission.application.service.SubmissionService;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingSummaryResult;
@@ -31,15 +32,19 @@ import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModul
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlRequest;
 import com.english_hub.core.modules.submission.presentation.rest.dto.UploadUrlResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.answercontent.MultipleChoiceAnswerContent;
+import com.english_hub.core.modules.submission.presentation.rest.dto.answercontent.ShortAnswerAnswerContent;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -51,6 +56,8 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -186,7 +193,8 @@ class SubmissionControllerTest {
 
 		ResponseEntity<SubmitModuleResponse> response = submissionController.submitModule(
 				150L,
-				new SubmitModuleRequest(List.of(new SubmitModuleRequest.AnswerPayload(21L, content))));
+				new SubmitModuleRequest(List.of(new SubmitModuleRequest.AnswerPayload(
+						21L, new MultipleChoiceAnswerContent(List.of(1L))))));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		SubmitModuleResponse body = response.getBody();
@@ -197,6 +205,36 @@ class SubmissionControllerTest {
 		assertThat(body.answers().getFirst().id()).isEqualTo(340L);
 		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
 		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+	}
+
+	/** The controller must hand the service both the shape's type and its rendered JSONB map. */
+	@Test
+	void projectsTheSealedAnswerContentOntoTheServicePayload() {
+		when(submissionService.submitModule(eq(150L), anyList())).thenReturn(new SubmitModuleResult(
+				"Đã nộp phần làm bài.", 150L, SubmissionStatus.SUBMITTED, List.of()));
+
+		submissionController.submitModule(
+				150L,
+				new SubmitModuleRequest(List.of(
+						new SubmitModuleRequest.AnswerPayload(21L, new MultipleChoiceAnswerContent(List.of(1L, 3L))),
+						new SubmitModuleRequest.AnswerPayload(30L, new ShortAnswerAnswerContent("The answer is...")))));
+
+		ArgumentCaptor<List<AnswerPayload>> captor = ArgumentCaptor.forClass(List.class);
+		verify(submissionService).submitModule(eq(150L), captor.capture());
+		assertThat(captor.getValue()).containsExactly(
+				new AnswerPayload(
+						21L, QuestionType.MULTIPLE_CHOICE, Map.of("selectedOptionIds", List.of(1L, 3L))),
+				new AnswerPayload(30L, QuestionType.SHORT_ANSWER, Map.of("text", "The answer is...")));
+	}
+
+	@Test
+	void passesANullPayloadListThroughWhenNoAnswersAreSent() {
+		when(submissionService.submitModule(eq(150L), isNull())).thenReturn(new SubmitModuleResult(
+				"Đã nộp phần làm bài.", 150L, SubmissionStatus.SUBMITTED, List.of()));
+
+		assertThat(submissionController.submitModule(150L, new SubmitModuleRequest(null)).getStatusCode())
+				.isEqualTo(HttpStatus.OK);
+		assertThat(submissionController.submitModule(150L, null).getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 
 	@Test

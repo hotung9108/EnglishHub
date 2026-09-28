@@ -57,10 +57,10 @@ const TeacherSubmissionDetails = () => {
 
       {/* Quick Actions Bar */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-        <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
+        <button className="btn btn-secondary bg-white btn-sm" style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
           <Download size={14} color="#64748B" /> {t('submissionDetails.btnDownloadAll')}
         </button>
-        <button style={{ padding: '6px 12px', backgroundColor: 'white', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', fontWeight: 500, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
+        <button className="btn btn-secondary bg-white btn-sm" style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
           <Printer size={14} color="#64748B" /> {t('submissionDetails.btnPrint')}
         </button>
       </div>
@@ -279,16 +279,16 @@ const TeacherSubmissionDetails = () => {
       <StickyActionBar 
         leftActions={
           <>
-            <button style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#475569', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '8px' }}>
+            <button className="btn btn-secondary border-none" style={{ color: '#475569' }}>
               {t('submissionDetails.btnDiscard')}
             </button>
-            <button style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#334155', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <button className="btn btn-secondary" style={{ backgroundColor: '#F1F5F9', color: '#334155' }}>
               <Save size={14} color="#64748B" /> {t('submissionDetails.btnSaveDraft')}
             </button>
           </>
         }
         rightActions={
-          <button style={{ padding: '8px 20px', fontSize: '12px', fontWeight: 700, color: 'white', backgroundColor: '#2563EB', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)' }}>
+          <button className="btn btn-primary" style={{ fontWeight: 700 }}>
             <Send size={16} /> {t('submissionDetails.btnSend')}
           </button>
         }

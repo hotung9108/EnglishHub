@@ -49,7 +49,7 @@ public class QuestionController {
 				new CreateQuestionCommand(
 						request.content(),
 						request.questionType(),
-						request.correctAnswer(),
+						request.correctAnswer().toMap(),
 						request.score(),
 						request.orderIndex()));
 		return ResponseEntity.status(HttpStatus.CREATED)
@@ -70,7 +70,7 @@ public class QuestionController {
 				questionId,
 				new UpdateQuestionCommand(
 						request.content(),
-						request.correctAnswer(),
+						request.correctAnswer() == null ? null : request.correctAnswer().toMap(),
 						request.score(),
 						request.orderIndex()));
 		return ResponseEntity.ok(new QuestionMessageResponse("Cập nhật câu hỏi thành công."));

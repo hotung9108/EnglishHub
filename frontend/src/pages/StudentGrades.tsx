@@ -134,40 +134,30 @@ export const StudentGrades: React.FC = () => {
     }
   };
 
-  const getSkillTagClass = (skill: string) => {
-    switch (skill) {
-      case 'Writing': return 'writing';
-      case 'Speaking': return 'speaking';
-      case 'Reading': return 'reading';
-      case 'Listening': return 'listening';
-      default: return 'mock';
-    }
-  };
-
   const handleExport = () => {
     window.print();
   };
 
   return (
-    <div className="std-eco-container">
+    <div className="container p-24">
       {/* Header */}
-      <div className="std-eco-header">
+      <div className="flex-between items-start mb-24">
         <div>
-          <h1 className="std-eco-title">
+          <h1 className="flex items-center gap-12 m-0 text-on-surface font-bold mb-8" style={{ fontSize: '28px' }}>
             <Award size={28} color="var(--primary)" />
             {isVi ? 'Bảng Điểm & Kết Quả Đánh Giá' : 'Academic Grade Book & Assessment'}
           </h1>
-          <p className="std-eco-subtitle">
+          <p className="m-0 text-on-surface-variant" style={{ fontSize: '15px' }}>
             {isVi 
               ? 'Theo dõi chi tiết điểm số từng bài nộp, trọng số học phần và kết quả quy đổi theo chuẩn IELTS.' 
               : 'Track assignment grades, weighted GPA, and standardized IELTS band scale equivalents.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="flex gap-10">
           <button 
             type="button" 
-            className="std-eco-btn-secondary"
+            className="btn btn-secondary bg-white"
             onClick={handleExport}
           >
             <Download size={16} />
@@ -177,215 +167,176 @@ export const StudentGrades: React.FC = () => {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="std-eco-stats-grid">
-        <div className="std-eco-stat-card">
-          <div className="std-eco-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+      <div className="grid gap-20 mb-32" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <div className="flex items-center gap-16 bg-white p-24 rounded-xl border">
+          <div className="flex-center rounded-full flex-shrink-0" style={{ width: 48, height: 48, backgroundColor: '#eff6ff', color: '#2563eb' }}>
             <Award size={24} />
           </div>
           <div>
-            <div className="std-eco-stat-num">Band 7.5</div>
-            <div className="std-eco-stat-label">{isVi ? 'Điểm TB Tích lũy (Overall Band)' : 'Cumulative Band Score'}</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>Band 7.5</div>
+            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Điểm TB Tích lũy (Overall Band)' : 'Cumulative Band Score'}</div>
           </div>
         </div>
 
-        <div className="std-eco-stat-card">
-          <div className="std-eco-stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+        <div className="flex items-center gap-16 bg-white p-24 rounded-xl border">
+          <div className="flex-center rounded-full flex-shrink-0" style={{ width: 48, height: 48, backgroundColor: '#f0fdf4', color: '#16a34a' }}>
             <CheckCircle2 size={24} />
           </div>
           <div>
-            <div className="std-eco-stat-num">{gradedCount} / {grades.length}</div>
-            <div className="std-eco-stat-label">{isVi ? 'Bài tập đã có kết quả' : 'Assignments Graded'}</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>{gradedCount} / {grades.length}</div>
+            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Bài tập đã có kết quả' : 'Assignments Graded'}</div>
           </div>
         </div>
 
-        <div className="std-eco-stat-card">
-          <div className="std-eco-stat-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+        <div className="flex items-center gap-16 bg-white p-24 rounded-xl border">
+          <div className="flex-center rounded-full flex-shrink-0" style={{ width: 48, height: 48, backgroundColor: '#fffbeb', color: '#d97706' }}>
             <Clock size={24} />
           </div>
           <div>
-            <div className="std-eco-stat-num">{pendingCount} {isVi ? 'bài' : 'items'}</div>
-            <div className="std-eco-stat-label">{isVi ? 'Đang chờ giáo viên/AI chấm' : 'Awaiting Grading'}</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>{pendingCount} {isVi ? 'bài' : 'items'}</div>
+            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Đang chờ giáo viên/AI chấm' : 'Awaiting Grading'}</div>
           </div>
         </div>
 
-        <div className="std-eco-stat-card">
-          <div className="std-eco-stat-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }}>
+        <div className="flex items-center gap-16 bg-white p-24 rounded-xl border">
+          <div className="flex-center rounded-full flex-shrink-0" style={{ width: 48, height: 48, backgroundColor: '#faf5ff', color: '#9333ea' }}>
             <TrendingUp size={24} />
           </div>
           <div>
-            <div className="std-eco-stat-num">+0.5 Band</div>
-            <div className="std-eco-stat-label">{isVi ? 'Tăng trưởng so với đầu kỳ' : 'Progress vs Diagnostic'}</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>+0.5 Band</div>
+            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Tăng trưởng so với đầu kỳ' : 'Progress vs Diagnostic'}</div>
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="std-eco-filter-bar">
-        <div className="std-eco-pills">
-          <button 
-            type="button"
-            className={`std-eco-pill ${selectedSkill === 'all' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('all')}
+      <div className="flex-between items-center flex-wrap gap-16 bg-white p-12-18 rounded-xl border mb-24">
+        <div className="flex items-center gap-12 flex-wrap">
+          {/* Skill Filter Dropdown */}
+          <select 
+            value={selectedSkill}
+            onChange={(e) => setSelectedSkill(e.target.value)}
+            className="select-input"
+            style={{ minWidth: '160px' }}
           >
-            {isVi ? 'Tất cả kỹ năng' : 'All Skills'}
-            <span className="std-eco-pill-badge">{grades.length}</span>
-          </button>
-          <button 
-            type="button"
-            className={`std-eco-pill ${selectedSkill === 'Writing' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('Writing')}
-          >
-            <PenTool size={14} />
-            Writing
-          </button>
-          <button 
-            type="button"
-            className={`std-eco-pill ${selectedSkill === 'Speaking' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('Speaking')}
-          >
-            <Mic size={14} />
-            Speaking
-          </button>
-          <button 
-            type="button"
-            className={`std-eco-pill ${selectedSkill === 'Reading' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('Reading')}
-          >
-            <BookOpen size={14} />
-            Reading
-          </button>
-          <button 
-            type="button"
-            className={`std-eco-pill ${selectedSkill === 'Listening' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('Listening')}
-          >
-            <Headphones size={14} />
-            Listening
-          </button>
-        </div>
+            <option value="all">{isVi ? `Tất cả kỹ năng (${grades.length})` : `All Skills (${grades.length})`}</option>
+            <option value="Writing">Writing</option>
+            <option value="Speaking">Speaking</option>
+            <option value="Reading">Reading</option>
+            <option value="Listening">Listening</option>
+          </select>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {/* Class Filter */}
           <select 
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            style={{
-              padding: '8px 12px',
-              fontSize: '13px',
-              borderRadius: 'var(--radius-md, 8px)',
-              border: '1px solid var(--outline-variant)',
-              backgroundColor: 'var(--surface)',
-              color: 'var(--on-surface)',
-              outline: 'none'
-            }}
+            className="select-input"
+            style={{ minWidth: '200px' }}
           >
             <option value="all">{isVi ? 'Tất cả các lớp' : 'All Enrolled Classes'}</option>
             {classes.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+        </div>
 
-          {/* Search box */}
-          <div className="std-eco-search-wrap">
-            <Search size={15} className="std-eco-search-icon" />
-            <input 
-              type="text"
-              className="std-eco-search-input"
-              placeholder={isVi ? 'Tìm kiếm bài tập...' : 'Search assignment...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        {/* Search box */}
+        <div className="search-container" style={{ width: '280px' }}>
+          <Search size={15} className="text-on-surface-variant flex-shrink-0" />
+          <input 
+            type="text"
+            className="search-input"
+            placeholder={isVi ? 'Tìm kiếm bài tập...' : 'Search assignment...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
       {/* Main Grades Table */}
-      <div className="std-eco-card">
-        <div className="std-eco-card-header">
-          <h2 className="std-eco-card-title">
+      <div className="card bg-white p-0 overflow-hidden">
+        <div className="flex-between items-center border-b p-16-24">
+          <h2 className="flex items-center gap-8 m-0 font-bold text-on-surface" style={{ fontSize: '18px' }}>
             <FileText size={18} color="var(--primary)" />
             {isVi ? 'Danh Sách Điểm Số & Đánh Giá Chi Tiết' : 'Detailed Assignment Grades & Scores'}
           </h2>
-          <span style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+          <span className="text-on-surface-variant" style={{ fontSize: '13px' }}>
             {isVi ? `Hiển thị ${filteredGrades.length} kết quả` : `Showing ${filteredGrades.length} entries`}
           </span>
         </div>
 
-        <div className="grades-table-responsive">
-          <table className="grades-table">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left" style={{ borderCollapse: 'collapse', minWidth: '800px' }}>
             <thead>
-              <tr>
-                <th>{isVi ? 'Bài tập & Khóa học' : 'Assignment & Class'}</th>
-                <th>{isVi ? 'Kỹ năng' : 'Skill'}</th>
-                <th>{isVi ? 'Ngày nộp' : 'Submitted Date'}</th>
-                <th>{isVi ? 'Trọng số' : 'Weight'}</th>
-                <th>{isVi ? 'Điểm thô' : 'Raw Score'}</th>
-                <th>{isVi ? 'Quy đổi IELTS' : 'Equivalent Band'}</th>
-                <th>{isVi ? 'Trạng thái' : 'Status'}</th>
-                <th style={{ textAlign: 'right' }}>{isVi ? 'Hành động' : 'Action'}</th>
+              <tr className="bg-surface-container-low text-on-surface-variant" style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Bài tập & Khóa học' : 'Assignment & Class'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Kỹ năng' : 'Skill'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Ngày nộp' : 'Submitted Date'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Trọng số' : 'Weight'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Điểm thô' : 'Raw Score'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Quy đổi IELTS' : 'Equivalent Band'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Trạng thái' : 'Status'}</th>
+                <th className="p-16-24 font-bold border-b text-right">{isVi ? 'Hành động' : 'Action'}</th>
               </tr>
             </thead>
             <tbody>
               {filteredGrades.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <div style={{ fontWeight: 700, color: 'var(--on-surface)', marginBottom: '3px' }}>
+                <tr key={row.id} className="border-b" style={{ borderColor: 'var(--outline-variant)' }}>
+                  <td className="p-16-24">
+                    <div className="font-bold text-on-surface mb-4" style={{ fontSize: '14px' }}>
                       {row.assignmentTitle}
                     </div>
-                    <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                    <div className="text-on-surface-variant" style={{ fontSize: '12px' }}>
                       {row.className}
                     </div>
                   </td>
-                  <td>
-                    <span className={`std-skill-tag ${getSkillTagClass(row.skill)}`}>
+                  <td className="p-16-24">
+                    <span className={`flex items-center gap-6 font-semibold text-uppercase rounded text-on-surface bg-surface-container-low w-fit`} style={{ fontSize: '11px', padding: '4px 10px' }}>
                       {getSkillIcon(row.skill)}
                       {row.skill}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--on-surface-variant)', fontSize: '13px' }}>
+                  <td className="p-16-24 text-on-surface-variant" style={{ fontSize: '13px' }}>
                     {row.submittedDate}
                   </td>
-                  <td>
-                    <span style={{ fontWeight: 600, fontSize: '13px' }}>
-                      {row.weight}
-                    </span>
+                  <td className="p-16-24 font-semibold" style={{ fontSize: '13px' }}>
+                    {row.weight}
                   </td>
-                  <td>
-                    <span style={{ fontWeight: 600, color: row.rawScore !== '--' ? 'var(--on-surface)' : 'var(--on-surface-variant)' }}>
+                  <td className="p-16-24">
+                    <span className="font-semibold" style={{ color: row.rawScore !== '--' ? 'var(--on-surface)' : 'var(--on-surface-variant)' }}>
                       {row.rawScore}
                     </span>
                   </td>
-                  <td>
+                  <td className="p-16-24">
                     {row.status === 'graded' ? (
-                      <span className="grade-score-pill high">
+                      <span className="font-bold rounded-full bg-primary-container text-on-primary-container" style={{ padding: '6px 14px', fontSize: '13px' }}>
                         {row.scaledGrade}
                       </span>
                     ) : (
-                      <span className="grade-score-pill pending">
+                      <span className="flex items-center gap-6 font-semibold rounded-full bg-surface-container-high text-on-surface-variant w-fit" style={{ padding: '6px 14px', fontSize: '12px' }}>
                         <Clock size={12} />
                         {row.scaledGrade}
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td className="p-16-24">
                     {row.status === 'graded' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', color: '#16a34a', fontWeight: 600 }}>
+                      <span className="inline-flex items-center gap-6 font-semibold text-success" style={{ fontSize: '12.5px' }}>
                         <CheckCircle2 size={15} />
                         {isVi ? 'Đã chấm' : 'Graded'}
                       </span>
                     ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12.5px', color: '#d97706', fontWeight: 600 }}>
+                      <span className="inline-flex items-center gap-6 font-semibold text-warning" style={{ fontSize: '12.5px' }}>
                         <Clock size={15} />
                         {isVi ? 'Đang chấm' : 'Pending'}
                       </span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="p-16-24 text-right">
                     {row.status === 'graded' ? (
                       <button
                         type="button"
-                        className="std-eco-btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '12.5px' }}
+                        className="btn btn-secondary bg-white btn-sm"
                         onClick={() => navigate(`/student/assignments/${row.assignmentId}/result`)}
                       >
                         <span>{isVi ? 'Xem lời giải' : 'Review Result'}</span>
@@ -394,8 +345,7 @@ export const StudentGrades: React.FC = () => {
                     ) : (
                       <button
                         type="button"
-                        className="std-eco-btn-secondary"
-                        style={{ padding: '6px 12px', fontSize: '12.5px', opacity: 0.7 }}
+                        className="btn btn-secondary bg-white opacity-70 btn-sm"
                         onClick={() => navigate(`/student/assignments/${row.assignmentId}`)}
                       >
                         <span>{isVi ? 'Xem bài nộp' : 'View Submission'}</span>
@@ -407,9 +357,9 @@ export const StudentGrades: React.FC = () => {
 
               {filteredGrades.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--on-surface-variant)' }}>
-                    <AlertCircle size={32} style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
-                    <p style={{ margin: 0, fontWeight: 600 }}>
+                  <td colSpan={8} className="text-center py-40 text-on-surface-variant">
+                    <AlertCircle size={32} className="mx-auto mb-10 opacity-50 block" />
+                    <p className="m-0 font-semibold text-sm">
                       {isVi ? 'Không tìm thấy kết quả phù hợp với bộ lọc' : 'No grade records match the selected filters'}
                     </p>
                   </td>

@@ -28,27 +28,27 @@ const Step3AddStudents = () => {
   };
 
   return (
-    <div className="card" style={{ padding: '32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div className="card p-32">
+      <div className="flex-between mb-24">
         <h2 className="headline-sm text-on-surface">Thêm học viên vào lớp</h2>
-        <span className="badge badge-primary" style={{ fontSize: '14px', padding: '6px 12px' }}>
+        <span className="badge badge-primary font-medium" style={{ fontSize: '14px', padding: '6px 12px' }}>
           Đã chọn: {selectedStudents.length} học viên
         </span>
       </div>
       
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <span style={{ position: 'absolute', left: '12px', top: '12px', color: '#6B7280' }}>
+      <div className="flex gap-16 mb-24">
+        <div className="relative flex-1">
+          <span className="absolute text-on-surface-variant" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </span>
           <input 
             type="text" 
-            className="input" 
+            className="input w-full" 
             placeholder="Tìm kiếm học viên theo tên, email hoặc mã..." 
-            style={{ width: '100%', padding: '12px 16px 12px 40px', borderRadius: 'var(--radius-default)', border: '1px solid var(--outline)', backgroundColor: 'var(--surface-container-lowest)' }} 
+            style={{ paddingLeft: '40px', paddingRight: '16px', paddingTop: '12px', paddingBottom: '12px', borderRadius: 'var(--radius-default)', border: '1px solid var(--outline)', backgroundColor: 'var(--surface-container-lowest)' }} 
           />
         </div>
-        <select className="input" style={{ width: '200px', padding: '12px 16px', borderRadius: 'var(--radius-default)', border: '1px solid var(--outline)', backgroundColor: 'var(--surface-container-lowest)' }}>
+        <select className="input p-12-16" style={{ width: '200px', borderRadius: 'var(--radius-default)', border: '1px solid var(--outline)', backgroundColor: 'var(--surface-container-lowest)' }}>
           <option value="">Lọc theo trình độ</option>
           <option value="ielts5">IELTS 5.0 - 5.5</option>
           <option value="ielts6">IELTS 6.0 - 6.5</option>
@@ -56,57 +56,59 @@ const Step3AddStudents = () => {
         </select>
       </div>
 
-      <div style={{ border: '1px solid var(--outline-variant)', borderRadius: 'var(--radius-default)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="table-container rounded" style={{ border: '1px solid var(--outline-variant)' }}>
+        <table className="table w-full">
           <thead>
-            <tr style={{ backgroundColor: 'var(--surface-container-low)', borderBottom: '1px solid var(--outline-variant)' }}>
-              <th style={{ padding: '16px', width: '48px' }}>
+            <tr style={{ backgroundColor: 'var(--surface-container-low)' }}>
+              <th className="p-16" style={{ width: '48px', borderBottom: '1px solid var(--outline-variant)' }}>
                 <input 
                   type="checkbox" 
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  className="cursor-pointer"
+                  style={{ width: '18px', height: '18px' }}
                   checked={selectedStudents.length === mockStudents.length && mockStudents.length > 0}
                   onChange={toggleAll}
                 />
               </th>
-              <th style={{ padding: '16px', color: '#4B5563', fontWeight: '600', fontSize: '14px' }}>Mã HV</th>
-              <th style={{ padding: '16px', color: '#4B5563', fontWeight: '600', fontSize: '14px' }}>Họ và tên</th>
-              <th style={{ padding: '16px', color: '#4B5563', fontWeight: '600', fontSize: '14px' }}>Email</th>
-              <th style={{ padding: '16px', color: '#4B5563', fontWeight: '600', fontSize: '14px' }}>Trình độ hiện tại</th>
+              <th className="p-16 text-on-surface-variant font-semibold" style={{ fontSize: '14px', borderBottom: '1px solid var(--outline-variant)', textAlign: 'left' }}>Mã HV</th>
+              <th className="p-16 text-on-surface-variant font-semibold" style={{ fontSize: '14px', borderBottom: '1px solid var(--outline-variant)', textAlign: 'left' }}>Họ và tên</th>
+              <th className="p-16 text-on-surface-variant font-semibold" style={{ fontSize: '14px', borderBottom: '1px solid var(--outline-variant)', textAlign: 'left' }}>Email</th>
+              <th className="p-16 text-on-surface-variant font-semibold" style={{ fontSize: '14px', borderBottom: '1px solid var(--outline-variant)', textAlign: 'left' }}>Trình độ hiện tại</th>
             </tr>
           </thead>
           <tbody>
             {mockStudents.map((student, index) => (
               <tr 
                 key={student.id} 
+                className="cursor-pointer transition-all"
                 style={{ 
                   borderBottom: index !== mockStudents.length - 1 ? '1px solid var(--outline-variant)' : 'none',
-                  backgroundColor: selectedStudents.includes(student.id) ? '#F3F4F6' : 'white',
-                  transition: 'background-color 0.2s'
+                  backgroundColor: selectedStudents.includes(student.id) ? '#F3F4F6' : 'white'
                 }}
                 onClick={() => toggleStudent(student.id)}
               >
-                <td style={{ padding: '16px' }}>
+                <td className="p-16">
                   <input 
                     type="checkbox" 
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    className="cursor-pointer"
+                    style={{ width: '18px', height: '18px' }}
                     checked={selectedStudents.includes(student.id)}
                     onChange={() => {}} // Handle change on row click
                     onClick={(e) => e.stopPropagation()} // Prevent double toggle
                   />
                 </td>
-                <td style={{ padding: '16px', fontWeight: '500', color: '#111827' }}>{student.id}</td>
-                <td style={{ padding: '16px', color: '#374151' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#E5E7EB', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', fontWeight: 'bold', color: '#4B5563' }}>
+                <td className="p-16 font-medium text-on-surface">{student.id}</td>
+                <td className="p-16 text-on-surface">
+                  <div className="flex items-center gap-12">
+                    <div className="flex justify-center items-center font-bold text-on-surface-variant rounded-full" style={{ width: '32px', height: '32px', backgroundColor: '#E5E7EB', fontSize: '14px' }}>
                       {student.name.charAt(0)}
                     </div>
                     {student.name}
                   </div>
                 </td>
-                <td style={{ padding: '16px', color: '#6B7280' }}>{student.email}</td>
-                <td style={{ padding: '16px' }}>
-                  <span style={{ 
-                    padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '500',
+                <td className="p-16 text-on-surface-variant">{student.email}</td>
+                <td className="p-16">
+                  <span className="font-medium" style={{ 
+                    padding: '4px 8px', borderRadius: '4px', fontSize: '12px',
                     backgroundColor: student.level === 'Chưa test' ? '#FEE2E2' : '#E0E7FF',
                     color: student.level === 'Chưa test' ? '#991B1B' : '#3730A3'
                   }}>

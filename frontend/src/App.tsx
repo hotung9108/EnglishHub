@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Roles from './pages/Roles';
@@ -12,6 +14,7 @@ import AddTeacher from './pages/AddTeacher';
 import Students from './pages/Students';
 import AddStudent from './pages/AddStudent';
 import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 import TeacherClasses from './pages/TeacherClasses';
 import TeacherDetails from './pages/TeacherDetails';
 import StudentAssignments from './pages/StudentAssignments';
@@ -31,17 +34,37 @@ import StudentAnalytics from './pages/StudentAnalytics';
 import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
+import TeacherEditAssignment from './pages/TeacherEditAssignment';
+import TeacherExamBank from './pages/TeacherExamBank';
 import TeacherSubmissionDetails from './pages/TeacherSubmissionDetails';
 import TeacherClassProgress from './pages/TeacherClassProgress';
+import TeacherDashboard from './pages/TeacherDashboard';
+import StudentDetails from './pages/StudentDetails';
+import AdminReports from './pages/AdminReports';
+import AdminSettings from './pages/AdminSettings';
+import AdminGradingAuditLogs from './pages/AdminGradingAuditLogs';
+import AdminClassArchive from './pages/AdminClassArchive';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import NotFound from './pages/NotFound';
+import Forbidden from './pages/Forbidden';
 
 function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+      <LanguageProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
+          {/* Error & Fallback Routes */}
+          <Route path="/404" element={<NotFound />} />
+          <Route path="/not-found" element={<NotFound />} />
+          <Route path="/403" element={<Forbidden />} />
+          <Route path="/unauthorized" element={<Forbidden />} />
         
         {/* Admin Routes */}
         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
@@ -53,27 +76,42 @@ function App() {
             <Route path="roles" element={<Roles />} />
             <Route path="classes" element={<Classes />} />
             <Route path="classes/create" element={<AddClass />} />
+            <Route path="classes/archive" element={<AdminClassArchive />} />
             <Route path="classes/:id" element={<ClassDetails />} />
             <Route path="teachers" element={<Teachers />} />
             <Route path="teachers/create" element={<AddTeacher />} />
             <Route path="teachers/:id" element={<TeacherDetails />} />
             <Route path="students" element={<Students />} />
             <Route path="students/create" element={<AddStudent />} />
-            <Route path="reports" element={<Dashboard />} />
-            <Route path="settings" element={<Dashboard />} />
+            <Route path="students/:id" element={<StudentDetails />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="audit/gradings" element={<AdminGradingAuditLogs />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Route>
+
+        {/* Global Redirects */}
+        <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/progress" element={<Navigate to="/teacher/classes/ENG-IELTS-6.5A/progress" replace />} />
 
         {/* Teacher Routes */}
         <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>
           <Route path="/teacher" element={<MainLayout />}>
-            <Route index element={<Navigate to="/teacher/classes" replace />} />
+            <Route index element={<Navigate to="/teacher/dashboard" replace />} />
+            <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:id" element={<TeacherClassProgress />} />
             <Route path="classes/:id/progress" element={<TeacherClassProgress />} />
             <Route path="assignments" element={<TeacherAssignments />} />
             <Route path="assignments/create" element={<TeacherCreateAssignment />} />
             <Route path="assignments/:id" element={<TeacherAssignmentDetails />} />
+            <Route path="assignments/:id/edit" element={<TeacherEditAssignment />} />
+            <Route path="assignments/edit/:id" element={<TeacherEditAssignment />} />
             <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
+            <Route path="exam-bank" element={<TeacherExamBank />} />
+            <Route path="assignments/templates" element={<Navigate to="/teacher/exam-bank" replace />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
         </Route>
 
@@ -97,11 +135,17 @@ function App() {
             <Route path="grades" element={<StudentGrades />} />
             <Route path="analytics" element={<StudentAnalytics />} />
             <Route path="status" element={<StudentAssignments />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
         </Route>
+
+        {/* Global Catch-all 404 Route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
-    </AuthProvider>
-  );
+    </LanguageProvider>
+  </AuthProvider>
+);
 }
 
 export default App;

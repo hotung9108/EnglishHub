@@ -11,6 +11,9 @@ import com.english_hub.core.modules.question.domain.model.Question;
 import com.english_hub.core.modules.question.domain.model.QuestionType;
 import com.english_hub.core.modules.question.presentation.rest.dto.CreateQuestionRequest;
 import com.english_hub.core.modules.question.presentation.rest.dto.UpdateQuestionRequest;
+import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer;
+import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer.QuestionOption;
+import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.ShortAnswerCorrectAnswer;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -67,12 +70,48 @@ class QuestionControllerTest {
 
 		var response = questionController.createQuestion(
 				9L,
-				new CreateQuestionRequest("Choose one", QuestionType.MULTIPLE_CHOICE, answer, BigDecimal.ONE, 1));
+				new CreateQuestionRequest(
+						"Choose one",
+						QuestionType.MULTIPLE_CHOICE,
+						new MultipleChoiceCorrectAnswer(options()),
+						BigDecimal.ONE,
+						1));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 		assertThat(response.getBody().id()).isEqualTo(21L);
 		assertThat(response.getBody().message()).isEqualTo("Tạo câu hỏi thành công.");
-}
+	}
+
+	@Test
+	void mapsShortAnswerCreateRequestToDomainMap() {
+		Map<String, Object> answer = Map.of("correctAnswer", "English");
+		when(questionService.createQuestion(9L, new CreateQuestionCommand(
+				"Name a subject", QuestionType.SHORT_ANSWER, answer, BigDecimal.ONE, 2)))
+				.thenReturn(22L);
+
+		var response = questionController.createQuestion(
+				9L,
+				new CreateQuestionRequest(
+						"Name a subject",
+						QuestionType.SHORT_ANSWER,
+						new ShortAnswerCorrectAnswer("English"),
+						BigDecimal.ONE,
+						2));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+		assertThat(response.getBody().id()).isEqualTo(22L);
+	}
+
+	@Test
+	void mapsUpdateCorrectAnswerToDomainMapAndKeepsOmittedAnswerNull() {
+		questionController.updateQuestion(
+				21L, new UpdateQuestionRequest(null, new ShortAnswerCorrectAnswer("English"), null, null));
+		questionController.updateQuestion(21L, new UpdateQuestionRequest("Updated", null, null, null));
+
+		verify(questionService).updateQuestion(21L, new UpdateQuestionCommand(
+				null, Map.of("correctAnswer", "English"), null, null));
+		verify(questionService).updateQuestion(21L, new UpdateQuestionCommand("Updated", null, null, null));
+	}
 
 	@Test
 	void mapsDetailUpdateAndDeleteResponses() {
@@ -109,12 +148,17 @@ class QuestionControllerTest {
 	}
 
 	private Map<String, Object> multipleChoiceAnswer() {
-		return Map.of(
-				"options",
-				List.of(
-						Map.of("id", 1, "content", "A", "isCorrect", true),
-						Map.of("id", 2, "content", "B", "isCorrect", false),
-						Map.of("id", 3, "content", "C", "isCorrect", false),
-						Map.of("id", 4, "content", "D", "isCorrect", false)));
+		return Map.of("options", options().stream().map(option -> Map.of(
+				"id", option.id(),
+				"content", option.content(),
+				"isCorrect", option.isCorrect())).toList());
+	}
+
+	private List<QuestionOption> options() {
+		return List.of(
+				new QuestionOption(1, "A", true),
+				new QuestionOption(2, "B", false),
+				new QuestionOption(3, "C", false),
+				new QuestionOption(4, "D", false));
 	}
 }

@@ -219,7 +219,61 @@ class QuestionApiIntegrationTest {
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("{\"content\":\"Blocked\"}"))
 				.andExpect(status().isForbidden());
- 	}
+	}
+
+	@Test
+	void teacherAndStudentFromOneClassCannotReadQuestionsFromAnotherClass() throws Exception {
+		ClassEntity foreignClass = classRepository.save(new ClassEntity(
+				"Foreign question class " + uniqueSuffix(),
+				"Advanced",
+				"Question resource-scope fixture",
+				LocalDate.of(2026, 9, 15),
+				null,
+				ClassStatus.ACTIVE,
+				otherTeacherId));
+		Assignment foreignAssignment = assignmentRepository.save(new Assignment(
+				foreignClass.getId(),
+				"Foreign question assignment " + uniqueSuffix(),
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				2,
+				false,
+				AssignmentStatus.DRAFT));
+		AssignmentModule foreignModule = moduleRepository.save(new AssignmentModule(
+				foreignAssignment.getId(),
+				ModuleSkill.READING,
+				ModuleTaskType.QUIZ,
+				1,
+				"Foreign question module",
+				BigDecimal.TEN,
+				null,
+				null,
+				null,
+				null,
+				"Grade reading"));
+		Question foreignQuestion = questionRepository.save(new Question(
+				foreignModule.getId(),
+				"Foreign question",
+				QuestionType.SHORT_ANSWER,
+				"{\"correct_answer\":\"English\"}",
+				BigDecimal.ONE,
+				1));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", foreignModule.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", foreignModule.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/v1/questions/{id}", foreignQuestion.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/questions/{id}", foreignQuestion.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+			.andExpect(status().isForbidden());
+	}
 
 	@Test
 	void createUpdateAndDeleteQuestionUseCamelCaseApi() throws Exception {
@@ -254,6 +308,150 @@ class QuestionApiIntegrationTest {
 				.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.message").value("Đã xoá câu hỏi."));
+	}
+
+	@Test
+	void createPersistsMultipleChoiceAnswerAsSnakeCaseJson() throws Exception {
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"options":[
+						  {"id":1,"content":"Option A","isCorrect":true},
+						  {"id":2,"content":"Option B","isCorrect":false},
+						  {"id":3,"content":"Option C","isCorrect":false},
+						  {"id":4,"content":"Option D","isCorrect":false}
+						]},"score":2.50,"orderIndex":2}
+						"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.message").value("Tạo câu hỏi thành công."));
+
+		questionRepository.flush();
+		Question created = questionRepository
+				.findByModuleIdOrderByOrderIndexAsc(moduleId).stream()
+				.filter(candidate -> candidate.getOrderIndex() == 2)
+				.findFirst()
+				.orElseThrow();
+
+		assertThat(created.getQuestionType()).isEqualTo(QuestionType.MULTIPLE_CHOICE);
+		assertThat(created.getScore()).isEqualByComparingTo(new BigDecimal("2.50"));
+		assertThat(created.getCorrectAnswer())
+				.contains("\"is_correct\":true")
+				.contains("\"content\":\"Option A\"")
+				.doesNotContain("isCorrect");
+	}
+
+	@Test
+	void createAcceptsLegacySnakeCaseCorrectAnswerKeys() throws Exception {
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"options":[
+						  {"id":1,"content":"A","is_correct":true},
+						  {"id":2,"content":"B","is_correct":false},
+						  {"id":3,"content":"C","is_correct":false},
+						  {"id":4,"content":"D","is_correct":false}
+						]},"orderIndex":2}
+						"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Name a subject","questionType":"SHORT_ANSWER",
+						"correctAnswer":{"correct_answer":"English"},"orderIndex":3}
+						"""))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void createRejectsUnrecognisedCorrectAnswerShape() throws Exception {
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"answer":"Option A"},"orderIndex":2}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						org.hamcrest.Matchers.startsWith("correctAnswer phải là")));
+	}
+
+	@Test
+	void createRejectsInvalidCorrectAnswerStructure() throws Exception {
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"options":[
+						  {"id":1,"content":"A","isCorrect":true},
+						  {"id":2,"content":"B","isCorrect":false}
+						]},"orderIndex":2}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("options phải có đúng 4 lựa chọn."));
+
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"options":[
+						  {"id":1,"content":"A","isCorrect":true},
+						  {"id":2,"content":"B","isCorrect":true},
+						  {"id":3,"content":"C","isCorrect":false},
+						  {"id":4,"content":"D","isCorrect":false}
+						]},"orderIndex":2}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						"options phải có đúng một lựa chọn đúng và id không được trùng."));
+
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"Name a subject","questionType":"SHORT_ANSWER",
+						"correctAnswer":{"correctAnswer":"   "},"orderIndex":2}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("correctAnswer không được để trống."));
+	}
+
+	@Test
+	void updatePersistsTypedCorrectAnswerAndRejectsInvalidShape() throws Exception {
+		mockMvc.perform(put("/api/v1/questions/{id}", questionId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"correctAnswer":{"options":[
+						  {"id":1,"content":"A","isCorrect":false},
+						  {"id":2,"content":"B","isCorrect":true},
+						  {"id":3,"content":"C","isCorrect":false},
+						  {"id":4,"content":"D","isCorrect":false}
+						]}}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Cập nhật câu hỏi thành công."));
+
+		questionRepository.flush();
+		assertThat(questionRepository.findById(questionId).orElseThrow().getCorrectAnswer())
+				.contains("\"is_correct\":true")
+				.contains("\"content\":\"B\"");
+
+		mockMvc.perform(put("/api/v1/questions/{id}", questionId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"correctAnswer\":{\"answer\":\"A\"}}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						org.hamcrest.Matchers.startsWith("correctAnswer phải là")));
 	}
 
 	@Test
