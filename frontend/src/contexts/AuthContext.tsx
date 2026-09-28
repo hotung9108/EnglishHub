@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, User } from '../types/auth';
+import { tokenService } from '../api/core/tokenService';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -51,15 +52,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isLoading] = useState(false);
 
-  const login = (userData: User) => {
+  useEffect(() => {
+    // Automatically reset user session if token refresh fails or session is revoked
+    const unsubscribe = tokenService.subscribeAuthFailure(() => {
+      setUser(null);
+      localStorage.removeItem('mockUser');
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const login = (userData: User, tokens?: { accessToken: string; refreshToken?: string }) => {
     const enriched = enrichUserData(userData);
     setUser(enriched);
     localStorage.setItem('mockUser', JSON.stringify(enriched));
+    if (tokens) {
+      tokenService.setTokens(tokens);
+    }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('mockUser');
+    tokenService.clearTokens();
   };
 
   const updateUser = (data: Partial<User>) => {
