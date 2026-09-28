@@ -1,186 +1,179 @@
 import axios from 'axios';
-import type {
-  AxiosInstance,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-} from 'axios';
-import type { RequestConfig } from '../../types/api.types';
-import { tokenService } from './tokenService';
-import { normalizeError } from './errorHandler';
-
-import { envConfig } from '../../config/env';
+import type { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { environment } from '@/config/environment';
+import { tokenStorage as defaultTokenStorage } from './token-storage';
+import { parseApiError, UnauthorizedError } from './errors';
+import type { CustomAxiosRequestConfig } from './types';
+import type { ITokenStorage } from '../interfaces/token.interface';
 
 interface QueueItem {
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
+  resolve: (value?: unknown) => void;
+  reject: (reason?: unknown) => void;
 }
 
-let isRefreshing = false;
-let failedQueue: QueueItem[] = [];
+export const AUTH_EVENTS = {
+  EXPIRED: 'auth:expired',
+} as const;
 
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else if (token) {
-      prom.resolve(token);
+export class TokenRefreshManager {
+  private isRefreshing = false;
+  private failedQueue: QueueItem[] = [];
+  private readonly storage: ITokenStorage;
+
+  constructor(storage: ITokenStorage = defaultTokenStorage) {
+    this.storage = storage;
+  }
+
+  private processQueue(error: Error | null): void {
+    this.failedQueue.forEach(promise => {
+      if (error) {
+        promise.reject(error);
+      } else {
+        promise.resolve();
+      }
+    });
+    this.failedQueue = [];
+  }
+
+  async handle401(
+    error: AxiosError,
+    client: AxiosInstance
+  ): Promise<AxiosResponse | unknown> {
+    const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
+
+    if (!originalRequest) {
+      return Promise.reject(parseApiError(error));
     }
-  });
-  failedQueue = [];
-};
 
-/**
- * Attaches request and response interceptors to an Axios instance.
- * Features:
- * - Automatic Bearer token attachment.
- * - Accept-Language header propagation.
- * - Silent token refresh with queued concurrency on 401 Unauthorized.
- * - Error normalization into typed ApiException.
- */
-export function setupInterceptors(axiosInstance: AxiosInstance): void {
-  // 1. Request Interceptor
-  axiosInstance.interceptors.request.use(
+    const requestUrl = originalRequest.url || '';
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/refresh') ||
+      requestUrl.includes('/auth/logout');
+
+    // Do not attempt refresh on auth endpoints or already-retried requests
+    if (isAuthEndpoint || originalRequest._retry || originalRequest.skipAuth) {
+      return Promise.reject(parseApiError(error));
+    }
+
+    const refreshToken = this.storage.getRefreshToken();
+    if (!refreshToken) {
+      this.storage.clearTokens();
+      this.notifySessionExpired();
+      return Promise.reject(
+        new UnauthorizedError('Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại.', error)
+      );
+    }
+
+    if (this.isRefreshing) {
+      return new Promise((resolve, reject) => {
+        this.failedQueue.push({ resolve, reject });
+      })
+        .then(() => {
+          const newToken = this.storage.getAccessToken();
+          if (newToken && originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          }
+          return client(originalRequest);
+        })
+        .catch(err => Promise.reject(parseApiError(err)));
+    }
+
+    originalRequest._retry = true;
+    this.isRefreshing = true;
+
+    try {
+      // Call backend refresh endpoint directly via isolated Axios request
+      const refreshUrl = `${environment.api.baseUrl}/auth/refresh`;
+      const response = await axios.post<{ accessToken: string; message?: string }>(
+        refreshUrl,
+        { refreshToken },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: environment.api.timeout,
+        }
+      );
+
+      const newAccessToken = response.data?.accessToken;
+      if (!newAccessToken) {
+        throw new Error('Refresh response did not contain an access token.');
+      }
+
+      this.storage.setAccessToken(newAccessToken);
+      this.processQueue(null);
+
+      if (originalRequest.headers) {
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      }
+
+      return client(originalRequest);
+    } catch (refreshErr) {
+      this.storage.clearTokens();
+      const rejectionError = new UnauthorizedError(
+        'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
+        refreshErr
+      );
+      this.processQueue(rejectionError);
+      this.notifySessionExpired();
+      return Promise.reject(rejectionError);
+    } finally {
+      this.isRefreshing = false;
+    }
+  }
+
+  private notifySessionExpired(): void {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(AUTH_EVENTS.EXPIRED));
+    }
+  }
+}
+
+export function setupRequestInterceptor(
+  client: AxiosInstance,
+  storage: ITokenStorage = defaultTokenStorage
+): void {
+  client.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-      const customConfig = config as RequestConfig;
+      const customConfig = config as CustomAxiosRequestConfig;
 
-      // Attach Bearer token unless explicitly skipped
+      // Apply default JSON headers if not already specified and not FormData
+      if (!customConfig.headers.Accept) {
+        customConfig.headers.Accept = 'application/json';
+      }
+      if (!customConfig.headers['Content-Type'] && !(customConfig.data instanceof FormData)) {
+        customConfig.headers['Content-Type'] = 'application/json';
+      }
+
+      // Attach Bearer token if not skipped
       if (!customConfig.skipAuth) {
-        const token = tokenService.getAccessToken();
-        if (token) {
-          config.headers.set('Authorization', `Bearer ${token}`);
+        const token = storage.getAccessToken();
+        if (token && !customConfig.headers.Authorization) {
+          customConfig.headers.Authorization = `Bearer ${token}`;
         }
       }
 
-      // Attach client language preference
-      try {
-        const lang =
-          localStorage.getItem('eh_language') ||
-          localStorage.getItem('language') ||
-          envConfig.DEFAULT_LANGUAGE;
-        config.headers.set('Accept-Language', lang);
-      } catch {
-        config.headers.set('Accept-Language', envConfig.DEFAULT_LANGUAGE);
-      }
-
-      // Ensure JSON header if sending standard body
-      if (
-        config.data &&
-        !(config.data instanceof FormData) &&
-        !config.headers.get('Content-Type')
-      ) {
-        config.headers.set('Content-Type', 'application/json');
-      }
-
-      return config;
+      return customConfig;
     },
-    (error) => {
-      return Promise.reject(normalizeError(error));
+    (error: unknown) => {
+      return Promise.reject(parseApiError(error));
     }
   );
+}
 
-  // 2. Response Interceptor
-  axiosInstance.interceptors.response.use(
+export function setupResponseInterceptor(
+  client: AxiosInstance,
+  refreshManager: TokenRefreshManager = new TokenRefreshManager()
+): void {
+  client.interceptors.response.use(
     (response: AxiosResponse) => {
       return response;
     },
-    async (error) => {
-      const originalRequest = error.config as (RequestConfig & { _retry?: boolean }) | undefined;
-
-      // If no config or network-level failure before reaching endpoint
-      if (!originalRequest || !error.response) {
-        return Promise.reject(normalizeError(error));
+    async (error: unknown) => {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return refreshManager.handle401(error, client);
       }
 
-      const status = error.response.status;
-      const requestUrl = originalRequest.url || '';
-
-      // Skip refresh attempt for public endpoints or if already retried
-      const authEndpoints = envConfig.ENDPOINTS.AUTH;
-      const isAuthEndpoint =
-        requestUrl.includes(authEndpoints.LOGIN) ||
-        requestUrl.includes(authEndpoints.REFRESH) ||
-        requestUrl.includes(authEndpoints.REGISTER);
-
-      if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
-        const refreshToken = tokenService.getRefreshToken();
-
-        if (refreshToken) {
-          if (isRefreshing) {
-            // Queue request until refresh is done
-            return new Promise<AxiosResponse>((resolve, reject) => {
-              failedQueue.push({
-                resolve: (token: string) => {
-                  originalRequest.headers = originalRequest.headers || {};
-                  originalRequest.headers.Authorization = `Bearer ${token}`;
-                  resolve(axiosInstance(originalRequest));
-                },
-                reject: (err: unknown) => {
-                  reject(normalizeError(err));
-                },
-              });
-            });
-          }
-
-          originalRequest._retry = true;
-          isRefreshing = true;
-
-          try {
-            // Use a clean axios instance to avoid recursive interceptor calls
-            const baseURL = axiosInstance.defaults.baseURL || '';
-            const refreshPath = envConfig.ENDPOINTS.AUTH.REFRESH.replace(/^\/+/, '');
-            const refreshEndpoint = baseURL.endsWith('/')
-              ? `${baseURL}${refreshPath}`
-              : `${baseURL}/${refreshPath}`;
-
-            const refreshResponse = await axios.post<{
-              accessToken?: string;
-              token?: string;
-              data?: { accessToken?: string };
-            }>(
-              refreshEndpoint,
-              { refreshToken },
-              {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: envConfig.AUTH_REFRESH_TIMEOUT,
-              }
-            );
-
-            // Extract access token from Spring Boot or custom format
-            const payload = refreshResponse.data;
-            const newAccessToken =
-              payload.accessToken ||
-              payload.token ||
-              payload.data?.accessToken;
-
-            if (!newAccessToken) {
-              throw new Error('No access token returned from refresh endpoint');
-            }
-
-            // Persist new token
-            tokenService.setAccessToken(newAccessToken);
-
-            // Notify queued requests
-            processQueue(null, newAccessToken);
-
-            // Retry original failed request
-            originalRequest.headers = originalRequest.headers || {};
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-
-            return axiosInstance(originalRequest);
-          } catch (refreshErr) {
-            processQueue(refreshErr, null);
-            tokenService.clearTokens();
-            return Promise.reject(normalizeError(refreshErr));
-          } finally {
-            isRefreshing = false;
-          }
-        } else {
-          // No refresh token available, session is invalidated
-          tokenService.clearTokens();
-        }
-      }
-
-      return Promise.reject(normalizeError(error));
+      return Promise.reject(parseApiError(error));
     }
   );
 }

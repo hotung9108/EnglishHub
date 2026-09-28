@@ -2,7 +2,7 @@
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, User } from '../types/auth';
-import { tokenService } from '../api/core/tokenService';
+import { tokenStorage, AUTH_EVENTS } from '@/api';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -53,29 +53,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading] = useState(false);
 
   useEffect(() => {
-    // Automatically reset user session if token refresh fails or session is revoked
-    const unsubscribe = tokenService.subscribeAuthFailure(() => {
+    const handleAuthExpired = () => {
       setUser(null);
       localStorage.removeItem('mockUser');
-    });
+      tokenStorage.clearTokens();
+    };
+
+    window.addEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
     return () => {
-      unsubscribe();
+      window.removeEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
     };
   }, []);
 
-  const login = (userData: User, tokens?: { accessToken: string; refreshToken?: string }) => {
+  const login = (userData: User) => {
     const enriched = enrichUserData(userData);
     setUser(enriched);
     localStorage.setItem('mockUser', JSON.stringify(enriched));
-    if (tokens) {
-      tokenService.setTokens(tokens);
-    }
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('mockUser');
-    tokenService.clearTokens();
+    tokenStorage.clearTokens();
   };
 
   const updateUser = (data: Partial<User>) => {

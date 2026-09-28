@@ -1,2 +1,2 @@
-export { envConfig, loadEnvConfig } from './env';
-export type { EnvConfig } from './env';
+export { environment, default } from './environment';
+export type { EnvironmentConfig, ApiConfig, AppConfig, AuthConfig } from './types';

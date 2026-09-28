@@ -26,7 +26,7 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
-  login: (user: User, tokens?: { accessToken: string; refreshToken?: string }) => void;
+  login: (user: User) => void;
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
 }

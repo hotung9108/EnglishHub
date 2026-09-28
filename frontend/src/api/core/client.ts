@@ -1,46 +1,76 @@
 import axios from 'axios';
-import type { AxiosInstance, CreateAxiosDefaults } from 'axios';
-import { setupInterceptors } from './interceptors';
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, CreateAxiosDefaults } from 'axios';
+import { environment } from '@/config/environment';
+import { setupRequestInterceptor, setupResponseInterceptor, TokenRefreshManager } from './interceptors';
+import { tokenStorage } from './token-storage';
+import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
+import type { ITokenStorage } from '../interfaces/token.interface';
 
-import { envConfig } from '../../config/env';
-
-export interface CreateClientConfig extends CreateAxiosDefaults {
-  enableInterceptors?: boolean;
-}
-
-/**
- * Resolves the default API base URL using centralized envConfig.
- */
-export function getDefaultBaseUrl(): string {
-  return envConfig.API_BASE_URL;
-}
-
-/**
- * Factory function to create configured Axios instances.
- * Adheres to Open/Closed Principle and Dependency Inversion Principle.
- */
-export function createApiClient(customConfig: CreateClientConfig = {}): AxiosInstance {
-  const { enableInterceptors = true, ...axiosConfig } = customConfig;
-
+export function createApiClient(
+  customDefaults?: CreateAxiosDefaults,
+  storage: ITokenStorage = tokenStorage
+): AxiosInstance {
   const instance = axios.create({
-    baseURL: getDefaultBaseUrl(),
-    timeout: envConfig.API_TIMEOUT,
+    baseURL: environment.api.baseUrl,
+    timeout: environment.api.timeout,
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      ...axiosConfig.headers,
     },
-    ...axiosConfig,
+    ...customDefaults,
   });
 
-  if (enableInterceptors) {
-    setupInterceptors(instance);
-  }
+  const refreshManager = new TokenRefreshManager(storage);
+  setupRequestInterceptor(instance, storage);
+  setupResponseInterceptor(instance, refreshManager);
 
   return instance;
 }
 
-/**
- * Default shared Axios instance for EnglishHub frontend application.
- */
-export const axiosClient = createApiClient();
+// Shared singleton Axios instance
+export const apiClient: AxiosInstance = createApiClient();
+
+export class AxiosHttpClientAdapter implements IHttpClient {
+  private readonly client: AxiosInstance;
+
+  constructor(client: AxiosInstance = apiClient) {
+    this.client = client;
+  }
+
+  async get<T>(url: string, options?: ApiRequestOptions): Promise<T> {
+    const response = await this.client.get<T>(url, options);
+    return response.data;
+  }
+
+  async post<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
+    const response = await this.client.post<T>(url, data, options);
+    return response.data;
+  }
+
+  async put<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
+    const response = await this.client.put<T>(url, data, options);
+    return response.data;
+  }
+
+  async patch<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
+    const response = await this.client.patch<T>(url, data, options);
+    return response.data;
+  }
+
+  async delete<T>(url: string, options?: ApiRequestOptions): Promise<T> {
+    const response = await this.client.delete<T>(url, options);
+    return response.data;
+  }
+
+  async request<T>(config: AxiosRequestConfig & ApiRequestOptions): Promise<T> {
+    const response = await this.client.request<T>(config);
+    return response.data;
+  }
+
+  async getRaw<T>(url: string, options?: ApiRequestOptions): Promise<AxiosResponse<T>> {
+    return this.client.get<T>(url, options);
+  }
+}
+
+// Shared singleton HTTP client adapter conforming to IHttpClient
+export const httpClient: IHttpClient = new AxiosHttpClientAdapter(apiClient);
