@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, User } from '../types/auth';
+import { tokenStorage, AUTH_EVENTS } from '@/api';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -51,6 +52,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isLoading] = useState(false);
 
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setUser(null);
+      localStorage.removeItem('mockUser');
+      tokenStorage.clearTokens();
+    };
+
+    window.addEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
+    return () => {
+      window.removeEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
+    };
+  }, []);
+
   const login = (userData: User) => {
     const enriched = enrichUserData(userData);
     setUser(enriched);
@@ -60,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('mockUser');
+    tokenStorage.clearTokens();
   };
 
   const updateUser = (data: Partial<User>) => {
