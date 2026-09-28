@@ -61,6 +61,7 @@ test('AuthService - login sets tokens and session, logout clears session', async
 
   const loginRes = await auth.login({ email: 'teacher@englishhub.dev', password: 'SecretPassword' });
   assert.strictEqual(loginRes.accessToken, 'access-123');
+  assert.strictEqual(loginRes.user.role, 'teacher', 'role should be normalized to lowercase');
   assert.strictEqual(storage.getAccessToken(), 'access-123');
   assert.strictEqual(storage.getRefreshToken(), 'refresh-456');
   assert.strictEqual(auth.isAuthenticated(), true);

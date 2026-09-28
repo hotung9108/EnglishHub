@@ -53,11 +53,16 @@ export class AuthService {
       this.storage.setRefreshToken(response.refreshToken);
     }
     if (response?.user) {
+      const user = {
+        ...response.user,
+        role: response.user.role.toLowerCase(),
+      };
       try {
-        localStorage.setItem(environment.auth.userKey, JSON.stringify(response.user));
+        localStorage.setItem(environment.auth.userKey, JSON.stringify(user));
       } catch {
         // Ignore storage error
       }
+      return { ...response, user };
     }
 
     return response;
@@ -110,7 +115,11 @@ export class AuthService {
   getSavedUser(): AuthUserData | null {
     try {
       const raw = localStorage.getItem(environment.auth.userKey);
-      return raw ? (JSON.parse(raw) as AuthUserData) : null;
+      if (!raw) {
+        return null;
+      }
+      const user = JSON.parse(raw) as AuthUserData;
+      return user ? { ...user, role: user.role.toLowerCase() } : null;
     } catch {
       return null;
     }
