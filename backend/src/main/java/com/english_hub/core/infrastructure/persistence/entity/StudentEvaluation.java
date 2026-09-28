@@ -5,7 +5,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,6 +34,9 @@ public class StudentEvaluation {
 	@Column(nullable = false, columnDefinition = "TEXT")
 	private String content;
 
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private Instant createdAt;
+
 	public StudentEvaluation(
 			Long studentId,
 			Long teacherId,
@@ -41,5 +46,16 @@ public class StudentEvaluation {
 		this.teacherId = teacherId;
 		this.classId = classId;
 		this.content = content;
+	}
+
+	public void updateContent(String content) {
+		this.content = content;
+	}
+
+	@PrePersist
+	void onCreate() {
+		if (createdAt == null) {
+			createdAt = Instant.now();
+		}
 	}
 }

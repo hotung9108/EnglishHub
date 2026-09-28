@@ -1,5 +1,6 @@
 package com.english_hub.core.infrastructure.persistence.entity;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -12,6 +13,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -53,6 +56,12 @@ public class Assignment {
 	@Column(nullable = false, columnDefinition = "assignment_status")
 	private AssignmentStatus status;
 
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private Instant createdAt;
+
+	@Column(name = "updated_at", nullable = false)
+	private Instant updatedAt;
+
 	public Assignment(
 			Long classId,
 			String title,
@@ -70,5 +79,40 @@ public class Assignment {
 		this.maxSubmissions = maxSubmissions;
 		this.deleted = deleted;
 		this.status = status;
+	}
+
+	public void updateFrom(
+			Long classId,
+			String title,
+			String description,
+			OffsetDateTime openAt,
+			OffsetDateTime closeAt,
+			Integer maxSubmissions,
+			boolean deleted,
+			AssignmentStatus status) {
+		this.classId = classId;
+		this.title = title;
+		this.description = description;
+		this.openAt = openAt;
+		this.closeAt = closeAt;
+		this.maxSubmissions = maxSubmissions;
+		this.deleted = deleted;
+		this.status = status;
+	}
+
+	@PrePersist
+	void onCreate() {
+		Instant now = Instant.now();
+		if (createdAt == null) {
+			createdAt = now;
+		}
+		if (updatedAt == null) {
+			updatedAt = now;
+		}
+	}
+
+	@PreUpdate
+	void onUpdate() {
+		updatedAt = Instant.now();
 	}
 }

@@ -123,6 +123,19 @@
   color: #2563EB;
 }
 
+.sidebar-submenu {
+  display: flex;
+  flex-direction: column;
+  margin-left: 22px;
+  border-left: 1px solid #F1F5F9;
+}
+
+.sidebar-submenu-link {
+  font-size: 13px;
+  padding: 6px 14px;
+  margin-top: 2px;
+}
+
 .sidebar-footer {
   padding: 0 14px;
   margin-top: auto;

@@ -12,7 +12,9 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  Layout
+  Layout,
+  History,
+  Library
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -76,16 +78,24 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {
         title: t('sectionResults'),
         items: [
-          { path: '/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/reports', label: t('menuReports'), icon: BarChart3 },
+          { path: '/admin/audit/gradings', label: t('auditLogs.title'), icon: History },
         ]
       }
     ],
     teacher: [
       {
+        title: t('sectionOverview'),
+        items: [
+          { path: '/teacher/dashboard', label: t('menuDashboard'), icon: LayoutDashboard },
+        ]
+      },
+      {
         title: t('sectionTeaching'),
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+          { path: '/teacher/exam-bank', label: t('menuExamBank'), icon: Library },
         ]
       },
       {
@@ -164,7 +174,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
                       <NavLink
                         key={`child-${cIndex}`}
                         to={child.path}
-                        className={({ isActive }) => `sidebar-link sidebar-sublink ${isActive ? 'active' : ''}`}
+                        className={({ isActive }) => `sidebar-link sidebar-submenu-link ${isActive ? 'active' : ''}`}
                       >
                         <span>{child.label}</span>
                       </NavLink>
@@ -187,7 +197,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
           <Settings size={18} strokeWidth={2} />
           <span>{t('settings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link sidebar-link-logout">
+        <NavLink to="/login" className="sidebar-link sidebar-link-logout text-error">
           <LogOut size={18} strokeWidth={2} />
           <span>{t('logout')}</span>
         </NavLink>

@@ -8,8 +8,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 /**
  * Adapts the String-facing entity APIs to the Jackson 2 JsonNode type used by
  * Hibernate's default JSONB mapper. Jackson 3 JsonNode is intentionally not
- * used here because it failed during Hibernate JSONB persistence; existing
- * mappings such as Grading.aiTranscript remain outside this task.
+ * used here because it failed during Hibernate JSONB persistence; used by
+ * Answer, Question and Grading JSONB fields.
  */
 final class JsonbValueCodec {
 

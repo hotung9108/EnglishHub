@@ -62,7 +62,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   return (
     <header className="topbar">
       {/* Left: Mobile Menu & Global Search */}
-      <div className="topbar-left">
+      <div className="topbar-left flex items-center gap-16 flex-1">
         <button 
           type="button" 
           className="mobile-menu-btn" 
@@ -98,7 +98,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
         {/* Notification Bell */}
         <button 
           type="button" 
-          className="topbar-icon-btn" 
+          className="topbar-icon-btn relative" 
           title="Thông báo"
         >
           <Bell size={18} />
