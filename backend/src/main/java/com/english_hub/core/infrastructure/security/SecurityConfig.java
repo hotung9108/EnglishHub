@@ -67,7 +67,7 @@ public class SecurityConfig {
 	CorsConfigurationSource corsConfigurationSource(
 			@Value("${app.security.cors.allowed-origins:*}") String[] allowedOrigins) {
 		var config = new CorsConfiguration();
-		config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+		config.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
 		config.setAllowedMethods(List.of(
 				HttpMethod.GET.name(),
 				HttpMethod.POST.name(),
