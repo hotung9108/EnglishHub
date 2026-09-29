@@ -127,14 +127,14 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
               {user?.avatar ? (
                 <img 
                   src={user.avatar} 
-                  alt={user.name} 
+                  alt={user.fullName} 
                 />
               ) : (
-                getInitials(user?.name)
+                getInitials(user?.fullName)
               )}
             </div>
             <div className="topbar-user-details">
-              <span className="topbar-user-name">{user?.name || 'User'}</span>
+              <span className="topbar-user-name">{user?.fullName || 'User'}</span>
               <span className="topbar-user-role">{user?.role || 'Student'}</span>
             </div>
             <ChevronDown size={14} color="#64748B" />
@@ -143,7 +143,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           {isMenuOpen && (
             <div className="topbar-dropdown-menu">
               <div className="topbar-dropdown-header">
-                <div className="topbar-dropdown-name">{user?.name || 'User'}</div>
+                <div className="topbar-dropdown-name">{user?.fullName || 'User'}</div>
                 <div className="topbar-dropdown-email">{user?.email || 'user@eh.com'}</div>
               </div>
 

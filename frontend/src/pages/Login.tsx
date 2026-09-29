@@ -2,18 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
-import type { User } from '../types/auth';
 import { 
   Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, 
   ShieldCheck, GraduationCap, Users, BookOpen, 
   CheckCircle2, Globe, AlertCircle, Award, Star
 } from 'lucide-react';
-
-const MOCK_ACCOUNTS: Record<string, User> = {
-  'admin@eh.com': { id: '1', name: 'Nguyễn Văn Hùng (Admin)', email: 'admin@eh.com', role: 'admin' },
-  'teacher@eh.com': { id: '2', name: 'Cô Trần Thị Mai Lan (Teacher)', email: 'teacher@eh.com', role: 'teacher' },
-  'student@eh.com': { id: '3', name: 'Alice Johnson (Student)', email: 'student@eh.com', role: 'student' },
-};
 
 const LoginForm: React.FC = () => {
   const { language, toggleLanguage } = useLanguage();
@@ -22,8 +15,8 @@ const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('admin@eh.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
@@ -31,28 +24,26 @@ const LoginForm: React.FC = () => {
 
   const handleRoleSelect = (role: 'admin' | 'teacher' | 'student') => {
     setSelectedRole(role);
-    if (role === 'admin') setEmail('admin@eh.com');
-    if (role === 'teacher') setEmail('teacher@eh.com');
-    if (role === 'student') setEmail('student@eh.com');
+    setEmail('');
+    setPassword('');
     setError('');
   };
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
 
-    const user = MOCK_ACCOUNTS[email];
-    if (user) {
-      login(user);
+    try {
+      await login({ email, password });
       const from = location.state?.from?.pathname || '/';
       if (from === '/') {
-        if (user.role === 'admin') navigate('/admin', { replace: true });
-        else if (user.role === 'teacher') navigate('/teacher', { replace: true });
-        else if (user.role === 'student') navigate('/student', { replace: true });
+        if (selectedRole === 'admin') navigate('/admin', { replace: true });
+        else if (selectedRole === 'teacher') navigate('/teacher', { replace: true });
+        else if (selectedRole === 'student') navigate('/student', { replace: true });
       } else {
         navigate(from, { replace: true });
       }
-    } else {
+    } catch {
       setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác' : 'Invalid email or password credentials');
     }
   };

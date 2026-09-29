@@ -37,7 +37,7 @@ services:
       STORAGE_S3_REGION: ${STORAGE_S3_REGION:-auto}
       STORAGE_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
       STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-english-hub-dev}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -52,7 +52,7 @@ services:
       - englishhub_dev_network
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: englishhub-minio
     restart: unless-stopped
     environment:
@@ -65,7 +65,7 @@ services:
     volumes:
       - minio_data_dev:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -73,7 +73,7 @@ services:
       - englishhub_dev_network
 
   minio-setup:
-    image: quay.io/minio/mc:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: englishhub-minio-setup
     depends_on:
       minio:
@@ -82,11 +82,13 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-      mc mb --ignore-existing local/$$MINIO_BUCKET &&
-      mc anonymous set download local/$$MINIO_BUCKET
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/"$$MINIO_BUCKET" &&
+        mc anonymous set download local/"$$MINIO_BUCKET"
     networks:
       - englishhub_dev_network
 
@@ -98,7 +100,7 @@ services:
     container_name: englishhub-frontend
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./frontend:/app

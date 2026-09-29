@@ -1,15 +1,15 @@
 export type Role = 'admin' | 'teacher' | 'student';
 
 export interface User {
-  id: string;
-  name: string;
+  id: number;
+  fullName: string;
   email: string;
   role: Role;
   avatar?: string;
   phone?: string;
+  specialization?: string;
   code?: string;
   department?: string;
-  specialization?: string;
   bio?: string;
   meetingUrl?: string;
   targetBand?: string;
@@ -26,7 +26,7 @@ export interface AuthState {
 }
 
 export interface AuthContextType extends AuthState {
-  login: (user: User) => void;
-  logout: () => void;
+  login: (payload: { email: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
   updateUser: (data: Partial<User>) => void;
 }

@@ -7,6 +7,7 @@ import { TokenRefreshManager } from '../core/interceptors';
 import { AuthService } from '../services/auth.service';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
+import { buildListParams, computePagination, pageAfterEmptyRefetch } from '../../hooks/useUsers.utils';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 import type { CustomAxiosRequestConfig } from '../core/types';
 
@@ -61,6 +62,7 @@ test('AuthService - login sets tokens and session, logout clears session', async
 
   const loginRes = await auth.login({ email: 'teacher@englishhub.dev', password: 'SecretPassword' });
   assert.strictEqual(loginRes.accessToken, 'access-123');
+  assert.strictEqual(loginRes.user.role, 'teacher', 'role should be normalized to lowercase');
   assert.strictEqual(storage.getAccessToken(), 'access-123');
   assert.strictEqual(storage.getRefreshToken(), 'refresh-456');
   assert.strictEqual(auth.isAuthenticated(), true);
@@ -95,10 +97,71 @@ test('UserService - routes user profile and admin endpoints correctly', async ()
   assert.strictEqual(mockHttp.calls[2].method, 'PATCH');
   assert.strictEqual(mockHttp.calls[2].url, '/users/me/password');
 
-  // Admin user CRUD (inherits BaseApiService) -> /admin/users
-  await userSvc.getAll({ role: 'TEACHER' });
+  // Admin user list -> /admin/users
+  mockHttp.mockResponse = { data: [], pagination: { page: 1, limit: 20, total: 0 } };
+  await userSvc.listUsers({ page: 1, limit: 20, role: 'TEACHER' });
   assert.strictEqual(mockHttp.calls[3].method, 'GET');
   assert.strictEqual(mockHttp.calls[3].url, '/admin/users');
+});
+
+test('UserService - trims list filters and maps BE pagination', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const expected = {
+    data: [{ id: 12, fullName: 'An Nguyen', email: 'an@example.test', role: 'STUDENT', status: 'ACTIVE' }],
+    pagination: { page: 2, limit: 10, total: 11 },
+  };
+  mockHttp.mockResponse = expected;
+
+  assert.deepStrictEqual(await userSvc.listUsers({ page: 2, limit: 10, q: ' An ', role: 'STUDENT' }), expected);
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 2, limit: 10, q: 'An', role: 'STUDENT' });
+});
+
+test('UserService - uses admin create, update, and delete routes', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const payload = { fullName: 'An Nguyen', email: 'an@example.test', password: 'StrongPass8', role: 'STUDENT' as const };
+  mockHttp.mockResponse = { message: 'created', user: { id: 12, email: payload.email, role: payload.role } };
+  assert.deepStrictEqual(await userSvc.createUser(payload), mockHttp.mockResponse);
+  mockHttp.mockResponse = { message: 'updated' };
+  assert.deepStrictEqual(await userSvc.updateUser(12, { fullName: 'An N.' }), mockHttp.mockResponse);
+  mockHttp.mockResponse = { message: 'deleted' };
+  assert.deepStrictEqual(await userSvc.deleteUser(12), mockHttp.mockResponse);
+  assert.deepStrictEqual(mockHttp.calls.map(({ method, url }) => [method, url]), [
+    ['POST', '/admin/users'],
+    ['PUT', '/admin/users/12'],
+    ['DELETE', '/admin/users/12'],
+  ]);
+});
+
+test('buildListParams clamps pagination and omits blank filters', () => {
+  assert.deepStrictEqual(buildListParams({ page: 0, limit: 101, q: '  ', role: undefined }), {
+    page: 1,
+    limit: 100,
+  });
+  assert.deepStrictEqual(buildListParams({ page: 2.8, limit: 0, q: ' An ', role: 'ADMIN' }), {
+    page: 2,
+    limit: 1,
+    q: 'An',
+    role: 'ADMIN',
+  });
+});
+
+test('computePagination derives page navigation', () => {
+  assert.deepStrictEqual(computePagination({ page: 2, limit: 20, total: 41 }), {
+    page: 2,
+    limit: 20,
+    total: 41,
+    totalPages: 3,
+    hasNext: true,
+    hasPrevious: true,
+  });
+});
+
+test('pageAfterEmptyRefetch moves back only when a page is empty', () => {
+  for (const [page, itemCount, expected] of [[3, 0, 2], [1, 0, 1], [3, 4, 3]]) {
+    assert.strictEqual(pageAfterEmptyRefetch(page, itemCount), expected);
+  }
 });
 
 // ==========================================
