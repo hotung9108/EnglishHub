@@ -24,6 +24,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:?Database username (DB_USER) is required}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Database password (DB_PASSWORD) is required}
       JWT_SECRET: ${JWT_SECRET:?JWT secret key is required}
+      # Danh sách domain frontend được phép gọi API, phân tách bởi dấu phẩy.
+      # "*" = cho phép tất cả các origin (mặc định). Nên giới hạn theo domain thật khi đưa vào dùng.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Giới hạn RAM JVM cho Spring Boot để tối ưu tài nguyên máy tính cá nhân
       JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx768m}"
