@@ -52,6 +52,8 @@ class AuthServiceTest {
 	private JwtTokenService jwtTokenService;
 
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
+	private final com.english_hub.core.modules.auth.domain.service.PasswordResetStore passwordResetStore =
+			new com.english_hub.core.modules.auth.domain.service.PasswordResetStore();
 	private AuthService authService;
 
 	@BeforeEach
@@ -61,6 +63,7 @@ class AuthServiceTest {
 				refreshTokenRepository,
 				passwordEncoder,
 				jwtTokenService,
+				passwordResetStore,
 				604800L);
 	}
 
@@ -255,6 +258,34 @@ class AuthServiceTest {
 				ArgumentCaptor.forClass(com.english_hub.core.modules.user.domain.model.UserRole.class);
 		verify(jwtTokenService).createAccessToken(eq(USER_ID), roleCaptor.capture());
 		assertThat(roleCaptor.getValue()).isEqualTo(com.english_hub.core.modules.user.domain.model.UserRole.TEACHER);
+	}
+
+	@Test
+	void forgotPasswordGeneratesOtpForExistingUser() {
+		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeTeacher(PASSWORD)));
+
+		var response = authService.forgotPassword(
+				new com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand(EMAIL));
+
+		assertThat(response.email()).isEqualTo(EMAIL);
+		assertThat(response.debugOtp()).isNotNull().hasSize(6);
+	}
+
+	@Test
+	void resetPasswordUpdatesPasswordWhenOtpIsValid() {
+		AuthUser user = activeTeacher(PASSWORD);
+		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+
+		var forgotResp = authService.forgotPassword(
+				new com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand(EMAIL));
+
+		var resetResp = authService.resetPassword(
+				new com.english_hub.core.modules.auth.application.command.ResetPasswordCommand(
+						EMAIL, forgotResp.debugOtp(), null, "BrandNewPassword123!"));
+
+		assertThat(resetResp.message()).contains("thành công");
+		verify(authUserRepository).save(user);
+		assertThat(passwordEncoder.matches("BrandNewPassword123!", user.getPasswordHash())).isTrue();
 	}
 
 	private RefreshCommand refreshCommand() {

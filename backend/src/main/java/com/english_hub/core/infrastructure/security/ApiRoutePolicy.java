@@ -15,6 +15,8 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/login", List.of()),
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/refresh", List.of()),
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/logout", List.of()),
+			new RouteRule(HttpMethod.POST, "/api/v1/auth/forgot-password", List.of()),
+			new RouteRule(HttpMethod.POST, "/api/v1/auth/reset-password", List.of()),
 
 			// User administration
 			new RouteRule(HttpMethod.GET, "/api/v1/admin/users", List.of("ADMIN")),

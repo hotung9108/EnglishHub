@@ -182,6 +182,24 @@ class AdminUserServiceTest {
 	}
 
 	@Test
+	void rejectsCreateUserWithInvalidFullName() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.existsByEmail("student@example.com")).thenReturn(false);
+
+		assertThatThrownBy(() -> adminUserService.createUser(new CreateUserCommand(
+				"Student 123", "student@example.com", "Student05", "STUDENT", null,
+				null, null, null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Họ và tên không được chứa chữ số.");
+
+		assertThatThrownBy(() -> adminUserService.createUser(new CreateUserCommand(
+				"Student<alert>", "student@example.com", "Student05", "STUDENT", null,
+				null, null, null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Họ và tên không được chứa ký tự đặc biệt.");
+	}
+
+	@Test
 	void updatesTeacherProfileFieldsForAnAdmin() {
 		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
 		when(userRepository.findById(41L)).thenReturn(Optional.of(user(41L, UserRole.TEACHER)));

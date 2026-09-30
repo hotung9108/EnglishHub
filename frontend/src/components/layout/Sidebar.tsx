@@ -191,11 +191,18 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       <div className="sidebar-footer">
         <div className="sidebar-divider"></div>
         <NavLink 
+          to={role === 'admin' ? '/admin/profile' : role === 'teacher' ? '/teacher/profile' : '/student/profile'} 
+          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+        >
+          <User size={18} strokeWidth={2} />
+          <span>{t('profile.title') || 'Hồ sơ cá nhân'}</span>
+        </NavLink>
+        <NavLink 
           to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} 
           className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
         >
           <Settings size={18} strokeWidth={2} />
-          <span>{t('settings')}</span>
+          <span>{t('menuSettings')}</span>
         </NavLink>
         <NavLink to="/login" className="sidebar-link sidebar-link-logout text-error">
           <LogOut size={18} strokeWidth={2} />

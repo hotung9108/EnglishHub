@@ -5,6 +5,7 @@ import {
   Shield, Mail, Phone, Edit3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { validateFullName } from '../utils/nameValidation';
 
 interface AccountUser {
   id: string;
@@ -42,6 +43,7 @@ export const Accounts: React.FC = () => {
     role: 'Student' as 'Student' | 'Teacher' | 'Admin',
     status: 'Active' as 'Active' | 'Blocked'
   });
+  const [nameError, setNameError] = useState('');
 
   const filteredUsers = users.filter(user => {
     if (roleFilter !== 'All' && user.role !== roleFilter) return false;
@@ -60,6 +62,7 @@ export const Accounts: React.FC = () => {
 
   const handleOpenCreateDrawer = () => {
     setEditingUser(null);
+    setNameError('');
     setFormData({
       name: '',
       email: '',
@@ -72,6 +75,7 @@ export const Accounts: React.FC = () => {
 
   const handleOpenEditDrawer = (user: AccountUser) => {
     setEditingUser(user);
+    setNameError('');
     setFormData({
       name: user.name,
       email: user.email,
@@ -86,18 +90,27 @@ export const Accounts: React.FC = () => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) return;
 
+    const valResult = validateFullName(formData.name, isVi);
+    if (!valResult.isValid) {
+      setNameError(valResult.errorMessage || '');
+      return;
+    }
+    setNameError('');
+    const cleanName = valResult.normalized;
+
     if (editingUser) {
       setUsers(prev => prev.map(u => u.id === editingUser.id ? {
         ...u,
-        ...formData
+        ...formData,
+        name: cleanName
       } : u));
     } else {
       const newId = formData.role === 'Admin' ? `AD-00${users.length + 1}` : formData.role === 'Teacher' ? `GV-00${users.length + 1}` : `HV-880${users.length + 1}`;
-      const initials = formData.name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
+      const initials = cleanName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
       const newUser: AccountUser = {
         id: newId,
         avatar: initials,
-        name: formData.name,
+        name: cleanName,
         email: formData.email,
         phone: formData.phone || 'Chưa cập nhật',
         role: formData.role,
@@ -328,9 +341,30 @@ export const Accounts: React.FC = () => {
                     className="input"
                     placeholder="Nguyễn Văn A..."
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      if (nameError) setNameError('');
+                    }}
+                    onBlur={() => {
+                      const res = validateFullName(formData.name, isVi);
+                      if (!res.isValid) {
+                        setNameError(res.errorMessage || '');
+                      } else {
+                        setNameError('');
+                      }
+                    }}
+                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
+                  {nameError ? (
+                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      {nameError}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="adm-form-group">
