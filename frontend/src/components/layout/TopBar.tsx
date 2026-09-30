@@ -26,6 +26,11 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
 
   const role = user?.role || 'student';
   const isStudent = location.pathname.startsWith('/student') || role === 'student';
+  const profileBasePath = role === 'admin' 
+    ? '/admin/profile' 
+    : role === 'teacher' 
+      ? '/teacher/profile' 
+      : '/student/profile';
   const settingsBasePath = role === 'admin' 
     ? '/admin/settings' 
     : role === 'teacher' 
@@ -148,7 +153,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
               </div>
 
               <Link 
-                to={`${settingsBasePath}?tab=profile`} 
+                to={`${profileBasePath}?tab=general`} 
                 className="topbar-dropdown-item"
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -157,7 +162,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
               </Link>
 
               <Link 
-                to={`${settingsBasePath}?tab=security`} 
+                to={`${profileBasePath}?tab=security`} 
                 className="topbar-dropdown-item"
                 onClick={() => setIsMenuOpen(false)}
               >

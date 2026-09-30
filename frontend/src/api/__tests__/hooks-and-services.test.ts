@@ -75,6 +75,39 @@ test('AuthService - login sets tokens and session, logout clears session', async
   assert.strictEqual(auth.isAuthenticated(), false);
 });
 
+test('AuthService - forgotPassword and resetPassword call correct public endpoints', async () => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+
+  mockHttp.mockResponse = {
+    message: 'OTP dispatched',
+    otpPreview: '123456',
+    token: 'reset-token-xyz',
+    expiresInSeconds: 900,
+  };
+
+  const forgotRes = await auth.forgotPassword({ email: 'student@englishhub.dev' });
+  assert.strictEqual(forgotRes.otpPreview, '123456');
+  assert.strictEqual(forgotRes.token, 'reset-token-xyz');
+  assert.strictEqual(mockHttp.calls[0].method, 'POST');
+  assert.strictEqual(mockHttp.calls[0].url, '/auth/forgot-password');
+
+  mockHttp.mockResponse = {
+    message: 'Password reset successful',
+  };
+
+  const resetRes = await auth.resetPassword({
+    email: 'student@englishhub.dev',
+    token: 'reset-token-xyz',
+    otp: '123456',
+    newPassword: 'BrandNewPassword123!',
+  });
+  assert.strictEqual(resetRes.message, 'Password reset successful');
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/auth/reset-password');
+});
+
 // ==========================================
 // 2. USER SERVICE TESTS
 // ==========================================

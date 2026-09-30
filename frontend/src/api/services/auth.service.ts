@@ -32,6 +32,27 @@ export interface LogoutResponse {
   message?: string;
 }
 
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  email: string;
+  debugOtp?: string;
+}
+
+export interface ResetPasswordPayload {
+  email: string;
+  otp?: string;
+  token?: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
 export class AuthService {
   private readonly http: IHttpClient;
   private readonly storage: ITokenStorage;
@@ -97,6 +118,18 @@ export class AuthService {
     } finally {
       this.clearSession();
     }
+  }
+
+  async forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> {
+    return this.http.post<ForgotPasswordResponse>('/auth/forgot-password', payload, {
+      skipAuth: true,
+    });
+  }
+
+  async resetPassword(payload: ResetPasswordPayload): Promise<ResetPasswordResponse> {
+    return this.http.post<ResetPasswordResponse>('/auth/reset-password', payload, {
+      skipAuth: true,
+    });
   }
 
   clearSession(): void {

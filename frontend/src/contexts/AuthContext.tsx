@@ -2,8 +2,10 @@
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, Role, User } from '../types/auth';
-import { authService, tokenStorage, AUTH_EVENTS } from '@/api';
+import { authService, userService, tokenStorage, AUTH_EVENTS } from '@/api';
 import type { AuthUserData } from '@/api/services/auth.service';
+import type { UserProfile } from '@/api/services/user.service';
+import { environment } from '@/config/environment';
 
 const ROLES: Role[] = ['admin', 'teacher', 'student'];
 
@@ -15,6 +17,28 @@ const toUser = (data: AuthUserData | null): User | null => {
     fullName: data.fullName ?? '',
     email: data.email ?? '',
     role: ROLES.includes(role) ? role : 'student',
+  };
+};
+
+const profileToUser = (profile: UserProfile): User => {
+  const role = profile.role.toLowerCase() as Role;
+  const validRole: Role = ROLES.includes(role) ? role : 'student';
+  const roleCode = profile.studentCode || (
+    validRole === 'teacher' ? `GV-${String(profile.id).padStart(3, '0')}` :
+    validRole === 'admin' ? `AD-${String(profile.id).padStart(3, '0')}` :
+    `HV-${String(profile.id).padStart(3, '0')}`
+  );
+
+  return {
+    id: profile.id,
+    fullName: profile.fullName || '',
+    email: profile.email || '',
+    role: validRole,
+    avatar: profile.avatarUrl,
+    phone: profile.phone,
+    specialization: profile.specialization,
+    code: roleCode,
+    dateOfBirth: profile.dateOfBirth,
   };
 };
 
@@ -31,6 +55,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const savedUser = authService.getSavedUser();
           if (savedUser) {
             setUser(toUser(savedUser));
+          }
+
+          // Fetch freshest user profile from backend
+          try {
+            const profile = await userService.getMyProfile();
+            const freshUser = profileToUser(profile);
+            setUser(freshUser);
+            localStorage.setItem(environment.auth.userKey, JSON.stringify(freshUser));
+          } catch {
+            // Keep savedUser if profile request fails
           }
         }
       } catch {
@@ -55,7 +89,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (payload: { email: string; password: string }) => {
     const response = await authService.login(payload);
-    setUser(toUser(response.user));
+    const initialUser = toUser(response.user);
+    if (initialUser) {
+      setUser(initialUser);
+    }
+
+    try {
+      const fullProfile = await userService.getMyProfile();
+      const enrichedUser = profileToUser(fullProfile);
+      setUser(enrichedUser);
+      localStorage.setItem(environment.auth.userKey, JSON.stringify(enrichedUser));
+    } catch {
+      // Retain initial login user
+    }
   };
 
   const logout = async () => {
@@ -67,6 +113,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(prev => {
       if (!prev) return null;
       const updated = { ...prev, ...data };
+      try {
+        localStorage.setItem(environment.auth.userKey, JSON.stringify(updated));
+      } catch {
+        // Ignore storage error
+      }
       return updated;
     });
   };

@@ -31,8 +31,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
+import { userService } from '../api/services/user.service';
 import type { Role } from '../types/auth';
 import type { SettingsTab, ActiveSession, NotificationSettings, PreferenceSettings } from '../types/settings.types';
+import { validateFullName } from '../utils/nameValidation';
 import '../styles/settings.css';
 
 interface SettingsProps {
@@ -82,6 +84,7 @@ const INITIAL_SESSIONS: ActiveSession[] = [
 const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   const { user, updateUser, login } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
+  const isVi = language === 'vi';
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Active tab state derived directly from URL search params
@@ -106,22 +109,31 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
 
   // User form state
   const currentRole: Role = user?.role || 'admin';
+  const computedUserCode = user?.code || (user?.id ? (
+    currentRole === 'admin' ? `AD-${String(user.id).padStart(3, '0')}` :
+    currentRole === 'teacher' ? `GV-${String(user.id).padStart(3, '0')}` :
+    `HV-${String(user.id).padStart(3, '0')}`
+  ) : '');
+
   const [formData, setFormData] = useState({
     name: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
-    code: user?.code || (currentRole === 'admin' ? 'AD-2026-001' : currentRole === 'teacher' ? 'GV-2026-088' : 'HV-2026-402'),
+    code: computedUserCode,
     avatar: user?.avatar || '',
-    joinedDate: user?.joinedDate || (currentRole === 'admin' ? '15/01/2025' : currentRole === 'teacher' ? '01/08/2024' : '10/02/2026'),
+    joinedDate: user?.joinedDate || '',
     department: user?.department || 'Ban Quản trị Hệ thống',
-    specialization: user?.specialization || 'IELTS Academic & Speaking/Writing',
-    bio: user?.bio || '8.5 IELTS Overall (Speaking 8.5, Writing 8.0). Hơn 7 năm kinh nghiệm giảng dạy IELTS chuyên sâu tại EnglishHub.',
-    meetingUrl: user?.meetingUrl || 'https://meet.google.com/eh-lan-ielts',
-    currentClass: user?.currentClass || 'IELTS Intensive K24',
-    targetBand: user?.targetBand || '7.5+ IELTS',
-    school: user?.school || 'Đại học Quốc Gia Hà Nội',
-    dateOfBirth: user?.dateOfBirth || '2005-06-15',
+    specialization: user?.specialization || '',
+    bio: user?.bio || '',
+    meetingUrl: user?.meetingUrl || '',
+    currentClass: user?.currentClass || '',
+    targetBand: user?.targetBand || '',
+    school: user?.school || '',
+    dateOfBirth: user?.dateOfBirth || '',
   });
+  const [nameError, setNameError] = useState('');
+
+
 
   // Code badge copy state
   const [copiedCode, setCopiedCode] = useState(false);
@@ -162,7 +174,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     strengthClass = 'strong';
   }
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
 
@@ -176,15 +188,24 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
       return;
     }
 
-    if (validRulesCount < 3) {
-      setPasswordError(t('profile.passwordRequirementsTitle'));
+    if (newPassword.length < 8) {
+      setPasswordError(isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự' : 'Password must be at least 8 characters');
       return;
     }
 
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    showToast(t('settings.passwordUpdated'));
+    try {
+      await userService.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast(t('settings.passwordUpdated'));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('settings.passwordMismatch');
+      setPasswordError(msg);
+    }
   };
 
   // 2FA state
@@ -245,24 +266,45 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     defaultAudioSpeed: '1.0x',
   });
 
-  const handleSaveProfile = (e?: React.FormEvent) => {
+  const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    updateUser({
-      fullName: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      code: formData.code,
-      avatar: formData.avatar,
-      department: formData.department,
-      specialization: formData.specialization,
-      bio: formData.bio,
-      meetingUrl: formData.meetingUrl,
-      currentClass: formData.currentClass,
-      targetBand: formData.targetBand,
-      school: formData.school,
-      dateOfBirth: formData.dateOfBirth,
-    });
-    showToast(t('settings.savedSuccess'));
+    const valResult = validateFullName(formData.name, isVi);
+    if (!valResult.isValid) {
+      setNameError(valResult.errorMessage || '');
+      showToast(valResult.errorMessage || '');
+      return;
+    }
+
+    setNameError('');
+    const cleanName = valResult.normalized;
+
+    try {
+      await userService.updateMyProfile({
+        fullName: cleanName,
+        phone: formData.phone,
+        avatarUrl: formData.avatar,
+      });
+
+      updateUser({
+        fullName: cleanName,
+        email: formData.email,
+        phone: formData.phone,
+        code: formData.code,
+        avatar: formData.avatar,
+        department: formData.department,
+        specialization: formData.specialization,
+        bio: formData.bio,
+        meetingUrl: formData.meetingUrl,
+        currentClass: formData.currentClass,
+        targetBand: formData.targetBand,
+        school: formData.school,
+        dateOfBirth: formData.dateOfBirth,
+      });
+      setFormData(prev => ({ ...prev, name: cleanName }));
+      showToast(t('settings.savedSuccess'));
+    } catch {
+      showToast(isVi ? 'Không thể lưu hồ sơ' : 'Failed to update profile');
+    }
   };
 
   const handleRoleSwitch = async (newRole: Role) => {
@@ -609,9 +651,30 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                   type="text" 
                   className="settings-input" 
                   value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, name: e.target.value }));
+                    if (nameError) setNameError('');
+                  }}
+                  onBlur={() => {
+                    const res = validateFullName(formData.name, isVi);
+                    if (!res.isValid) {
+                      setNameError(res.errorMessage || '');
+                    } else {
+                      setNameError('');
+                    }
+                  }}
+                  style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                   required 
                 />
+                {nameError ? (
+                  <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {nameError}
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {t('settings.fullNameHint')}
+                  </span>
+                )}
               </div>
 
               <div className="settings-field">

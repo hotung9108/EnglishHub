@@ -35,11 +35,13 @@ const LoginForm: React.FC = () => {
 
     try {
       await login({ email, password });
+      const savedUser = JSON.parse(localStorage.getItem('englishhub_user') || '{}');
+      const actualRole = savedUser?.role || selectedRole;
       const from = location.state?.from?.pathname || '/';
       if (from === '/') {
-        if (selectedRole === 'admin') navigate('/admin', { replace: true });
-        else if (selectedRole === 'teacher') navigate('/teacher', { replace: true });
-        else if (selectedRole === 'student') navigate('/student', { replace: true });
+        if (actualRole === 'admin') navigate('/admin', { replace: true });
+        else if (actualRole === 'teacher') navigate('/teacher', { replace: true });
+        else navigate('/student', { replace: true });
       } else {
         navigate(from, { replace: true });
       }

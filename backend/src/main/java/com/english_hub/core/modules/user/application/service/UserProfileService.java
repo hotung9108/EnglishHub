@@ -48,7 +48,8 @@ public class UserProfileService {
 			if (!hasText(request.fullName())) {
 				throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 			}
-			currentUser.updateFullName(request.fullName().trim());
+			String normalizedFullName = com.english_hub.core.modules.user.domain.model.FullNameValidator.validateAndNormalize(request.fullName());
+			currentUser.updateFullName(normalizedFullName);
 			changed = true;
 		}
 		if (request.phone() != null) {

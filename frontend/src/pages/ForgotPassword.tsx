@@ -6,6 +6,7 @@ import {
   AlertCircle, Globe, KeyRound, Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { authService } from '@/api';
 import type { ForgotPasswordStep, PasswordStrength } from '../types/auth-flow.types';
 import '../styles/login.css';
 import '../styles/forgot-password.css';
@@ -64,14 +65,10 @@ export const ForgotPassword: React.FC = () => {
     };
   }, [step, navigate]);
 
-  // Quick select accounts for rapid testing
-  const handleQuickSelectEmail = (selectedEmail: string) => {
-    setEmail(selectedEmail);
-    setErrorMessage('');
-  };
+
 
   // Step 1: Submit email to request OTP
-  const handleRequestOtp = (e: React.FormEvent) => {
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -81,14 +78,19 @@ export const ForgotPassword: React.FC = () => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      // Generate a mock 6-digit OTP
-      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(newOtp);
-      setIsLoading(false);
+    try {
+      const res = await authService.forgotPassword({ email });
+      if (res.debugOtp) {
+        setGeneratedOtp(res.debugOtp);
+      }
       setStep('verify');
       setResendSeconds(60);
-    }, 600);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (isVi ? 'Tài khoản không tồn tại trong hệ thống' : 'Account not found');
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Step 2: Handle OTP input
@@ -123,18 +125,30 @@ export const ForgotPassword: React.FC = () => {
   };
 
   const handleAutofillOtp = () => {
-    setOtp(generatedOtp.split(''));
-    setErrorMessage('');
-    otpInputRefs.current[5]?.focus();
+    if (generatedOtp) {
+      setOtp(generatedOtp.split(''));
+      setErrorMessage('');
+      otpInputRefs.current[5]?.focus();
+    }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (resendSeconds > 0) return;
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(newOtp);
-    setResendSeconds(60);
-    setOtp(['', '', '', '', '', '']);
+    setIsLoading(true);
     setErrorMessage('');
+    try {
+      const res = await authService.forgotPassword({ email });
+      if (res.debugOtp) {
+        setGeneratedOtp(res.debugOtp);
+      }
+      setResendSeconds(60);
+      setOtp(['', '', '', '', '', '']);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (isVi ? 'Không thể gửi lại mã' : 'Failed to resend code');
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
@@ -147,16 +161,7 @@ export const ForgotPassword: React.FC = () => {
       return;
     }
 
-    if (fullOtp !== generatedOtp) {
-      setErrorMessage(isVi ? 'Mã xác minh không chính xác. Vui lòng kiểm tra lại.' : 'Invalid verification code. Please check again.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setStep('reset');
-    }, 500);
+    setStep('reset');
   };
 
   // Step 3: Password strength calculation
@@ -178,7 +183,7 @@ export const ForgotPassword: React.FC = () => {
 
   const strength = calculatePasswordStrength();
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -203,11 +208,20 @@ export const ForgotPassword: React.FC = () => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.resetPassword({
+        email,
+        otp: otp.join(''),
+        newPassword,
+      });
       setStep('success');
       setRedirectSeconds(5);
-    }, 800);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (isVi ? 'Không thể đặt lại mật khẩu' : 'Reset password failed');
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -299,79 +313,53 @@ export const ForgotPassword: React.FC = () => {
         {/* ================= STEP 1: REQUEST EMAIL ================= */}
         {step === 'request' && (
           <div>
-
-              <div className="login-header-group">
-                <h2 className="login-form-title">
-                  {isVi ? 'Quên mật khẩu?' : 'Forgot Password?'}
-                </h2>
-              </div>
-
-              {/* Quick Select Testing Accounts */}
-              <div className="fp-quick-accounts">
-                <span className="fp-quick-label">
-                  {isVi ? 'Tài khoản mẫu để thử nghiệm nhanh:' : 'Quick demo accounts:'}
-                </span>
-                <div className="fp-quick-pills">
-                  <button 
-                    type="button" 
-                    className="fp-quick-pill-btn"
-                    onClick={() => handleQuickSelectEmail('admin@eh.com')}
-                  >
-                    admin@eh.com (Admin)
-                  </button>
-                  <button 
-                    type="button" 
-                    className="fp-quick-pill-btn"
-                    onClick={() => handleQuickSelectEmail('teacher@eh.com')}
-                  >
-                    teacher@eh.com (Teacher)
-                  </button>
-                  <button 
-                    type="button" 
-                    className="fp-quick-pill-btn"
-                    onClick={() => handleQuickSelectEmail('student@eh.com')}
-                  >
-                    student@eh.com (Student)
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleRequestOtp}>
-                <div className="login-input-group">
-                  <label className="login-input-label">
-                    <span>{isVi ? 'Địa chỉ Email' : 'Email Address'}</span>
-                  </label>
-                  <div className="login-input-wrapper">
-                    <Mail size={16} className="login-input-icon" />
-                    <input 
-                      type="email"
-                      className="login-input-field"
-                      placeholder="yourname@eh.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                <button 
-                  type="submit" 
-                  className="login-submit-btn" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <span>{isVi ? 'Đang gửi mã...' : 'Sending code...'}</span>
-                  ) : (
-                    <>
-                      <span>{isVi ? 'Gửi mã xác nhận' : 'Send Recovery Code'}</span>
-                      <ArrowRight size={16} />
-                    </>
-                  )}
-                </button>
-              </form>
+            <div className="login-header-group">
+              <h2 className="login-form-title">
+                {isVi ? 'Quên mật khẩu?' : 'Forgot Password?'}
+              </h2>
+              <p className="login-form-desc">
+                {isVi 
+                  ? 'Nhập địa chỉ email liên kết với tài khoản của bạn để nhận mã khôi phục.' 
+                  : 'Enter the email address associated with your account to receive a recovery code.'}
+              </p>
             </div>
-          )}
+
+            <form onSubmit={handleRequestOtp}>
+              <div className="login-input-group">
+                <label className="login-input-label">
+                  <span>{isVi ? 'Địa chỉ Email' : 'Email Address'}</span>
+                </label>
+                <div className="login-input-wrapper">
+                  <Mail size={16} className="login-input-icon" />
+                  <input 
+                    type="email"
+                    className="login-input-field"
+                    placeholder="yourname@eh.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="login-submit-btn" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span>{isVi ? 'Đang gửi mã...' : 'Sending code...'}</span>
+                ) : (
+                  <>
+                    <span>{isVi ? 'Gửi mã xác nhận' : 'Send Recovery Code'}</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
 
           {/* ================= STEP 2: VERIFY OTP ================= */}
           {step === 'verify' && (

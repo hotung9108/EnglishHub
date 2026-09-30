@@ -73,6 +73,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="accounts/profile" element={<Profile />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="roles" element={<Roles />} />
             <Route path="classes" element={<Classes />} />
             <Route path="classes/create" element={<AddClass />} />
