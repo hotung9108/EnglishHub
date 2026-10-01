@@ -8,13 +8,14 @@ export function clampLimit(limit = 20): number {
   return Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 20;
 }
 
-export function buildListParams(params: UserListParams = {}) {
+export function buildListParams(params: UserListParams = {}, extra: Record<string, string> = {}) {
   const q = params.q?.trim();
   return {
     page: clampPage(params.page),
     limit: clampLimit(params.limit),
     ...(q ? { q } : {}),
     ...(params.role ? { role: params.role } : {}),
+    ...extra,
   };
 }
 

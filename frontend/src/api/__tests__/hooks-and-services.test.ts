@@ -200,30 +200,80 @@ test('pageAfterEmptyRefetch moves back only when a page is empty', () => {
 // ==========================================
 // 3. CLASS SERVICE TESTS
 // ==========================================
-test('ClassService - CRUD and member sub-resources', async () => {
+test('ClassService - list clamps params and returns the paginated envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  mockHttp.mockResponse = {
+    data: [{ id: 15, name: 'IELTS 6.5', status: 'ACTIVE', teacherId: 7 }],
+    pagination: { page: 2, limit: 10, total: 31 },
+  };
+  const classSvc = new ClassService(mockHttp);
+
+  const result = await classSvc.list({ page: 0, limit: 101, status: 'ACTIVE' });
+
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 1, limit: 100, status: 'ACTIVE' });
+  assert.strictEqual(result.data.length, 1);
+  assert.deepStrictEqual(result.pagination, { page: 2, limit: 10, total: 31 });
+
+  // status omitted -> no status key in query
+  await classSvc.list({ page: 3, limit: 20 });
+  assert.deepStrictEqual(mockHttp.calls[1].options?.params, { page: 3, limit: 20 });
+});
+
+test('ClassService - CRUD endpoints hit the documented paths and bodies', async () => {
   const mockHttp = new MockHttpClient();
   const classSvc = new ClassService(mockHttp);
 
-  // getAll -> /classes
-  await classSvc.getAll();
+  await classSvc.getDetail(15);
   assert.strictEqual(mockHttp.calls[0].method, 'GET');
-  assert.strictEqual(mockHttp.calls[0].url, '/classes');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15');
 
-  // getMembers -> /classes/:id/members
-  await classSvc.getMembers(15);
-  assert.strictEqual(mockHttp.calls[1].method, 'GET');
-  assert.strictEqual(mockHttp.calls[1].url, '/classes/15/members');
+  await classSvc.create({ name: 'IELTS 6.5', level: 'B1', teacherId: 7 });
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes');
+  assert.deepStrictEqual(mockHttp.calls[1].data, { name: 'IELTS 6.5', level: 'B1', teacherId: 7 });
 
-  // addMember -> /classes/:id/members
-  await classSvc.addMember(15, 101);
-  assert.strictEqual(mockHttp.calls[2].method, 'POST');
-  assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members');
-  assert.deepStrictEqual(mockHttp.calls[2].data, { studentId: 101 });
+  await classSvc.update(15, { status: 'INACTIVE' });
+  assert.strictEqual(mockHttp.calls[2].method, 'PUT');
+  assert.strictEqual(mockHttp.calls[2].url, '/classes/15');
+  assert.deepStrictEqual(mockHttp.calls[2].data, { status: 'INACTIVE' });
 
-  // removeMember -> /classes/:id/members/:memberId
-  await classSvc.removeMember(15, 202);
+  await classSvc.delete(15);
   assert.strictEqual(mockHttp.calls[3].method, 'DELETE');
-  assert.strictEqual(mockHttp.calls[3].url, '/classes/15/members/202');
+  assert.strictEqual(mockHttp.calls[3].url, '/classes/15');
+});
+
+test('ClassService - member sub-resources unwrap the data envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [{ memberId: 202, studentId: 101, fullName: 'Lan Nguyen', studentCode: 'STU-001' }],
+  };
+  const members = await classSvc.listMembers(15);
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/members');
+  assert.deepStrictEqual(members, [
+    { memberId: 202, studentId: 101, fullName: 'Lan Nguyen', studentCode: 'STU-001' },
+  ]);
+
+  await classSvc.addMember(15, 101);
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes/15/members');
+  assert.deepStrictEqual(mockHttp.calls[1].data, { studentId: 101 });
+
+  await classSvc.removeMember(15, 202);
+  assert.strictEqual(mockHttp.calls[2].method, 'DELETE');
+  assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members/202');
+});
+
+test('buildListParams passes through extra filters for non-user endpoints', () => {
+  assert.deepStrictEqual(buildListParams({ page: 2, limit: 10 }, { status: 'ACTIVE' }), {
+    page: 2,
+    limit: 10,
+    status: 'ACTIVE',
+  });
 });
 
 // ==========================================

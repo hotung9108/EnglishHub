@@ -15,3 +15,18 @@ export type {
   UserListResponse,
   UserRole,
 } from '@/api/services/user.service';
+export type {
+  AddedClassMemberResponse,
+  ClassDetail,
+  ClassId,
+  ClassListParams,
+  ClassListResponse,
+  ClassMember,
+  ClassPagination,
+  ClassStatus,
+  ClassSummary,
+  CreatedClassResponse,
+  CreateClassPayload,
+  TeacherSummary,
+  UpdateClassPayload,
+} from '@/api/services/class.service';
