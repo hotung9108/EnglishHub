@@ -48,6 +48,9 @@ public final class ApiRoutePolicy {
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN")),
 
+			// Reports
+			new RouteRule(HttpMethod.GET, "/api/v1/reports/**", List.of("ADMIN", "TEACHER")),
+
 			// Assignment
 			new RouteRule(
 					HttpMethod.GET,
