@@ -2,6 +2,7 @@ export * from './core';
 export * from './useAuth';
 export * from './useCurrentUser';
 export * from './useClasses';
+export * from './useAssignments';
 export { useUsers } from './useUsers';
 export type { UseUsersOptions, UseUsersResult } from './useUsers';
 export type {

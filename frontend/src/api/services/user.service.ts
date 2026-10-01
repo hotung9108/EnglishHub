@@ -1,6 +1,9 @@
 import { buildListParams } from '@/hooks/useUsers.utils';
 import { httpClient } from '../core/client';
+import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
+
+export type { MessageResponse } from '../interfaces/api-response.interface';
 
 export type UserId = number;
 export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
@@ -30,10 +33,6 @@ export interface ChangePasswordPayload {
   newPassword?: string;
 }
 
-export interface MessageResponse {
-  message: string;
-}
-
 type CreateUserBase = { fullName: string; email: string; password: string };
 
 export type CreateUserPayload =
@@ -57,11 +56,7 @@ export interface UpdateUserPayload {
 
 export type UserListParams = { page?: number; limit?: number; q?: string; role?: UserRole };
 export type UserListItem = Pick<UserProfile, 'id' | 'fullName' | 'email' | 'role' | 'status'>;
-export interface UserPagination {
-  page: number;
-  limit: number;
-  total: number;
-}
+export type UserPagination = PaginationResponse;
 export interface UserListResponse {
   data: UserListItem[];
   pagination: UserPagination;
