@@ -341,3 +341,81 @@ test('TokenRefreshManager - queues multiple concurrent 401s and resolves all onc
     axios.post = originalPost;
   }
 });
+
+// ==========================================
+// 3. ASSIGNMENT SERVICE TESTS
+// ==========================================
+test('AssignmentService - full CRUD with correct endpoints and params', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  // listAssignments -> GET /classes/{id}/assignments
+  mockHttp.mockResponse = {
+    data: [
+      { id: 1, title: 'HW1', status: 'PUBLISHED', closeAt: '2026-10-01T23:59:00Z' },
+    ],
+    pagination: { page: 1, limit: 20, total: 5 },
+  };
+  const list = await assignmentSvc.listAssignments(7, { page: 1, limit: 20, status: 'PUBLISHED' });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/7/assignments');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 1, limit: 20, status: 'PUBLISHED' });
+  assert.strictEqual(list.pagination.total, 5);
+
+  // createAssignment -> POST /classes/{id}/assignments
+  mockHttp.mockResponse = { message: 'Created', id: 42 };
+  const created = await assignmentSvc.createAssignment(7, {
+    title: 'HW2',
+    description: 'Desc',
+    openAt: '2026-09-25T08:00:00Z',
+    closeAt: '2026-10-08T23:59:00Z',
+    maxSubmissions: 3,
+  });
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes/7/assignments');
+  assert.strictEqual((mockHttp.calls[1].data as { title: string }).title, 'HW2');
+  assert.strictEqual(created.id, 42);
+
+  // getAssignment -> GET /assignments/{id}
+  await assignmentSvc.getAssignment(42);
+  assert.strictEqual(mockHttp.calls[2].method, 'GET');
+  assert.strictEqual(mockHttp.calls[2].url, '/assignments/42');
+
+  // updateAssignment -> PUT /assignments/{id}
+  await assignmentSvc.updateAssignment(42, { title: 'Updated' });
+  assert.strictEqual(mockHttp.calls[3].method, 'PUT');
+  assert.strictEqual(mockHttp.calls[3].url, '/assignments/42');
+  assert.deepStrictEqual(mockHttp.calls[3].data, { title: 'Updated' });
+
+  // deleteAssignment -> DELETE /assignments/{id}
+  await assignmentSvc.deleteAssignment(42);
+  assert.strictEqual(mockHttp.calls[4].method, 'DELETE');
+  assert.strictEqual(mockHttp.calls[4].url, '/assignments/42');
+
+  // updateAssignmentStatus -> PATCH /assignments/{id}/status
+  await assignmentSvc.updateAssignmentStatus(42, 'CLOSED');
+  assert.strictEqual(mockHttp.calls[5].method, 'PATCH');
+  assert.strictEqual(mockHttp.calls[5].url, '/assignments/42/status');
+  assert.deepStrictEqual(mockHttp.calls[5].data, { status: 'CLOSED' });
+});
+
+test('AssignmentService - trims/clamps params and omits empty status', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  mockHttp.mockResponse = { data: [], pagination: { page: 1, limit: 20, total: 0 } };
+  await assignmentSvc.listAssignments(3, { page: 0, limit: 1000, status: '  PUBLISHED  ' });
+  const params = mockHttp.calls[0].options?.params as Record<string, number | string>;
+  assert.strictEqual(params.page, 1);
+  assert.strictEqual(params.limit, 100);
+  assert.strictEqual(params.status, 'PUBLISHED');
+
+  mockHttp.calls = [];
+  await assignmentSvc.listAssignments(3, { page: 2 });
+  const params2 = mockHttp.calls[0].options?.params as Record<string, number | string>;
+  assert.strictEqual(params2.page, 2);
+  assert.strictEqual(params2.limit, 20);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(params2, 'status'), false);
+});

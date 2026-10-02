@@ -28,6 +28,7 @@ export type {
   ApiRequestOptions,
 } from './interfaces/http.interface';
 export type { ITokenStorage } from './interfaces/token.interface';
+export type { MessageResponse, PaginationResponse } from './interfaces/api-response.interface';
 
 // Domain Services
 export * from './services';
