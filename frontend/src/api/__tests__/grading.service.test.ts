@@ -9,7 +9,6 @@ import {
   type GradingListParams,
   type GradingStatus,
   type SubmissionModuleGradingResponse,
-  type ReviewGradingAnnotationRequest,
 } from '../services/grading.service';
 
 async function assertEndpointCall(
@@ -121,58 +120,6 @@ test('GradingService #52 - GET gradings with the backend query names', async () 
     method: 'GET',
     url: '/gradings',
     options: { ...options, params },
-  });
-});
-
-test('GradingService #53 - GET annotations for one answer', async () => {
-  const options = { signal: new AbortController().signal };
-  await assertEndpointCall(service => service.listAnnotations(39, options), {
-    method: 'GET',
-    url: '/answers/39/annotations',
-    options,
-  });
-});
-
-test('GradingService #54 - POST an annotation', async () => {
-  const payload = {
-    startOffset: 2,
-    endOffset: 8,
-    errorType: 'GRAMMAR',
-    comment: 'Check the tense.',
-    suggestedFix: 'Use past tense.',
-  };
-  await assertEndpointCall(service => service.createAnnotation(39, payload), {
-    method: 'POST',
-    url: '/answers/39/annotations',
-    data: payload,
-    options: undefined,
-  });
-});
-
-test('GradingService #55 - PATCH annotation review status', async () => {
-  const payload: ReviewGradingAnnotationRequest = { reviewStatus: 'ACCEPTED' };
-  await assertEndpointCall(service => service.reviewAnnotation(14, payload), {
-    method: 'PATCH',
-    url: '/annotations/14/review',
-    data: payload,
-    options: undefined,
-  });
-});
-
-test('GradingService #56 - DELETE an annotation', async () => {
-  await assertEndpointCall(service => service.deleteAnnotation(14), {
-    method: 'DELETE',
-    url: '/annotations/14',
-    options: undefined,
-  });
-});
-
-test('GradingService #57 - GET grading change logs', async () => {
-  const options = { signal: new AbortController().signal };
-  await assertEndpointCall(service => service.getChangeLogs(5, options), {
-    method: 'GET',
-    url: '/gradings/5/change-logs',
-    options,
   });
 });
 

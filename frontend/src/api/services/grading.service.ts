@@ -1,10 +1,9 @@
 import { httpClient } from '../core/client';
+import type { MessageResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 
 export type GradingMethod = 'AUTO' | 'TEACHER_MANUAL';
 export type GradingStatus = 'PENDING' | 'AI_GRADED' | 'COMPLETED' | 'FAILED';
-export type GradingAnnotationSource = 'AI' | 'TEACHER';
-export type AnnotationReviewStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 
 export interface SubmissionModuleGradingResponse {
   id: number;
@@ -29,9 +28,7 @@ export interface GradingDetailResponse {
   aiInstructionSnapshot: string | null;
 }
 
-export interface GradingMessageResponse {
-  message: string;
-}
+export type GradingMessageResponse = MessageResponse;
 
 export interface UpdateFinalGradeRequest {
   finalScore: number;
@@ -62,50 +59,6 @@ export interface GradingPagination {
 export interface GradingListResponse {
   data: GradingSummaryResponse[];
   pagination: GradingPagination;
-}
-
-export interface GradingAnnotation {
-  id: number;
-  source: GradingAnnotationSource;
-  startOffset: number;
-  endOffset: number;
-  errorType: string | null;
-  comment: string | null;
-  suggestedFix: string | null;
-  reviewStatus: AnnotationReviewStatus;
-}
-
-export interface GradingAnnotationListResponse {
-  data: GradingAnnotation[];
-}
-
-export interface CreateGradingAnnotationRequest {
-  startOffset: number;
-  endOffset: number;
-  errorType?: string | null;
-  comment?: string | null;
-  suggestedFix?: string | null;
-}
-
-export interface CreatedGradingAnnotationResponse {
-  message: string;
-  id: number;
-}
-
-export interface ReviewGradingAnnotationRequest {
-  reviewStatus: Exclude<AnnotationReviewStatus, 'PENDING'>;
-}
-
-export interface GradingChangeLog {
-  changedBy: string;
-  oldScore: number | null;
-  newScore: number | null;
-  note: string | null;
-  changedAt: string;
-}
-
-export interface GradingChangeLogListResponse {
-  data: GradingChangeLog[];
 }
 
 export interface StudentGradingResult {
@@ -157,41 +110,6 @@ export class GradingService {
     options?: ApiRequestOptions
   ): Promise<GradingListResponse> {
     return this.http.get<GradingListResponse>('/gradings', { ...options, params });
-  }
-
-  listAnnotations(
-    answerId: number,
-    options?: ApiRequestOptions
-  ): Promise<GradingAnnotationListResponse> {
-    return this.http.get<GradingAnnotationListResponse>(`/answers/${answerId}/annotations`, options);
-  }
-
-  createAnnotation(
-    answerId: number,
-    payload: CreateGradingAnnotationRequest,
-    options?: ApiRequestOptions
-  ): Promise<CreatedGradingAnnotationResponse> {
-    return this.http.post<CreatedGradingAnnotationResponse>(
-      `/answers/${answerId}/annotations`,
-      payload,
-      options
-    );
-  }
-
-  reviewAnnotation(
-    id: number,
-    payload: ReviewGradingAnnotationRequest,
-    options?: ApiRequestOptions
-  ): Promise<GradingMessageResponse> {
-    return this.http.patch<GradingMessageResponse>(`/annotations/${id}/review`, payload, options);
-  }
-
-  deleteAnnotation(id: number, options?: ApiRequestOptions): Promise<GradingMessageResponse> {
-    return this.http.delete<GradingMessageResponse>(`/annotations/${id}`, options);
-  }
-
-  getChangeLogs(id: number, options?: ApiRequestOptions): Promise<GradingChangeLogListResponse> {
-    return this.http.get<GradingChangeLogListResponse>(`/gradings/${id}/change-logs`, options);
   }
 
   async getStudentGradingResult(
