@@ -6,6 +6,8 @@ export type { UseClassesOptions, UseClassesResult } from '@/types/classes.types'
 export * from './useAssignments';
 export { useUsers } from './useUsers';
 export type { UseUsersOptions, UseUsersResult } from './useUsers';
+export { useGrading, useStudentGradingResult } from './useGrading';
+export type { UseGradingResult, UseStudentGradingResult } from './useGrading';
 export type {
   CreatableRole,
   CreateUserPayload,
