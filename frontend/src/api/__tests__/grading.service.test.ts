@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { AxiosResponse } from 'axios';
 import { ApiClientError } from '../core/errors';
-import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
+import type { ApiRequestOptions } from '../interfaces/http.interface';
+import { MockHttpClient } from './helpers/mock-http-client';
 import {
   GradingService,
   type GradingDetailResponse,
@@ -12,59 +12,14 @@ import {
   type ReviewGradingAnnotationRequest,
 } from '../services/grading.service';
 
-interface RecordedCall {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  url: string;
-  data: unknown;
-  options: ApiRequestOptions | undefined;
-}
-
-class MockHttpClient implements IHttpClient {
-  readonly calls: RecordedCall[] = [];
-  readonly error = new ApiClientError('Mock request failed.', 403);
-
-  async get<T>(url: string, options?: ApiRequestOptions): Promise<T> {
-    this.calls.push({ method: 'GET', url, data: undefined, options });
-    throw this.error;
-  }
-
-  async post<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
-    this.calls.push({ method: 'POST', url, data, options });
-    throw this.error;
-  }
-
-  async put<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
-    this.calls.push({ method: 'PUT', url, data, options });
-    throw this.error;
-  }
-
-  async patch<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
-    this.calls.push({ method: 'PATCH', url, data, options });
-    throw this.error;
-  }
-
-  async delete<T>(url: string, options?: ApiRequestOptions): Promise<T> {
-    this.calls.push({ method: 'DELETE', url, data: undefined, options });
-    throw this.error;
-  }
-
-  async request<T>(): Promise<T> {
-    throw this.error;
-  }
-
-  async getRaw<T>(): Promise<AxiosResponse<T>> {
-    throw this.error;
-  }
-}
-
 async function assertEndpointCall(
   action: (service: GradingService) => Promise<unknown>,
-  expectedCall: RecordedCall
+  expectedCall: MockHttpClient['calls'][number]
 ): Promise<void> {
   const http = new MockHttpClient();
   const service = new GradingService(http);
 
-  await assert.rejects(action(service), (error: unknown) => error === http.error);
+  await action(service);
   assert.deepStrictEqual(http.calls, [expectedCall]);
 }
 
@@ -127,7 +82,6 @@ test('GradingService #48 - GET grading by submission module', async () => {
   await assertEndpointCall(service => service.getBySubmissionModuleId(7, options), {
     method: 'GET',
     url: '/submission-modules/7/grading',
-    data: undefined,
     options,
   });
 });
@@ -156,7 +110,6 @@ test('GradingService #51 - GET grading detail', async () => {
   await assertEndpointCall(service => service.getById(5, options), {
     method: 'GET',
     url: '/gradings/5',
-    data: undefined,
     options,
   });
 });
@@ -167,7 +120,6 @@ test('GradingService #52 - GET gradings with the backend query names', async () 
   await assertEndpointCall(service => service.listGradings(params, options), {
     method: 'GET',
     url: '/gradings',
-    data: undefined,
     options: { ...options, params },
   });
 });
@@ -177,7 +129,6 @@ test('GradingService #53 - GET annotations for one answer', async () => {
   await assertEndpointCall(service => service.listAnnotations(39, options), {
     method: 'GET',
     url: '/answers/39/annotations',
-    data: undefined,
     options,
   });
 });
@@ -212,7 +163,6 @@ test('GradingService #56 - DELETE an annotation', async () => {
   await assertEndpointCall(service => service.deleteAnnotation(14), {
     method: 'DELETE',
     url: '/annotations/14',
-    data: undefined,
     options: undefined,
   });
 });
@@ -222,7 +172,6 @@ test('GradingService #57 - GET grading change logs', async () => {
   await assertEndpointCall(service => service.getChangeLogs(5, options), {
     method: 'GET',
     url: '/gradings/5/change-logs',
-    data: undefined,
     options,
   });
 });
