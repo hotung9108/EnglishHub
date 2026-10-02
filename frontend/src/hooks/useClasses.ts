@@ -2,52 +2,36 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseApiError } from '@/api/core/errors';
 import { classService } from '@/api/services/class.service';
 import type {
+  AddedClassMemberResponse,
   ClassDetail,
   ClassId,
   ClassMember,
   ClassPagination,
   ClassStatus,
   ClassSummary,
+  CreatedClassResponse,
   CreateClassPayload,
-  UpdateClassPayload,
 } from '@/api/services/class.service';
 import type { MessageResponse } from '@/api/services/user.service';
+import type {
+  AddClassMemberCallbacks,
+  AddClassMemberVariables,
+  ClassesQuery,
+  ClassListState,
+  CreateClassCallbacks,
+  DeleteClassCallbacks,
+  RemoveClassMemberCallbacks,
+  RemoveClassMemberVariables,
+  UpdateClassCallbacks,
+  UpdateClassVariables,
+  UseClassesOptions,
+  UseClassesResult,
+  UseClassQueryOptions,
+} from '@/types/classes.types';
 import { useQuery } from './core/useQuery';
 import { useMutation } from './core/useMutation';
 import type { UseMutationResult, UseQueryResult } from './core/types';
 import { clampLimit, clampPage, computePagination, pageAfterEmptyRefetch } from './useUsers.utils';
-
-export interface UseClassesOptions {
-  initialPage?: number;
-  initialLimit?: number;
-  initialStatus?: ClassStatus;
-  enabled?: boolean;
-}
-
-type ClassesQuery = { page: number; limit: number; status: ClassStatus | undefined };
-type ClassListState = {
-  classes: ClassSummary[];
-  pagination: ReturnType<typeof computePagination>;
-  isLoading: boolean;
-  isSuccess: boolean;
-  isError: boolean;
-  error: ReturnType<typeof parseApiError> | null;
-};
-
-export interface UseClassesResult {
-  classes: ClassSummary[];
-  pagination: ReturnType<typeof computePagination>;
-  filters: { status: ClassStatus | undefined };
-  isLoading: boolean;
-  isSuccess: boolean;
-  isError: boolean;
-  error: ReturnType<typeof parseApiError> | null;
-  isEmpty: boolean;
-  setStatus: (status: ClassStatus | undefined) => void;
-  setPage: (page: number) => void;
-  setLimit: (limit: number) => void;
-  refetch: () => Promise<ClassListState['classes'] | null>;
-}
 
 const queryKey = (query: ClassesQuery) => JSON.stringify([query.page, query.limit, query.status]);
 
@@ -189,7 +173,7 @@ export function useClasses(options: UseClassesOptions = {}): UseClassesResult {
 
 export function useClass(
   id: ClassId | undefined,
-  options: { enabled?: boolean } = {}
+  options: UseClassQueryOptions = {}
 ): UseQueryResult<ClassDetail, void> {
   const { enabled = true } = options;
   return useQuery<ClassDetail, void>(async () => {
@@ -202,7 +186,7 @@ export function useClass(
 
 export function useClassMembers(
   id: ClassId | undefined,
-  options: { enabled?: boolean } = {}
+  options: UseClassQueryOptions = {}
 ): UseQueryResult<ClassMember[], void> {
   const { enabled = true } = options;
   return useQuery<ClassMember[], void>(async () => {
@@ -213,10 +197,10 @@ export function useClassMembers(
   }, undefined, { enabled: enabled && id !== undefined });
 }
 
-export function useCreateClass(options?: {
-  onSuccess?: (created: { message: string; id: ClassId }) => void;
-}): UseMutationResult<{ message: string; id: ClassId }, CreateClassPayload> {
-  return useMutation<{ message: string; id: ClassId }, CreateClassPayload>(
+export function useCreateClass(
+  options?: CreateClassCallbacks
+): UseMutationResult<CreatedClassResponse, CreateClassPayload> {
+  return useMutation<CreatedClassResponse, CreateClassPayload>(
     (payload: CreateClassPayload) => classService.create(payload),
     {
       onSuccess: result => {
@@ -227,9 +211,9 @@ export function useCreateClass(options?: {
 }
 
 export function useUpdateClass(
-  options?: { onSuccess?: (result: MessageResponse) => void }
-): UseMutationResult<MessageResponse, { id: ClassId; payload: UpdateClassPayload }> {
-  return useMutation<MessageResponse, { id: ClassId; payload: UpdateClassPayload }>(
+  options?: UpdateClassCallbacks
+): UseMutationResult<MessageResponse, UpdateClassVariables> {
+  return useMutation<MessageResponse, UpdateClassVariables>(
     ({ id, payload }) => classService.update(id, payload),
     {
       onSuccess: result => {
@@ -240,7 +224,7 @@ export function useUpdateClass(
 }
 
 export function useDeleteClass(
-  options?: { onSuccess?: (result: MessageResponse) => void }
+  options?: DeleteClassCallbacks
 ): UseMutationResult<MessageResponse, ClassId> {
   return useMutation<MessageResponse, ClassId>((id: ClassId) => classService.delete(id), {
     onSuccess: result => {
@@ -249,10 +233,10 @@ export function useDeleteClass(
   });
 }
 
-export function useAddClassMember(options?: {
-  onSuccess?: (result: { message: string; memberId: number }) => void;
-}): UseMutationResult<{ message: string; memberId: number }, { classId: ClassId; studentId: number }> {
-  return useMutation<{ message: string; memberId: number }, { classId: ClassId; studentId: number }>(
+export function useAddClassMember(
+  options?: AddClassMemberCallbacks
+): UseMutationResult<AddedClassMemberResponse, AddClassMemberVariables> {
+  return useMutation<AddedClassMemberResponse, AddClassMemberVariables>(
     ({ classId, studentId }) => classService.addMember(classId, studentId),
     {
       onSuccess: result => {
@@ -262,10 +246,10 @@ export function useAddClassMember(options?: {
   );
 }
 
-export function useRemoveClassMember(options?: {
-  onSuccess?: (result: MessageResponse) => void;
-}): UseMutationResult<MessageResponse, { classId: ClassId; memberId: number }> {
-  return useMutation<MessageResponse, { classId: ClassId; memberId: number }>(
+export function useRemoveClassMember(
+  options?: RemoveClassMemberCallbacks
+): UseMutationResult<MessageResponse, RemoveClassMemberVariables> {
+  return useMutation<MessageResponse, RemoveClassMemberVariables>(
     ({ classId, memberId }) => classService.removeMember(classId, memberId),
     {
       onSuccess: result => {
