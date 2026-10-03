@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { 
   Lock, Eye, EyeOff, ArrowRight, 
   ArrowLeft, CheckCircle2, ShieldCheck, KeyRound, 
   AlertCircle, Globe, Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { authService } from '@/api';
 import type { PasswordStrength } from '../types/auth-flow.types';
 import '../styles/login.css';
 import '../styles/forgot-password.css';
@@ -14,6 +15,10 @@ export const ResetPassword: React.FC = () => {
   const { language, toggleLanguage } = useLanguage();
   const isVi = language === 'vi';
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const token = searchParams.get('token') || '';
+  const email = searchParams.get('email') || '';
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -62,7 +67,7 @@ export const ResetPassword: React.FC = () => {
 
   const strength = calculatePasswordStrength();
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -87,10 +92,20 @@ export const ResetPassword: React.FC = () => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.resetPassword({
+        email,
+        token,
+        newPassword,
+      });
       setIsSuccess(true);
-    }, 700);
+      setRedirectSeconds(5);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (isVi ? 'Không thể đặt lại mật khẩu' : 'Failed to reset password');
+      setErrorMessage(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -122,6 +137,12 @@ export const ResetPassword: React.FC = () => {
               <h2 className="login-form-title">
                 {isVi ? 'Đặt lại mật khẩu' : 'Reset Password'}
               </h2>
+              {email && (
+                <p className="login-form-desc">
+                  {isVi ? `Đang đặt lại mật khẩu cho tài khoản: ` : `Resetting password for: `}
+                  <strong style={{ color: 'var(--primary)' }}>{email}</strong>
+                </p>
+              )}
             </div>
 
               {/* Error Message */}

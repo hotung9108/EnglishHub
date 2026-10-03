@@ -8,6 +8,7 @@ import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.core.modules.user.application.page.UserPageRequest;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
+import com.english_hub.core.modules.user.domain.model.FullNameValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -77,9 +78,11 @@ public class AdminUserService {
 			throw ApiException.conflict("Email đã được sử dụng.");
 		}
 
+		String normalizedFullName = FullNameValidator.validateAndNormalize(request.fullName());
+
 		try {
 			User user = User.create(
-					request.fullName().trim(),
+					normalizedFullName,
 					email,
 					null,
 					null,
@@ -116,7 +119,8 @@ public class AdminUserService {
 			if (!hasText(request.fullName())) {
 				throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 			}
-			target.updateFullName(request.fullName().trim());
+			String normalizedFullName = FullNameValidator.validateAndNormalize(request.fullName());
+			target.updateFullName(normalizedFullName);
 			changed = true;
 		}
 		if (request.phone() != null) {

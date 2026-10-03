@@ -4,6 +4,7 @@ import {
   ArrowLeft, ArrowRight, Check, Award
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { validateFullName } from '../utils/nameValidation';
 
 export const AddTeacher: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export const AddTeacher: React.FC = () => {
     experience: '5 năm kinh nghiệm luyện thi IELTS Academic',
     assignedClass: 'ENG-IELTS-6.5A'
   });
+  const [nameError, setNameError] = useState('');
 
   const steps = [
     { num: 1 as const, title: isVi ? 'Thông tin cá nhân' : 'Personal Info' },
@@ -29,7 +31,14 @@ export const AddTeacher: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(isVi ? `Đã thêm hồ sơ giảng viên ${formData.name} (${formData.code}) thành công!` : `Teacher profile created for ${formData.name}!`);
+    const valResult = validateFullName(formData.name, isVi);
+    if (!valResult.isValid) {
+      setNameError(valResult.errorMessage || '');
+      setCurrentStep(1);
+      return;
+    }
+    setNameError('');
+    alert(isVi ? `Đã thêm hồ sơ giảng viên ${valResult.normalized} (${formData.code}) thành công!` : `Teacher profile created for ${valResult.normalized}!`);
     navigate('/admin/teachers');
   };
 
@@ -83,9 +92,30 @@ export const AddTeacher: React.FC = () => {
                     type="text"
                     className="input"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      if (nameError) setNameError('');
+                    }}
+                    onBlur={() => {
+                      const res = validateFullName(formData.name, isVi);
+                      if (!res.isValid) {
+                        setNameError(res.errorMessage || '');
+                      } else {
+                        setNameError('');
+                      }
+                    }}
+                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
+                  {nameError ? (
+                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      {nameError}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                      {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="adm-form-grid">
@@ -126,7 +156,16 @@ export const AddTeacher: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-primary"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => {
+                      const res = validateFullName(formData.name, isVi);
+                      if (!res.isValid) {
+                        setNameError(res.errorMessage || '');
+                        return;
+                      }
+                      setNameError('');
+                      setFormData(prev => ({ ...prev, name: res.normalized }));
+                      setCurrentStep(2);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addTeacher.btnNextStep3')}</span>

@@ -15,6 +15,8 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/login", List.of()),
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/refresh", List.of()),
 			new RouteRule(HttpMethod.POST, "/api/v1/auth/logout", List.of()),
+			new RouteRule(HttpMethod.POST, "/api/v1/auth/forgot-password", List.of()),
+			new RouteRule(HttpMethod.POST, "/api/v1/auth/reset-password", List.of()),
 
 			// User administration
 			new RouteRule(HttpMethod.GET, "/api/v1/admin/users", List.of("ADMIN")),
@@ -45,6 +47,9 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN")),
+
+			// Reports
+			new RouteRule(HttpMethod.GET, "/api/v1/reports/**", List.of("ADMIN", "TEACHER")),
 
 			// Assignment
 			new RouteRule(

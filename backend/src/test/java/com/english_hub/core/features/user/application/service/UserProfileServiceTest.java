@@ -87,6 +87,35 @@ class UserProfileServiceTest {
 	}
 
 	@Test
+	void updatesProfileWithValidNormalizedFullName() {
+		User currentUser = user(12L);
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		userProfileService.updateMyProfile(new UpdateOwnProfileCommand("  Trần   Thị Mai Lan  ", null, null));
+
+		ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+		verify(userRepository).save(captor.capture());
+		assertThat(captor.getValue().fullName()).isEqualTo("Trần Thị Mai Lan");
+	}
+
+	@Test
+	void rejectsProfileUpdateWithInvalidFullName() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(12L));
+
+		assertThatThrownBy(() -> userProfileService.updateMyProfile(
+				new UpdateOwnProfileCommand("Nguyen Van 123", null, null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Họ và tên không được chứa chữ số.");
+
+		assertThatThrownBy(() -> userProfileService.updateMyProfile(
+				new UpdateOwnProfileCommand("Nguyen <script>", null, null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Họ và tên không được chứa ký tự đặc biệt.");
+
+		verify(userRepository, never()).save(any(User.class));
+	}
+
+	@Test
 	void changesPasswordAfterVerifyingTheCurrentPassword() {
 		User currentUser = userWithPassword("Current05Password");
 		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);

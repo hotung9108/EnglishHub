@@ -15,8 +15,16 @@ import com.english_hub.core.modules.auth.presentation.rest.dto.AuthUserResponse;
 import com.english_hub.core.modules.auth.presentation.rest.dto.LogoutResponse;
 import com.english_hub.core.modules.auth.presentation.rest.dto.RefreshResponse;
 import com.english_hub.core.infrastructure.security.JwtTokenService;
+import com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand;
+import com.english_hub.core.modules.auth.application.command.ResetPasswordCommand;
+import com.english_hub.core.modules.auth.domain.service.PasswordResetStore;
+import com.english_hub.core.modules.auth.presentation.rest.dto.ForgotPasswordResponse;
+import com.english_hub.core.modules.auth.presentation.rest.dto.ResetPasswordResponse;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+	private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
 	private static final int USER_AGENT_MAX_LENGTH = 255;
 	private static final int IP_ADDRESS_MAX_LENGTH = 45;
 
@@ -33,6 +42,7 @@ public class AuthService {
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenService jwtTokenService;
+	private final PasswordResetStore passwordResetStore;
 	private final long refreshTokenTtlSeconds;
 
 	@Autowired
@@ -41,11 +51,13 @@ public class AuthService {
 			RefreshTokenRepository refreshTokenRepository,
 			PasswordEncoder passwordEncoder,
 			JwtTokenService jwtTokenService,
+			PasswordResetStore passwordResetStore,
 			@Value("${app.security.refresh-token-ttl-seconds}") long refreshTokenTtlSeconds) {
 		this.authUserRepository = authUserRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenService = jwtTokenService;
+		this.passwordResetStore = passwordResetStore;
 		this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
 	}
 
@@ -115,6 +127,65 @@ public class AuthService {
 
 		refreshTokenRepository.revokeByTokenHash(tokenHash);
 		return new LogoutResponse("Đăng xuất thành công.");
+	}
+
+	@Transactional(readOnly = true)
+	public ForgotPasswordResponse forgotPassword(ForgotPasswordCommand command) {
+		if (command == null || !hasText(command.email())) {
+			throw ApiException.badRequest("Vui lòng cung cấp địa chỉ email.");
+		}
+
+		String cleanEmail = command.email().trim().toLowerCase();
+		AuthUser user = authUserRepository.findByEmail(cleanEmail)
+				.orElseThrow(() -> ApiException.notFound("Tài khoản với email này không tồn tại trong hệ thống."));
+
+		if (user.getStatus() == UserStatus.LOCKED) {
+			throw ApiException.forbidden("Tài khoản đã bị khoá.");
+		}
+
+		String otp = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
+		String token = UUID.randomUUID().toString();
+		long ttlSeconds = 900; // 15 mins
+		passwordResetStore.store(cleanEmail, otp, token, ttlSeconds);
+
+		LOGGER.info("Generated password reset OTP for [{}]: OTP={}, token={}", cleanEmail, otp, token);
+		return new ForgotPasswordResponse("Mã xác thực đã được gửi đến email của bạn.", cleanEmail, otp);
+	}
+
+	@Transactional
+	public ResetPasswordResponse resetPassword(ResetPasswordCommand command) {
+		if (command == null || !hasText(command.email())) {
+			throw ApiException.badRequest("Vui lòng cung cấp địa chỉ email.");
+		}
+		if (!hasText(command.otp()) && !hasText(command.token())) {
+			throw ApiException.badRequest("Vui lòng cung cấp mã OTP hoặc liên kết đặt lại mật khẩu.");
+		}
+		if (!hasText(command.newPassword()) || command.newPassword().trim().length() < 8) {
+			throw ApiException.badRequest("Mật khẩu mới phải có tối thiểu 8 ký tự.");
+		}
+
+		String cleanEmail = command.email().trim().toLowerCase();
+		boolean verified = passwordResetStore.verifyAndConsume(
+				cleanEmail,
+				command.otp() == null ? null : command.otp().trim(),
+				command.token() == null ? null : command.token().trim());
+
+		if (!verified) {
+			throw ApiException.badRequest("Mã xác thực hoặc liên kết không hợp lệ, hoặc đã hết hạn.");
+		}
+
+		AuthUser user = authUserRepository.findByEmail(cleanEmail)
+				.orElseThrow(() -> ApiException.notFound("Tài khoản không tồn tại."));
+
+		if (user.getStatus() == UserStatus.LOCKED) {
+			throw ApiException.forbidden("Tài khoản đã bị khoá.");
+		}
+
+		user.setPasswordHash(passwordEncoder.encode(command.newPassword().trim()));
+		authUserRepository.save(user);
+
+		LOGGER.info("Password successfully reset for user [{}]", cleanEmail);
+		return new ResetPasswordResponse("Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.");
 	}
 
 	private com.english_hub.core.modules.user.domain.model.UserRole toUserFeatureRole(

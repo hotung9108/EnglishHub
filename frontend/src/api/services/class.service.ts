@@ -1,59 +1,126 @@
-import { BaseApiService } from '../core/base-api.service';
+import { buildListParams } from '@/hooks/useUsers.utils';
 import { httpClient } from '../core/client';
-import type { IHttpClient } from '../interfaces/http.interface';
+import type { MessageResponse } from './user.service';
+import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 
-export interface ClassDto {
+export type ClassId = number;
+export type ClassStatus = 'ACTIVE' | 'INACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface TeacherSummary {
   id: number;
-  name: string;
-  code: string;
-  description?: string;
-  teacherId?: number;
-  status: 'ACTIVE' | 'ARCHIVED';
-  studentCount?: number;
-  createdAt?: string;
+  fullName: string;
 }
+
+export interface ClassSummary {
+  id: ClassId;
+  name: string;
+  status: ClassStatus;
+  teacherId?: number;
+}
+
+export interface ClassDetail extends ClassSummary {
+  level?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  teacher?: TeacherSummary;
+  memberCount?: number;
+}
+
+export interface ClassPagination {
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export interface ClassListResponse {
+  data: ClassSummary[];
+  pagination: ClassPagination;
+}
+
+export type ClassListParams = { status?: ClassStatus; page?: number; limit?: number };
 
 export interface CreateClassPayload {
   name: string;
-  code: string;
+  level?: string;
   description?: string;
+  startDate?: string;
+  endDate?: string;
+  teacherId?: number;
 }
 
 export interface UpdateClassPayload {
   name?: string;
-  code?: string;
+  level?: string;
   description?: string;
-  status?: 'ACTIVE' | 'ARCHIVED';
+  endDate?: string;
+  status?: ClassStatus;
+  teacherId?: number;
+}
+
+export interface CreatedClassResponse extends MessageResponse {
+  id: ClassId;
 }
 
 export interface ClassMember {
-  id: number;
+  memberId: number;
   studentId: number;
-  studentName: string;
-  studentEmail: string;
-  joinedAt: string;
+  fullName: string;
+  studentCode?: string;
 }
 
-export class ClassService extends BaseApiService<
-  ClassDto,
-  CreateClassPayload,
-  UpdateClassPayload,
-  number
-> {
+export interface ClassMemberListResponse {
+  data: ClassMember[];
+}
+
+export interface AddedClassMemberResponse extends MessageResponse {
+  memberId: number;
+}
+
+const CLASSES_ENDPOINT = '/classes';
+
+export class ClassService {
+  private readonly http: IHttpClient;
+
   constructor(http: IHttpClient = httpClient) {
-    super('/classes', http);
+    this.http = http;
   }
 
-  async getMembers(classId: number): Promise<ClassMember[]> {
-    return this.get<ClassMember[]>(`${classId}/members`);
+  async list(params: ClassListParams = {}, options?: ApiRequestOptions): Promise<ClassListResponse> {
+    const response = await this.http.get<ClassListResponse>(CLASSES_ENDPOINT, {
+      ...options,
+      params: buildListParams({ page: params.page, limit: params.limit }, params.status ? { status: params.status } : {}),
+    });
+    return { data: response.data, pagination: { ...response.pagination } };
   }
 
-  async addMember(classId: number, studentId: number): Promise<void> {
-    return this.post<void>(`${classId}/members`, { studentId });
+  async getDetail(id: ClassId, options?: ApiRequestOptions): Promise<ClassDetail> {
+    return this.http.get<ClassDetail>(`${CLASSES_ENDPOINT}/${id}`, options);
   }
 
-  async removeMember(classId: number, memberId: number): Promise<void> {
-    return this.deleteRequest<void>(`${classId}/members/${memberId}`);
+  async create(payload: CreateClassPayload): Promise<CreatedClassResponse> {
+    return this.http.post<CreatedClassResponse>(CLASSES_ENDPOINT, payload);
+  }
+
+  async update(id: ClassId, payload: UpdateClassPayload): Promise<MessageResponse> {
+    return this.http.put<MessageResponse>(`${CLASSES_ENDPOINT}/${id}`, payload);
+  }
+
+  async delete(id: ClassId): Promise<MessageResponse> {
+    return this.http.delete<MessageResponse>(`${CLASSES_ENDPOINT}/${id}`);
+  }
+
+  async listMembers(id: ClassId, options?: ApiRequestOptions): Promise<ClassMember[]> {
+    const response = await this.http.get<ClassMemberListResponse>(`${CLASSES_ENDPOINT}/${id}/members`, options);
+    return response.data ?? [];
+  }
+
+  async addMember(id: ClassId, studentId: number): Promise<AddedClassMemberResponse> {
+    return this.http.post<AddedClassMemberResponse>(`${CLASSES_ENDPOINT}/${id}/members`, { studentId });
+  }
+
+  async removeMember(id: ClassId, memberId: number): Promise<MessageResponse> {
+    return this.http.delete<MessageResponse>(`${CLASSES_ENDPOINT}/${id}/members/${memberId}`);
   }
 }
 

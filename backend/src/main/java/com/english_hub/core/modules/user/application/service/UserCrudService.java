@@ -5,6 +5,7 @@ import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.user.application.dto.UserDto;
 import com.english_hub.core.modules.user.application.mapper.UserMapper;
+import com.english_hub.core.modules.user.domain.model.FullNameValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
 
@@ -77,7 +78,8 @@ public class UserCrudService implements UserService {
 			if (request.getFullName().isBlank()) {
 				throw ApiException.badRequest("Không có dữ liệu để cập nhật.");
 			}
-			target.updateFullName(request.getFullName().trim());
+			String normalizedFullName = FullNameValidator.validateAndNormalize(request.getFullName());
+			target.updateFullName(normalizedFullName);
 			changed = true;
 		}
 		if (request.getPhone() != null) {
@@ -117,6 +119,7 @@ public class UserCrudService implements UserService {
 				|| !EMAIL_PATTERN.matcher(request.getEmail().trim()).matches()) {
 			throw ApiException.badRequest("Vui lòng nhập đầy đủ và đúng định dạng thông tin.");
 		}
+		FullNameValidator.validateAndNormalize(request.getFullName());
 	}
 
 	private boolean hasText(String value) {
