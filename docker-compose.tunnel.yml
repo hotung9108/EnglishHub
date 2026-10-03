@@ -1,0 +1,16 @@
+services:
+
+  # Cloudflare Tunnel Container (Tùy chọn: dùng profile cloudflare nếu muốn chạy qua docker)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: englishhub-tunnel
+    restart: always
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    networks:
+      - englishhub_shared
+
+networks:
+  englishhub_shared:
+    external: true
