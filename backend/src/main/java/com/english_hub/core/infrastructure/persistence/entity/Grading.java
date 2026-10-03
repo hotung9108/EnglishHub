@@ -122,4 +122,25 @@ public class Grading {
 		this.reviewedAt = reviewedAt;
 		this.gradedAt = reviewedAt;
 	}
+
+	/**
+	 * Records a deterministic answer-comparison verdict. {@code reviewedBy} and {@code reviewedAt}
+	 * stay null because no teacher reviewed it; a later teacher override goes through
+	 * {@link #updateTeacherGrade} and is audited in {@code grading_change_logs}.
+	 */
+	public void applyAutoGrade(
+			BigDecimal finalScore,
+			BigDecimal maxScoreSnapshot,
+			OffsetDateTime gradedAt) {
+		this.method = GradingMethod.AUTO;
+		this.status = GradingStatus.COMPLETED;
+		this.finalScore = finalScore;
+		this.maxScoreSnapshot = maxScoreSnapshot;
+		this.gradedAt = gradedAt;
+	}
+
+	/** Marks the attempt so the teacher can see it failed instead of silently staying pending. */
+	public void markFailed() {
+		this.status = GradingStatus.FAILED;
+	}
 }

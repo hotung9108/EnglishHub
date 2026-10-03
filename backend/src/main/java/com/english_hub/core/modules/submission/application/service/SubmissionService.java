@@ -2,6 +2,7 @@ package com.english_hub.core.modules.submission.application.service;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
+import com.english_hub.core.modules.module.domain.service.AutoGradeEligibility;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
@@ -23,6 +24,7 @@ import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
 import com.english_hub.core.modules.submission.domain.model.UploadStatus;
+import com.english_hub.core.modules.submission.domain.event.SubmissionModuleSubmittedEvent;
 import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentWindowRepository;
@@ -48,6 +50,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -90,6 +93,7 @@ public class SubmissionService {
 	private final CurrentUserProvider currentUserProvider;
 	private final ObjectMapper objectMapper;
 	private final StorageService storageService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public SubmissionService(
 			SubmissionRepository submissionRepository,
@@ -103,7 +107,8 @@ public class SubmissionService {
 			ModuleQuestionRepository moduleQuestionRepository,
 			CurrentUserProvider currentUserProvider,
 			ObjectMapper objectMapper,
-			StorageService storageService) {
+			StorageService storageService,
+			ApplicationEventPublisher eventPublisher) {
 		this.submissionRepository = submissionRepository;
 		this.submissionModuleRepository = submissionModuleRepository;
 		this.gradingRepository = gradingRepository;
@@ -116,6 +121,7 @@ public class SubmissionService {
 		this.currentUserProvider = currentUserProvider;
 		this.objectMapper = objectMapper;
 		this.storageService = storageService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -257,6 +263,11 @@ public class SubmissionService {
 						.toList());
 		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
 		submissionModuleRepository.save(submissionModule);
+		/*
+		 * Handed to auto-grading only after this transaction commits, because scoring reads the
+		 * answer rows written above. The listener decides eligibility from the module itself.
+		 */
+		eventPublisher.publishEvent(new SubmissionModuleSubmittedEvent(submissionModuleId));
 
 		List<AnswerResult> answerResults = IntStream.range(0, validatedPayloads.size())
 				.mapToObj(index -> new AnswerResult(
@@ -447,9 +458,9 @@ public class SubmissionService {
 		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
 		}
-		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
-		if (moduleInfo == null
-				|| (moduleInfo.taskType() != ModuleTaskType.ESSAY && moduleInfo.taskType() != ModuleTaskType.REWRITE)) {
+		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(context.submissionModule().getModuleId());
+		/* REWRITE answers questions like QUIZ does, so a document upload is essay-only. */
+		if (moduleInfo == null || moduleInfo.taskType() != ModuleTaskType.ESSAY) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
 		}
 		String extension = documentExtensionOf(mimeType);
@@ -716,10 +727,15 @@ public class SubmissionService {
 		return !now.isBefore(window.openAt()) && !now.isAfter(window.closeAt());
 	}
 
+	/**
+	 * Resolves the grading method from the module's skill and task type using the same predicate
+	 * auto-grading applies, so a module is never labelled {@code AUTO} but left ungraded.
+	 */
 	private GradingMethod gradingMethodOf(ModuleInfo moduleInfo) {
-		return moduleInfo.taskType() == ModuleTaskType.QUIZ
-				? GradingMethod.AUTO
-				: GradingMethod.TEACHER_MANUAL;
+		boolean autoGraded = AutoGradeEligibility.isEligible(
+				com.english_hub.core.modules.module.domain.model.ModuleSkill.valueOf(moduleInfo.skill().name()),
+				com.english_hub.core.modules.module.domain.model.ModuleTaskType.valueOf(moduleInfo.taskType().name()));
+		return autoGraded ? GradingMethod.AUTO : GradingMethod.TEACHER_MANUAL;
 	}
 
 	private SubmissionStatus parseStatusFilter(String statusValue) {

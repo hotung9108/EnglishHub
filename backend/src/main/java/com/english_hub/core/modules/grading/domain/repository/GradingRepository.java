@@ -14,4 +14,12 @@ public interface GradingRepository {
 	GradingPage findPage(GradingFilter filter, int page, int limit);
 
 	Grading saveTeacherGrade(Grading grading);
+
+	Grading saveAutoGrade(Grading grading);
+
+	/**
+	 * Locks and returns the grading of a submission module, so a concurrent second auto-grading task
+	 * blocks here and then observes the first one's terminal status.
+	 */
+	Optional<Grading> findBySubmissionModuleIdForUpdate(Long submissionModuleId);
 }

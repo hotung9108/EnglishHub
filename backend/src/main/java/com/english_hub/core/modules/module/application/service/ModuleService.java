@@ -305,8 +305,13 @@ public class ModuleService {
 		}
 	}
 
+	/**
+	 * Whitelist of supported skill and task-type pairs. Reading also supports REWRITE, which is
+	 * answered through the same question payloads as QUIZ and is therefore auto-graded the same way.
+	 */
 	private boolean isSupportedPair(ModuleSkill skill, ModuleTaskType taskType) {
 		return (skill == ModuleSkill.READING && taskType == ModuleTaskType.QUIZ)
+				|| (skill == ModuleSkill.READING && taskType == ModuleTaskType.REWRITE)
 				|| (skill == ModuleSkill.LISTENING && taskType == ModuleTaskType.QUIZ)
 				|| (skill == ModuleSkill.WRITING && taskType == ModuleTaskType.ESSAY)
 				|| (skill == ModuleSkill.SPEAKING && taskType == ModuleTaskType.RECORDING);
