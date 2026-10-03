@@ -2,6 +2,10 @@ package com.english_hub.core.infrastructure.persistence.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.math.BigDecimal;
+
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -109,5 +113,24 @@ public class Answer {
 		return questionId == null && content.isTextual()
 				? content.textValue()
 				: JsonbValueCodec.serialize(content);
+	}
+
+	/**
+	 * Merges the auto-grading verdict into the answer content so the per-question outcome travels
+	 * with the answer itself, matching the {@code isCorrect}/{@code score} shape the submission
+	 * chapter of the API design already documents.
+	 *
+	 * <p>Only valid for question-bound answers: essay and recording answers store {@code content} as
+	 * a bare JSON string and have nothing to merge into.
+	 */
+	public void applyGradingOutcome(boolean isCorrect, BigDecimal score) {
+		if (questionId == null) {
+			throw new IllegalArgumentException("A grading outcome requires an answer bound to a question.");
+		}
+		if (!(content instanceof ObjectNode object)) {
+			throw new IllegalArgumentException("A grading outcome requires an object answer content.");
+		}
+		object.put("isCorrect", isCorrect);
+		object.put("score", score);
 	}
 }
