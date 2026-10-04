@@ -62,7 +62,8 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 								submission.getStudentId(),
 								module == null ? null : module.skill(),
 								submitted,
-								null);
+								null,
+								module == null ? null : module.instructions());
 					}))));
 	}
 
@@ -88,6 +89,7 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 							context.studentId(),
 							context.moduleSkill(),
 							context.submitted(),
-							answer.getContent() == null ? null : answer.getContent().length())));
+							answer.getContent() == null ? null : answer.getContent().length(),
+							context.moduleInstructions())));
 	}
 }

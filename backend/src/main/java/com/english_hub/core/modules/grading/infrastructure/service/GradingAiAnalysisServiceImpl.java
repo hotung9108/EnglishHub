@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -38,6 +39,27 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 	private final AnswerAnnotationRepository answerAnnotationRepository;
 	private final StorageService storageService;
 	private final AiServiceClient aiServiceClient;
+	private final String configuredModel;
+	private final String configuredProvider;
+
+	public GradingAiAnalysisServiceImpl(
+			GradingRepository gradingRepository,
+			GradingContextRepository gradingContextRepository,
+			SpringDataAnswerRepository answerRepository,
+			AnswerAnnotationRepository answerAnnotationRepository,
+			StorageService storageService,
+			AiServiceClient aiServiceClient,
+			@Value("${app.ai-service.model:}") String configuredModel,
+			@Value("${app.ai-service.provider:}") String configuredProvider) {
+		this.gradingRepository = gradingRepository;
+		this.gradingContextRepository = gradingContextRepository;
+		this.answerRepository = answerRepository;
+		this.answerAnnotationRepository = answerAnnotationRepository;
+		this.storageService = storageService;
+		this.aiServiceClient = aiServiceClient;
+		this.configuredModel = configuredModel;
+		this.configuredProvider = configuredProvider;
+	}
 
 	public GradingAiAnalysisServiceImpl(
 			GradingRepository gradingRepository,
@@ -46,12 +68,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			AnswerAnnotationRepository answerAnnotationRepository,
 			StorageService storageService,
 			AiServiceClient aiServiceClient) {
-		this.gradingRepository = gradingRepository;
-		this.gradingContextRepository = gradingContextRepository;
-		this.answerRepository = answerRepository;
-		this.answerAnnotationRepository = answerAnnotationRepository;
-		this.storageService = storageService;
-		this.aiServiceClient = aiServiceClient;
+		this(gradingRepository, gradingContextRepository, answerRepository, answerAnnotationRepository, storageService, aiServiceClient, null, null);
 	}
 
 	@Override
@@ -73,7 +90,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			GradingContext context = contextOpt.get();
 
 			if (context.moduleSkill() == ModuleSkill.SPEAKING) {
-				handleSpeakingAnalysis(grading, submissionModuleId);
+				handleSpeakingAnalysis(grading, submissionModuleId, context.moduleInstructions());
 			} else {
 				LOGGER.info("Skill {} AI analysis not supported yet; keeping status as PENDING.", context.moduleSkill());
 			}
@@ -84,7 +101,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 		}
 	}
 
-	private void handleSpeakingAnalysis(Grading grading, long submissionModuleId) {
+	private void handleSpeakingAnalysis(Grading grading, long submissionModuleId, String moduleInstructions) {
 		List<Answer> answers = answerRepository.findBySubmissionModuleId(submissionModuleId);
 		if (answers.isEmpty()) {
 			throw new IllegalStateException("No answer found for submission module " + submissionModuleId);
@@ -115,20 +132,28 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 		}
 
 		double maxScore = grading.maxScoreSnapshot() != null ? grading.maxScoreSnapshot().doubleValue() : 9.0;
+		String targetModel = (configuredModel != null && !configuredModel.isBlank()) ? configuredModel.trim() : null;
+		String targetProvider = (configuredProvider != null && !configuredProvider.isBlank()) ? configuredProvider.trim() : null;
+
 		AiSpeakingAnalysisRequest request = new AiSpeakingAnalysisRequest(
 				submissionModuleId,
 				presignedGetUrl,
 				audioBase64,
 				storageKey,
-				null,
+				moduleInstructions,
 				grading.aiInstructionSnapshot(),
-				maxScore
+				maxScore,
+				targetModel,
+				targetProvider
 		);
 
 		AiSpeakingAnalysisResponse response = aiServiceClient.analyzeSpeaking(request);
 		if (response == null) {
 			throw new IllegalStateException("Received null response from AI Service");
 		}
+
+		LOGGER.info("AI Speaking Analysis completed for submissionModuleId {} (score: {}, modelUsed: {}, providerUsed: {})",
+				submissionModuleId, response.overallScore(), response.modelUsed(), response.providerUsed());
 
 		BigDecimal finalScore = BigDecimal.valueOf(response.overallScore());
 		String aiFeedback = response.aiFeedback();

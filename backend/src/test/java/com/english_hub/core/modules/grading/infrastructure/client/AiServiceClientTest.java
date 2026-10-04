@@ -87,4 +87,62 @@ class AiServiceClientTest {
 		assertThat(response.annotations()).hasSize(1);
 		assertThat(response.annotations().getFirst().comment()).isEqualTo("Good intonation");
 	}
+
+	@Test
+	void serializeRequest_withCustomModelAndProvider_producesValidCamelCaseJson() throws Exception {
+		AiSpeakingAnalysisRequest request = new AiSpeakingAnalysisRequest(
+				102L,
+				"https://example.com/audio2.wav",
+				null,
+				"submissions/102/audio.wav",
+				"Talk about travel",
+				"Band 8 rubric",
+				9.0,
+				"google/gemini-2.5-flash",
+				"openrouter"
+		);
+
+		String json = objectMapper.writeValueAsString(request);
+		JsonNode tree = objectMapper.readTree(json);
+
+		assertThat(tree.get("submissionModuleId").asLong()).isEqualTo(102L);
+		assertThat(tree.get("model").asText()).isEqualTo("google/gemini-2.5-flash");
+		assertThat(tree.get("aiProvider").asText()).isEqualTo("openrouter");
+	}
+
+	@Test
+	void deserializeResponse_withModelUsedAndProviderUsed_populatesFields() throws Exception {
+		String jsonResponse = """
+				{
+				  "submissionModuleId": 102,
+				  "overallScore": 8.0,
+				  "aiFeedback": "Excellent speech.",
+				  "aiTranscript": [],
+				  "fluencyMetrics": {
+				    "wordsPerMinute": 140.0,
+				    "pauseCount": 2,
+				    "totalDurationSeconds": 30.0,
+				    "phonationTimeRatio": 0.85
+				  },
+				  "criteriaScores": {
+				    "fluencyAndCoherence": 8.0,
+				    "lexicalResource": 8.0,
+				    "grammaticalRangeAndAccuracy": 8.0,
+				    "pronunciation": 8.0,
+				    "overallScore": 8.0
+				  },
+				  "annotations": [],
+				  "modelUsed": "anthropic/claude-3.5-sonnet",
+				  "providerUsed": "openrouter"
+				}
+				""";
+
+		AiSpeakingAnalysisResponse response = objectMapper.readValue(jsonResponse, AiSpeakingAnalysisResponse.class);
+
+		assertThat(response.submissionModuleId()).isEqualTo(102L);
+		assertThat(response.overallScore()).isEqualTo(8.0);
+		assertThat(response.modelUsed()).isEqualTo("anthropic/claude-3.5-sonnet");
+		assertThat(response.providerUsed()).isEqualTo("openrouter");
+	}
 }
+

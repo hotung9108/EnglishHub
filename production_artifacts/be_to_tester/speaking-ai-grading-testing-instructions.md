@@ -165,3 +165,43 @@ Execute in `backend/`:
      }
      ```
      Grading status becomes `COMPLETED` and `method = TEACHER_MANUAL`.
+
+---
+
+### TC-AI-05: Dynamic Model & Provider Selection via API Request (Option 1)
+- **Overview**: Callers (Core Backend or API testers) can dynamically select the AI model and provider per request without restarting any service or modifying `.env`.
+- **JSON Request with Custom Model & Provider**:
+  - **Method**: `POST`
+  - **URL**: `http://localhost:8001/api/v1/analyze/speaking`
+  - **Body**:
+    ```json
+    {
+      "submissionModuleId": 15,
+      "audioBase64": "ID3...",
+      "moduleInstructions": "Describe your favorite hobby.",
+      "maxScore": 9.0,
+      "model": "anthropic/claude-3.5-sonnet",
+      "aiProvider": "openrouter"
+    }
+    ```
+  - **Expected Status**: `200 OK`
+  - **Expected Fields**:
+    - `"modelUsed": "anthropic/claude-3.5-sonnet"`
+    - `"providerUsed": "openrouter"` (or `"openrouter-mock"` in Mock mode)
+
+- **Multipart Upload with Custom Model**:
+  - **Method**: `POST`
+  - **URL**: `http://localhost:8001/api/v1/analyze/speaking/upload`
+  - **Form Data**:
+    - `file`: `audio.mp3`
+    - `submissionModuleId`: `16`
+    - `model`: `google/gemini-1.5-pro`
+    - `aiProvider`: `gemini`
+  - **Expected Status**: `200 OK`
+  - **Expected Fields**:
+    - `"modelUsed": "google/gemini-1.5-pro"`
+    - `"providerUsed": "gemini"` (or `"gemini-mock"` in Mock mode)
+
+- **Backend Configuration**:
+  - `application.properties`: `app.ai-service.model` (`${AI_SERVICE_MODEL:}`) & `app.ai-service.provider` (`${AI_SERVICE_PROVIDER:}`).
+  - Automatically propagated via `AiSpeakingAnalysisRequest` record to AI Service.

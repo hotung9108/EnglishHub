@@ -13,5 +13,31 @@ public record GradingContext(
 		Long studentId,
 		ModuleSkill moduleSkill,
 		boolean submitted,
-		Integer answerContentLength) {
+		Integer answerContentLength,
+		String moduleInstructions) {
+
+	public GradingContext(
+			Long submissionModuleId,
+			Long answerId,
+			Long submissionId,
+			Long assignmentId,
+			Long classId,
+			Long teacherId,
+			Long studentId,
+			ModuleSkill moduleSkill,
+			boolean submitted,
+			Integer answerContentLength) {
+		this(
+				submissionModuleId,
+				answerId,
+				submissionId,
+				assignmentId,
+				classId,
+				teacherId,
+				studentId,
+				moduleSkill,
+				submitted,
+				answerContentLength,
+				null);
+	}
 }

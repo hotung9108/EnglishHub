@@ -62,22 +62,36 @@ You MUST respond strictly with a valid JSON object matching the following schema
         mime_type: str = "audio/mp3",
         module_instructions: Optional[str] = None,
         ai_instruction_snapshot: Optional[str] = None,
-        max_score: float = 9.0
+        max_score: float = 9.0,
+        custom_model: Optional[str] = None,
+        custom_provider: Optional[str] = None
     ) -> AnalyzeSpeakingResponse:
         """
         Analyzes speaking audio using OpenRouter or Gemini Multimodal.
+        Supports dynamic model and provider override per request.
         If in MOCK_MODE or no API key is provided, returns deterministic QA-21 benchmark response.
         """
-        provider = settings.AI_PROVIDER.lower()
+        provider = (custom_provider or settings.AI_PROVIDER).strip().lower()
         has_openrouter = bool(settings.OPENROUTER_API_KEY.strip())
         has_gemini = bool(settings.GEMINI_API_KEY.strip())
 
         use_openrouter = (provider == "openrouter" and has_openrouter) or (provider == "auto" and has_openrouter)
         use_gemini = (provider == "gemini" and has_gemini) or (provider == "auto" and not use_openrouter and has_gemini)
 
+        # Target model names: custom_model takes precedence over settings
+        target_openrouter_model = custom_model or settings.OPENROUTER_MODEL
+        target_gemini_model = custom_model or settings.GEMINI_MODEL
+
         if settings.MOCK_MODE or (not use_openrouter and not use_gemini):
-            logger.info("Running in QA-21 Benchmark / Mock Mode for submissionModuleId: %s", submission_module_id)
-            return cls._generate_qa21_benchmark_response(submission_module_id, max_score)
+            logger.info("Running in QA-21 Benchmark / Mock Mode for submissionModuleId: %s (model: %s, provider: %s)",
+                        submission_module_id, custom_model or "default", provider)
+            resolved_mock_model = custom_model or (target_openrouter_model if provider == "openrouter" else target_gemini_model)
+            return cls._generate_qa21_benchmark_response(
+                submission_module_id,
+                max_score,
+                model_used=resolved_mock_model,
+                provider_used=f"{provider}-mock" if settings.MOCK_MODE else "mock"
+            )
 
         user_prompt = f"""Evaluate this IELTS Speaking recording.
 Topic / Instructions: {module_instructions or 'Describe a book you enjoyed reading recently.'}
@@ -89,15 +103,15 @@ Max Score: {max_score}
         if use_openrouter:
             try:
                 return await cls._call_openrouter(
-                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score
+                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_openrouter_model
                 )
             except Exception as exc:
-                logger.warn("OpenRouter call failed: %s. Attempting fallback if available.", str(exc))
+                logger.warning("OpenRouter call failed: %s. Attempting fallback if available.", str(exc))
                 if has_gemini:
                     try:
                         logger.info("Falling back to Gemini Direct API...")
                         return await cls._call_gemini_direct(
-                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score
+                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_gemini_model
                         )
                     except Exception as gemini_exc:
                         logger.error("Gemini Direct fallback also failed: %s", str(gemini_exc))
@@ -110,15 +124,15 @@ Max Score: {max_score}
         if use_gemini:
             try:
                 return await cls._call_gemini_direct(
-                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score
+                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_gemini_model
                 )
             except Exception as exc:
-                logger.warn("Gemini Direct call failed: %s. Attempting OpenRouter fallback if available.", str(exc))
+                logger.warning("Gemini Direct call failed: %s. Attempting OpenRouter fallback if available.", str(exc))
                 if has_openrouter:
                     try:
                         logger.info("Falling back to OpenRouter API...")
                         return await cls._call_openrouter(
-                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score
+                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_openrouter_model
                         )
                     except Exception as or_exc:
                         logger.error("OpenRouter fallback also failed: %s", str(or_exc))
@@ -127,7 +141,8 @@ Max Score: {max_score}
                     detail=f"Dịch vụ AI phản hồi chậm hoặc gián đoạn kết nối: {str(exc)}"
                 )
 
-        return cls._generate_qa21_benchmark_response(submission_module_id, max_score)
+        return cls._generate_qa21_benchmark_response(submission_module_id, max_score, model_used=custom_model, provider_used=provider)
+
 
     @classmethod
     async def _call_openrouter(
@@ -136,7 +151,8 @@ Max Score: {max_score}
         audio_bytes: bytes,
         mime_type: str,
         user_prompt: str,
-        max_score: float
+        max_score: float,
+        model_name: Optional[str] = None
     ) -> AnalyzeSpeakingResponse:
         import httpx
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
@@ -160,8 +176,9 @@ Max Score: {max_score}
             "Content-Type": "application/json"
         }
 
+        active_model = model_name or settings.OPENROUTER_MODEL
         payload = {
-            "model": settings.OPENROUTER_MODEL,
+            "model": active_model,
             "messages": [
                 {
                     "role": "system",
@@ -190,7 +207,7 @@ Max Score: {max_score}
         url = f"{settings.OPENROUTER_BASE_URL.rstrip('/')}/chat/completions"
         logger.info(
             "Calling OpenRouter model '%s' for submissionModuleId: %s",
-            settings.OPENROUTER_MODEL,
+            active_model,
             submission_module_id
         )
 
@@ -228,7 +245,13 @@ Max Score: {max_score}
             clean_json_str = clean_json_str.strip()
 
             parsed_data = json.loads(clean_json_str)
-            return cls._build_response_from_json(submission_module_id, parsed_data, max_score)
+            return cls._build_response_from_json(
+                submission_module_id,
+                parsed_data,
+                max_score,
+                model_used=active_model,
+                provider_used="openrouter"
+            )
 
     @classmethod
     async def _call_gemini_direct(
@@ -237,17 +260,25 @@ Max Score: {max_score}
         audio_bytes: bytes,
         mime_type: str,
         user_prompt: str,
-        max_score: float
+        max_score: float,
+        model_name: Optional[str] = None
     ) -> AnalyzeSpeakingResponse:
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
+        active_model = model_name or settings.GEMINI_MODEL
         model = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
+            model_name=active_model,
             system_instruction=cls.SYSTEM_PROMPT,
             generation_config={
                 "temperature": 0.2,
                 "response_mime_type": "application/json"
             }
+        )
+
+        logger.info(
+            "Calling Gemini Direct model '%s' for submissionModuleId: %s",
+            active_model,
+            submission_module_id
         )
 
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
@@ -260,14 +291,22 @@ Max Score: {max_score}
         raw_text = response.text
         parsed_json = json.loads(raw_text)
 
-        return cls._build_response_from_json(submission_module_id, parsed_json, max_score)
+        return cls._build_response_from_json(
+            submission_module_id,
+            parsed_json,
+            max_score,
+            model_used=active_model,
+            provider_used="gemini"
+        )
 
     @classmethod
     def _build_response_from_json(
         cls,
         submission_module_id: int,
         data: Dict[str, Any],
-        max_score: float
+        max_score: float,
+        model_used: Optional[str] = None,
+        provider_used: Optional[str] = None
     ) -> AnalyzeSpeakingResponse:
         raw_words = data.get("words", [])
         words = [
@@ -346,14 +385,18 @@ Max Score: {max_score}
             aiTranscript=words,
             fluencyMetrics=fluency_metrics,
             criteriaScores=criteria,
-            annotations=annotations
+            annotations=annotations,
+            modelUsed=model_used,
+            providerUsed=provider_used
         )
 
     @classmethod
     def _generate_qa21_benchmark_response(
         cls,
         submission_module_id: int,
-        max_score: float = 9.0
+        max_score: float = 9.0,
+        model_used: Optional[str] = None,
+        provider_used: Optional[str] = None
     ) -> AnalyzeSpeakingResponse:
         """
         Returns the fixed QA-21 reference benchmark dataset.
@@ -440,5 +483,8 @@ Max Score: {max_score}
             aiTranscript=words,
             fluencyMetrics=fluency_metrics,
             criteriaScores=criteria,
-            annotations=annotations
+            annotations=annotations,
+            modelUsed=model_used or "benchmark/qa-21-deterministic",
+            providerUsed=provider_used or "mock"
         )
+

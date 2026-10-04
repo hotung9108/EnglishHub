@@ -3,7 +3,7 @@ title: "Build Standalone AI Microservice (FastAPI) & Integrate Speaking Grading 
 assignee: "@be-secondary"
 status: "In Review"
 priority: "High"
-description: "Implement decoupled AI Microservice using Python FastAPI for UC26 Speaking grading. Integrate with Core Backend (Spring Boot) via asynchronous REST in gradingAiExecutor. Include Neon Storage S3 audio retrieval, Gemini Flash multimodal processing, word-level timestamps JSONB, fluency metrics, CEFR/IELTS rubric evaluation, answer annotations, resilience & fallback handling per PP 6.5.2, and QA-21 benchmark testing."
+description: "Implement decoupled AI Microservice using Python FastAPI for UC26 Speaking grading. Integrate with Core Backend (Spring Boot) via asynchronous REST in gradingAiExecutor. Include Neon Storage S3 audio retrieval, Gemini Flash multimodal processing, word-level timestamps JSONB, fluency metrics, CEFR/IELTS rubric evaluation, answer annotations, resilience & fallback handling per PP 6.5.2, QA-21 benchmark testing, and dynamic per-request AI model/provider selection (Option 1)."
 artifacts:
   - "production_artifacts/be_to_tester/speaking-ai-grading-testing-instructions.md"
 

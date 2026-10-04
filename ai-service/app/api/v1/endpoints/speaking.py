@@ -33,13 +33,17 @@ async def analyze_speaking(request: AnalyzeSpeakingRequest) -> AnalyzeSpeakingRe
             mime_type=mime_type,
             module_instructions=request.moduleInstructions,
             ai_instruction_snapshot=request.aiInstructionSnapshot,
-            max_score=request.maxScore
+            max_score=request.maxScore,
+            custom_model=request.model,
+            custom_provider=request.aiProvider
         )
 
         logger.info(
-            "Successfully completed speaking analysis for submissionModuleId: %s with score: %s",
+            "Successfully completed speaking analysis for submissionModuleId: %s with score: %s (model: %s, provider: %s)",
             request.submissionModuleId,
-            result.overallScore
+            result.overallScore,
+            result.modelUsed,
+            result.providerUsed
         )
         return result
 
@@ -70,9 +74,12 @@ async def analyze_speaking_upload(
     submission_module_id: int = Form(1, alias="submissionModuleId"),
     module_instructions: Optional[str] = Form(None, alias="moduleInstructions"),
     ai_instruction_snapshot: Optional[str] = Form(None, alias="aiInstructionSnapshot"),
-    max_score: float = Form(9.0, alias="maxScore")
+    max_score: float = Form(9.0, alias="maxScore"),
+    model: Optional[str] = Form(None, alias="model", description="Model AI tùy chọn"),
+    ai_provider: Optional[str] = Form(None, alias="aiProvider", description="Provider tùy chọn ('openrouter' | 'gemini')")
 ) -> AnalyzeSpeakingResponse:
-    logger.info("Received direct audio upload: %s (content_type: %s)", file.filename, file.content_type)
+    logger.info("Received direct audio upload: %s (content_type: %s, model: %s, provider: %s)",
+                file.filename, file.content_type, model or "default", ai_provider or "default")
     try:
         audio_bytes = await file.read()
         if not audio_bytes:
@@ -89,7 +96,9 @@ async def analyze_speaking_upload(
             mime_type=mime_type,
             module_instructions=module_instructions,
             ai_instruction_snapshot=ai_instruction_snapshot,
-            max_score=max_score
+            max_score=max_score,
+            custom_model=model,
+            custom_provider=ai_provider
         )
         return result
 

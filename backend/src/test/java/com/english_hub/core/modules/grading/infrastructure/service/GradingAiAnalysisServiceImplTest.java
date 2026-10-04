@@ -104,7 +104,8 @@ class GradingAiAnalysisServiceImplTest {
 				15L,
 				ModuleSkill.SPEAKING,
 				true,
-				null);
+				null,
+				"Describe a book you enjoyed reading recently.");
 
 		Answer answer = new Answer(
 				submissionModuleId,
@@ -146,6 +147,12 @@ class GradingAiAnalysisServiceImplTest {
 		when(aiServiceClient.analyzeSpeaking(any(AiSpeakingAnalysisRequest.class))).thenReturn(aiResponse);
 
 		service.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<AiSpeakingAnalysisRequest> requestCaptor = ArgumentCaptor.forClass(AiSpeakingAnalysisRequest.class);
+		verify(aiServiceClient).analyzeSpeaking(requestCaptor.capture());
+		AiSpeakingAnalysisRequest capturedRequest = requestCaptor.getValue();
+		assertThat(capturedRequest.moduleInstructions()).isEqualTo("Describe a book you enjoyed reading recently.");
+		assertThat(capturedRequest.aiInstructionSnapshot()).isEqualTo("Assess candidate with IELTS Speaking rubric");
 
 		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
 		verify(gradingRepository).saveAiGrade(gradingCaptor.capture());
@@ -281,4 +288,93 @@ class GradingAiAnalysisServiceImplTest {
 		verify(gradingRepository).updateStatus(3L, GradingStatus.FAILED);
 		verifyNoInteractions(aiServiceClient);
 	}
+
+	@Test
+	void handleSpeakingAnalysis_withConfiguredModelAndProvider_passesThemToAiService() {
+		long submissionModuleId = 103L;
+		GradingAiAnalysisServiceImpl configuredService = new GradingAiAnalysisServiceImpl(
+				gradingRepository,
+				gradingContextRepository,
+				answerRepository,
+				answerAnnotationRepository,
+				storageService,
+				aiServiceClient,
+				"anthropic/claude-3.5-sonnet",
+				"openrouter"
+		);
+
+		Grading grading = new Grading(
+				103L,
+				submissionModuleId,
+				GradingMethod.AUTO,
+				GradingStatus.PENDING,
+				null,
+				null,
+				null,
+				BigDecimal.valueOf(9.0),
+				null,
+				null,
+				null,
+				null,
+				"Band 8 IELTS"
+		);
+
+		GradingContext context = new GradingContext(
+				submissionModuleId,
+				null,
+				200L,
+				10L,
+				5L,
+				2L,
+				15L,
+				ModuleSkill.SPEAKING,
+				true,
+				null,
+				"Talk about education"
+		);
+
+		Answer answer = new Answer(
+				submissionModuleId,
+				null,
+				null,
+				"submissions/speaking_103.mp3",
+				45,
+				720000L,
+				"audio/mp3",
+				UploadStatus.READY,
+				null,
+				null,
+				null,
+				null
+		);
+
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		when(storageService.generatePresignedGetUrl("submissions/speaking_103.mp3")).thenReturn("https://storage.com/audio.mp3");
+
+		AiSpeakingAnalysisResponse aiResponse = new AiSpeakingAnalysisResponse(
+				submissionModuleId,
+				8.0,
+				"Great speech",
+				objectMapper.createArrayNode(),
+				new FluencyMetricsDto(140.0, 1, 30.0, 0.85),
+				new CriteriaScoresDto(8.0, 8.0, 8.0, 8.0, 8.0),
+				List.of(),
+				"anthropic/claude-3.5-sonnet",
+				"openrouter"
+		);
+
+		when(aiServiceClient.analyzeSpeaking(any(AiSpeakingAnalysisRequest.class))).thenReturn(aiResponse);
+
+		configuredService.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<AiSpeakingAnalysisRequest> requestCaptor = ArgumentCaptor.forClass(AiSpeakingAnalysisRequest.class);
+		verify(aiServiceClient).analyzeSpeaking(requestCaptor.capture());
+		AiSpeakingAnalysisRequest captured = requestCaptor.getValue();
+		assertThat(captured.model()).isEqualTo("anthropic/claude-3.5-sonnet");
+		assertThat(captured.aiProvider()).isEqualTo("openrouter");
+	}
 }
+
+

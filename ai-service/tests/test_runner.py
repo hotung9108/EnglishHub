@@ -92,7 +92,42 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertEqual(res_json["submissionModuleId"], 14)
         self.assertGreaterEqual(res_json["overallScore"], 6.5)
 
+    def test_analyze_speaking_dynamic_model_and_provider(self):
+        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+        payload = {
+            "submissionModuleId": 15,
+            "audioBase64": mock_audio_b64,
+            "moduleInstructions": "Describe your favorite hobby.",
+            "maxScore": 9.0,
+            "model": "anthropic/claude-3.5-sonnet",
+            "aiProvider": "openrouter"
+        }
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+        data = response.json()
+        self.assertEqual(data["submissionModuleId"], 15)
+        self.assertEqual(data["modelUsed"], "anthropic/claude-3.5-sonnet")
+        self.assertEqual(data["providerUsed"], "openrouter-mock")
+
+    def test_analyze_speaking_direct_upload_with_custom_model(self):
+        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
+        files = {
+            "file": ("test.mp3", fake_audio, "audio/mp3")
+        }
+        data = {
+            "submissionModuleId": 16,
+            "maxScore": "9.0",
+            "model": "google/gemini-1.5-pro",
+            "aiProvider": "gemini"
+        }
+        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+        res_json = response.json()
+        self.assertEqual(res_json["submissionModuleId"], 16)
+        self.assertEqual(res_json["modelUsed"], "google/gemini-1.5-pro")
+        self.assertEqual(res_json["providerUsed"], "gemini-mock")
 
 
 if __name__ == "__main__":
     unittest.main()
+

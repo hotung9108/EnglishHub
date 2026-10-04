@@ -48,6 +48,8 @@ class AnalyzeSpeakingRequest(CamelModel):
     moduleInstructions: Optional[str] = Field(None, alias="moduleInstructions")
     aiInstructionSnapshot: Optional[str] = Field(None, alias="aiInstructionSnapshot")
     maxScore: float = Field(9.0, alias="maxScore")
+    model: Optional[str] = Field(None, alias="model", description="Tùy chọn ghi đè model AI (ví dụ: google/gemini-2.5-flash, gemini-1.5-pro)")
+    aiProvider: Optional[str] = Field(None, alias="aiProvider", description="Tùy chọn ghi đè AI provider ('openrouter' hoặc 'gemini')")
 
 
 class AnalyzeSpeakingResponse(CamelModel):
@@ -58,3 +60,5 @@ class AnalyzeSpeakingResponse(CamelModel):
     fluencyMetrics: FluencyMetrics = Field(..., alias="fluencyMetrics")
     criteriaScores: CriteriaScores = Field(..., alias="criteriaScores")
     annotations: List[AnnotationItem] = Field(default_factory=list, alias="annotations")
+    modelUsed: Optional[str] = Field(None, alias="modelUsed", description="Model AI thực tế đã dùng để chấm bài")
+    providerUsed: Optional[str] = Field(None, alias="providerUsed", description="Provider AI thực tế đã phục vụ request")
