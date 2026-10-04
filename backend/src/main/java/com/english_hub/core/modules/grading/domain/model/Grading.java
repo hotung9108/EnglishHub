@@ -46,6 +46,34 @@ public record Grading(
 				aiInstructionSnapshot);
 	}
 
+	/**
+	 * Deterministic answer-comparison verdict. Keeps the method {@code AUTO} and leaves
+	 * {@code reviewedBy}/{@code reviewedAt} null because no teacher reviewed it; a later teacher
+	 * override goes through {@link #withTeacherGrade} and is audited in {@code grading_change_logs}.
+	 */
+	public Grading withAutoGrade(BigDecimal score, BigDecimal maxScore, OffsetDateTime gradedAt) {
+		if (score == null
+				|| maxScore == null
+				|| score.compareTo(BigDecimal.ZERO) < 0
+				|| score.compareTo(maxScore) > 0) {
+			throw new IllegalArgumentException("Auto score must be between zero and the module max score.");
+		}
+		return new Grading(
+				id,
+				submissionModuleId,
+				GradingMethod.AUTO,
+				GradingStatus.COMPLETED,
+				aiFeedback,
+				score,
+				finalFeedback,
+				maxScore,
+				null,
+				null,
+				gradedAt,
+				aiTranscript,
+				aiInstructionSnapshot);
+	}
+
 	public Grading withAiGrade(
 			BigDecimal score,
 			String feedback,

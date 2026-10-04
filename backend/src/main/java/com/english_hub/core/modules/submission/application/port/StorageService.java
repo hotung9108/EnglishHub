@@ -20,12 +20,16 @@ public interface StorageService {
 	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
 	 * authenticated read access (e.g. for AI analysis microservice).
 	 */
-	String generatePresignedGetUrl(String storageKey);
+	default String generatePresignedGetUrl(String storageKey) {
+		return null;
+	}
 
 	/**
 	 * Fetches the raw bytes of the object directly from storage. Returns null if missing.
 	 */
-	byte[] getObjectBytes(String storageKey);
+	default byte[] getObjectBytes(String storageKey) {
+		return null;
+	}
 
 	/**
 	 * Returns {@code true} when an object exists at {@code storageKey}.

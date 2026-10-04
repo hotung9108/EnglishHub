@@ -48,12 +48,16 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 				assignmentRepository.findById(submission.getAssignmentId()).flatMap(assignment ->
 					classRepository.findById(assignment.classId()).map(englishClass -> {
 						var module = moduleRepository.findById(submissionModule.getModuleId()).orElse(null);
-						boolean submitted = submission.getSubmittedAt() != null
-								&& submission.getStatus() != com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus.IN_PROGRESS
-								&& submissionModule.getStatus()
-										!= com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus.IN_PROGRESS;
+						/*
+						 * Derived from the module row alone. The parent submission's submittedAt is
+						 * only stamped by the final submit, so requiring it here reported every
+						 * per-module submit as not yet submitted.
+						 */
+						boolean submitted = submissionModule.getStatus()
+								!= com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus.IN_PROGRESS;
 						return new GradingContext(
 								submissionModule.getId(),
+								submissionModule.getModuleId(),
 								null,
 								submission.getId(),
 								assignment.id(),
@@ -63,6 +67,8 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 								module == null ? null : module.skill(),
 								submitted,
 								null,
+								module == null ? null : module.taskType(),
+								module == null ? null : module.maxScore(),
 								module == null ? null : module.instructions());
 					}))));
 	}
@@ -78,18 +84,9 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 	@Transactional(readOnly = true)
 	public Optional<GradingContext> findByAnswerId(Long answerId) {
 		return answerRepository.findById(answerId).flatMap(answer ->
-			findBySubmissionModuleId(answer.getSubmissionModuleId())
-					.map(context -> new GradingContext(
-							context.submissionModuleId(),
-							answer.getId(),
-							context.submissionId(),
-							context.assignmentId(),
-							context.classId(),
-							context.teacherId(),
-							context.studentId(),
-							context.moduleSkill(),
-							context.submitted(),
-							answer.getContent() == null ? null : answer.getContent().length(),
-							context.moduleInstructions())));
+				findBySubmissionModuleId(answer.getSubmissionModuleId())
+						.map(context -> context.withAnswer(
+								answer.getId(),
+								answer.getContent() == null ? null : answer.getContent().length())));
 	}
 }

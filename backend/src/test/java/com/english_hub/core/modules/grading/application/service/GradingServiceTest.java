@@ -25,6 +25,7 @@ import com.english_hub.core.modules.grading.domain.repository.GradingContextRepo
 import com.english_hub.core.modules.grading.domain.repository.GradingRepository;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
+import com.english_hub.core.modules.module.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -219,8 +220,8 @@ class GradingServiceTest {
 	void rejectsAnnotationOutsideAnswerContent() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
 		when(gradingContextRepository.findByAnswerId(8L))
-				.thenReturn(Optional.of(new GradingContext(14L, 8L, 7L, 3L, 2L, 20L, 41L,
-						ModuleSkill.WRITING, true, 16)));
+				.thenReturn(Optional.of(new GradingContext(14L, 6L, 8L, 7L, 3L, 2L, 20L, 41L,
+						ModuleSkill.WRITING, true, 16, ModuleTaskType.ESSAY, null)));
 
 		assertThatExceptionOfType(ApiException.class)
 				.isThrownBy(() -> gradingService.createTeacherAnnotation(
@@ -234,7 +235,8 @@ class GradingServiceTest {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
 		when(gradingContextRepository.findBySubmissionModuleId(14L))
 				.thenReturn(Optional.of(new GradingContext(
-						14L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null)));
+						14L, 6L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null,
+						ModuleTaskType.RECORDING, null)));
 		Grading pending = grading(5L, bd("10.00"), null, GradingStatus.PENDING);
 		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(pending));
 
@@ -279,7 +281,7 @@ class GradingServiceTest {
 	}
 
 	private GradingContext context(Long teacherId, ModuleSkill skill) {
-		return new GradingContext(14L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64);
+		return new GradingContext(14L, 6L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64, ModuleTaskType.ESSAY, null);
 	}
 
 	private User user(Long id, UserRole role) {

@@ -16,7 +16,7 @@ services:
     container_name: englishhub-backend-prod
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8080}:${SERVER_PORT:-8080}"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # Kết nối trực tiếp tới Neon PostgreSQL Serverless (bắt buộc sslmode=require)
@@ -39,8 +39,10 @@ services:
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
       AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      SERVER_PORT: ${SERVER_PORT:-8080}
     networks:
       - englishhub_network
+      - englishhub_shared
     depends_on:
       ai-service:
         condition: service_healthy
@@ -98,3 +100,5 @@ services:
 networks:
   englishhub_network:
     driver: bridge
+  englishhub_shared:
+    external: true

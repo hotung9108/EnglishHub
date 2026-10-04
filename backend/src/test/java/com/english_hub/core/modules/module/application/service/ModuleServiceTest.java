@@ -127,6 +127,35 @@ class ModuleServiceTest {
 	}
 
 	@Test
+	void teacherOwnerCanCreateAReadingRewriteModuleBecauseItIsAnsweredWithQuestions() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(moduleRepository.existsByAssignmentIdAndOrderIndex(5L, 1)).thenReturn(false);
+		Module saved = module(9L, 5L, ModuleSkill.READING, 1);
+		when(moduleRepository.save(any(Module.class))).thenReturn(saved);
+
+		long id = moduleService.createModule(
+				5L,
+				new CreateModuleCommand(ModuleSkill.READING, ModuleTaskType.REWRITE, 1, "Rewrite", null, null));
+
+		assertThat(id).isEqualTo(9L);
+		verify(moduleRepository).save(any(Module.class));
+	}
+
+	@Test
+	void listeningRewriteIsStillRejectedBecauseItIsNotASupportedPair() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenAssignmentAndClass(5L, 3L, 10L);
+
+		assertApiException(
+				() -> moduleService.createModule(
+						5L,
+						new CreateModuleCommand(ModuleSkill.LISTENING, ModuleTaskType.REWRITE, 1, "Rewrite", null, null)),
+				"Skill và taskType không hợp lệ.");
+		verify(moduleRepository, never()).save(any(Module.class));
+	}
+
+	@Test
 	void studentCannotCreateModule() {
 		givenCaller(user(41L, UserRole.STUDENT));
 

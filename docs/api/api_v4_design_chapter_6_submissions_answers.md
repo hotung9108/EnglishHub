@@ -76,7 +76,7 @@
 
 ## 6.4 #40. Nộp bài chính thức
 
-**Mô tả:** Chốt lại toàn bộ bài làm. Đổi `submissions.status` và tất cả `submission_modules.status` chưa `SUBMITTED` → `SUBMITTED`, set `submitted_at = now()`. Kích hoạt chấm tự động với các module có `method = AUTO` (Quiz): server so khớp `answers.content` với `questions.correct_answer`, tính điểm, cập nhật `gradings.final_score` và `status = COMPLETED`.
+**Mô tả:** Chốt lại toàn bộ bài làm. Đổi `submissions.status` và tất cả `submission_modules.status` chưa `SUBMITTED` → `SUBMITTED`, set `submitted_at = now()`. Module có `method = AUTO` được chấm tự động **sau khi transaction commit**: server so khớp `answers.content` với `questions.correct_answer`, tính điểm, cập nhật `gradings.final_score` và `status = COMPLETED` sau khi response đã trả về (xem mục 6.6).
 
 **Method - Path:** `POST /submissions/{id}/submit`
 
@@ -166,6 +166,46 @@ trúc payload — **không có field discriminator**, wire format không đổi 
 Shape phải khớp `questionType` của câu hỏi được gửi kèm. Ràng buộc trên shape được kiểm tra ở tầng
 parse/validate, **trước** khi service đối chiếu `questionType`.
 
+**Chấm tự động sau khi nộp (async, không chặn response):**
+
+| `skill` + `taskType` | Chấm tự động | Ghi chú |
+|---|---|---|
+| `READING` + `QUIZ` | Có | |
+| `READING` + `REWRITE` | Có | `REWRITE` trả lời bằng `answers` giống `QUIZ`, nên cũng được chấm tự động |
+| `LISTENING` + `QUIZ` | Có | |
+| `LISTENING` + `REWRITE` | Không | cặp skill/taskType này không được tạo module |
+| `WRITING` + `ESSAY`, `SPEAKING` + `RECORDING` | Không | giáo viên chấm tay |
+
+Cơ chế: sau khi transaction nộp bài **commit**, hệ thống đẩy `submission_module` vào executor
+chấm điểm. Response `200` trả về ngay và **không** chứa kết quả chấm — client phải poll lại
+`GET /submission-modules/{id}` (hoặc `GET /submissions/{id}`) cho tới khi `grading.status` rời
+`PENDING`.
+
+So khớp được định nghĩa như sau:
+
+| `questionType` | Cách so khớp |
+|---|---|
+| `MULTIPLE_CHOICE` | tập `selectedOptionIds` của học viên phải **bằng đúng** tập id option có `isCorrect = true`; chọn thiếu hoặc thừa đều sai |
+| `SHORT_ANSWER` | so khớp `text` sau khi chuẩn hóa: Unicode NFC, cắt khoảng trắng đầu/cuối, gộp khoảng trắng trong, lowercase theo `Locale.ROOT`. **Dấu câu giữ nguyên** vì đáp án do giáo viên soạn |
+
+Kết quả được ghi như sau:
+
+| Trường | Giá trị sau khi chấm |
+|---|---|
+| `gradings.method` | `AUTO` |
+| `gradings.status` | `COMPLETED` |
+| `gradings.final_score` | tổng điểm của các câu trả lời đúng, **được chặn trần** ở `modules.max_score` |
+| `gradings.max_score_snapshot` | `modules.max_score` |
+| `gradings.graded_at` | thời điểm chấm |
+| `gradings.reviewed_by`, `gradings.reviewed_at` | `null` (không có giáo viên review) |
+| `answers.content` | merge thêm `isCorrect` (boolean) và `score` (số) vào JSONB hiện có |
+| `submission_modules.status` | `GRADED` |
+
+Câu hỏi học viên không trả lời được tính `0` điểm và `isCorrect = false`. Chấm lại là idempotent:
+grading row đã ở trạng thái khác `PENDING` thì lần chạy sau bỏ qua, nên gọi lại API không nhân đôi
+điểm. Nếu chấm tự động lỗi, `gradings.status` được đổi sang `FAILED` và **không** làm fail request
+nộp bài (request đó đã commit).
+
 **Response:**
 
 | Mô tả | Code | Return |
@@ -218,7 +258,7 @@ Ràng buộc: `submission_module` phải thuộc skill `SPEAKING` / task type `R
 
 **Mô tả:** Tương tự #46 nhưng dành cho module Writing / Essay. Server tạo presigned URL để client PUT file `.docx` hoặc `.pdf` thẳng lên R2. Sau khi upload, client gọi `#43` để submit module.
 
-Ràng buộc: `submission_module` phải thuộc skill `WRITING` / task type `ESSAY` hoặc `REWRITE` và đang `IN_PROGRESS`, **và `submission` cha cũng phải còn `IN_PROGRESS`**.
+Ràng buộc: `submission_module` phải thuộc skill `WRITING` / task type `ESSAY` và đang `IN_PROGRESS`, **và `submission` cha cũng phải còn `IN_PROGRESS`**. Task type `REWRITE` **không** nhận upload tài liệu: `REWRITE` được trả lời bằng mảng `answers` qua #43 giống `QUIZ` (xem mục 6.6).
 
 **Method - Path:** `POST /submission-modules/{id}/document-upload-url`
 

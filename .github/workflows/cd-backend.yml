@@ -70,7 +70,7 @@ jobs:
             sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$GITHUB_SHA|" .env
 
             # Thay thế container
-            docker compose -f docker-compose.prod.yml --profile cloudflare up -d --pull always
+            docker compose -f docker-compose.prod.yml up -d --pull always
 
             # Xóa image cũ không dùng nữa
             docker image prune -f
