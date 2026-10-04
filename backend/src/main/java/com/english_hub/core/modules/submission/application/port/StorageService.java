@@ -17,6 +17,17 @@ public interface StorageService {
 	PresignedUpload generatePresignedPutUrl(String storageKey, String contentType);
 
 	/**
+	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
+	 * authenticated read access (e.g. for AI analysis microservice).
+	 */
+	String generatePresignedGetUrl(String storageKey);
+
+	/**
+	 * Fetches the raw bytes of the object directly from storage. Returns null if missing.
+	 */
+	byte[] getObjectBytes(String storageKey);
+
+	/**
 	 * Returns {@code true} when an object exists at {@code storageKey}.
 	 */
 	boolean objectExists(String storageKey);

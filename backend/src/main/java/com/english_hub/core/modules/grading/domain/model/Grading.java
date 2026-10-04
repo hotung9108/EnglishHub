@@ -45,4 +45,46 @@ public record Grading(
 				aiTranscript,
 				aiInstructionSnapshot);
 	}
+
+	public Grading withAiGrade(
+			BigDecimal score,
+			String feedback,
+			Object transcript,
+			OffsetDateTime gradedAt) {
+		if (score != null && maxScoreSnapshot != null
+				&& (score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(maxScoreSnapshot) > 0)) {
+			throw new IllegalArgumentException("AI score must be between zero and maxScoreSnapshot.");
+		}
+		return new Grading(
+				id,
+				submissionModuleId,
+				GradingMethod.AUTO,
+				GradingStatus.AI_GRADED,
+				feedback,
+				score,
+				feedback,
+				maxScoreSnapshot,
+				null,
+				null,
+				gradedAt,
+				transcript,
+				aiInstructionSnapshot);
+	}
+
+	public Grading withFailedStatus() {
+		return new Grading(
+				id,
+				submissionModuleId,
+				method,
+				GradingStatus.FAILED,
+				aiFeedback,
+				finalScore,
+				finalFeedback,
+				maxScoreSnapshot,
+				reviewedBy,
+				reviewedAt,
+				gradedAt,
+				aiTranscript,
+				aiInstructionSnapshot);
+	}
 }

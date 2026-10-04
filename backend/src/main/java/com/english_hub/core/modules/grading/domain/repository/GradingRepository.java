@@ -14,4 +14,8 @@ public interface GradingRepository {
 	GradingPage findPage(GradingFilter filter, int page, int limit);
 
 	Grading saveTeacherGrade(Grading grading);
+
+	Grading saveAiGrade(Grading grading);
+
+	void updateStatus(Long gradingId, com.english_hub.core.modules.grading.domain.model.GradingStatus status);
 }

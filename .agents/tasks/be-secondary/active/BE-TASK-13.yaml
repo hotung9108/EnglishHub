@@ -1,0 +1,9 @@
+id: BE-TASK-13
+title: "Build Standalone AI Microservice (FastAPI) & Integrate Speaking Grading Pipeline (UC26)"
+assignee: "@be-secondary"
+status: "In Review"
+priority: "High"
+description: "Implement decoupled AI Microservice using Python FastAPI for UC26 Speaking grading. Integrate with Core Backend (Spring Boot) via asynchronous REST in gradingAiExecutor. Include Neon Storage S3 audio retrieval, Gemini Flash multimodal processing, word-level timestamps JSONB, fluency metrics, CEFR/IELTS rubric evaluation, answer annotations, resilience & fallback handling per PP 6.5.2, and QA-21 benchmark testing."
+artifacts:
+  - "production_artifacts/be_to_tester/speaking-ai-grading-testing-instructions.md"
+

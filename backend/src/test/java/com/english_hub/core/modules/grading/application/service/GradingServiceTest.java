@@ -246,6 +246,21 @@ class GradingServiceTest {
 		assertThat(pending.status()).isEqualTo(GradingStatus.PENDING);
 	}
 
+	@Test
+	void requestAiAnalysis_allowsRetryWhenStatusIsFailed() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(new GradingContext(
+						14L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null)));
+		Grading failed = grading(5L, bd("10.00"), null, GradingStatus.FAILED);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(failed));
+
+		gradingService.requestAiAnalysis(14L);
+
+		verify(gradingRepository).updateStatus(5L, GradingStatus.PENDING);
+		verify(gradingAiAnalysisService).analyzeSubmittedModule(14L);
+	}
+
 	private Grading grading(Long id, BigDecimal maxScore, BigDecimal finalScore, GradingStatus status) {
 		return new Grading(
 				id,
