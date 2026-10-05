@@ -18,7 +18,96 @@ public record GradingContext(
 		boolean submitted,
 		Integer answerContentLength,
 		ModuleTaskType moduleTaskType,
-		BigDecimal moduleMaxScore) {
+		BigDecimal moduleMaxScore,
+		String moduleInstructions) {
+
+	public GradingContext(
+			Long submissionModuleId,
+			Long moduleId,
+			Long answerId,
+			Long submissionId,
+			Long assignmentId,
+			Long classId,
+			Long teacherId,
+			Long studentId,
+			ModuleSkill moduleSkill,
+			boolean submitted,
+			Integer answerContentLength,
+			ModuleTaskType moduleTaskType,
+			BigDecimal moduleMaxScore) {
+		this(
+				submissionModuleId,
+				moduleId,
+				answerId,
+				submissionId,
+				assignmentId,
+				classId,
+				teacherId,
+				studentId,
+				moduleSkill,
+				submitted,
+				answerContentLength,
+				moduleTaskType,
+				moduleMaxScore,
+				null);
+	}
+
+	public GradingContext(
+			Long submissionModuleId,
+			Long answerId,
+			Long submissionId,
+			Long assignmentId,
+			Long classId,
+			Long teacherId,
+			Long studentId,
+			ModuleSkill moduleSkill,
+			boolean submitted,
+			Integer answerContentLength,
+			String moduleInstructions) {
+		this(
+				submissionModuleId,
+				null,
+				answerId,
+				submissionId,
+				assignmentId,
+				classId,
+				teacherId,
+				studentId,
+				moduleSkill,
+				submitted,
+				answerContentLength,
+				null,
+				null,
+				moduleInstructions);
+	}
+
+	public GradingContext(
+			Long submissionModuleId,
+			Long answerId,
+			Long submissionId,
+			Long assignmentId,
+			Long classId,
+			Long teacherId,
+			Long studentId,
+			ModuleSkill moduleSkill,
+			boolean submitted,
+			Integer answerContentLength) {
+		this(
+				submissionModuleId,
+				null,
+				answerId,
+				submissionId,
+				assignmentId,
+				classId,
+				teacherId,
+				studentId,
+				moduleSkill,
+				submitted,
+				answerContentLength,
+				null,
+				null,
+				null);
+	}
 
 	/** Narrows this module-level context to one answer, keeping the module verdict fields. */
 	public GradingContext withAnswer(Long id, Integer contentLength) {
@@ -35,6 +124,7 @@ public record GradingContext(
 				submitted,
 				contentLength,
 				moduleTaskType,
-				moduleMaxScore);
+				moduleMaxScore,
+				moduleInstructions);
 	}
 }

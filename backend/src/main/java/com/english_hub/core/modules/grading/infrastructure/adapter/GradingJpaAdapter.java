@@ -86,6 +86,33 @@ public class GradingJpaAdapter implements GradingRepository {
 		return mapper.toDomain(jpaRepository.save(target));
 	}
 
+	@Override
+	@Transactional
+	public Grading saveAiGrade(Grading source) {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target =
+				jpaRepository.findById(source.id()).orElseThrow();
+		target.setMethod(com.english_hub.core.infrastructure.persistence.entity.GradingMethod.AUTO);
+		target.setStatus(com.english_hub.core.infrastructure.persistence.entity.GradingStatus.AI_GRADED);
+		target.setAiFeedback(source.aiFeedback());
+		target.setFinalScore(source.finalScore());
+		target.setFinalFeedback(source.finalFeedback());
+		target.setGradedAt(source.gradedAt());
+		if (source.aiTranscript() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode) {
+			target.setAiTranscript(jsonNode);
+		}
+		return mapper.toDomain(jpaRepository.save(target));
+	}
+
+	@Override
+	@Transactional
+	public void updateStatus(Long gradingId, com.english_hub.core.modules.grading.domain.model.GradingStatus status) {
+		jpaRepository.findById(gradingId).ifPresent(target -> {
+			target.setStatus(
+					com.english_hub.core.infrastructure.persistence.entity.GradingStatus.valueOf(status.name()));
+			jpaRepository.save(target);
+		});
+	}
+
 	private Specification<com.english_hub.core.infrastructure.persistence.entity.Grading> buildSpecification(
 			GradingFilter filter) {
 		return (root, query, criteriaBuilder) -> {

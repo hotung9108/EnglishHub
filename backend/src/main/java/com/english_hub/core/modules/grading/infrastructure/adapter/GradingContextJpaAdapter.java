@@ -40,7 +40,7 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 		this.moduleRepository = moduleRepository;
 	}
 
-@Override
+	@Override
 	@Transactional(readOnly = true)
 	public Optional<GradingContext> findBySubmissionModuleId(Long submissionModuleId) {
 		return submissionModuleRepository.findById(submissionModuleId).flatMap(submissionModule ->
@@ -68,7 +68,8 @@ public class GradingContextJpaAdapter implements GradingContextRepository {
 								submitted,
 								null,
 								module == null ? null : module.taskType(),
-								module == null ? null : module.maxScore());
+								module == null ? null : module.maxScore(),
+								module == null ? null : module.instructions());
 					}))));
 	}
 

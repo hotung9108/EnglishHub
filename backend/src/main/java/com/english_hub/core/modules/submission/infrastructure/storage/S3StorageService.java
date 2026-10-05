@@ -12,10 +12,13 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -68,6 +71,34 @@ public class S3StorageService implements StorageService, AutoCloseable {
 				presigned.url().toString(),
 				storageKey,
 				OffsetDateTime.ofInstant(presigned.expiration(), ZoneOffset.UTC));
+	}
+
+	@Override
+	public String generatePresignedGetUrl(String storageKey) {
+		PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(GetObjectPresignRequest.builder()
+				.signatureDuration(PRESIGN_TTL)
+				.getObjectRequest(getObject -> getObject
+						.bucket(bucket)
+						.key(storageKey))
+				.build());
+		return presigned.url().toString();
+	}
+
+	@Override
+	public byte[] getObjectBytes(String storageKey) {
+		try {
+			return s3Client.getObjectAsBytes(GetObjectRequest.builder()
+					.bucket(bucket)
+					.key(storageKey)
+					.build()).asByteArray();
+		} catch (NoSuchKeyException exception) {
+			return null;
+		} catch (S3Exception exception) {
+			if (exception.statusCode() == 404) {
+				return null;
+			}
+			throw exception;
+		}
 	}
 
 	@Override

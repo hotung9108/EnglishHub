@@ -90,8 +90,11 @@ public class GradingService {
 				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
 		if (!context.submitted()
 				|| (context.moduleSkill() != ModuleSkill.WRITING && context.moduleSkill() != ModuleSkill.SPEAKING)
-				|| grading.status() != GradingStatus.PENDING) {
+				|| (grading.status() != GradingStatus.PENDING && grading.status() != GradingStatus.FAILED)) {
 			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
+		}
+		if (grading.status() == GradingStatus.FAILED) {
+			gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
 		}
 		gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
 	}

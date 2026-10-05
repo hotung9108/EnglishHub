@@ -42,6 +42,7 @@ services:
       STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
+      AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
@@ -51,6 +52,29 @@ services:
         condition: service_healthy
       minio-setup:
         condition: service_completed_successfully
+      ai-service:
+        condition: service_started
+    networks:
+      - englishhub_dev_network
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: englishhub-ai-service
+    restart: unless-stopped
+    environment:
+      PORT: 8001
+      AI_PROVIDER: ${AI_PROVIDER:-auto}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MOCK_MODE: ${AI_SERVICE_MOCK_MODE:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    ports:
+      - "${AI_SERVICE_PORT:-8001}:8001"
     networks:
       - englishhub_dev_network
 
