@@ -8,6 +8,7 @@ import { AuthService } from '../services/auth.service';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
 import { buildListParams, computePagination, pageAfterEmptyRefetch } from '../../hooks/useUsers.utils';
+import { buildStudentEvaluationParams } from '../../hooks/useStudentEvaluation.utils';
 import type { CustomAxiosRequestConfig } from '../core/types';
 import { MockHttpClient } from './helpers/mock-http-client';
 
@@ -163,6 +164,33 @@ test('pageAfterEmptyRefetch moves back only when a page is empty', () => {
   for (const [page, itemCount, expected] of [[3, 0, 2], [1, 0, 1], [3, 4, 3]]) {
     assert.strictEqual(pageAfterEmptyRefetch(page, itemCount), expected);
   }
+});
+
+test('buildStudentEvaluationParams defaults page and limit', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams(), { page: 1, limit: 20 });
+});
+
+test('buildStudentEvaluationParams clamps page and limit', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams({ page: 0, limit: 101 }), {
+    page: 1,
+    limit: 100,
+  });
+  assert.deepStrictEqual(buildStudentEvaluationParams({ page: 2.8, limit: 0 }), {
+    page: 2,
+    limit: 1,
+  });
+});
+
+test('buildStudentEvaluationParams keeps classId when present and omits it when absent', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams({ classId: 3 }), {
+    classId: 3,
+    page: 1,
+    limit: 20,
+  });
+  assert.deepStrictEqual(buildStudentEvaluationParams({ classId: undefined }), {
+    page: 1,
+    limit: 20,
+  });
 });
 
 // ==========================================

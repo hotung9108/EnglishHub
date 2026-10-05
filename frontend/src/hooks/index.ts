@@ -9,6 +9,8 @@ export type { UseUsersOptions, UseUsersResult } from './useUsers';
 export { useGrading, useStudentGradingResult } from './useGrading';
 export type { UseGradingResult, UseStudentGradingResult } from './useGrading';
 export { useSubmission, useSubmissionAttempts } from './useSubmission';
+export { useStudentEvaluation } from './useStudentEvaluation';
+export type { UseStudentEvaluationOptions, UseStudentEvaluationResult } from './useStudentEvaluation';
 export type {
   UseSubmissionAttemptsOptions,
   UseSubmissionAttemptsResult,
