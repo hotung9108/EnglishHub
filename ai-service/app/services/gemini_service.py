@@ -55,6 +55,34 @@ You MUST respond strictly with a valid JSON object matching the following schema
 """
 
     @classmethod
+    def _build_static_system_prompt(
+        cls,
+        module_instructions: Optional[str] = None,
+        ai_instruction_snapshot: Optional[str] = None,
+        max_score: float = 9.0
+    ) -> str:
+        """
+        Builds the unified static system prompt containing:
+        1. Base Examiner Persona and Evaluation Rubric criteria
+        2. Strict JSON output schema specification
+        3. Assignment Context: Topic/Instructions, Rubric Snapshot, and Max Score
+
+        This prefix is 100% deterministic and static for all students answering the same
+        assignment module, enabling automatic LLM Prompt Caching (OpenRouter / Gemini Context Caching).
+        """
+        topic = (module_instructions or "Describe a book you enjoyed reading recently.").strip()
+        rubric = (ai_instruction_snapshot or "Standard CEFR / IELTS Part 2").strip()
+
+        return (
+            f"{cls.SYSTEM_PROMPT.strip()}\n\n"
+            "--- ASSIGNMENT CONTEXT (STATIC PREFIX FOR PROMPT CACHING) ---\n"
+            f"Topic / Instructions: {topic}\n"
+            f"Rubric Notes: {rubric}\n"
+            f"Max Score: {max_score}\n"
+            "------------------------------------------------------------"
+        )
+
+    @classmethod
     async def analyze_speaking(
         cls,
         submission_module_id: int,
@@ -71,7 +99,16 @@ You MUST respond strictly with a valid JSON object matching the following schema
         Supports dynamic model and provider override per request.
         If in MOCK_MODE or no API key is provided, returns deterministic QA-21 benchmark response.
         """
-        provider = (custom_provider or settings.AI_PROVIDER).strip().lower()
+        # Sanitize overrides (e.g. Swagger UI auto-fills "string")
+        cleaned_provider = (custom_provider or "").strip().lower()
+        if cleaned_provider in ("", "string", "none", "null"):
+            cleaned_provider = settings.AI_PROVIDER.strip().lower()
+
+        cleaned_model = (custom_model or "").strip()
+        if cleaned_model in ("", "string", "none", "null"):
+            cleaned_model = None
+
+        provider = cleaned_provider
         has_openrouter = bool(settings.OPENROUTER_API_KEY.strip())
         has_gemini = bool(settings.GEMINI_API_KEY.strip())
 
@@ -79,13 +116,13 @@ You MUST respond strictly with a valid JSON object matching the following schema
         use_gemini = (provider == "gemini" and has_gemini) or (provider == "auto" and not use_openrouter and has_gemini)
 
         # Target model names: custom_model takes precedence over settings
-        target_openrouter_model = custom_model or settings.OPENROUTER_MODEL
-        target_gemini_model = custom_model or settings.GEMINI_MODEL
+        target_openrouter_model = cleaned_model or settings.OPENROUTER_MODEL
+        target_gemini_model = cleaned_model or settings.GEMINI_MODEL
 
         if settings.MOCK_MODE or (not use_openrouter and not use_gemini):
             logger.info("Running in QA-21 Benchmark / Mock Mode for submissionModuleId: %s (model: %s, provider: %s)",
-                        submission_module_id, custom_model or "default", provider)
-            resolved_mock_model = custom_model or (target_openrouter_model if provider == "openrouter" else target_gemini_model)
+                        submission_module_id, cleaned_model or "default", provider)
+            resolved_mock_model = cleaned_model or (target_openrouter_model if provider == "openrouter" else target_gemini_model)
             return cls._generate_qa21_benchmark_response(
                 submission_module_id,
                 max_score,
@@ -93,17 +130,24 @@ You MUST respond strictly with a valid JSON object matching the following schema
                 provider_used=f"{provider}-mock" if settings.MOCK_MODE else "mock"
             )
 
-        user_prompt = f"""Evaluate this IELTS Speaking recording.
-Topic / Instructions: {module_instructions or 'Describe a book you enjoyed reading recently.'}
-Rubric Notes: {ai_instruction_snapshot or 'Standard CEFR / IELTS Part 2'}
-Max Score: {max_score}
-"""
+        static_system_prompt = cls._build_static_system_prompt(
+            module_instructions=module_instructions,
+            ai_instruction_snapshot=ai_instruction_snapshot,
+            max_score=max_score
+        )
+        user_prompt = "Please listen to the attached student audio recording and evaluate it strictly against the assignment topic and rubric defined in the system instructions."
 
         # Primary: OpenRouter
         if use_openrouter:
             try:
                 return await cls._call_openrouter(
-                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_openrouter_model
+                    submission_module_id,
+                    audio_bytes,
+                    mime_type,
+                    static_system_prompt,
+                    user_prompt,
+                    max_score,
+                    model_name=target_openrouter_model
                 )
             except Exception as exc:
                 logger.warning("OpenRouter call failed: %s. Attempting fallback if available.", str(exc))
@@ -111,7 +155,13 @@ Max Score: {max_score}
                     try:
                         logger.info("Falling back to Gemini Direct API...")
                         return await cls._call_gemini_direct(
-                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_gemini_model
+                            submission_module_id,
+                            audio_bytes,
+                            mime_type,
+                            static_system_prompt,
+                            user_prompt,
+                            max_score,
+                            model_name=target_gemini_model
                         )
                     except Exception as gemini_exc:
                         logger.error("Gemini Direct fallback also failed: %s", str(gemini_exc))
@@ -124,7 +174,13 @@ Max Score: {max_score}
         if use_gemini:
             try:
                 return await cls._call_gemini_direct(
-                    submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_gemini_model
+                    submission_module_id,
+                    audio_bytes,
+                    mime_type,
+                    static_system_prompt,
+                    user_prompt,
+                    max_score,
+                    model_name=target_gemini_model
                 )
             except Exception as exc:
                 logger.warning("Gemini Direct call failed: %s. Attempting OpenRouter fallback if available.", str(exc))
@@ -132,7 +188,13 @@ Max Score: {max_score}
                     try:
                         logger.info("Falling back to OpenRouter API...")
                         return await cls._call_openrouter(
-                            submission_module_id, audio_bytes, mime_type, user_prompt, max_score, model_name=target_openrouter_model
+                            submission_module_id,
+                            audio_bytes,
+                            mime_type,
+                            static_system_prompt,
+                            user_prompt,
+                            max_score,
+                            model_name=target_openrouter_model
                         )
                     except Exception as or_exc:
                         logger.error("OpenRouter fallback also failed: %s", str(or_exc))
@@ -150,6 +212,7 @@ Max Score: {max_score}
         submission_module_id: int,
         audio_bytes: bytes,
         mime_type: str,
+        static_system_prompt: str,
         user_prompt: str,
         max_score: float,
         model_name: Optional[str] = None
@@ -177,13 +240,33 @@ Max Score: {max_score}
         }
 
         active_model = model_name or settings.OPENROUTER_MODEL
+        is_anthropic = "claude" in active_model.lower() or "anthropic" in active_model.lower()
+
+        # Prompt Caching optimization (Tier 1):
+        # 1. Place static system instructions + rubric + assignment topic in the system message.
+        # 2. For Anthropic models on OpenRouter, add explicit cache_control.
+        # 3. For Gemini/OpenAI/DeepSeek models, stable prefix automatically triggers implicit prompt caching.
+        if is_anthropic:
+            system_message = {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": static_system_prompt,
+                        "cache_control": {"type": "ephemeral"}
+                    }
+                ]
+            }
+        else:
+            system_message = {
+                "role": "system",
+                "content": static_system_prompt
+            }
+
         payload = {
             "model": active_model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": cls.SYSTEM_PROMPT
-                },
+                system_message,
                 {
                     "role": "user",
                     "content": [
@@ -259,6 +342,7 @@ Max Score: {max_score}
         submission_module_id: int,
         audio_bytes: bytes,
         mime_type: str,
+        static_system_prompt: str,
         user_prompt: str,
         max_score: float,
         model_name: Optional[str] = None
@@ -268,7 +352,7 @@ Max Score: {max_score}
         active_model = model_name or settings.GEMINI_MODEL
         model = genai.GenerativeModel(
             model_name=active_model,
-            system_instruction=cls.SYSTEM_PROMPT,
+            system_instruction=static_system_prompt,
             generation_config={
                 "temperature": 0.2,
                 "response_mime_type": "application/json"
@@ -287,7 +371,9 @@ Max Score: {max_score}
             "data": audio_b64
         }
 
-        response = model.generate_content([audio_part, user_prompt])
+        # Prompt Caching optimization (Tier 1):
+        # Static prompt prefix goes first, dynamic per-student audio goes last.
+        response = model.generate_content([user_prompt, audio_part])
         raw_text = response.text
         parsed_json = json.loads(raw_text)
 

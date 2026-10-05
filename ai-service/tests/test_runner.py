@@ -127,7 +127,29 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertEqual(res_json["modelUsed"], "google/gemini-1.5-pro")
         self.assertEqual(res_json["providerUsed"], "gemini-mock")
 
+    def test_prompt_caching_structure_tier1(self):
+        from app.services.gemini_service import GeminiService
+
+        prompt1 = GeminiService._build_static_system_prompt(
+            module_instructions="Describe an interesting journey.",
+            ai_instruction_snapshot="CEFR B2 emphasis on past tenses",
+            max_score=9.0
+        )
+        prompt2 = GeminiService._build_static_system_prompt(
+            module_instructions="Describe an interesting journey.",
+            ai_instruction_snapshot="CEFR B2 emphasis on past tenses",
+            max_score=9.0
+        )
+
+        # 1. Determinism and prefix stability: prompt1 and prompt2 MUST be identical for cache hits
+        self.assertEqual(prompt1, prompt2)
+        self.assertIn("Topic / Instructions: Describe an interesting journey.", prompt1)
+        self.assertIn("Rubric Notes: CEFR B2 emphasis on past tenses", prompt1)
+        self.assertIn("Max Score: 9.0", prompt1)
+        self.assertIn("--- ASSIGNMENT CONTEXT (STATIC PREFIX FOR PROMPT CACHING) ---", prompt1)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
