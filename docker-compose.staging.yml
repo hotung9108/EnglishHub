@@ -4,10 +4,8 @@
 # Hướng dẫn chạy:
 # 1. Tạo file .env từ env.production.example: cp env.production.example .env
 # 2. Điền thông tin kết nối Neon DB, JWT_SECRET vào .env
-# 3. Chạy backend:
-#      docker compose -f docker-compose.prod.yml up -d
-# 4. (Tùy chọn) Chạy cả Cloudflare Tunnel qua Docker (nếu không cài tunnel app trên OS):
-#      docker compose -f docker-compose.prod.yml --profile cloudflare up -d
+# 3. Chạy backend staging:
+#      docker compose -f docker-compose.staging.yml up -d
 # ==============================================================================
 
 services:
@@ -39,11 +37,16 @@ services:
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
       SERVER_PORT: ${SERVER_PORT:-8082}
+      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
+      # OpenAPI servers
+      APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
+      app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
+      app.openapi.server-description: ${APP_OPENAPI_SERVER_DESCRIPTION:-Staging (Cloudflare Tunnel)}
     networks:
       - englishhub_network
       - englishhub_shared
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${SERVER_PORT:-8082}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
