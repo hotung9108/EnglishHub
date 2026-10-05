@@ -9,7 +9,7 @@ import type {
   StudentEvaluationListParams,
   StudentEvaluationListResponse,
   UpdateStudentEvaluationRequest,
-} from '@/api/services/student-evaluation.service';
+} from '@/types/student-evaluation.types';
 import type { MessageResponse } from '@/api/interfaces/api-response.interface';
 import { useMutation } from './core/useMutation';
 import {

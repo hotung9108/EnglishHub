@@ -1,43 +1,14 @@
 import { httpClient } from '../core/client';
-import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
+import type { MessageResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
-
-export interface StudentEvaluationListItem {
-  id: number;
-  classId: number;
-  teacherName: string;
-  content: string;
-  createdAt: string;
-}
-
-export interface StudentEvaluationListParams {
-  classId?: number;
-  page?: number;
-  limit?: number;
-}
-
-export interface StudentEvaluationListResponse {
-  data: StudentEvaluationListItem[];
-  pagination: PaginationResponse;
-}
-
-export interface StudentEvaluationDetailResponse {
-  id: number;
-  content: string;
-}
-
-export interface CreateStudentEvaluationRequest {
-  classId: number;
-  content: string;
-}
-
-export interface CreatedStudentEvaluationResponse extends MessageResponse {
-  id: number;
-}
-
-export interface UpdateStudentEvaluationRequest {
-  content: string;
-}
+import type {
+  CreateStudentEvaluationRequest,
+  CreatedStudentEvaluationResponse,
+  StudentEvaluationDetailResponse,
+  StudentEvaluationListParams,
+  StudentEvaluationListResponse,
+  UpdateStudentEvaluationRequest,
+} from '../../types/student-evaluation.types';
 
 export class StudentEvaluationService {
   private readonly http: IHttpClient;

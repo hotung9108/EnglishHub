@@ -1,4 +1,4 @@
-import type { StudentEvaluationListParams } from '../api/services/student-evaluation.service';
+import type { StudentEvaluationListParams } from '../types/student-evaluation.types';
 import { clampLimit, clampPage } from './useUsers.utils';
 
 export function buildStudentEvaluationParams(
