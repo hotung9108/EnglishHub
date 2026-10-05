@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 	private final String configuredModel;
 	private final String configuredProvider;
 
+	@Autowired
 	public GradingAiAnalysisServiceImpl(
 			GradingRepository gradingRepository,
 			GradingContextRepository gradingContextRepository,
