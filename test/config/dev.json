@@ -1,0 +1,12 @@
+﻿{
+  \"env\": \"dev\",
+  \"frontend\": { \"baseUrl\": \"http://localhost:5173\" },
+  \"backend\":  { \"baseUrl\": \"http://localhost:8080\", \"apiPrefix\": \"/api/v1\" },
+  \"aiService\":{ \"baseUrl\": \"http://localhost:8000\" },
+  \"selenium\": { \"browser\": \"chrome\", \"headless\": false, \"timeout\": 30000 },
+  \"users\": {
+    \"admin\":   { \"email\": \"admin@utc-polyglot.edu.vn\", \"password\": \"Password123!\" },
+    \"teacher\": { \"email\": \"teacher01@gmail.com\", \"password\": \"Password123!\" },
+    \"student\": { \"email\": \"sv000001@gmail.com\", \"password\": \"Password123!\" }
+  }
+}
