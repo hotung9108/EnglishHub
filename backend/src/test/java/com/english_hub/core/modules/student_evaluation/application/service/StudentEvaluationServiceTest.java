@@ -25,6 +25,7 @@ import com.english_hub.core.modules.student_evaluation.domain.repository.Student
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,17 +71,23 @@ class StudentEvaluationServiceTest {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(TEACHER_ID, UserRole.TEACHER));
 		when(classRepository.studentExists(STUDENT_ID)).thenReturn(true);
 		StudentEvaluation evaluation = evaluation(EVALUATION_ID, STUDENT_ID, TEACHER_ID, CLASS_ID, "Good work.");
-		when(studentEvaluationRepository.findPage(new StudentEvaluationFilter(STUDENT_ID, CLASS_ID), 2, 5))
+		StudentEvaluationFilter filter = new StudentEvaluationFilter(
+				STUDENT_ID,
+				CLASS_ID,
+				Instant.parse("2026-09-19T17:00:00Z"),
+				Instant.parse("2026-09-20T17:00:00Z"));
+		when(studentEvaluationRepository.findPage(filter, 2, 5))
 				.thenReturn(new StudentEvaluationPage(List.of(evaluation), 2, 5, 7));
 		when(classRepository.findTeacher(TEACHER_ID)).thenReturn(Optional.of(new TeacherInfo(TEACHER_ID, "Teacher A")));
 
-		StudentEvaluationPage result = service.listForStudent(STUDENT_ID, CLASS_ID, 2, 5);
+		StudentEvaluationPage result = service.listForStudent(
+				STUDENT_ID, CLASS_ID, LocalDate.of(2026, 9, 20), LocalDate.of(2026, 9, 20), 2, 5);
 
 		assertThat(result.getContent()).containsExactly(evaluation.withTeacherName("Teacher A"));
 		assertThat(result.getPage()).isEqualTo(2);
 		assertThat(result.getSize()).isEqualTo(5);
 		assertThat(result.getTotalElements()).isEqualTo(7);
-		verify(studentEvaluationRepository).findPage(new StudentEvaluationFilter(STUDENT_ID, CLASS_ID), 2, 5);
+		verify(studentEvaluationRepository).findPage(filter, 2, 5);
 	}
 
 	@Test
@@ -89,7 +96,7 @@ class StudentEvaluationServiceTest {
 
 		ApiException exception = assertThrows(
 				ApiException.class,
-				() -> service.listForStudent(STUDENT_ID + 1, null, 1, 20));
+				() -> service.listForStudent(STUDENT_ID + 1, null, null, null, 1, 20));
 
 		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
 		verifyNoInteractions(studentEvaluationRepository, classRepository);
@@ -101,7 +108,7 @@ class StudentEvaluationServiceTest {
 
 		ApiException exception = assertThrows(
 				ApiException.class,
-				() -> service.listForStudent(STUDENT_ID, null, 1, 20));
+				() -> service.listForStudent(STUDENT_ID, null, null, null, 1, 20));
 
 		assertApiException(exception, HttpStatus.FORBIDDEN, "Bạn không có quyền thực hiện thao tác này.");
 		verifyNoInteractions(studentEvaluationRepository, classRepository);
@@ -114,7 +121,7 @@ class StudentEvaluationServiceTest {
 
 		ApiException exception = assertThrows(
 				ApiException.class,
-				() -> service.listForStudent(STUDENT_ID, null, 1, 20));
+				() -> service.listForStudent(STUDENT_ID, null, null, null, 1, 20));
 
 		assertApiException(exception, HttpStatus.NOT_FOUND, "Không tìm thấy học viên.");
 		verifyNoInteractions(studentEvaluationRepository);

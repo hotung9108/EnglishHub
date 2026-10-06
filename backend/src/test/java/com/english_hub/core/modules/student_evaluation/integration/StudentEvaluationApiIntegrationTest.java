@@ -242,6 +242,134 @@ class StudentEvaluationApiIntegrationTest {
 	}
 
 	@Test
+	void listFiltersByInclusiveVietnameseCalendarDaysAtBothUtcBoundaries() throws Exception {
+		long beforeFromDate = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Before fromDate", "2026-09-19T16:59:59Z");
+		long fromDateBoundary = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "FromDate boundary", "2026-09-19T17:00:00Z");
+		long toDateBoundary = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "ToDate boundary", "2026-09-20T16:59:59Z");
+		long afterToDate = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "After toDate", "2026-09-20T17:00:00Z");
+		long laterDate = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Later date", "2026-09-21T17:00:00Z");
+		String authorization = bearer(teacherOneId, UserRole.TEACHER);
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "2026-09-20")
+					.header("Authorization", authorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.total").value(4))
+				.andExpect(jsonPath("$.data[0].id").value(laterDate))
+				.andExpect(jsonPath("$.data[1].id").value(afterToDate))
+				.andExpect(jsonPath("$.data[3].id").value(fromDateBoundary));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("toDate", "2026-09-20")
+					.header("Authorization", authorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.total").value(3))
+				.andExpect(jsonPath("$.data[0].id").value(toDateBoundary))
+				.andExpect(jsonPath("$.data[2].id").value(beforeFromDate));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "2026-09-20")
+					.param("toDate", "2026-09-20")
+					.header("Authorization", authorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.total").value(2))
+				.andExpect(jsonPath("$.data[0].id").value(toDateBoundary))
+				.andExpect(jsonPath("$.data[1].id").value(fromDateBoundary));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "2026-09-25")
+					.header("Authorization", authorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.length()").value(0))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+	}
+
+	@Test
+	void listRejectsInvalidDateParametersAndReversedRange() throws Exception {
+		String authorization = bearer(teacherOneId, UserRole.TEACHER);
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "not-a-date")
+					.header("Authorization", authorization))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Khoảng thời gian không hợp lệ."));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("toDate", "")
+					.header("Authorization", authorization))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Khoảng thời gian không hợp lệ."));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "2026-02-30")
+					.header("Authorization", authorization))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Khoảng thời gian không hợp lệ."));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("toDate", "2026-02-30")
+					.header("Authorization", authorization))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Khoảng thời gian không hợp lệ."));
+
+		mockMvc.perform(get("/api/v1/students/{id}/evaluations", studentOneId)
+					.param("fromDate", "2026-09-21")
+					.param("toDate", "2026-09-20")
+					.header("Authorization", authorization))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Khoảng thời gian không hợp lệ."));
+	}
+
+	@Test
+	void studentAndAdminCannotCreateUpdateOrDeleteEvaluations() throws Exception {
+		long evaluationId = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Protected evaluation", "2026-09-22T10:00:00Z");
+
+		assertMutationForbidden(studentOneId, UserRole.STUDENT, evaluationId);
+		assertMutationForbidden(adminId, UserRole.ADMIN, evaluationId);
+	}
+
+	@Test
+	void unauthenticatedRequestsCannotCreateUpdateOrDeleteEvaluations() throws Exception {
+		long evaluationId = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Protected evaluation", "2026-09-22T10:00:00Z");
+
+		mockMvc.perform(post("/api/v1/students/{id}/evaluations", studentOneId)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"classId\":" + classOneId + ",\"content\":\"New evaluation\"}"))
+				.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(put("/api/v1/evaluations/{id}", evaluationId)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"content\":\"Updated evaluation\"}"))
+				.andExpect(status().isUnauthorized());
+
+		mockMvc.perform(delete("/api/v1/evaluations/{id}", evaluationId))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void anotherTeacherCannotDeleteEvaluationAndAuthorCanStillReadIt() throws Exception {
+		long evaluationId = saveEvaluation(
+				studentOneId, teacherOneId, classOneId, "Author's evaluation", "2026-09-22T10:00:00Z");
+
+		mockMvc.perform(delete("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherTwoId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", bearer(teacherOneId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(evaluationId))
+				.andExpect(jsonPath("$.content").value("Author's evaluation"));
+	}
+
+	@Test
 	void adminCannotGetEvaluationDetail() throws Exception {
 		long evaluationId = saveEvaluation(
 				studentOneId, teacherOneId, classOneId, "Admin detail fixture", "2026-09-22T10:00:00Z");
@@ -289,6 +417,26 @@ class StudentEvaluationApiIntegrationTest {
 		StudentEvaluation evaluation = new StudentEvaluation(studentId, teacherId, classId, content);
 		ReflectionTestUtils.setField(evaluation, "createdAt", Instant.parse(createdAt));
 		return evaluationRepository.saveAndFlush(evaluation).getId();
+	}
+
+	private void assertMutationForbidden(long actorId, UserRole role, long evaluationId) throws Exception {
+		String authorization = bearer(actorId, role);
+
+		mockMvc.perform(post("/api/v1/students/{id}/evaluations", studentOneId)
+					.header("Authorization", authorization)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"classId\":" + classOneId + ",\"content\":\"New evaluation\"}"))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(put("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", authorization)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"content\":\"Updated evaluation\"}"))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(delete("/api/v1/evaluations/{id}", evaluationId)
+					.header("Authorization", authorization))
+				.andExpect(status().isForbidden());
 	}
 
 	private String bearer(long userId, UserRole role) {
