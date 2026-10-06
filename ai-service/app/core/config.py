@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 # Automatically load environment variables from ai-service/.env or root .env
 try:
@@ -15,6 +15,7 @@ except ImportError:
     pass
 
 try:
+    from pydantic import field_validator
     from pydantic_settings import BaseSettings, SettingsConfigDict
     class Settings(BaseSettings):
         APP_NAME: str = "EnglishHub AI Service"
@@ -42,7 +43,21 @@ try:
         MAX_RETRIES: int = 2
         
         # CORS
-        CORS_ALLOWED_ORIGINS: List[str] = ["*"]
+        CORS_ALLOWED_ORIGINS: Union[str, List[str]] = ["*"]
+
+        @field_validator("CORS_ALLOWED_ORIGINS", mode="after")
+        @classmethod
+        def parse_cors_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
+            if isinstance(v, str):
+                v = v.strip()
+                if v.startswith("[") and v.endswith("]"):
+                    import json
+                    try:
+                        return json.loads(v)
+                    except Exception:
+                        pass
+                return [origin.strip() for origin in v.split(",") if origin.strip()]
+            return v
 
         model_config = SettingsConfigDict(
             env_file=".env",

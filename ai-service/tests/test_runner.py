@@ -148,6 +148,60 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertIn("Max Score: 9.0", prompt1)
         self.assertIn("--- ASSIGNMENT CONTEXT (STATIC PREFIX FOR PROMPT CACHING) ---", prompt1)
 
+        # 2. Unified single-method verification for Writing skill
+        writing_prompt = GeminiService._build_static_system_prompt(
+            skill="writing",
+            module_instructions="Write an essay discussing advantages and disadvantages of online learning.",
+            ai_instruction_snapshot="Focus on Task Response and Coherence",
+            max_score=9.0
+        )
+        self.assertIn("Write an essay discussing advantages and disadvantages of online learning.", writing_prompt)
+        self.assertIn("Focus on Task Response and Coherence", writing_prompt)
+        self.assertIn("SCORING RUBRIC & CALIBRATION", writing_prompt)
+
+
+
+class TestWritingApi(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+        self.essay = (
+            "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
+            "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"
+            "First of all, engaging in voluntary activities allows teenagers to acquire practical experience. "
+            "Community service help teenagers understand social responsibilities and learn how to work effectively in a team. "
+            "Furthermore, participating in social work can make a big benefit for their future university applications because admissions officers always appreciate well-rounded candidates.\n"
+            "However they should not be overloaded with too many working hours, as academic study must remain their top priority. "
+            "In conclusion, mandatory community service is highly beneficial for high school students as long as it is reasonably arranged."
+        )
+
+    def test_analyze_writing_qa21_benchmark(self):
+        payload = {
+            "submissionModuleId": 15,
+            "content": self.essay,
+            "moduleInstructions": "Some people believe that unpaid community service should be a compulsory part of high school programmes. To what extent do you agree or disagree?",
+            "maxScore": 9.0,
+            "aiProvider": "mock"
+        }
+        response = self.client.post("/api/v1/analyze/writing", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["submissionModuleId"], 15)
+        self.assertEqual(data["overallScore"], 6.5)
+        self.assertIn("IELTS Writing", data["aiFeedback"])
+        self.assertIn("textMetrics", data)
+        self.assertEqual(data["textMetrics"]["wordCount"], 125)
+        self.assertIn("criteriaScores", data)
+        self.assertEqual(data["criteriaScores"]["taskResponse"], 7.0)
+        self.assertGreaterEqual(len(data["annotations"]), 1)
+
+    def test_analyze_writing_validation_missing_input(self):
+        payload = {
+            "submissionModuleId": 15,
+            "content": "   "
+        }
+        response = self.client.post("/api/v1/analyze/writing", json=payload)
+        self.assertIn(response.status_code, [400, 422])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,7 @@
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
 import base64
 from fastapi.testclient import TestClient
 from app.main import app

@@ -109,6 +109,10 @@ public class Grading {
 		return JsonbValueCodec.serialize(aiTranscript);
 	}
 
+	public void setAiTranscriptJson(String json) {
+		this.aiTranscript = JsonbValueCodec.parse(json, "ai_transcript");
+	}
+
 	public void updateTeacherGrade(
 			BigDecimal finalScore,
 			String finalFeedback,

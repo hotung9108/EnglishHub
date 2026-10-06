@@ -2,6 +2,7 @@ package com.english_hub.core.modules.grading.presentation.rest;
 
 import com.english_hub.core.modules.grading.application.service.GradingService;
 import com.english_hub.core.modules.grading.domain.model.GradingPage;
+import com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.AnswerAnnotationListResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.AnswerAnnotationResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.CreateAnswerAnnotationRequest;
@@ -50,6 +51,11 @@ public class GradingController {
 		gradingService.requestAiAnalysis(id);
 		return ResponseEntity.status(HttpStatus.ACCEPTED)
 				.body(new GradingMessageResponse("Đã gửi yêu cầu phân tích, vui lòng chờ."));
+	}
+
+	@GetMapping("/submission-modules/{id}/grading/ai-suggestion")
+	public ResponseEntity<AiGradingSuggestionResponse> getAiSuggestion(@PathVariable long id) {
+		return ResponseEntity.ok(gradingService.getAiSuggestion(id));
 	}
 
 	@PutMapping("/gradings/{id}")

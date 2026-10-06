@@ -1,0 +1,18 @@
+id: BE-TASK-15
+title: "Research & Build Writing AI Grading Pipeline (UC27) and Core Backend Integration"
+assignee: "@be-secondary"
+status: "Done"
+priority: "High"
+progress: "DONE. Researched and implemented complete Writing AI Grading Pipeline (UC27) in ai-service and integrated end-to-end into Spring Boot Core Backend.
+1. AI Microservice (ai-service): Built FastAPI endpoints POST /api/v1/analyze/writing and POST /api/v1/analyze/writing/upload. Built TextAnalyzer with quantitative linguistic metrics (TTR, sentence complexity, Flesch-Kincaid readability) and document extraction (.txt, .docx, .pdf, .md). Implemented GeminiService with prompt caching (Tier-1 ephemeral caching), deterministic QA-21 fixed benchmark, CEFR/IELTS 4-criteria rubric, and verbatim character-offset error annotations.
+2. Core Backend Integration (backend):
+- Created client DTOs: AiWritingAnalysisRequest, AiWritingAnalysisResponse, WritingCriteriaScoresDto, TextMetricsDto, and enhanced AiAnnotationDto with exactText.
+- Extended AiServiceClient and AiServiceClientImpl with analyzeWriting (JSON payload) and analyzeWritingUpload (multipart upload for documents) including automatic retry and exponential backoff.
+- Integrated into GradingAiAnalysisServiceImpl: dispatched ModuleSkill.WRITING, supporting both raw essay text from answer.getContent() and uploaded document files from answer.getDocStorageKey() via StorageService.
+- Persisted finalScore, aiFeedback, detailed criteria scores and text metrics into gradings.ai_transcript (JSONB), and character-offset error annotations into answer_annotations.
+- Implemented fault tolerance per PP Section 6.5.2: when AI calls fail/timeout (504), grading status updates to FAILED, preserving student submissions for manual teacher grading (UC24) without crashing the system.
+- Tested: 100% pass on all 5 Python writing tests, 7 AI runner tests, and all Spring Boot unit & integration tests (GradingAiAnalysisServiceImplTest, AiServiceClientTest, GradingApiIntegrationTest, AutoGradingIntegrationTest)."
+description: "Research and implement Writing AI Grading Pipeline (UC27) in ai-service and core backend integration. Extract student essay content, compute quantitative linguistic metrics, standardize IELTS/CEFR 4-criteria rubric prompts with Gemini Structured Outputs, extract character-offset error annotations, guarantee 100% deterministic QA-21 benchmark testing, integrate into Spring Boot GradingAiAnalysisServiceImpl, and implement third-party LLM timeout/failure resilience fallback per PP 6.5.2."
+artifacts:
+  - "docs/WRITING_AI_PIPELINE_RESEARCH.md"
+  - "production_artifacts/be_to_tester/writing-ai-grading-testing-instructions.md"
