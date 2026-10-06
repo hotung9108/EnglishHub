@@ -93,4 +93,42 @@ class GradingControllerMockMvcTest {
 
 		verify(gradingService).requestAiAnalysis(14L);
 	}
+
+	@Test
+	void aiSuggestionEndpointReturnsOkWithAggregatedData() throws Exception {
+		when(gradingService.getAiSuggestion(14L)).thenReturn(new com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse(
+				14L,
+				1L,
+				"WRITING",
+				"AI_GRADED",
+				java.math.BigDecimal.valueOf(7.0),
+				java.math.BigDecimal.valueOf(9.0),
+				"Good overall coherence.",
+				null,
+				null,
+				List.of(),
+				null,
+				"benchmark/qa-21-deterministic",
+				"mock",
+				false,
+				true,
+				"AI đã hoàn tất gợi ý chấm điểm."
+		));
+
+		mockMvc.perform(get("/api/v1/submission-modules/14/grading/ai-suggestion"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.submissionModuleId").value(14))
+				.andExpect(jsonPath("$.gradingId").value(1))
+				.andExpect(jsonPath("$.skill").value("WRITING"))
+				.andExpect(jsonPath("$.status").value("AI_GRADED"))
+				.andExpect(jsonPath("$.suggestedScore").value(7.0))
+				.andExpect(jsonPath("$.maxScore").value(9.0))
+				.andExpect(jsonPath("$.aiFeedback").value("Good overall coherence."))
+				.andExpect(jsonPath("$.modelUsed").value("benchmark/qa-21-deterministic"))
+				.andExpect(jsonPath("$.providerUsed").value("mock"))
+				.andExpect(jsonPath("$.canTriggerAi").value(false))
+				.andExpect(jsonPath("$.fallbackManualGradingAvailable").value(true));
+
+		verify(gradingService).getAiSuggestion(14L);
+	}
 }

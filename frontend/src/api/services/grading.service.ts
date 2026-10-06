@@ -28,6 +28,37 @@ export interface GradingDetailResponse {
   aiInstructionSnapshot: string | null;
 }
 
+export interface AiGradingAnnotation {
+  id: number;
+  answerId: number;
+  source: 'AI' | 'TEACHER';
+  reviewStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  startOffset: number;
+  endOffset: number;
+  errorType?: string | null;
+  comment?: string | null;
+  suggestedFix?: string | null;
+}
+
+export interface AiGradingSuggestionResponse {
+  submissionModuleId: number;
+  gradingId: number;
+  skill: 'SPEAKING' | 'WRITING';
+  status: GradingStatus;
+  suggestedScore: number | null;
+  maxScore: number | null;
+  aiFeedback: string | null;
+  criteriaScores: Record<string, number> | null;
+  metrics: Record<string, number> | null;
+  annotations: AiGradingAnnotation[];
+  transcript: unknown | null;
+  modelUsed: string | null;
+  providerUsed: string | null;
+  canTriggerAi: boolean;
+  fallbackManualGradingAvailable: boolean;
+  fallbackMessage: string;
+}
+
 export type GradingMessageResponse = MessageResponse;
 
 export interface UpdateFinalGradeRequest {
@@ -89,6 +120,16 @@ export class GradingService {
     return this.http.post<GradingMessageResponse>(
       `/submission-modules/${id}/grading/ai-analyze`,
       undefined,
+      options
+    );
+  }
+
+  getAiSuggestion(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<AiGradingSuggestionResponse> {
+    return this.http.get<AiGradingSuggestionResponse>(
+      `/submission-modules/${submissionModuleId}/grading/ai-suggestion`,
       options
     );
   }

@@ -6,6 +6,13 @@ from app.schemas.speaking import (
     AnalyzeSpeakingRequest,
     AnalyzeSpeakingResponse,
 )
+from app.schemas.writing import (
+    WritingMetrics,
+    WritingCriteriaScores,
+    WritingAnnotationItem,
+    AnalyzeWritingRequest,
+    AnalyzeWritingResponse,
+)
 
 __all__ = [
     "WordTimestamp",
@@ -14,4 +21,9 @@ __all__ = [
     "AnnotationItem",
     "AnalyzeSpeakingRequest",
     "AnalyzeSpeakingResponse",
+    "WritingMetrics",
+    "WritingCriteriaScores",
+    "WritingAnnotationItem",
+    "AnalyzeWritingRequest",
+    "AnalyzeWritingResponse",
 ]

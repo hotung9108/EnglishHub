@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1.endpoints import health, speaking
+from app.api.v1.endpoints import health, speaking, writing
 
 # Configure structured logging
 logging.basicConfig(
@@ -32,6 +32,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(health.router, prefix="", tags=["Health"])
 app.include_router(speaking.router, prefix=settings.API_V1_PREFIX, tags=["Speaking Analysis"])
+app.include_router(writing.router, prefix=settings.API_V1_PREFIX, tags=["Writing Analysis"])
 
 
 @app.on_event("startup")
