@@ -116,10 +116,12 @@ jobs:
 
       - name: Connect to Tailscale
         id: tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: --accept-dns=false
+          timeout: 10m
+          retry: 3
         continue-on-error: true
 
       - name: Show Tailscale diagnostics
@@ -152,6 +154,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_NAME,DEPLOY_SHA
+          timeout: 2m
+          command_timeout: 60m
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
