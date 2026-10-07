@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -48,77 +48,89 @@ const StudentAssignmentOverview: React.FC = () => {
     return Number.isFinite(parsed) ? parsed : 1;
   }, [id]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch assignment detail
-      let assignmentData: AssignmentDetail | null = null;
-      try {
-        assignmentData = await assignmentService.getAssignment(numericAssignmentId);
-        setAssignment(assignmentData);
-      } catch {
-        // Fallback default info if ID is mock string like HW-01
-        assignmentData = {
-          id: numericAssignmentId,
-          title: `Bài tập ${id || 'HW-01'}`,
-          status: 'PUBLISHED',
-          modules: [{ id: 1, skill: 'WRITING' }]
-        };
-        setAssignment(assignmentData);
-      }
-
-      // 2. Fetch student attempts
-      if (user?.id) {
-        try {
-          const subRes = await submissionService.listSubmissions({
-            assignmentId: numericAssignmentId,
-            studentId: user.id,
-            limit: 20
-          });
-          const list = subRes.data || [];
-          const activeAttempt = findInProgressAttempt(list);
-          setInProgressSub(activeAttempt);
-
-          // Find best score
-          let maxVal = -1;
-          list.forEach((item) => {
-            const sc = item.modules?.[0]?.grading?.finalScore ?? 0;
-            if (sc > maxVal) maxVal = sc;
-          });
-
-          const records: AttemptRecord[] = list.map((item) => {
-            const rawScore = item.modules?.[0]?.grading?.finalScore ?? null;
-            const isGraded = item.status === 'GRADED';
-            const band = rawScore !== null ? (rawScore / 100 * 9).toFixed(1) : '--';
-            return {
-              id: item.id,
-              attemptNumber: item.attemptNumber,
-              submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
-              score: rawScore,
-              maxScore: 100,
-              bandScore: band,
-              status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
-              isBest: rawScore !== null && rawScore === maxVal && maxVal > 0,
-            };
-          });
-
-          setAttempts(records);
-        } catch {
-          setAttempts([]);
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải thông tin bài tập.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [numericAssignmentId, id, user?.id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch assignment detail
+        let assignmentData: AssignmentDetail | null = null;
+        try {
+          assignmentData = await assignmentService.getAssignment(numericAssignmentId);
+          if (isMounted) setAssignment(assignmentData);
+        } catch {
+          // Fallback default info if ID is mock string like HW-01
+          assignmentData = {
+            id: numericAssignmentId,
+            title: `Bài tập ${id || 'HW-01'}`,
+            status: 'PUBLISHED',
+            modules: [{ id: 1, skill: 'WRITING' }]
+          };
+          if (isMounted) setAssignment(assignmentData);
+        }
+
+        // 2. Fetch student attempts
+        if (user?.id) {
+          try {
+            const subRes = await submissionService.listSubmissions({
+              assignmentId: numericAssignmentId,
+              studentId: user.id,
+              limit: 20
+            });
+            const list = subRes.data || [];
+            const activeAttempt = findInProgressAttempt(list);
+            if (isMounted) setInProgressSub(activeAttempt);
+
+            // Find best score
+            let maxVal = -1;
+            list.forEach((item) => {
+              const sc = item.modules?.[0]?.grading?.finalScore ?? 0;
+              if (sc > maxVal) maxVal = sc;
+            });
+
+            const records: AttemptRecord[] = list.map((item) => {
+              const rawScore = item.modules?.[0]?.grading?.finalScore ?? null;
+              const isGraded = item.status === 'GRADED';
+              const band = rawScore !== null ? (rawScore / 100 * 9).toFixed(1) : '--';
+              return {
+                id: item.id,
+                attemptNumber: item.attemptNumber,
+                submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
+                score: rawScore,
+                maxScore: 100,
+                bandScore: band,
+                status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
+                isBest: rawScore !== null && rawScore === maxVal && maxVal > 0,
+              };
+            });
+
+            if (isMounted) setAttempts(records);
+          } catch {
+            if (isMounted) setAttempts([]);
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải thông tin bài tập.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     void loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericAssignmentId, id, user?.id, reloadKey]);
 
   const maxSubmissions = 3;
   const remainingAttempts = getRemainingAttempts(maxSubmissions, attempts.filter(a => a.status !== 'in_progress').length) ?? 3;
@@ -202,7 +214,7 @@ const StudentAssignmentOverview: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
             <RefreshCw size={13} /> Thử lại

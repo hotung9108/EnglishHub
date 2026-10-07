@@ -29,84 +29,98 @@ const StudentClassDetails: React.FC = () => {
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [assignments, setAssignments] = useState<EnrichedClassAssignment[]>([]);
 
-  const fetchClassDetails = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const numericId = Number(id);
-      const isNum = !isNaN(numericId);
-      const targetClassId = isNum ? numericId : 1;
-
-      const [classRes, assignmentsRes, submissionsRes] = await Promise.allSettled([
-        isNum ? classService.getDetail(numericId) : Promise.reject('Invalid ID'),
-        assignmentService.listAssignments(targetClassId),
-        submissionService.listSubmissions({ studentId: user?.id })
-      ]);
-
-      let detail: ClassDetail | null = null;
-      if (classRes.status === 'fulfilled' && classRes.value) {
-        detail = classRes.value;
-      } else {
-        detail = {
-          id: targetClassId,
-          name: `Lớp học #${targetClassId}`,
-          status: 'ACTIVE',
-          teacher: undefined,
-          level: undefined
-        };
-      }
-      setClassDetail(detail);
-
-      const rawAssignments: AssignmentSummary[] = assignmentsRes.status === 'fulfilled'
-        ? (assignmentsRes.value?.data || (Array.isArray(assignmentsRes.value) ? assignmentsRes.value : []))
-        : [];
-
-      const rawSubmissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
-        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
-        : [];
-
-      if (rawAssignments.length > 0) {
-        const mapped = rawAssignments.map(a => {
-          const sub = rawSubmissions.find(s => String(s.assignmentId) === String(a.id) || String(s.id) === String(a.id));
-          let status: 'not_started' | 'pending' | 'graded' = 'not_started';
-          if (sub) {
-            status = sub.status === 'GRADED' ? 'graded' : 'pending';
-          }
-
-          let skill = 'Writing';
-          const titleLower = a.title.toLowerCase();
-          if (titleLower.includes('speak')) skill = 'Speaking';
-          else if (titleLower.includes('read')) skill = 'Reading';
-          else if (titleLower.includes('listen')) skill = 'Listening';
-
-          const scoreVal = sub?.modules?.[0]?.grading?.finalScore ?? undefined;
-
-          return {
-            id: String(a.id),
-            title: a.title,
-            dueDate: a.closeAt ? new Date(a.closeAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : (isVi ? 'Không có hạn nộp' : 'No deadline'),
-            skill,
-            status,
-            score: scoreVal !== undefined && scoreVal !== null ? scoreVal : undefined,
-            submissionId: sub?.id ? String(sub.id) : undefined
-          };
-        });
-        setAssignments(mapped);
-      } else {
-        setAssignments([]);
-      }
-    } catch (err) {
-      console.error('Failed to load class details', err);
-      setError('Không thể tải thông tin chi tiết lớp học.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    fetchClassDetails();
-  }, [id, user?.id]);
+    let isMounted = true;
+
+    const fetchClassDetails = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const numericId = Number(id);
+        const isNum = !isNaN(numericId);
+        const targetClassId = isNum ? numericId : 1;
+
+        const [classRes, assignmentsRes, submissionsRes] = await Promise.allSettled([
+          isNum ? classService.getDetail(numericId) : Promise.reject('Invalid ID'),
+          assignmentService.listAssignments(targetClassId),
+          submissionService.listSubmissions({ studentId: user?.id })
+        ]);
+
+        if (!isMounted) return;
+
+        let detail: ClassDetail | null = null;
+        if (classRes.status === 'fulfilled' && classRes.value) {
+          detail = classRes.value;
+        } else {
+          detail = {
+            id: targetClassId,
+            name: `Lớp học #${targetClassId}`,
+            status: 'ACTIVE',
+            teacher: undefined,
+            level: undefined
+          };
+        }
+        setClassDetail(detail);
+
+        const rawAssignments: AssignmentSummary[] = assignmentsRes.status === 'fulfilled'
+          ? (assignmentsRes.value?.data || (Array.isArray(assignmentsRes.value) ? assignmentsRes.value : []))
+          : [];
+
+        const rawSubmissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+          ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+          : [];
+
+        if (rawAssignments.length > 0) {
+          const mapped = rawAssignments.map(a => {
+            const sub = rawSubmissions.find(s => String(s.assignmentId) === String(a.id) || String(s.id) === String(a.id));
+            let status: 'not_started' | 'pending' | 'graded' = 'not_started';
+            if (sub) {
+              status = sub.status === 'GRADED' ? 'graded' : 'pending';
+            }
+
+            let skill = 'Writing';
+            const titleLower = a.title.toLowerCase();
+            if (titleLower.includes('speak')) skill = 'Speaking';
+            else if (titleLower.includes('read')) skill = 'Reading';
+            else if (titleLower.includes('listen')) skill = 'Listening';
+
+            const scoreVal = sub?.modules?.[0]?.grading?.finalScore ?? undefined;
+
+            return {
+              id: String(a.id),
+              title: a.title,
+              dueDate: a.closeAt ? new Date(a.closeAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : (isVi ? 'Không có hạn nộp' : 'No deadline'),
+              skill,
+              status,
+              score: scoreVal !== undefined && scoreVal !== null ? scoreVal : undefined,
+              submissionId: sub?.id ? String(sub.id) : undefined
+            };
+          });
+          setAssignments(mapped);
+        } else {
+          setAssignments([]);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load class details', err);
+        setError('Không thể tải thông tin chi tiết lớp học.');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchClassDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, user?.id, isVi, reloadKey]);
 
   const stats = useMemo(() => {
     const total = assignments.length;
@@ -159,7 +173,7 @@ const StudentClassDetails: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchClassDetails} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>Thử lại</span>
           </button>

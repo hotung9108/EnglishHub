@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, BookOpen, 
@@ -36,100 +36,114 @@ const StudentAssignmentReading: React.FC = () => {
     return Number.isFinite(parsed) ? parsed : 1;
   }, [id]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch assignment
-      let currentAssignment: AssignmentDetail | null = null;
-      try {
-        currentAssignment = await assignmentService.getAssignment(numericId);
-        setAssignment(currentAssignment);
-      } catch {
-        currentAssignment = {
-          id: numericId,
-          title: `Reading Practice #${id || '1'}`,
-          status: 'PUBLISHED',
-          modules: [{ id: 1, skill: 'READING' }]
-        };
-        setAssignment(currentAssignment);
-      }
-
-      // 2. Fetch module and questions
-      let moduleId = currentAssignment?.modules?.[0]?.id;
-      if (!moduleId) {
-        try {
-          const modRes = await moduleService.listModules(numericId);
-          if (modRes.modules && modRes.modules.length > 0) {
-            moduleId = modRes.modules[0].id;
-          }
-        } catch {
-          // Fallback
-        }
-      }
-
-      if (moduleId) {
-        try {
-          const mod = await moduleService.getModule(moduleId);
-          setModuleDetail(mod);
-        } catch {
-          // Fallback
-        }
-
-        try {
-          const qRes = await questionService.listQuestions(moduleId);
-          if (qRes.questions && qRes.questions.length > 0) {
-            setQuestions(qRes.questions);
-          } else {
-            setQuestions([]);
-          }
-        } catch {
-          setQuestions([]);
-        }
-      } else {
-        setQuestions([]);
-      }
-
-      // 3. Resolve or start submission attempt
-      const urlSubmissionId = searchParams.get('submissionId');
-      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
-        try {
-          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-          setSubmission(sub);
-        } catch {
-          // Fallback
-        }
-      } else if (user?.id) {
-        try {
-          const subList = await submissionService.listSubmissions({
-            assignmentId: numericId,
-            studentId: user.id,
-            status: 'IN_PROGRESS',
-            limit: 1
-          });
-          if (subList.data && subList.data.length > 0) {
-            const sub = await submissionService.getSubmission(subList.data[0].id);
-            setSubmission(sub);
-          } else {
-            const startRes = await submissionService.startAttempt(numericId);
-            const sub = await submissionService.getSubmission(startRes.id);
-            setSubmission(sub);
-          }
-        } catch {
-          // Fallback
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài đọc.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [numericId, id, searchParams, user?.id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch assignment
+        let currentAssignment: AssignmentDetail | null = null;
+        try {
+          currentAssignment = await assignmentService.getAssignment(numericId);
+          if (isMounted) setAssignment(currentAssignment);
+        } catch {
+          currentAssignment = {
+            id: numericId,
+            title: `Reading Practice #${id || '1'}`,
+            status: 'PUBLISHED',
+            modules: [{ id: 1, skill: 'READING' }]
+          };
+          if (isMounted) setAssignment(currentAssignment);
+        }
+
+        // 2. Fetch module and questions
+        let moduleId = currentAssignment?.modules?.[0]?.id;
+        if (!moduleId) {
+          try {
+            const modRes = await moduleService.listModules(numericId);
+            if (modRes.modules && modRes.modules.length > 0) {
+              moduleId = modRes.modules[0].id;
+            }
+          } catch {
+            // Fallback
+          }
+        }
+
+        if (moduleId) {
+          try {
+            const mod = await moduleService.getModule(moduleId);
+            if (isMounted) setModuleDetail(mod);
+          } catch {
+            // Fallback
+          }
+
+          try {
+            const qRes = await questionService.listQuestions(moduleId);
+            if (isMounted) {
+              if (qRes.questions && qRes.questions.length > 0) {
+                setQuestions(qRes.questions);
+              } else {
+                setQuestions([]);
+              }
+            }
+          } catch {
+            if (isMounted) setQuestions([]);
+          }
+        } else {
+          if (isMounted) setQuestions([]);
+        }
+
+        // 3. Resolve or start submission attempt
+        const urlSubmissionId = searchParams.get('submissionId');
+        if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+          try {
+            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+            if (isMounted) setSubmission(sub);
+          } catch {
+            // Fallback
+          }
+        } else if (user?.id) {
+          try {
+            const subList = await submissionService.listSubmissions({
+              assignmentId: numericId,
+              studentId: user.id,
+              status: 'IN_PROGRESS',
+              limit: 1
+            });
+            if (subList.data && subList.data.length > 0) {
+              const sub = await submissionService.getSubmission(subList.data[0].id);
+              if (isMounted) setSubmission(sub);
+            } else {
+              const startRes = await submissionService.startAttempt(numericId);
+              const sub = await submissionService.getSubmission(startRes.id);
+              if (isMounted) setSubmission(sub);
+            }
+          } catch {
+            // Fallback
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải đề bài đọc.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     void loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, id, searchParams, user?.id, reloadKey]);
 
   const totalQuestions = questions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
@@ -237,7 +251,7 @@ const StudentAssignmentReading: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
             <RefreshCw size={13} /> Thử lại
@@ -410,9 +424,13 @@ const StudentAssignmentReading: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {['A', 'B', 'C', 'D'].map((optKey) => {
                     const isSelected = selectedAnswers[activeQuestion] === optKey;
-                    const optText = (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.text
-                      || (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.content
-                      || `Lựa chọn ${optKey}`;
+                    const questionWithOptions = currentQuestionItem as QuestionResponse & {
+                      options?: Array<{ id?: string; key?: string; text?: string; content?: string }>;
+                    };
+                    const matchedOption = questionWithOptions.options?.find(
+                      (o) => o.id === optKey || o.key === optKey
+                    );
+                    const optText = matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
                     return (
                       <label 
                         key={optKey}

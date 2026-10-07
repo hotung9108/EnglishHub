@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
@@ -40,85 +40,97 @@ const StudentDashboard: React.FC = () => {
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [progress, setProgress] = useState<ReportStudentProgressResponse | null>(null);
 
-  const fetchDashboardData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch student's classes
-      const classRes = await classService.list({ limit: 50 });
-      const activeClasses = classRes.data || [];
-      setClasses(activeClasses);
-
-      // 2. Fetch submissions for student
-      let subList: SubmissionListItem[] = [];
-      if (user?.id) {
-        try {
-          const subRes = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
-          subList = subRes.data || [];
-          setSubmissions(subList);
-        } catch {
-          // Fallback if submissions cannot be listed
-          setSubmissions([]);
-        }
-
-        // 3. Fetch progress report
-        try {
-          const progRes = await reportService.getStudentProgress(user.id);
-          setProgress(progRes);
-        } catch {
-          setProgress(null);
-        }
-      }
-
-      // 4. Fetch assignments for each class
-      const assignmentPromises = activeClasses.map(async (cls) => {
-        try {
-          const res = await assignmentService.listAssignments(cls.id, { limit: 20 });
-          const items = res.data || [];
-          return await Promise.all(
-            items.map(async (a) => {
-              let matchedSub: SubmissionListItem | undefined = undefined;
-              if (user?.id) {
-                try {
-                  const subRes = await submissionService.listSubmissions({
-                    assignmentId: a.id,
-                    studentId: user.id,
-                    limit: 1
-                  });
-                  if (subRes.data && subRes.data.length > 0) {
-                    matchedSub = subRes.data[0];
-                  }
-                } catch {
-                  // Fallback
-                }
-              }
-              return {
-                ...a,
-                className: cls.name,
-                classId: cls.id,
-                submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
-                score: matchedSub?.modules?.[0]?.grading?.finalScore ?? null,
-              };
-            })
-          );
-        } catch {
-          return [];
-        }
-      });
-
-      const assignmentResults = await Promise.all(assignmentPromises);
-      setAssignments(assignmentResults.flat());
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu bảng điều khiển. Vui lòng thử lại sau.';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch student's classes
+        const classRes = await classService.list({ limit: 50 });
+        const activeClasses = classRes.data || [];
+        if (isMounted) setClasses(activeClasses);
+
+        // 2. Fetch submissions for student
+        let subList: SubmissionListItem[] = [];
+        if (user?.id) {
+          try {
+            const subRes = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
+            subList = subRes.data || [];
+            if (isMounted) setSubmissions(subList);
+          } catch {
+            // Fallback if submissions cannot be listed
+            if (isMounted) setSubmissions([]);
+          }
+
+          // 3. Fetch progress report
+          try {
+            const progRes = await reportService.getStudentProgress(user.id);
+            if (isMounted) setProgress(progRes);
+          } catch {
+            if (isMounted) setProgress(null);
+          }
+        }
+
+        // 4. Fetch assignments for each class
+        const assignmentPromises = activeClasses.map(async (cls) => {
+          try {
+            const res = await assignmentService.listAssignments(cls.id, { limit: 20 });
+            const items = res.data || [];
+            return await Promise.all(
+              items.map(async (a) => {
+                let matchedSub: SubmissionListItem | undefined = undefined;
+                if (user?.id) {
+                  try {
+                    const subRes = await submissionService.listSubmissions({
+                      assignmentId: a.id,
+                      studentId: user.id,
+                      limit: 1
+                    });
+                    if (subRes.data && subRes.data.length > 0) {
+                      matchedSub = subRes.data[0];
+                    }
+                  } catch {
+                    // Fallback
+                  }
+                }
+                return {
+                  ...a,
+                  className: cls.name,
+                  classId: cls.id,
+                  submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
+                  score: matchedSub?.modules?.[0]?.grading?.finalScore ?? null,
+                };
+              })
+            );
+          } catch {
+            return [];
+          }
+        });
+
+        const assignmentResults = await Promise.all(assignmentPromises);
+        if (isMounted) setAssignments(assignmentResults.flat());
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu bảng điều khiển. Vui lòng thử lại sau.';
+        setError(message);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     void fetchDashboardData();
-  }, [fetchDashboardData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, reloadKey]);
 
   // Derived statistics
   const totalAssignments = assignments.length;
@@ -245,7 +257,7 @@ const StudentDashboard: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={fetchDashboardData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
           >
             <RefreshCw size={14} /> Thử lại

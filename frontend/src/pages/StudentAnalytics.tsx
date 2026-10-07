@@ -46,35 +46,49 @@ export const StudentAnalytics: React.FC = () => {
   const [progressData, setProgressData] = useState<ReportStudentProgressResponse | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [progressRes, submissionsRes] = await Promise.allSettled([
-        user?.id ? reportService.getStudentProgress(Number(user.id)) : Promise.reject('No user'),
-        submissionService.listSubmissions({ studentId: user?.id })
-      ]);
-
-      if (progressRes.status === 'fulfilled' && progressRes.value) {
-        setProgressData(progressRes.value);
-      }
-
-      if (submissionsRes.status === 'fulfilled' && submissionsRes.value) {
-        const rawSubs = submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []);
-        setSubmissions(rawSubs);
-      }
-    } catch (err) {
-      console.error('Failed to load student analytics', err);
-      setError(isVi ? 'Không thể tải dữ liệu phân tích năng lực.' : 'Failed to fetch student analytics.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [user?.id, timeRange]);
+    let isMounted = true;
+
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [progressRes, submissionsRes] = await Promise.allSettled([
+          user?.id ? reportService.getStudentProgress(Number(user.id)) : Promise.reject('No user'),
+          submissionService.listSubmissions({ studentId: user?.id })
+        ]);
+
+        if (!isMounted) return;
+
+        if (progressRes.status === 'fulfilled' && progressRes.value) {
+          setProgressData(progressRes.value);
+        }
+
+        if (submissionsRes.status === 'fulfilled' && submissionsRes.value) {
+          const rawSubs = submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []);
+          setSubmissions(rawSubs);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load student analytics', err);
+        setError(isVi ? 'Không thể tải dữ liệu phân tích năng lực.' : 'Failed to fetch student analytics.');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchAnalytics();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, timeRange, isVi, reloadKey]);
 
 
   const skillsData: SkillScore[] = useMemo(() => {
@@ -214,7 +228,7 @@ export const StudentAnalytics: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchAnalytics} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>{isVi ? 'Thử lại' : 'Retry'}</span>
           </button>
