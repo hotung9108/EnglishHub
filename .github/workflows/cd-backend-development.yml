@@ -160,6 +160,14 @@ jobs:
             # Pull image mới về trước
             docker pull $IMAGE_NAME:$DEPLOY_SHA
 
+            # Đảm bảo network chung tồn tại (tunnel + backend đều cần)
+            docker network inspect englishhub_shared >/dev/null 2>&1 \
+              || docker network create englishhub_shared >/dev/null
+
+            # Khởi động Cloudflare Tunnel trước khi khởi động Backend
+            cd /home/${{ secrets.SERVER_USER }}/tunnel
+            docker compose -f docker-compose.tunnel.yml up -d Tunnel
+
             # Cập nhật BACKEND_IMAGE trong .env để compose dùng đúng tag
             cd /home/${{ secrets.SERVER_USER }}/englishhub-dev
             sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$DEPLOY_SHA|" .env

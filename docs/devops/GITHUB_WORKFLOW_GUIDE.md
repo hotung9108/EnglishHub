@@ -166,12 +166,13 @@ Hệ thống workflow nằm trong thư mục [`.github/workflows/`](file:///d:/C
   1. **Kết nối mạng an toàn qua Tailscale Mesh VPN**: Sử dụng `tailscale/github-action@v2` với `TAILSCALE_AUTHKEY` để runner có thể truy cập an toàn vào IP nội bộ của máy chủ phát triển mà không cần mở cổng SSH ra ngoài Internet.
   2. **Đóng gói Docker Image & Push lên GHCR**: Đăng nhập GitHub Container Registry (`ghcr.io`) và đóng gói image `ghcr.io/hotung9108/english-hub-backend` với 2 tag: `:latest` và `:${{ head_sha của lần chạy Backend CI }}`.
   3. **Deploy qua SSH**:
-     - Kết nối SSH vào server dev (`SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`).
-     - Đăng nhập GHCR trên server bằng `GHCR_PAT`.
-     - Kéo Docker image mới theo SHA commit.
-     - Cập nhật biến `BACKEND_IMAGE` trong file `/home/${{ secrets.SERVER_USER }}/englishhub-dev/.env`.
-     - Chạy lại container: `docker compose -f docker-compose.staging.yml up -d --pull always`.
-     - Dọn dẹp image không sử dụng (`docker image prune -f`).
+    - Kết nối SSH vào server dev (`SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`).
+    - Đăng nhập GHCR trên server bằng `GHCR_PAT`.
+    - Kéo Docker image mới theo SHA commit.
+    - Đảm bảo network `englishhub_shared` tồn tại, rồi **khởi động Cloudflare Tunnel trước** tại `/home/${{ secrets.SERVER_USER }}/tunnel` (`docker compose up -d tunnel`).
+    - Cập nhật biến `BACKEND_IMAGE` trong file `/home/${{ secrets.SERVER_USER }}/englishhub-dev/.env`.
+    - Chạy lại container: `docker compose -f docker-compose.staging.yml up -d --pull always`.
+    - Dọn dẹp image không sử dụng (`docker image prune -f`).
 
 ---
 
@@ -193,7 +194,7 @@ Hệ thống workflow nằm trong thư mục [`.github/workflows/`](file:///d:/C
   - Nếu không: bỏ qua chờ, deploy Backend ngay.
   - AI service CI/CD thất bại → **chặn** deploy Backend (timeout 20 phút).
 - **Các bước thực thi của job `deploy`**:
-  - Kết nối Tailscale mesh VPN -> Build & Push image lên GHCR (`:latest` và `:${{ head_sha của lần chạy Backend CI }}`) -> SSH vào máy chủ -> Cập nhật `/home/${{ secrets.SERVER_USER }}/englishhub/.env` -> Khởi động lại container Production (`docker-compose.prod.yml`).
+  - Kết nối Tailscale mesh VPN -> Build & Push image lên GHCR (`:latest` và `:${{ head_sha của lần chạy Backend CI }}`) -> SSH vào máy chủ -> Đảm bảo network `englishhub_shared` tồn tại và **khởi động Cloudflare Tunnel trước** tại `/home/${{ secrets.SERVER_USER }}/tunnel` -> Cập nhật `/home/${{ secrets.SERVER_USER }}/englishhub/.env` -> Khởi động lại container Production (`docker-compose.prod.yml`).
 
 ---
 
