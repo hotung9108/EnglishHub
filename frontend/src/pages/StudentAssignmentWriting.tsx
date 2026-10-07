@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ChevronRight, Paperclip, FileText, Download, 
@@ -30,91 +30,97 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [editorText, setEditorText] = useState('');
+  const [editorText, setEditorText] = useState(() => {
+    return localStorage.getItem(`eh_draft_writing_${id}`) || '';
+  });
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
     return Number.isFinite(parsed) ? parsed : 1;
   }, [id]);
 
-  // Load draft from localStorage on mount
-  useEffect(() => {
-    const savedDraft = localStorage.getItem(`eh_draft_writing_${id}`);
-    if (savedDraft) {
-      setEditorText(savedDraft);
-    }
-  }, [id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch assignment details
-      let currentAssignment: AssignmentDetail | null = null;
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        currentAssignment = await assignmentService.getAssignment(numericId);
-        setAssignment(currentAssignment);
-      } catch {
-        currentAssignment = {
-          id: numericId,
-          title: `Writing Task: #${id || '1'}`,
-          status: 'PUBLISHED',
-          modules: [{ id: 1, skill: 'WRITING' }]
-        };
-        setAssignment(currentAssignment);
-      }
-
-      // 2. Fetch module details if available
-      const moduleId = currentAssignment?.modules?.[0]?.id;
-      if (moduleId) {
+        // 1. Fetch assignment details
+        let currentAssignment: AssignmentDetail | null = null;
         try {
-          const mod = await moduleService.getModule(moduleId);
-          setModuleDetail(mod);
+          currentAssignment = await assignmentService.getAssignment(numericId);
+          if (isMounted) setAssignment(currentAssignment);
         } catch {
-          // Module endpoint fallback
+          currentAssignment = {
+            id: numericId,
+            title: `Writing Task: #${id || '1'}`,
+            status: 'PUBLISHED',
+            modules: [{ id: 1, skill: 'WRITING' }]
+          };
+          if (isMounted) setAssignment(currentAssignment);
         }
-      }
 
-      // 3. Resolve or start submission attempt
-      const urlSubmissionId = searchParams.get('submissionId');
-      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
-        try {
-          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-          setSubmission(sub);
-        } catch {
-          // Fallback
-        }
-      } else if (user?.id) {
-        try {
-          const subList = await submissionService.listSubmissions({
-            assignmentId: numericId,
-            studentId: user.id,
-            status: 'IN_PROGRESS',
-            limit: 1
-          });
-          if (subList.data && subList.data.length > 0) {
-            const sub = await submissionService.getSubmission(subList.data[0].id);
-            setSubmission(sub);
-          } else {
-            const startRes = await submissionService.startAttempt(numericId);
-            const sub = await submissionService.getSubmission(startRes.id);
-            setSubmission(sub);
+        // 2. Fetch module details if available
+        const moduleId = currentAssignment?.modules?.[0]?.id;
+        if (moduleId) {
+          try {
+            const mod = await moduleService.getModule(moduleId);
+            if (isMounted) setModuleDetail(mod);
+          } catch {
+            // Module endpoint fallback
           }
-        } catch {
-          // Fallback if unable to start or list
+        }
+
+        // 3. Resolve or start submission attempt
+        const urlSubmissionId = searchParams.get('submissionId');
+        if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+          try {
+            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+            if (isMounted) setSubmission(sub);
+          } catch {
+            // Fallback
+          }
+        } else if (user?.id) {
+          try {
+            const subList = await submissionService.listSubmissions({
+              assignmentId: numericId,
+              studentId: user.id,
+              status: 'IN_PROGRESS',
+              limit: 1
+            });
+            if (subList.data && subList.data.length > 0) {
+              const sub = await submissionService.getSubmission(subList.data[0].id);
+              if (isMounted) setSubmission(sub);
+            } else {
+              const startRes = await submissionService.startAttempt(numericId);
+              const sub = await submissionService.getSubmission(startRes.id);
+              if (isMounted) setSubmission(sub);
+            }
+          } catch {
+            // Fallback if unable to start or list
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải đề bài.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [numericId, id, searchParams, user?.id]);
+    };
 
-  useEffect(() => {
     void loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, id, searchParams, user?.id, reloadKey]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -225,7 +231,7 @@ const StudentAssignmentWriting: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
             <RefreshCw size={13} /> Thử lại

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,103 +54,114 @@ const StudentAssignments: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'not_started' | 'grading' | 'graded'>('all');
 
-  const fetchAssignmentsData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch student's classes
-      const classRes = await classService.list({ limit: 50 });
-      const fetchedClasses = classRes.data || [];
-      setClasses(fetchedClasses);
-
-
-      // 3. Fetch assignments across all enrolled classes
-      const assignmentPromises = fetchedClasses.map(async (cls) => {
-        try {
-          const res = await assignmentService.listAssignments(cls.id, { limit: 50 });
-          const items = res.data || [];
-          return await Promise.all(
-            items.map(async (a: AssignmentSummary): Promise<StudentAssignmentDisplay> => {
-              let matchedSub: SubmissionListItem | undefined = undefined;
-              if (user?.id) {
-                try {
-                  const subRes = await submissionService.listSubmissions({
-                    assignmentId: a.id,
-                    studentId: user.id,
-                    limit: 1
-                  });
-                  if (subRes.data && subRes.data.length > 0) {
-                    matchedSub = subRes.data[0];
-                  }
-                } catch {
-                  // Fallback
-                }
-              }
-
-              let displayStatus: AssignmentDisplayStatus = 'not_started';
-              let score: number | undefined = undefined;
-
-              if (matchedSub) {
-                if (matchedSub.status === 'GRADED') {
-                  displayStatus = 'graded';
-                  score = matchedSub.modules?.[0]?.grading?.finalScore ?? undefined;
-                } else if (matchedSub.status === 'SUBMITTED') {
-                  displayStatus = 'pending';
-                } else if (matchedSub.status === 'IN_PROGRESS') {
-                  displayStatus = 'in_progress';
-                }
-              }
-
-              // Determine skill type from title or modules
-              const lowerTitle = a.title.toLowerCase();
-              let skillType = 'General Task';
-              if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
-              else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
-              else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
-              else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
-
-              // Calculate days left
-              let daysLeft = 3;
-              if (a.closeAt) {
-                const diffMs = new Date(a.closeAt).getTime() - Date.now();
-                daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-              }
-
-              return {
-                id: a.id,
-                classId: String(cls.id),
-                className: cls.name,
-                title: a.title,
-                type: skillType,
-                status: displayStatus,
-                submissionId: matchedSub?.id,
-                submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
-                deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
-                teacherName: 'Giảng viên phụ trách',
-                score,
-                daysLeft,
-              };
-            })
-          );
-        } catch {
-          return [];
-        }
-      });
-
-      const assignmentResults = await Promise.all(assignmentPromises);
-      const combined = assignmentResults.flat();
-      setRawAssignments(combined);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải danh sách bài tập. Vui lòng thử lại.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchAssignmentsData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch student's classes
+        const classRes = await classService.list({ limit: 50 });
+        const fetchedClasses = classRes.data || [];
+        if (isMounted) setClasses(fetchedClasses);
+
+        // 2. Fetch assignments across all enrolled classes
+        const assignmentPromises = fetchedClasses.map(async (cls) => {
+          try {
+            const res = await assignmentService.listAssignments(cls.id, { limit: 50 });
+            const items = res.data || [];
+            return await Promise.all(
+              items.map(async (a: AssignmentSummary): Promise<StudentAssignmentDisplay> => {
+                let matchedSub: SubmissionListItem | undefined = undefined;
+                if (user?.id) {
+                  try {
+                    const subRes = await submissionService.listSubmissions({
+                      assignmentId: a.id,
+                      studentId: user.id,
+                      limit: 1
+                    });
+                    if (subRes.data && subRes.data.length > 0) {
+                      matchedSub = subRes.data[0];
+                    }
+                  } catch {
+                    // Fallback
+                  }
+                }
+
+                let displayStatus: AssignmentDisplayStatus = 'not_started';
+                let score: number | undefined = undefined;
+
+                if (matchedSub) {
+                  if (matchedSub.status === 'GRADED') {
+                    displayStatus = 'graded';
+                    score = matchedSub.modules?.[0]?.grading?.finalScore ?? undefined;
+                  } else if (matchedSub.status === 'SUBMITTED') {
+                    displayStatus = 'pending';
+                  } else if (matchedSub.status === 'IN_PROGRESS') {
+                    displayStatus = 'in_progress';
+                  }
+                }
+
+                // Determine skill type from title or modules
+                const lowerTitle = a.title.toLowerCase();
+                let skillType = 'General Task';
+                if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
+                else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
+                else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
+                else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+
+                // Calculate days left
+                let daysLeft = 3;
+                if (a.closeAt) {
+                  const diffMs = new Date(a.closeAt).getTime() - Date.now();
+                  daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                }
+
+                return {
+                  id: a.id,
+                  classId: String(cls.id),
+                  className: cls.name,
+                  title: a.title,
+                  type: skillType,
+                  status: displayStatus,
+                  submissionId: matchedSub?.id,
+                  submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
+                  deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
+                  teacherName: 'Giảng viên phụ trách',
+                  score,
+                  daysLeft,
+                };
+              })
+            );
+          } catch {
+            return [];
+          }
+        });
+
+        const assignmentResults = await Promise.all(assignmentPromises);
+        const combined = assignmentResults.flat();
+        if (isMounted) setRawAssignments(combined);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải danh sách bài tập. Vui lòng thử lại.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     void fetchAssignmentsData();
-  }, [fetchAssignmentsData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, reloadKey]);
 
   const getAssignmentRoute = (assignment: StudentAssignmentDisplay) => {
     const typeLower = assignment.type.toLowerCase();
@@ -279,7 +290,7 @@ const StudentAssignments: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={fetchAssignmentsData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
           >
             <RefreshCw size={14} /> {t('studentAssignments.retry')}

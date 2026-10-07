@@ -44,7 +44,13 @@ export const StudentFeedback: React.FC = () => {
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchFeedback = async () => {
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFeedback = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -149,19 +155,27 @@ export const StudentFeedback: React.FC = () => {
           });
         });
 
-      setFeedbackList(dynamicList);
-    } catch (err) {
-      console.error('Failed to load feedback', err);
-      setError(isVi ? 'Không thể tải phản hồi từ máy chủ.' : 'Failed to load feedback.');
-      setFeedbackList([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (isMounted) {
+          setFeedbackList(dynamicList);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load feedback', err);
+        setError(isVi ? 'Không thể tải phản hồi từ máy chủ.' : 'Failed to load feedback.');
+        setFeedbackList([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-  useEffect(() => {
-    fetchFeedback();
-  }, [user?.id]);
+    void fetchFeedback();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, isVi, reloadKey]);
 
   const teacherFeedbackCount = feedbackList.filter(f => f.reviewerType === 'teacher').length;
   const aiFeedbackCount = feedbackList.filter(f => f.reviewerType === 'ai').length;
@@ -225,7 +239,7 @@ export const StudentFeedback: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchFeedback} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>{isVi ? 'Thử lại' : 'Retry'}</span>
           </button>

@@ -20,82 +20,98 @@ const StudentClasses: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
 
-  const fetchClasses = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [classesRes, submissionsRes] = await Promise.allSettled([
-        classService.list(),
-        submissionService.listSubmissions({ studentId: user?.id })
-      ]);
-
-      const rawClasses: ClassSummary[] = classesRes.status === 'fulfilled'
-        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
-        : [];
-      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
-        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
-        : [];
-
-      if (rawClasses.length > 0) {
-        // Fetch assignments for each class
-        const assignmentsByClass = await Promise.all(
-          rawClasses.map(async (c) => {
-            try {
-              const res = await assignmentService.listAssignments(c.id);
-              return { classId: c.id, assignments: res.data || [] };
-            } catch {
-              return { classId: c.id, assignments: [] as AssignmentSummary[] };
-            }
-          })
-        );
-
-        const mapped: StudentClassInfo[] = rawClasses.map(c => {
-          const classAssignments = assignmentsByClass.find(item => item.classId === c.id)?.assignments || [];
-          const classSubmissions = submissions.filter(s => {
-            return classAssignments.some(a => a.id === s.assignmentId || a.id === s.id);
-          });
-
-          const graded = classSubmissions.filter(s => s.status === 'GRADED');
-          const avgScore = graded.length > 0 
-            ? parseFloat((graded.reduce((acc, curr) => acc + (curr.modules?.[0]?.grading?.finalScore || 0), 0) / (graded.length * 10)).toFixed(1))
-            : undefined;
-
-          const isCompleted = c.status === 'COMPLETED';
-
-          return {
-            id: String(c.id),
-            code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
-            name: c.name,
-            instructorName: 'Giáo viên phụ trách',
-            status: isCompleted ? 'completed' : 'active',
-            hasCertificate: isCompleted,
-            stats: {
-              assigned: classAssignments.length,
-              pending: Math.max(0, classAssignments.length - classSubmissions.length),
-              avgScore: avgScore ?? 0,
-              result: isCompleted ? 'Đạt' : undefined,
-              finalScore: isCompleted ? avgScore : undefined
-            }
-          };
-        });
-
-        setClassesList(mapped);
-      } else {
-        setClassesList([]);
-      }
-    } catch (err) {
-      console.error('Failed to load student classes', err);
-      setError('Không thể tải danh sách lớp học từ máy chủ.');
-      setClassesList([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
-    fetchClasses();
-  }, [user?.id]);
+    let isMounted = true;
+
+    const fetchClasses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [classesRes, submissionsRes] = await Promise.allSettled([
+          classService.list(),
+          submissionService.listSubmissions({ studentId: user?.id })
+        ]);
+
+        if (!isMounted) return;
+
+        const rawClasses: ClassSummary[] = classesRes.status === 'fulfilled'
+          ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+          : [];
+        const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+          ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+          : [];
+
+        if (rawClasses.length > 0) {
+          // Fetch assignments for each class
+          const assignmentsByClass = await Promise.all(
+            rawClasses.map(async (c) => {
+              try {
+                const res = await assignmentService.listAssignments(c.id);
+                return { classId: c.id, assignments: res.data || [] };
+              } catch {
+                return { classId: c.id, assignments: [] as AssignmentSummary[] };
+              }
+            })
+          );
+
+          if (!isMounted) return;
+
+          const mapped: StudentClassInfo[] = rawClasses.map(c => {
+            const classAssignments = assignmentsByClass.find(item => item.classId === c.id)?.assignments || [];
+            const classSubmissions = submissions.filter(s => {
+              return classAssignments.some(a => a.id === s.assignmentId || a.id === s.id);
+            });
+
+            const graded = classSubmissions.filter(s => s.status === 'GRADED');
+            const avgScore = graded.length > 0 
+              ? parseFloat((graded.reduce((acc, curr) => acc + (curr.modules?.[0]?.grading?.finalScore || 0), 0) / (graded.length * 10)).toFixed(1))
+              : undefined;
+
+            const isCompleted = c.status === 'COMPLETED';
+
+            return {
+              id: String(c.id),
+              code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
+              name: c.name,
+              instructorName: 'Giáo viên phụ trách',
+              status: isCompleted ? 'completed' : 'active',
+              hasCertificate: isCompleted,
+              stats: {
+                assigned: classAssignments.length,
+                pending: Math.max(0, classAssignments.length - classSubmissions.length),
+                avgScore: avgScore ?? 0,
+                result: isCompleted ? 'Đạt' : undefined,
+                finalScore: isCompleted ? avgScore : undefined
+              }
+            };
+          });
+
+          setClassesList(mapped);
+        } else {
+          setClassesList([]);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load student classes', err);
+        setError('Không thể tải danh sách lớp học từ máy chủ.');
+        setClassesList([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchClasses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, reloadKey]);
 
   const counts = useMemo(() => ({
     all: classesList.length,
@@ -172,7 +188,7 @@ const StudentClasses: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchClasses} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>Thử lại</span>
           </button>
