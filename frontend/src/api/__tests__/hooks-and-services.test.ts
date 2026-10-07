@@ -193,6 +193,26 @@ test('buildStudentEvaluationParams keeps classId when present and omits it when 
   });
 });
 
+test('buildStudentEvaluationParams trims date filters and omits blank values', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams({
+    fromDate: ' 2026-09-01 ',
+    toDate: ' 2026-10-01  ',
+  }), {
+    fromDate: '2026-09-01',
+    toDate: '2026-10-01',
+    page: 1,
+    limit: 20,
+  });
+  assert.deepStrictEqual(buildStudentEvaluationParams({
+    fromDate: '   ',
+    toDate: '',
+  }), { page: 1, limit: 20 });
+  assert.deepStrictEqual(buildStudentEvaluationParams({
+    fromDate: undefined,
+    toDate: undefined,
+  }), { page: 1, limit: 20 });
+});
+
 // ==========================================
 // 3. CLASS SERVICE TESTS
 // ==========================================
