@@ -1,23 +1,137 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ArrowLeft, ChevronRight, Search, Bell, BookOpen, 
-  Timer, Pause, Save, Send, Bookmark, Highlighter, 
-  ChevronLeft
+  ArrowLeft, ChevronRight, BookOpen, 
+  Timer, Bookmark, Highlighter, 
+  ChevronLeft, AlertCircle, RefreshCw, Loader2, CheckCircle2
 } from 'lucide-react';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
+import { questionService, type QuestionResponse } from '../api/services/question.service';
+import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAuth } from '../contexts/AuthContext';
 
 const StudentAssignmentReading: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // The id can be used to fetch assignment details. Console log to avoid unused variable warning.
-  console.log('Assignment ID:', id);
-  
-  // Mock State
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [questions, setQuestions] = useState<QuestionResponse[]>([]);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
 
-  const totalQuestions = 10;
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : 1;
+  }, [id]);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch assignment
+      let currentAssignment: AssignmentDetail | null = null;
+      try {
+        currentAssignment = await assignmentService.getAssignment(numericId);
+        setAssignment(currentAssignment);
+      } catch {
+        currentAssignment = {
+          id: numericId,
+          title: `Reading Practice #${id || '1'}`,
+          status: 'PUBLISHED',
+          modules: [{ id: 1, skill: 'READING' }]
+        };
+        setAssignment(currentAssignment);
+      }
+
+      // 2. Fetch module and questions
+      let moduleId = currentAssignment?.modules?.[0]?.id;
+      if (!moduleId) {
+        try {
+          const modRes = await moduleService.listModules(numericId);
+          if (modRes.modules && modRes.modules.length > 0) {
+            moduleId = modRes.modules[0].id;
+          }
+        } catch {
+          // Fallback
+        }
+      }
+
+      if (moduleId) {
+        try {
+          const mod = await moduleService.getModule(moduleId);
+          setModuleDetail(mod);
+        } catch {
+          // Fallback
+        }
+
+        try {
+          const qRes = await questionService.listQuestions(moduleId);
+          if (qRes.questions && qRes.questions.length > 0) {
+            setQuestions(qRes.questions);
+          } else {
+            setQuestions([]);
+          }
+        } catch {
+          setQuestions([]);
+        }
+      } else {
+        setQuestions([]);
+      }
+
+      // 3. Resolve or start submission attempt
+      const urlSubmissionId = searchParams.get('submissionId');
+      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+        try {
+          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+          setSubmission(sub);
+        } catch {
+          // Fallback
+        }
+      } else if (user?.id) {
+        try {
+          const subList = await submissionService.listSubmissions({
+            assignmentId: numericId,
+            studentId: user.id,
+            status: 'IN_PROGRESS',
+            limit: 1
+          });
+          if (subList.data && subList.data.length > 0) {
+            const sub = await submissionService.getSubmission(subList.data[0].id);
+            setSubmission(sub);
+          } else {
+            const startRes = await submissionService.startAttempt(numericId);
+            const sub = await submissionService.getSubmission(startRes.id);
+            setSubmission(sub);
+          }
+        } catch {
+          // Fallback
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài đọc.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [numericId, id, searchParams, user?.id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const totalQuestions = questions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
 
   const handleSelectAnswer = (qId: number, answer: string) => {
@@ -28,6 +142,58 @@ const StudentAssignmentReading: React.FC = () => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const handleSubmit = async () => {
+    if (answeredCount === 0) {
+      if (!confirm('Bạn chưa trả lời câu hỏi nào. Bạn có chắc chắn muốn nộp bài?')) {
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const subId = submission?.id;
+      const subModuleId = submission?.modules?.[0]?.id;
+
+      if (subModuleId) {
+        const answersPayload = Object.entries(selectedAnswers).map(([qId, ans]) => ({
+          questionId: Number(qId),
+          content: { selectedOptionIds: [ans] }
+        }));
+
+        try {
+          await submissionService.submitModule(subModuleId, { answers: answersPayload });
+        } catch {
+          // Continue
+        }
+      }
+
+      if (subId) {
+        try {
+          await submissionService.submitSubmission(subId);
+        } catch {
+          // Continue
+        }
+      }
+
+      setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+      setTimeout(() => {
+        if (subId) {
+          navigate(`/student/submissions/${subId}`);
+        } else {
+          navigate(`/student/assignments/${id}/result`);
+        }
+      }, 1200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const currentQuestionItem = questions[activeQuestion - 1] || questions[0];
+
   return (
     <div style={{ 
       margin: 'calc(var(--margin-desktop, 40px) * -1)',
@@ -35,11 +201,11 @@ const StudentAssignmentReading: React.FC = () => {
       flexDirection: 'column', 
       backgroundColor: '#F8FAFC'
     }}>
-      
-      {/* Page Header (replaces standard header) */}
+      {/* Page Header */}
       <div style={{ padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <button 
+            type="button"
             onClick={() => navigate('/student/assignments')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}
           >
@@ -48,354 +214,280 @@ const StudentAssignmentReading: React.FC = () => {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B' }}>
             <span>Hệ thống</span> <ChevronRight size={14} />
-            <span>Lớp học của tôi</span> <ChevronRight size={14} />
-            <span>ENG-IELTS-6.5A</span> <ChevronRight size={14} />
-            <span style={{ color: '#2563EB', fontWeight: 500 }}>Reading 01</span>
+            <span>Lớp học</span> <ChevronRight size={14} />
+            <span style={{ color: '#2563EB', fontWeight: 500 }}>
+              {assignment?.title || `Reading Practice #${id}`}
+            </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input type="text" placeholder="Tìm kiếm tài liệu..." style={{ padding: '8px 16px 8px 36px', borderRadius: '20px', border: '1px solid #E2E8F0', fontSize: '14px', width: '240px', outline: 'none' }} />
-          </div>
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <Bell size={20} color="#64748B" />
-            <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', backgroundColor: '#EF4444', borderRadius: '50%' }}></div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', backgroundColor: '#4F46E5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>AJ</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>Alice Johnson</span>
-              <span style={{ fontSize: '12px', color: '#64748B' }}>Học viên IELTS 6.5A</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Assignment Header - Title only (scrolls away) */}
-      <div style={{ padding: '24px 24px 16px 24px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <span style={{ padding: '4px 12px', backgroundColor: '#3B82F6', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '4px', textTransform: 'uppercase' }}>Reading 01</span>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase' }}>THE EVOLUTION OF PRINTING & TYPOGRAPHY</h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#64748B' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><BookOpen size={16} /> IELTS Academic Passage 1</span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Tổng số: <strong style={{ color: '#1E293B' }}>10 câu</strong></span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Mã đề: RD-ENG-01</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sticky Action Bar */}
-      <div style={{ position: 'sticky', top: '64px', zIndex: 50, padding: '10px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px', color: '#D97706' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '20px', color: '#DC2626', fontWeight: 600, fontSize: '14px' }}>
             <Timer size={16} />
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700 }}>TIME LEFT</span>
-              <span style={{ fontSize: '16px', fontWeight: 800, lineHeight: '1' }}>58:24</span>
-            </div>
+            <span>40:00</span>
           </div>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Pause size={14} /> Tạm dừng
-          </button>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Save size={14} /> Lưu nháp
-          </button>
-          <button className="btn btn-primary" style={{ backgroundColor: '#3B82F6', border: 'none', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Send size={14} /> Nộp bài thi
-          </button>
         </div>
       </div>
 
-      {/* Split View Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', flex: 1 }}>
-        
-        {/* Left Column: Passage */}
-        <div style={{ borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
-          
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>
-              <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', margin: 0 }}>ĐOẠN VĂN ĐỌC (PASSAGE 1)</h2>
-              <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Khoảng 820 từ)</span>
+      {error && (
+        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+            <AlertCircle size={20} />
+            <span style={{ fontSize: '14px' }}>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadData}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+          >
+            <RefreshCw size={13} /> Thử lại
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
+          <CheckCircle2 size={20} />
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+        </div>
+      )}
+
+      {/* Main 2-Column Split Workspace */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 480px', flex: 1, minHeight: 'calc(100vh - 128px)' }}>
+        {/* Left Column: Reading Passage */}
+        <div style={{ borderRight: '1px solid #E2E8F0', backgroundColor: 'white', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px 32px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FAFAFA' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <BookOpen size={18} color="#2563EB" />
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>READING PASSAGE</span>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button style={{ padding: '6px 12px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>A-</button>
-              <button style={{ padding: '6px 12px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>A+</button>
-              <button style={{ padding: '6px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Highlighter size={14} /> Đánh dấu
+              <button 
+                type="button"
+                style={{ padding: '6px 12px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '6px', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+              >
+                <Highlighter size={14} /> Highlight
               </button>
             </div>
           </div>
 
-          <div style={{ padding: '32px 48px', flex: 1 }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#0F172A', marginBottom: '16px', lineHeight: '1.4' }}>The Origin and Enduring Legacy of Typesetting Standards</h1>
-              <p style={{ fontSize: '16px', fontStyle: 'italic', color: '#475569', marginBottom: '40px' }}>Source: Excerpts from Classical Typography & Publication Archival Studies</p>
+          <div style={{ padding: '32px', overflowY: 'auto', flex: 1 }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+              {assignment?.title || 'Bài đọc'}
+            </h1>
+            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px', fontStyle: 'italic' }}>
+              {totalQuestions > 0 ? `Đọc đoạn văn sau và trả lời các câu hỏi từ 1 đến ${totalQuestions}.` : 'Đọc đoạn văn sau.'}
+            </p>
 
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, borderRadius: '4px' }}>PARAGRAPH A</span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>What is Lorem Ipsum?</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {moduleDetail?.instructions ? (
+                moduleDetail.instructions
+                  .split('\n\n')
+                  .filter((p: string) => p.trim())
+                  .map((paragraph: string, index: number) => (
+                    <div key={index} style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <span style={{ padding: '2px 8px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '11px', fontWeight: 700, borderRadius: '4px' }}>
+                          PARAGRAPH {index + 1}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', textAlign: 'justify', margin: 0, whiteSpace: 'pre-line' }}>
+                        {paragraph}
+                      </p>
+                    </div>
+                  ))
+              ) : (
+                <div style={{ textAlign: 'center', padding: '48px 16px', color: '#64748B' }}>
+                  <BookOpen size={40} style={{ margin: '0 auto 12px', color: '#94A3B8' }} />
+                  <p style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>Chưa có nội dung bài đọc</p>
+                  <span style={{ fontSize: '13px' }}>Nội dung bài đọc chưa được cập nhật cho phần thi này.</span>
                 </div>
-                <p style={{ fontSize: '17px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
-                  <strong>Lorem Ipsum</strong> is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. Designers at <span style={{ backgroundColor: '#FEF08A', padding: '2px 4px', borderRadius: '2px' }}>Letraset and James Mosley</span>, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset's Body Type sheets. It has survived not only many decades, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, borderRadius: '4px' }}>PARAGRAPH B</span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Why do we use it?</span>
-                </div>
-                <p style={{ fontSize: '17px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
-                  It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using <em>'Content here, content here'</em>, making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, borderRadius: '4px' }}>PARAGRAPH C</span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Where does it come from?</span>
-                </div>
-                <p style={{ fontSize: '17px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
-                  Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, "Lorem ipsum dolor sit amet..", comes from a line in section 1.10.32.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, borderRadius: '4px' }}>PARAGRAPH D</span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>The Transition to Digital Publishing</span>
-                </div>
-                <p style={{ fontSize: '17px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
-                  The standard chunk of Lorem Ipsum used since the 1500s is reproduced below for those interested. Sections 1.10.32 and 1.10.33 from "de Finibus Bonorum et Malorum" by Cicero are also reproduced in their exact original form, accompanied by English versions from the 1914 translation by H. Rackham. With the advent of digital typesetting in the late 20th century, the role of dummy text became even more critical. Graphical user interfaces (GUI) required designers to map out visual hierarchy before final copy was approved. This led to Lorem Ipsum being hardcoded into early design software.
-                </p>
-              </div>
-
-              <div style={{ marginBottom: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '12px', fontWeight: 700, borderRadius: '4px' }}>PARAGRAPH E</span>
-                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Modern Interpretations and Variants</span>
-                </div>
-                <p style={{ fontSize: '17px', lineHeight: '1.8', color: '#334155', textAlign: 'justify' }}>
-                  Today, there are many variations of passages of Lorem Ipsum available, but the majority have suffered alteration in some form, by injected humour, or randomised words which don't look even slightly believable. If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything embarrassing hidden in the middle of text. All the Lorem Ipsum generators on the Internet tend to repeat predefined chunks as necessary, making this the first true generator on the Internet. It uses a dictionary of over 200 Latin words, combined with a handful of model sentence structures, to generate Lorem Ipsum which looks reasonable. The generated Lorem Ipsum is therefore always free from repetition, injected humour, or non-characteristic words etc.
-                </p>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Questions (Sticky) */}
-        <div style={{ position: 'sticky', top: '128px', height: 'calc(100vh - 128px)', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
-          
+        {/* Right Column: Questions */}
+        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', backgroundColor: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: totalQuestions > 0 ? '16px' : 0 }}>
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>Danh sách câu hỏi (Questions 1 - 10)</h2>
-                <span style={{ fontSize: '13px', color: '#64748B' }}>Chọn một đáp án đúng nhất cho mỗi câu hỏi</span>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>
+                  Danh sách câu hỏi {totalQuestions > 0 ? `(1 - ${totalQuestions})` : ''}
+                </h2>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                  {totalQuestions > 0 ? 'Chọn đáp án đúng nhất cho từng câu' : 'Chưa có câu hỏi nào được gán'}
+                </span>
               </div>
-              <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
-                {answeredCount} / {totalQuestions} đã làm
-              </div>
+              {totalQuestions > 0 && (
+                <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
+                  {answeredCount} / {totalQuestions} đã làm
+                </div>
+              )}
             </div>
 
             {/* Question Navigator */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {Array.from({ length: 10 }).map((_, i) => {
-                const qId = i + 1;
-                const isAnswered = !!selectedAnswers[qId];
-                const isBookmarked = bookmarkedQuestions[qId];
-                const isActive = activeQuestion === qId;
-                
-                let bgColor = '#F1F5F9';
-                let textColor = '#475569';
+            {totalQuestions > 0 && (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {questions.map((_, i) => {
+                  const qId = i + 1;
+                  const isAnswered = !!selectedAnswers[qId];
+                  const isBookmarked = bookmarkedQuestions[qId];
+                  const isActive = activeQuestion === qId;
+                  
+                  let bgColor = '#F1F5F9';
+                  let textColor = '#475569';
 
-                if (isActive) {
-                  bgColor = '#2563EB';
-                  textColor = 'white';
-                } else if (isBookmarked) {
-                  bgColor = '#FEF08A';
-                  textColor = '#A16207';
-                } else if (isAnswered) {
-                  bgColor = '#DBEAFE';
-                  textColor = '#1D4ED8';
-                }
+                  if (isActive) {
+                    bgColor = '#2563EB';
+                    textColor = 'white';
+                  } else if (isBookmarked) {
+                    bgColor = '#FEF08A';
+                    textColor = '#A16207';
+                  } else if (isAnswered) {
+                    bgColor = '#DBEAFE';
+                    textColor = '#1D4ED8';
+                  }
 
-                return (
-                  <button 
-                    key={qId}
-                    onClick={() => setActiveQuestion(qId)}
-                    style={{ 
-                      width: '40px', height: '40px', borderRadius: '6px', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '15px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                      backgroundColor: bgColor, color: textColor,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {qId}
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <button 
+                      key={qId}
+                      type="button"
+                      onClick={() => setActiveQuestion(qId)}
+                      style={{ 
+                        width: '36px', height: '36px', borderRadius: '6px', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                        backgroundColor: bgColor, color: textColor,
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {qId}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-            
-            {/* Question Card 1 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 1</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph A)</span>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ height: 100, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ height: 60, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            ) : totalQuestions === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 16px', color: '#64748B' }}>
+                <BookOpen size={40} style={{ margin: '0 auto 12px', color: '#94A3B8' }} />
+                <p style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>Chưa có câu hỏi cho bài đọc này</p>
+                <span style={{ fontSize: '13px' }}>Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
+              </div>
+            ) : currentQuestionItem ? (
+              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
+                      {activeQuestion}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+                      {currentQuestionItem.questionType}
+                    </span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => toggleBookmark(activeQuestion)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: bookmarkedQuestions[activeQuestion] ? '#EAB308' : '#94A3B8' }}
+                  >
+                    <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => toggleBookmark(1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[1] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[1] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
-              </div>
 
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                According to paragraph A, what role did the Letraset sheets play in the 1960s?
-              </h3>
+                <p style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+                  {currentQuestionItem.content}
+                </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is an example of the first popularized typographic specimen' },
-                  { id: 'B', text: 'Some classical Latin texts discovered in Virginia library' },
-                  { id: 'C', text: 'Examples of the answers derived from modern translations' },
-                  { id: 'D', text: 'Of the answers provided solely by Aldus PageMaker' }
-                ].map(opt => {
-                  const isSelected = selectedAnswers[1] === opt.id;
-                  return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q1" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(1, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Question Card 2 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 2</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph B)</span>
+                {/* Options */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {['A', 'B', 'C', 'D'].map((optKey) => {
+                    const isSelected = selectedAnswers[activeQuestion] === optKey;
+                    const optText = (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.text
+                      || (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.content
+                      || `Lựa chọn ${optKey}`;
+                    return (
+                      <label 
+                        key={optKey}
+                        onClick={() => handleSelectAnswer(activeQuestion, optKey)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px',
+                          borderRadius: '8px', border: `1px solid ${isSelected ? '#2563EB' : '#E2E8F0'}`,
+                          backgroundColor: isSelected ? '#EFF6FF' : 'white', cursor: 'pointer', transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSelected ? '#2563EB' : '#CBD5E1'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
+                        }}>
+                          {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB' }}></div>}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#334155', lineHeight: '1.5' }}>
+                          <strong style={{ color: '#1E293B' }}>{optKey}.</strong> {optText}
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
-                <button 
-                  onClick={() => toggleBookmark(2)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[2] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[2] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
               </div>
-
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                Why do desktop publishing packages and layout designers actively utilize Lorem Ipsum?
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is used to maintain a realistic distribution of letters without distraction' },
-                  { id: 'B', text: 'It contains readable English translations from Cicero' },
-                ].map(opt => {
-                  const isSelected = selectedAnswers[2] === opt.id;
-                  return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q2" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(2, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
+            ) : null}
           </div>
 
-          {/* Right Column Footer (Sticky) */}
+          {/* Right Column Footer */}
           <div style={{ padding: '16px 24px', backgroundColor: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button 
+                type="button"
                 onClick={() => setActiveQuestion(Math.max(1, activeQuestion - 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                <ChevronLeft size={18} /> Câu trước
+                <ChevronLeft size={16} /> Câu trước
               </button>
               <button 
-                onClick={() => setActiveQuestion(Math.min(10, activeQuestion + 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                type="button"
+                onClick={() => setActiveQuestion(Math.min(totalQuestions, activeQuestion + 1))}
+                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                Câu tiếp theo <ChevronRight size={18} />
+                Câu sau <ChevronRight size={16} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <button style={{ padding: '10px 32px', border: 'none', backgroundColor: '#2563EB', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
-                Hoàn thành
-              </button>
-            </div>
+            <button 
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              style={{
+                padding: '10px 28px',
+                border: 'none',
+                backgroundColor: '#2563EB',
+                color: 'white',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Đang nộp bài...
+                </>
+              ) : (
+                'Hoàn thành & Nộp bài'
+              )}
+            </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

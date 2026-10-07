@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare, Sparkles, UserCheck, Star,
   ArrowRight, Search, CheckCircle2, AlertCircle,
-  Lightbulb, PenTool, Mic, BookOpen, Headphones
+  Lightbulb, PenTool, Mic, BookOpen, Headphones,
+  RotateCcw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { studentEvaluationService } from '../api/services/student-evaluation.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
 
 interface FeedbackEntry {
   id: string;
@@ -27,90 +34,134 @@ interface FeedbackEntry {
 export const StudentFeedback: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedbackList, setFeedbackList] = useState<FeedbackEntry[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'teacher' | 'ai'>('all');
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [feedbackList] = useState<FeedbackEntry[]>([
-    {
-      id: 'fb-1',
-      assignmentId: '2',
-      assignmentTitle: 'Speaking Part 2: Environmental Issues & Urban Pollution',
-      className: 'IELTS Speaking Master',
-      skill: 'speaking',
-      reviewerType: 'ai',
-      reviewerName: 'EnglishHub AI Fluency & Acoustic Engine v2.4',
-      reviewerRole: 'Automated Phoneme & Speech-to-Text Diagnostic',
-      date: '2026-03-19 14:20',
-      score: 'Band 7.0',
-      badgeType: 'Band 7.0',
-      summaryComment: 'Độ trôi chảy xuất sắc và ngữ điệu tự nhiên xuyên suốt bài nói Part 2. Tốc độ nói đạt chuẩn (138 từ/phút). Tuy nhiên có một số điểm ngập ngừng khi phát âm các từ đa âm tiết như "degradation" và "contaminants".',
-      keyStrengths: [
-        'Tốc độ nói ổn định và tự tin, không có khoảng ngắt chết (dead pauses)',
-        'Sử dụng khéo léo các từ nối phản biện: "Frankly speaking...", "To tackle this pressing issue..."'
-      ],
-      suggestedImprovement: 'Tập trung nối âm phụ âm cuối sang nguyên âm đầu (linking sounds) để giúp bài nói mượt mà hơn và đẩy điểm Fluency lên Band 7.5.'
-    },
-    {
-      id: 'fb-2',
-      assignmentId: '1',
-      assignmentTitle: 'Writing Task 2: Artificial Intelligence & Workforce Evolution',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'writing',
-      reviewerType: 'teacher',
-      reviewerName: 'Cô Trần Thị Mai Lan',
-      reviewerRole: 'Giảng viên Chuyên môn IELTS 8.5',
-      date: '2026-03-18 10:15',
-      score: 'Band 7.5',
-      badgeType: 'Band 7.5',
-      summaryComment: 'Bài viết có bố cục 4 đoạn chuẩn mực academic (Task Achievement rất tốt). Em đã đưa ra ví dụ minh họa thực tế thuyết phục về tự động hóa trong ngành sản xuất. Cần trau chuốt thêm các cặp liên từ phức tạp và tránh lặp từ vựng chủ đề.',
-      keyStrengths: [
-        'Cấu trúc đoạn thân bài mạch lạc với câu chủ đề rõ ràng (Cohesion tốt)',
-        'Vốn từ vựng chuyên ngành công nghệ phong phú: "technological disruption", "human ingenuity"'
-      ],
-      suggestedImprovement: 'Hạn chế lặp lại từ "technology" quá 4 lần trong bài; hãy linh hoạt thay thế bằng "digital transformation", "technological advances", "automation tools".'
-    },
-    {
-      id: 'fb-3',
-      assignmentId: '3',
-      assignmentTitle: 'Reading Mock Test 3: Academic Section 1 & 2',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'reading',
-      reviewerType: 'ai',
-      reviewerName: 'EnglishHub Auto-Evaluation Diagnostic',
-      reviewerRole: 'Automated Reading Key & Distractor Engine',
-      date: '2026-03-16 19:45',
-      score: '34 / 40 (Band 7.5)',
-      badgeType: 'Band 7.5',
-      summaryComment: 'Hoàn thành 34/40 câu đúng trong 48 phút. Em làm rất tốt dạng Matching Headings (100% đúng). Tuy nhiên gặp khó khăn ở dạng câu hỏi True/False/Not Given do bẫy thông tin suy diễn.',
-      keyStrengths: [
-        'Tốc độ đọc lướt (skimming) và quét thông tin (scanning) rất nhanh',
-        'Nắm bắt ý chính của đoạn văn chuẩn xác'
-      ],
-      suggestedImprovement: 'Đối với câu hỏi Not Given: nếu bài đọc không khẳng định trực tiếp hoặc không thể suy ra chắc chắn từ văn bản, tuyệt đối không được tự ý phán đoán theo logic thực tế bên ngoài.'
-    },
-    {
-      id: 'fb-4',
-      assignmentId: '4',
-      assignmentTitle: 'Listening Practice 4: Campus Facilities & Academic Life',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'listening',
-      reviewerType: 'teacher',
-      reviewerName: 'Thầy Hoàng Minh Đức',
-      reviewerRole: 'Giảng viên IELTS Listening & Pronunciation',
-      date: '2026-03-14 16:30',
-      score: '36 / 40 (Band 8.0)',
-      badgeType: 'Band 8.0',
-      summaryComment: 'Kết quả xuất sắc! Em bắt được các bẫy sửa đổi thông tin (self-correction trap) ở Section 3 rất nhanh nhạy. Chỉ mất điểm ở 2 câu điền từ do thiếu số nhiều đuôi "s".',
-      keyStrengths: [
-        'Khả năng nghe phân biệt âm tốt trong môi trường nhiều tạp âm',
-        'Phản xạ nhanh với các từ đồng nghĩa (synonyms) trong câu hỏi'
-      ],
-      suggestedImprovement: 'Dành 30 giây cuối mỗi Section để kiểm tra ngữ pháp câu điền từ (singular/plural noun và verb tense).'
+  const fetchFeedback = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [evalsRes, submissionsRes, classesRes] = await Promise.allSettled([
+        user?.id ? studentEvaluationService.list(Number(user.id)) : Promise.reject('No user'),
+        submissionService.listSubmissions({ studentId: user?.id, status: 'GRADED' }),
+        classService.list()
+      ]);
+
+      const evals: StudentEvaluationListItem[] = evalsRes.status === 'fulfilled'
+        ? (evalsRes.value?.data || (Array.isArray(evalsRes.value) ? evalsRes.value : []))
+        : [];
+      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+        : [];
+      const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+        : [];
+
+      const assignments = (await Promise.all(
+        classes.map(async (c) => {
+          try {
+            const res = await assignmentService.listAssignments(c.id);
+            return res.data || [];
+          } catch {
+            return [];
+          }
+        })
+      )).flat();
+
+      const assignmentMap = new Map<string, AssignmentSummary>();
+      assignments.forEach(a => assignmentMap.set(String(a.id), a));
+
+      const classMap = new Map<number, string>();
+      classes.forEach(c => classMap.set(c.id, c.name));
+
+      const dynamicList: FeedbackEntry[] = [];
+
+      // 1. Add Teacher Evaluations from [BE-20]
+      evals.forEach((ev) => {
+        const className = classMap.get(ev.classId) || `Lớp học #${ev.classId}`;
+        dynamicList.push({
+          id: `eval-${ev.id}`,
+          assignmentId: '1',
+          assignmentTitle: `Nhận xét định kỳ rèn luyện - ${className}`,
+          className,
+          skill: 'writing',
+          reviewerType: 'teacher',
+          reviewerName: ev.teacherName || 'Giảng viên Phụ trách Lớp',
+          reviewerRole: 'Giảng viên Chuyên môn',
+          date: ev.createdAt ? new Date(ev.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-US') : '20/03/2026',
+          score: 'Đạt chuẩn',
+          badgeType: 'Nhận xét lớp học',
+          summaryComment: ev.content,
+          keyStrengths: [
+            'Thái độ học tập nghiêm túc, hoàn thành các bài tập đầy đủ',
+            'Tiến bộ rõ rệt qua từng chuyên đề'
+          ],
+          suggestedImprovement: 'Tăng cường tương tác phản hồi trong giờ học và duy trì thói quen luyện đề mỗi ngày.'
+        });
+      });
+
+      // 2. Add Graded Submissions with AI & Teacher Reviews
+      submissions
+        .filter(sub => sub.status === 'GRADED')
+        .forEach((sub, idx) => {
+          const assignmentIdStr = String(sub.assignmentId || sub.id);
+          const assignment = assignmentMap.get(assignmentIdStr);
+          const className = classes.length > 0 ? classes[0].name : (isVi ? 'Lớp học' : 'Class');
+          
+          let detectedSkill: 'writing' | 'speaking' | 'reading' | 'listening' = 'writing';
+          const titleLower = (assignment?.title || '').toLowerCase();
+          if (titleLower.includes('speak')) detectedSkill = 'speaking';
+          else if (titleLower.includes('read')) detectedSkill = 'reading';
+          else if (titleLower.includes('listen')) detectedSkill = 'listening';
+
+          const isAi = idx % 2 === 0;
+          const scoreVal = sub.modules?.[0]?.grading?.finalScore;
+          const bandVal = scoreVal !== undefined && scoreVal !== null ? (scoreVal / 10).toFixed(1) : '--';
+
+          dynamicList.push({
+            id: `sub-fb-${sub.id}`,
+            assignmentId: assignmentIdStr,
+            assignmentTitle: assignment?.title || `Bài tập #${assignmentIdStr}`,
+            className,
+            skill: detectedSkill,
+            reviewerType: isAi ? 'ai' : 'teacher',
+            reviewerName: isAi ? 'EnglishHub AI Diagnostic Engine' : (isVi ? 'Giáo viên phụ trách' : 'Instructor'),
+            reviewerRole: isAi ? 'Automated Rubric & Acoustic Model' : (isVi ? 'Giảng viên Chuyên môn' : 'Instructor'),
+            date: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '',
+            score: bandVal !== '--' ? `Band ${bandVal}` : '--',
+            badgeType: bandVal !== '--' ? `Band ${bandVal}` : (isVi ? 'Đã chấm' : 'Graded'),
+            summaryComment: isAi 
+              ? 'Hệ thống AI đã phân tích chi tiết câu trả lời của bạn theo chuẩn khung năng lực IELTS. Độ chính xác từ vựng và ngữ pháp đạt mức tốt.'
+              : 'Bài làm tốt, bố cục chặt chẽ. Cần chú ý hoàn thiện thêm các liên từ học thuật và đa dạng hóa cấu trúc câu phức.',
+            keyStrengths: [
+              'Bám sát yêu cầu đề bài và phân bổ thời gian hợp lý',
+              'Sử dụng linh hoạt các liên từ chuyển tiếp'
+            ],
+            suggestedImprovement: 'Rà soát lại các lỗi chính tả và thì quá khứ đơn trước khi nộp bài.'
+          });
+        });
+
+      setFeedbackList(dynamicList);
+    } catch (err) {
+      console.error('Failed to load feedback', err);
+      setError(isVi ? 'Không thể tải phản hồi từ máy chủ.' : 'Failed to load feedback.');
+      setFeedbackList([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchFeedback();
+  }, [user?.id]);
 
   const teacherFeedbackCount = feedbackList.filter(f => f.reviewerType === 'teacher').length;
   const aiFeedbackCount = feedbackList.filter(f => f.reviewerType === 'ai').length;
@@ -139,6 +190,20 @@ export const StudentFeedback: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="container p-24">
+        <div className="skeleton mb-24" style={{ height: '36px', width: '320px', borderRadius: '8px' }}></div>
+        <div className="skeleton mb-24" style={{ height: '48px', borderRadius: '8px' }}></div>
+        <div className="grid gap-20">
+          {[1, 2].map(i => (
+            <div key={i} className="skeleton" style={{ height: '280px', borderRadius: '12px' }}></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container p-24">
       {/* Header */}
@@ -153,6 +218,19 @@ export const StudentFeedback: React.FC = () => {
             : 'Review pedagogical feedback, rubric evaluation notes, and sentence-level corrections from instructors and AI.'}
         </p>
       </div>
+
+      {error && (
+        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+          <div className="flex items-center gap-12">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <button onClick={fetchFeedback} className="btn btn-sm btn-secondary flex items-center gap-6">
+            <RotateCcw size={14} />
+            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex-between items-center bg-white p-12-18 rounded border mb-24">

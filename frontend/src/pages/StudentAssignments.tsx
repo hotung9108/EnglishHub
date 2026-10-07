@@ -1,6 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { 
   PenTool, 
   Mic, 
@@ -9,79 +13,146 @@ import {
   FileText, 
   CheckCircle2, 
   Clock, 
-  Hourglass, 
   Search, 
   Calendar, 
-  User, 
   Sparkles,
   Layers,
-  Check
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
-type AssignmentStatus = 'not_started' | 'pending' | 'ai_processing' | 'graded';
+type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
 
-interface MockAssignment {
-  id: string;
-  classId: string;
+interface StudentAssignmentDisplay {
+  id: string | number;
+  classId: string | number;
+  className: string;
   title: string;
-  type: string; // e.g. 'Writing Task 2', 'Speaking Part 2', 'Reading', 'Listening'
-  status: AssignmentStatus;
+  type: string; // e.g. 'Writing', 'Speaking', 'Reading', 'Listening'
+  status: AssignmentDisplayStatus;
+  submissionId?: number;
   submittedOn?: string;
   deadline?: string;
-  teacherName: string;
-  hasAudio?: boolean;
+  teacherName?: string;
   score?: number;
-  accuracy?: string; // e.g. '38/40'
-  
+  accuracy?: string;
   aiScore?: number;
   daysLeft?: number;
   requirement?: string;
 }
 
-const MOCK_CLASSES = [
-  { id: '1', name: 'IELTS Intensive Band 6.5 - 7.5', code: 'ENG-IELTS-6.5A', teacher: 'ThS. Trần Thị Mai Lan' },
-  { id: '2', name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao', code: 'ENG-GRAM-ADV', teacher: 'Thầy Hoàng Minh Đức' },
-];
-
-const MOCK_ASSIGNMENTS: MockAssignment[] = [
-  {
-    id: 'a1', classId: '1', title: 'HW-01: Renewable Energy Essay (Writing Task 2)', type: 'Writing Task 2', status: 'pending',
-    submittedOn: '04/09/2026', deadline: '05/09/2026', teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a2', classId: '1', title: 'HW-02: Technology Cue Card (Speaking Part 2)', type: 'Speaking Part 2', status: 'ai_processing',
-    submittedOn: '04/09/2026', hasAudio: true, aiScore: 85, teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a3', classId: '1', title: 'HW-03: Maya Civilization Reading Passage', type: 'Reading', status: 'graded',
-    submittedOn: '03/09/2026', accuracy: '38/40', score: 9.0, teacherName: 'Cô Mai Lan'
-  },
-  {
-    id: 'a4', classId: '2', title: 'HW-04: Academic Vocabulary Listening Mock Test', type: 'Listening', status: 'graded',
-    submittedOn: '01/09/2026', accuracy: '36/40', score: 8.5, teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a5', classId: '2', title: 'HW-05: Environment Problem Solution Discussion (Speaking)', type: 'Speaking', status: 'not_started',
-    deadline: '08/09/2026', daysLeft: 2, requirement: 'Ghi âm tối thiểu 2 phút', teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a6', classId: '2', title: 'HW-06: Multiple Choice (Listening Part 3)', type: 'Listening', status: 'not_started',
-    deadline: '11/09/2026', daysLeft: 5, requirement: '1 task', teacherName: 'Thầy Hoàng Minh Đức'
-  },
-  {
-    id: 'a7', classId: '1', title: 'RD-01: The Evolution of Printing (Reading)', type: 'Reading', status: 'not_started',
-    deadline: '10/09/2026', daysLeft: 4, teacherName: 'Cô Mai Lan'
-  }
-];
-
 const StudentAssignments: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [rawAssignments, setRawAssignments] = useState<StudentAssignmentDisplay[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'not_started' | 'grading' | 'graded'>('all');
 
-  const getAssignmentRoute = (assignment: MockAssignment) => {
+  const fetchAssignmentsData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch student's classes
+      const classRes = await classService.list({ limit: 50 });
+      const fetchedClasses = classRes.data || [];
+      setClasses(fetchedClasses);
+
+
+      // 3. Fetch assignments across all enrolled classes
+      const assignmentPromises = fetchedClasses.map(async (cls) => {
+        try {
+          const res = await assignmentService.listAssignments(cls.id, { limit: 50 });
+          const items = res.data || [];
+          return await Promise.all(
+            items.map(async (a: AssignmentSummary): Promise<StudentAssignmentDisplay> => {
+              let matchedSub: SubmissionListItem | undefined = undefined;
+              if (user?.id) {
+                try {
+                  const subRes = await submissionService.listSubmissions({
+                    assignmentId: a.id,
+                    studentId: user.id,
+                    limit: 1
+                  });
+                  if (subRes.data && subRes.data.length > 0) {
+                    matchedSub = subRes.data[0];
+                  }
+                } catch {
+                  // Fallback
+                }
+              }
+
+              let displayStatus: AssignmentDisplayStatus = 'not_started';
+              let score: number | undefined = undefined;
+
+              if (matchedSub) {
+                if (matchedSub.status === 'GRADED') {
+                  displayStatus = 'graded';
+                  score = matchedSub.modules?.[0]?.grading?.finalScore ?? undefined;
+                } else if (matchedSub.status === 'SUBMITTED') {
+                  displayStatus = 'pending';
+                } else if (matchedSub.status === 'IN_PROGRESS') {
+                  displayStatus = 'in_progress';
+                }
+              }
+
+              // Determine skill type from title or modules
+              const lowerTitle = a.title.toLowerCase();
+              let skillType = 'General Task';
+              if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
+              else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
+              else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
+              else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+
+              // Calculate days left
+              let daysLeft = 3;
+              if (a.closeAt) {
+                const diffMs = new Date(a.closeAt).getTime() - Date.now();
+                daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              }
+
+              return {
+                id: a.id,
+                classId: String(cls.id),
+                className: cls.name,
+                title: a.title,
+                type: skillType,
+                status: displayStatus,
+                submissionId: matchedSub?.id,
+                submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
+                deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
+                teacherName: 'Giảng viên phụ trách',
+                score,
+                daysLeft,
+              };
+            })
+          );
+        } catch {
+          return [];
+        }
+      });
+
+      const assignmentResults = await Promise.all(assignmentPromises);
+      const combined = assignmentResults.flat();
+      setRawAssignments(combined);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể tải danh sách bài tập. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void fetchAssignmentsData();
+  }, [fetchAssignmentsData]);
+
+  const getAssignmentRoute = (assignment: StudentAssignmentDisplay) => {
     const typeLower = assignment.type.toLowerCase();
     if (typeLower.includes('speaking')) {
       return `/student/assignments/speaking/${assignment.id}`;
@@ -97,40 +168,40 @@ const StudentAssignments: React.FC = () => {
 
   // Filtered by class & search query & status filter
   const filteredAssignments = useMemo(() => {
-    return MOCK_ASSIGNMENTS.filter((a) => {
-      const matchClass = selectedClassId === 'all' || a.classId === selectedClassId;
+    return rawAssignments.filter((a) => {
+      const matchClass = selectedClassId === 'all' || String(a.classId) === String(selectedClassId);
       const matchSearch = searchQuery.trim() === '' || 
         a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.teacherName.toLowerCase().includes(searchQuery.toLowerCase());
+        (a.teacherName && a.teacherName.toLowerCase().includes(searchQuery.toLowerCase()));
       
       let matchStatus = true;
       if (activeStatusFilter === 'not_started') {
         matchStatus = a.status === 'not_started';
       } else if (activeStatusFilter === 'grading') {
-        matchStatus = a.status === 'pending' || a.status === 'ai_processing';
+        matchStatus = a.status === 'pending' || a.status === 'ai_processing' || a.status === 'in_progress';
       } else if (activeStatusFilter === 'graded') {
         matchStatus = a.status === 'graded';
       }
 
       return matchClass && matchSearch && matchStatus;
     });
-  }, [selectedClassId, searchQuery, activeStatusFilter]);
+  }, [rawAssignments, selectedClassId, searchQuery, activeStatusFilter]);
 
   // Overall counts for stats cards based on class filter
   const classAssignments = useMemo(() => {
     return selectedClassId === 'all' 
-      ? MOCK_ASSIGNMENTS 
-      : MOCK_ASSIGNMENTS.filter(a => a.classId === selectedClassId);
-  }, [selectedClassId]);
+      ? rawAssignments 
+      : rawAssignments.filter(a => String(a.classId) === String(selectedClassId));
+  }, [rawAssignments, selectedClassId]);
 
   const stats = {
     notStarted: classAssignments.filter(a => a.status === 'not_started').length,
-    grading: classAssignments.filter(a => a.status === 'pending' || a.status === 'ai_processing').length,
+    grading: classAssignments.filter(a => a.status === 'pending' || a.status === 'ai_processing' || a.status === 'in_progress').length,
     graded: classAssignments.filter(a => a.status === 'graded').length,
   };
 
-  const selectedClass = MOCK_CLASSES.find(c => c.id === selectedClassId);
+  const selectedClass = classes.find(c => String(c.id) === String(selectedClassId));
 
   // Helper to render type icons & colors
   const getTypeBadge = (type: string) => {
@@ -199,544 +270,452 @@ const StudentAssignments: React.FC = () => {
         </p>
       </div>
 
-      {/* 2. Stat Summary Cards (Mobbin Dashboard Cards) */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-        gap: '16px', 
-        marginBottom: '28px' 
-      }}>
-        {/* Card: Chưa làm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'not_started' ? 'all' : 'not_started')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'not_started' ? '2px solid #64748B' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'not_started' 
-              ? '0 10px 25px -5px rgba(100, 116, 139, 0.15)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'not_started') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'not_started') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusNotStarted')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#0F172A', lineHeight: 1 }}>
-              {stats.notStarted}
-            </div>
-            <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '6px' }}>
-              Cần hoàn thành
-            </div>
+      {/* Error Banner */}
+      {error && (
+        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+            <AlertCircle size={20} />
+            <span style={{ fontSize: '14px' }}>{error}</span>
           </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#F1F5F9', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#475569' 
-          }}>
-            <Clock size={22} strokeWidth={2} />
-          </div>
-        </div>
-
-        {/* Card: Đang chấm điểm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'grading' ? 'all' : 'grading')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'grading' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'grading' 
-              ? '0 10px 25px -5px rgba(245, 158, 11, 0.2)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'grading') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(245, 158, 11, 0.12)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'grading') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusGrading')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#D97706', lineHeight: 1 }}>
-              {stats.grading}
-            </div>
-            <div style={{ fontSize: '12px', color: '#B45309', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B', display: 'inline-block' }}></span>
-              Đang chấm & AI xử lý
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#FFFBEB', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#D97706' 
-          }}>
-            <Hourglass size={22} strokeWidth={2} />
-          </div>
-        </div>
-
-        {/* Card: Đã có điểm */}
-        <div 
-          onClick={() => setActiveStatusFilter(prev => prev === 'graded' ? 'all' : 'graded')}
-          style={{ 
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px', 
-            padding: '20px 24px', 
-            border: activeStatusFilter === 'graded' ? '2px solid #10B981' : '1px solid #E2E8F0',
-            boxShadow: activeStatusFilter === 'graded' 
-              ? '0 10px 25px -5px rgba(16, 185, 129, 0.2)' 
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={(e) => {
-            if (activeStatusFilter !== 'graded') {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(16, 185, 129, 0.12)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeStatusFilter !== 'graded') {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05)';
-            }
-          }}
-        >
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-              {t('studentAssignments.statusGraded')}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#059669', lineHeight: 1 }}>
-              {stats.graded}
-            </div>
-            <div style={{ fontSize: '12px', color: '#047857', marginTop: '6px' }}>
-              Đã hoàn tất đánh giá
-            </div>
-          </div>
-          <div style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '12px', 
-            backgroundColor: '#ECFDF5', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            color: '#059669' 
-          }}>
-            <CheckCircle2 size={22} strokeWidth={2} />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Filter Bar & Search (Mobbin Segmented Control & Clean Search) */}
-      <div style={{ 
-        display: 'flex', 
-        flexWrap: 'wrap', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        gap: '16px', 
-        marginBottom: '24px' 
-      }}>
-        {/* Class Filter Segmented Pills */}
-        <div style={{ 
-          display: 'inline-flex', 
-          alignItems: 'center', 
-          backgroundColor: '#F1F5F9', 
-          borderRadius: '9999px', 
-          padding: '4px', 
-          gap: '4px',
-          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
-        }}>
-          <button 
-            onClick={() => setSelectedClassId('all')}
-            style={{ 
-              padding: '6px 16px', 
-              borderRadius: '9999px', 
-              fontSize: '13px', 
-              fontWeight: selectedClassId === 'all' ? 600 : 500,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: selectedClassId === 'all' ? '#FFFFFF' : 'transparent',
-              color: selectedClassId === 'all' ? '#0F172A' : '#64748B',
-              boxShadow: selectedClassId === 'all' ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-              transition: 'all 0.18s ease'
-            }}
+          <button
+            type="button"
+            onClick={fetchAssignmentsData}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
           >
-            Tất cả bài tập
+            <RefreshCw size={14} /> {t('studentAssignments.retry')}
           </button>
-          {MOCK_CLASSES.map(c => (
-            <button 
-              key={c.id}
-              onClick={() => setSelectedClassId(c.id)}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '9999px', 
-                fontSize: '13px', 
-                fontWeight: selectedClassId === c.id ? 600 : 500,
-                cursor: 'pointer',
-                border: 'none',
-                backgroundColor: selectedClassId === c.id ? '#FFFFFF' : 'transparent',
-                color: selectedClassId === c.id ? '#0F172A' : '#64748B',
-                boxShadow: selectedClassId === c.id ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-                transition: 'all 0.18s ease'
-              }}
-            >
-              {c.code}
-            </button>
-          ))}
-        </div>
-
-        {/* Search & Active Status Filter Tag */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1', maxWidth: '380px', minWidth: '240px' }}>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              type="text" 
-              placeholder="Tìm theo tên bài, kỹ năng..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ 
-                width: '100%', 
-                padding: '8px 12px 8px 36px', 
-                borderRadius: '10px', 
-                border: '1px solid #E2E8F0', 
-                backgroundColor: '#FFFFFF',
-                fontSize: '13px',
-                color: '#0F172A',
-                outline: 'none',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#6366F1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.15)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#E2E8F0';
-                e.target.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.03)';
-              }}
-            />
-          </div>
-          {activeStatusFilter !== 'all' && (
-            <button 
-              onClick={() => setActiveStatusFilter('all')}
-              style={{
-                fontSize: '12px',
-                color: '#64748B',
-                background: '#F1F5F9',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Bỏ lọc trạng thái ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 4. Active Course Info Banner (If specific class selected) */}
-      {selectedClass && (
-        <div style={{ 
-          backgroundColor: '#F8FAFC', 
-          border: '1px solid #E2E8F0', 
-          borderRadius: '12px', 
-          padding: '12px 18px', 
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '13px',
-          color: '#475569'
-        }}>
-          <Layers size={16} color="#64748B" />
-          <span>
-            <strong>{selectedClass.name}</strong> • Giảng viên: {selectedClass.teacher}
-          </span>
         </div>
       )}
 
-      {/* 5. Assignment Cards List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {filteredAssignments.length === 0 ? (
-          <div style={{ 
-            backgroundColor: '#FFFFFF', 
-            borderRadius: '16px', 
-            padding: '48px 24px', 
-            textAlign: 'center', 
-            border: '1px dashed #CBD5E1' 
+      {/* 2. Top Summary Stat Cards */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
+        gap: '16px', 
+        marginBottom: '28px' 
+      }}>
+        {/* Card 1: Not Started */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '10px',
+            backgroundColor: '#FEF2F2',
+            color: '#DC2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
           }}>
-            <FileText size={36} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
-            <div style={{ fontSize: '15px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-              Không tìm thấy bài tập phù hợp
+            <Clock size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+              {isLoading ? '...' : stats.notStarted}
             </div>
-            <div style={{ fontSize: '13px', color: '#64748B' }}>
-              Hãy thử chọn lớp học khác hoặc thay đổi từ khóa tìm kiếm.
+            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+              {t('studentAssignments.statNotStarted')}
             </div>
+          </div>
+        </div>
+
+        {/* Card 2: Grading in Progress */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '10px',
+            backgroundColor: '#FFFBEB',
+            color: '#D97706',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Sparkles size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+              {isLoading ? '...' : stats.grading}
+            </div>
+            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+              {t('studentAssignments.statGrading')}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Graded & Feedback */}
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '10px',
+            backgroundColor: '#F0FDF4',
+            color: '#16A34A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <CheckCircle2 size={24} />
+          </div>
+          <div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+              {isLoading ? '...' : stats.graded}
+            </div>
+            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+              {t('studentAssignments.statGraded')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Class Filter & Search Bar */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        marginBottom: '20px'
+      }}>
+        {/* Class Selection Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label htmlFor="student-class-select" style={{ fontSize: '14px', fontWeight: 500, color: '#475569' }}>
+            {t('studentAssignments.filterClassLabel')}
+          </label>
+          <select
+            id="student-class-select"
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+              backgroundColor: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#0F172A',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">{t('studentAssignments.filterAllClasses')}</option>
+            {classes.map(c => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Search input */}
+        <div style={{
+          position: 'relative',
+          width: '280px'
+        }}>
+          <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            type="text"
+            placeholder={t('studentAssignments.searchPlaceholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px 8px 36px',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+              fontSize: '13px',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Selected Class Info Banner if filtered */}
+      {selectedClass && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          backgroundColor: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          marginBottom: '20px',
+          fontSize: '13px',
+          color: '#475569',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <Layers size={16} color="#64748B" />
+          <span>{t('studentAssignments.viewingClassPrefix')}<strong>{selectedClass.name}</strong></span>
+        </div>
+      )}
+
+      {/* 4. Filter Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        borderBottom: '1px solid #E2E8F0',
+        paddingBottom: '12px',
+        marginBottom: '20px'
+      }}>
+        <button
+          type="button"
+          onClick={() => setActiveStatusFilter('all')}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            fontWeight: activeStatusFilter === 'all' ? 600 : 500,
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: activeStatusFilter === 'all' ? '#0F172A' : '#F1F5F9',
+            color: activeStatusFilter === 'all' ? '#FFFFFF' : '#475569',
+            cursor: 'pointer'
+          }}
+        >
+          {t('studentAssignments.tabAll')} ({classAssignments.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveStatusFilter('not_started')}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            fontWeight: activeStatusFilter === 'not_started' ? 600 : 500,
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: activeStatusFilter === 'not_started' ? '#DC2626' : '#F1F5F9',
+            color: activeStatusFilter === 'not_started' ? '#FFFFFF' : '#475569',
+            cursor: 'pointer'
+          }}
+        >
+          {t('studentAssignments.tabNotStarted')} ({stats.notStarted})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveStatusFilter('grading')}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            fontWeight: activeStatusFilter === 'grading' ? 600 : 500,
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: activeStatusFilter === 'grading' ? '#D97706' : '#F1F5F9',
+            color: activeStatusFilter === 'grading' ? '#FFFFFF' : '#475569',
+            cursor: 'pointer'
+          }}
+        >
+          {t('studentAssignments.tabGrading')} ({stats.grading})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveStatusFilter('graded')}
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            fontWeight: activeStatusFilter === 'graded' ? 600 : 500,
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: activeStatusFilter === 'graded' ? '#16A34A' : '#F1F5F9',
+            color: activeStatusFilter === 'graded' ? '#FFFFFF' : '#475569',
+            cursor: 'pointer'
+          }}
+        >
+          {t('studentAssignments.tabGraded')} ({stats.graded})
+        </button>
+      </div>
+
+      {/* 5. Assignments List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
+            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
+            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
+          </div>
+        ) : filteredAssignments.length === 0 ? (
+          <div style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            border: '1px solid #E2E8F0',
+            color: '#64748B'
+          }}>
+            <FileText size={40} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
+            <div style={{ fontSize: '16px', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>
+              {t('studentAssignments.emptyTitle')}
+            </div>
+            <p style={{ fontSize: '14px', margin: 0 }}>
+              {t('studentAssignments.emptyDesc')}
+            </p>
           </div>
         ) : (
           filteredAssignments.map((assignment) => {
-            const typeBadge = getTypeBadge(assignment.type);
-            const classObj = MOCK_CLASSES.find(c => c.id === assignment.classId);
-
+            const badge = getTypeBadge(assignment.type);
             return (
-              <div 
-                key={assignment.id} 
+              <div
+                key={assignment.id}
                 onClick={() => {
                   if (assignment.status === 'graded') {
-                    navigate(`/student/assignments/${assignment.id}/result`);
+                    navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
                   } else if (assignment.status === 'not_started') {
                     navigate(`/student/assignments/${assignment.id}/overview`);
                   } else {
                     navigate(getAssignmentRoute(assignment));
                   }
                 }}
-                style={{ 
-                  backgroundColor: '#FFFFFF', 
-                  borderRadius: '16px', 
-                  padding: '18px 22px', 
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)',
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
+                style={{
+                  display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 20px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                   flexWrap: 'wrap',
-                  gap: '16px',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  cursor: 'pointer'
+                  gap: '16px'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 10px 20px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.03)';
-                  e.currentTarget.style.borderColor = '#CBD5E1';
+                  e.currentTarget.style.borderColor = '#94A3B8';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04)';
                   e.currentTarget.style.borderColor = '#E2E8F0';
+                  e.currentTarget.style.transform = 'none';
                 }}
               >
-                {/* Left: Icon Box + Details */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1', minWidth: '280px' }}>
-                  {/* Skill Icon */}
-                  <div style={{ 
-                    width: '46px', 
-                    height: '46px', 
-                    borderRadius: '12px', 
-                    backgroundColor: typeBadge.bg, 
-                    color: typeBadge.color,
-                    display: 'flex', 
-                    alignItems: 'center', 
+                {/* Left: Icon & Info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 300px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    backgroundColor: badge.bg,
+                    color: badge.color,
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0
                   }}>
-                    {typeBadge.icon}
+                    {badge.icon}
                   </div>
 
-                  {/* Content Info */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {/* Tags row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: 600, 
-                        padding: '2px 8px', 
-                        borderRadius: '6px', 
-                        backgroundColor: '#F1F5F9', 
-                        color: '#475569' 
-                      }}>
-                        {classObj?.code || 'ENG'}
-                      </span>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: 600, 
-                        padding: '2px 8px', 
-                        borderRadius: '6px', 
-                        backgroundColor: typeBadge.bg, 
-                        color: typeBadge.color 
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: badge.bg,
+                        color: badge.color
                       }}>
                         {assignment.type}
                       </span>
-                      {assignment.daysLeft && assignment.daysLeft <= 3 && assignment.status === 'not_started' && (
-                        <span style={{ 
-                          fontSize: '11px', 
-                          fontWeight: 600, 
-                          padding: '2px 8px', 
-                          borderRadius: '6px', 
-                          backgroundColor: '#FEF2F2', 
-                          color: '#EF4444' 
-                        }}>
-                          {t('studentAssignments.badgeExpiring')}
-                        </span>
-                      )}
+                      <span style={{ fontSize: '12px', color: '#64748B' }}>
+                        {assignment.className}
+                      </span>
                     </div>
 
-                    {/* Title */}
-                    <h3 style={{ 
-                      fontSize: '15px', 
-                      fontWeight: 600, 
-                      color: '#0F172A', 
-                      margin: 0,
-                      lineHeight: 1.4
-                    }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
                       {assignment.title}
                     </h3>
 
-                    {/* Meta info row */}
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#64748B', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '12px', 
-                      flexWrap: 'wrap' 
-                    }}>
-                      {/* Status-specific metadata */}
-                      {assignment.status === 'pending' && (
+                    {/* Metadata & Deadlines */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B', marginTop: '6px', flexWrap: 'wrap' }}>
+                      {assignment.submittedOn ? (
+                        <span>{t('studentAssignments.submittedOn')}{assignment.submittedOn}</span>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: assignment.daysLeft && assignment.daysLeft <= 2 ? '#DC2626' : '#64748B', fontWeight: assignment.daysLeft && assignment.daysLeft <= 2 ? 600 : 400 }}>
+                          <Calendar size={13} />
+                          {t('studentAssignments.deadlinePrefix')}{assignment.deadline || t('studentAssignments.noDeadline')}
+                        </span>
+                      )}
+
+                      {assignment.score !== undefined && (
                         <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={13} color="#94A3B8" /> {t('studentAssignments.submittedOn')}{assignment.submittedOn}
-                          </span>
                           <span>•</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <User size={13} color="#94A3B8" /> {t('studentAssignments.teacherLabel')}{assignment.teacherName}
+                          <span style={{ color: '#059669', fontWeight: 700 }}>
+                            {t('studentAssignments.scorePrefix')}{assignment.score}/100 (Band {(assignment.score / 100 * 9).toFixed(1)})
                           </span>
-                          {assignment.deadline && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.deadlinePrefix')}{assignment.deadline}</span>
-                            </>
-                          )}
-                        </>
-                      )}
-
-                      {assignment.status === 'ai_processing' && (
-                        <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={13} color="#94A3B8" /> {t('studentAssignments.submittedOn')}{assignment.submittedOn}
-                          </span>
-                          <span>•</span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#D97706' }}>
-                            <Sparkles size={13} color="#D97706" /> {t('studentAssignments.aiEngine')}
-                          </span>
-                        </>
-                      )}
-
-                      {assignment.status === 'graded' && (
-                        <>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#059669' }}>
-                            <Check size={13} color="#059669" /> {t('studentAssignments.completedOn')}{assignment.submittedOn}
-                          </span>
-                          {assignment.accuracy && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.accuracyPrefix')}{assignment.accuracy}{t('studentAssignments.correctAnswers')}</span>
-                            </>
-                          )}
-                          {assignment.teacherName && (
-                            <>
-                              <span>•</span>
-                              <span>{assignment.teacherName}</span>
-                            </>
-                          )}
-                        </>
-                      )}
-
-                      {assignment.status === 'not_started' && (
-                        <>
-                          <span style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '4px', 
-                            color: assignment.daysLeft && assignment.daysLeft <= 3 ? '#DC2626' : '#64748B',
-                            fontWeight: assignment.daysLeft && assignment.daysLeft <= 3 ? 600 : 400
-                          }}>
-                            <Calendar size={13} color={assignment.daysLeft && assignment.daysLeft <= 3 ? '#DC2626' : '#94A3B8'} />
-                            {t('studentAssignments.duePrefix')}{assignment.deadline} {t('studentAssignments.daysLeftPrefix')}{assignment.daysLeft}{t('studentAssignments.daysLeftSuffix')}
-                          </span>
-                          {assignment.requirement && (
-                            <>
-                              <span>•</span>
-                              <span>{t('studentAssignments.requirePrefix')}{assignment.requirement}</span>
-                            </>
-                          )}
                         </>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right: Clean Status Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Right: Clean Status Badge & Action */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {(assignment.status === 'pending' || assignment.status === 'ai_processing') && (
                     <div style={{ 
                       display: 'inline-flex', 
                       alignItems: 'center', 
                       gap: '6px', 
                       color: '#B45309', 
-                      fontSize: '13px', 
+                      fontSize: '12px', 
                       fontWeight: 600, 
-                      padding: '6px 14px', 
+                      padding: '5px 12px', 
                       backgroundColor: '#FFFBEB', 
                       borderRadius: '9999px', 
                       border: '1px solid #FDE68A' 
                     }}>
-                      <span style={{ 
-                        width: '7px', 
-                        height: '7px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#F59E0B', 
-                        display: 'inline-block' 
-                      }}></span>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
                       {t('studentAssignments.statusGrading')}
+                    </div>
+                  )}
+
+                  {assignment.status === 'in_progress' && (
+                    <div style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      color: '#2563EB', 
+                      fontSize: '12px', 
+                      fontWeight: 600, 
+                      padding: '5px 12px', 
+                      backgroundColor: '#EFF6FF', 
+                      borderRadius: '9999px', 
+                      border: '1px solid #BFDBFE' 
+                    }}>
+                      <Clock size={12} />
+                      {t('studentAssignments.statusInProgress')}
                     </div>
                   )}
 
@@ -746,15 +725,15 @@ const StudentAssignments: React.FC = () => {
                       alignItems: 'center', 
                       gap: '6px', 
                       color: '#059669', 
-                      fontSize: '13px', 
+                      fontSize: '12px', 
                       fontWeight: 600, 
-                      padding: '6px 14px', 
+                      padding: '5px 12px', 
                       backgroundColor: '#ECFDF5', 
                       borderRadius: '9999px', 
                       border: '1px solid #A7F3D0' 
                     }}>
-                      <CheckCircle2 size={15} strokeWidth={2.2} />
-                      {t('studentAssignments.statusGraded')}
+                      <CheckCircle2 size={13} strokeWidth={2.2} />
+                      {t('studentAssignments.tabGraded')}
                     </div>
                   )}
 
@@ -764,15 +743,15 @@ const StudentAssignments: React.FC = () => {
                       alignItems: 'center', 
                       gap: '6px', 
                       color: '#475569', 
-                      fontSize: '13px', 
+                      fontSize: '12px', 
                       fontWeight: 600, 
-                      padding: '6px 14px', 
+                      padding: '5px 12px', 
                       backgroundColor: '#F1F5F9', 
                       borderRadius: '9999px', 
                       border: '1px solid #E2E8F0' 
                     }}>
-                      <Clock size={15} strokeWidth={2} />
-                      {t('studentAssignments.statusNotStarted')}
+                      <Clock size={13} strokeWidth={2} />
+                      {t('studentAssignments.tabNotStarted')}
                     </div>
                   )}
 
@@ -794,7 +773,7 @@ const StudentAssignments: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (assignment.status === 'graded') {
-                        navigate(`/student/assignments/${assignment.id}/result`);
+                        navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
                       } else if (assignment.status === 'not_started') {
                         navigate(`/student/assignments/${assignment.id}/overview`);
                       } else {
@@ -803,10 +782,12 @@ const StudentAssignments: React.FC = () => {
                     }}
                   >
                     {assignment.status === 'not_started'
-                      ? t('studentAssignments.btnStart')
+                      ? t('studentAssignments.btnStartNow')
                       : assignment.status === 'graded'
                         ? t('studentAssignments.btnFeedback')
-                        : t('studentAssignments.btnReview')}
+                        : assignment.status === 'in_progress'
+                          ? t('studentAssignments.btnContinue')
+                          : t('studentAssignments.btnReview')}
                   </button>
                 </div>
               </div>
@@ -829,7 +810,7 @@ const StudentAssignments: React.FC = () => {
         gap: '12px'
       }}>
         <div>
-          {t('studentAssignments.paginationPrefix')}<strong>{filteredAssignments.length}</strong>{t('studentAssignments.paginationMid')}<strong>{classAssignments.length}</strong>{t('studentAssignments.paginationSuffix')}
+          {t('studentAssignments.paginationPrefix')}<strong>{filteredAssignments.length}</strong>{t('studentAssignments.paginationMid')}<strong>{classAssignments.length}</strong>{t('studentAssignments.unitAssignments')}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', fontWeight: 500 }}>
           <span style={{ 
@@ -839,7 +820,7 @@ const StudentAssignments: React.FC = () => {
             backgroundColor: '#10B981', 
             display: 'inline-block' 
           }}></span>
-          {t('studentAssignments.syncStatus')}
+          {t('studentAssignments.syncStatusRealtime')}
         </div>
       </div>
     </div>

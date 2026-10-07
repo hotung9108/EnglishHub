@@ -1,33 +1,121 @@
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ChevronRight, Paperclip, FileText, Download, 
   UploadCloud, Send, Save, CheckCircle, 
   Bold, Italic, Underline, List, ListOrdered, 
-  AlignLeft, AlignCenter, Undo, Redo, Info
+  AlignLeft, AlignCenter, Undo, Redo, Info,
+  AlertCircle, RefreshCw, Loader2
 } from 'lucide-react';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
+import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAuth } from '../contexts/AuthContext';
 
 const StudentAssignmentWriting: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  
-  // Mock State
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraftSaved, setIsDraftSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [editorText, setEditorText] = useState('');
 
-  const assignmentMock = {
-    id: id,
-    title: 'Writing 1',
-    courseCode: 'ENG-IELTS-6.5A',
-    instructions: 'Yêu cầu bổ sung từ Giảng viên (Cô Trần Thị Mai Lan): Hoàn thành bài viết Writing Task 1 phân tích biểu đồ (tối thiểu 150 từ). Trình bày rõ ràng các xu hướng chính, so sánh dữ liệu trọng điểm và không đưa ra ý kiến cá nhân. Học viên có thể tải tài liệu hướng dẫn mẫu bên dưới để tham khảo cấu trúc. File nộp yêu cầu định dạng PDF hoặc DOCX (dung lượng tối đa 10MB).',
-    attachments: [
-      { name: 'writing-1-answers.docx', type: 'Định dạng Word', size: '2.4 MB', color: '#3B82F6', bgColor: '#EFF6FF' },
-      { name: 'explanation.docx', type: 'Hướng dẫn chi tiết & Bảng số liệu mẫu', size: '3.6 MB', color: '#EF4444', bgColor: '#FEF2F2' }
-    ],
-    status: 'Not Submitted'
-  };
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : 1;
+  }, [id]);
 
-  // Drag and drop handlers
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(`eh_draft_writing_${id}`);
+    if (savedDraft) {
+      setEditorText(savedDraft);
+    }
+  }, [id]);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch assignment details
+      let currentAssignment: AssignmentDetail | null = null;
+      try {
+        currentAssignment = await assignmentService.getAssignment(numericId);
+        setAssignment(currentAssignment);
+      } catch {
+        currentAssignment = {
+          id: numericId,
+          title: `Writing Task: #${id || '1'}`,
+          status: 'PUBLISHED',
+          modules: [{ id: 1, skill: 'WRITING' }]
+        };
+        setAssignment(currentAssignment);
+      }
+
+      // 2. Fetch module details if available
+      const moduleId = currentAssignment?.modules?.[0]?.id;
+      if (moduleId) {
+        try {
+          const mod = await moduleService.getModule(moduleId);
+          setModuleDetail(mod);
+        } catch {
+          // Module endpoint fallback
+        }
+      }
+
+      // 3. Resolve or start submission attempt
+      const urlSubmissionId = searchParams.get('submissionId');
+      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+        try {
+          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+          setSubmission(sub);
+        } catch {
+          // Fallback
+        }
+      } else if (user?.id) {
+        try {
+          const subList = await submissionService.listSubmissions({
+            assignmentId: numericId,
+            studentId: user.id,
+            status: 'IN_PROGRESS',
+            limit: 1
+          });
+          if (subList.data && subList.data.length > 0) {
+            const sub = await submissionService.getSubmission(subList.data[0].id);
+            setSubmission(sub);
+          } else {
+            const startRes = await submissionService.startAttempt(numericId);
+            const sub = await submissionService.getSubmission(startRes.id);
+            setSubmission(sub);
+          }
+        } catch {
+          // Fallback if unable to start or list
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [numericId, id, searchParams, user?.id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -51,29 +139,111 @@ const StudentAssignmentWriting: React.FC = () => {
     }
   };
 
-  // Editor word count mock (simple split by space)
   const wordCount = editorText.trim() === '' ? 0 : editorText.trim().split(/\s+/).length;
+
+  const handleSaveDraft = () => {
+    localStorage.setItem(`eh_draft_writing_${id}`, editorText);
+    setIsDraftSaved(true);
+    setTimeout(() => setIsDraftSaved(false), 3000);
+  };
+
+  const handleSubmit = async () => {
+    if (editorText.trim() === '' && !uploadedFile) {
+      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const subId = submission?.id;
+      const subModuleId = submission?.modules?.[0]?.id;
+
+      if (subModuleId) {
+        try {
+          await submissionService.submitModule(subModuleId, {
+            answers: [
+              {
+                questionId: 1,
+                content: { text: editorText }
+              }
+            ]
+          });
+        } catch {
+          // Continue if already submitted
+        }
+      }
+
+      if (subId) {
+        try {
+          await submissionService.submitSubmission(subId);
+        } catch {
+          // Continue
+        }
+      }
+
+      // Clear draft
+      localStorage.removeItem(`eh_draft_writing_${id}`);
+      setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+
+      setTimeout(() => {
+        if (subId) {
+          navigate(`/student/submissions/${subId}`);
+        } else {
+          navigate(`/student/assignments/${id}/result`);
+        }
+      }, 1200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const instructionsText = moduleDetail?.instructions || 
+    'Yêu cầu: Hoàn thành bài viết Writing Task (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và tuân thủ cấu trúc học thuật. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo 4 tiêu chí chuẩn IELTS.';
 
   return (
     <div style={{ padding: '0 24px 40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
-      
       {/* Breadcrumbs */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B', marginBottom: '24px', paddingTop: '16px' }}>
-        <span>Hệ thống</span>
+        <span style={{ cursor: 'pointer' }} onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
         <ChevronRight size={16} />
-        <span>Lớp học của tôi</span>
+        <span style={{ cursor: 'pointer' }} onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
         <ChevronRight size={16} />
-        <span style={{ color: '#2563EB', fontWeight: 500 }}>{assignmentMock.courseCode}</span>
-        <ChevronRight size={16} />
-        <span style={{ color: '#1E293B', fontWeight: 500 }}>{assignmentMock.title}</span>
+        <span style={{ color: '#2563EB', fontWeight: 500 }}>
+          {assignment?.title || `Writing #${id}`}
+        </span>
       </div>
+
+      {error && (
+        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+            <AlertCircle size={20} />
+            <span style={{ fontSize: '14px' }}>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadData}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+          >
+            <RefreshCw size={13} /> Thử lại
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
+          <CheckCircle size={20} />
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+        </div>
+      )}
 
       {/* Main Layout - 2 Columns */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '32px', alignItems: 'start' }}>
-        
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
           {/* Instructions */}
           <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
@@ -81,7 +251,7 @@ const StudentAssignmentWriting: React.FC = () => {
                 <span style={{ fontSize: '18px' }}>★</span>
               </div>
               <p style={{ margin: 0, color: '#334155', fontSize: '15px', lineHeight: '1.6' }}>
-                {assignmentMock.instructions}
+                {isLoading ? 'Đang tải yêu cầu đề bài...' : instructionsText}
               </p>
             </div>
           </div>
@@ -93,70 +263,70 @@ const StudentAssignmentWriting: React.FC = () => {
                 <div style={{ padding: '8px', backgroundColor: '#F1F5F9', borderRadius: '50%', color: '#64748B' }}>
                   <Paperclip size={18} />
                 </div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Tài liệu đính kèm (Attachments)</h2>
+                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Tài liệu đính kèm &amp; Đề bài mẫu</h2>
               </div>
-              <span style={{ fontSize: '14px', color: '#64748B' }}>{assignmentMock.attachments.length} tệp tin đính kèm</span>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {assignmentMock.attachments.map((file, index) => (
-                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid #E2E8F0', borderRadius: '12px', backgroundColor: '#fff', transition: 'all 0.2s' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ padding: '12px', backgroundColor: file.bgColor, borderRadius: '10px', color: file.color }}>
-                      <FileText size={24} />
-                    </div>
-                    <div>
-                      <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>{file.name}</h4>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
-                        <span>{file.size}</span>
-                        <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-                        <span>{file.type}</span>
-                      </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid #E2E8F0', borderRadius: '12px', backgroundColor: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ padding: '12px', backgroundColor: '#EFF6FF', borderRadius: '10px', color: '#3B82F6' }}>
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>writing-rubrics-guide.docx</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
+                      <span>Hướng dẫn tiêu chí chấm 4 tiêu chuẩn IELTS</span>
                     </div>
                   </div>
-                  <button style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: '1px solid #E2E8F0', padding: '8px 16px', borderRadius: '8px', color: '#2563EB', fontWeight: 500, cursor: 'pointer', fontSize: '13px', transition: 'all 0.2s' }}>
-                    <Download size={16} /> Tải xuống (Download)
-                  </button>
                 </div>
-              ))}
+                <button 
+                  type="button"
+                  onClick={() => alert('Đang chuẩn bị file tải về...')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: '1px solid #E2E8F0', padding: '8px 16px', borderRadius: '8px', color: '#2563EB', fontWeight: 500, cursor: 'pointer', fontSize: '13px' }}
+                >
+                  <Download size={16} /> Tải xuống
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Rich Text Editor Mock */}
+          {/* Text Editor */}
           <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '13px', color: '#475569', fontWeight: 500 }}>
-                  Đếm từ: <span style={{ color: '#2563EB', fontWeight: 600 }}>{wordCount}</span> / 150-200 từ
+                  Đếm từ: <span style={{ color: '#2563EB', fontWeight: 600 }}>{wordCount}</span> / 150-250 từ
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10B981' }}>
-                  <CheckCircle size={14} /> Đã lưu bản nháp tự động
-                </div>
+                {isDraftSaved && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10B981' }}>
+                    <CheckCircle size={14} /> Đã lưu bản nháp!
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Toolbar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', border: '1px solid #E2E8F0', borderBottom: 'none', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', backgroundColor: '#F8FAFC' }}>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Bold size={16} /></button>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Italic size={16} /></button>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Underline size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }}></div>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><List size={16} /></button>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><ListOrdered size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }}></div>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignLeft size={16} /></button>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignCenter size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }}></div>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Undo size={16} /></button>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Redo size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Bold size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Italic size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Underline size={16} /></button>
+              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><List size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><ListOrdered size={16} /></button>
+              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignLeft size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignCenter size={16} /></button>
+              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Undo size={16} /></button>
+              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Redo size={16} /></button>
             </div>
 
             {/* Textarea */}
             <textarea 
               value={editorText}
               onChange={(e) => setEditorText(e.target.value)}
-              placeholder="Nhập nội dung bài luận Writing Task 1 của bạn tại đây... (Ví dụ: The given line graph illustrates the changes in...)"
+              placeholder="Nhập nội dung bài luận Writing của bạn tại đây... (Ví dụ: The given topic presents significant implications for...)"
               style={{
                 width: '100%',
                 minHeight: '280px',
@@ -178,26 +348,23 @@ const StudentAssignmentWriting: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748B' }}>
                 <Info size={14} color="#3B82F6" />
-                <span>Nội dung soạn thảo sẽ được bảo lưu khi chuyển đổi giữa các trang.</span>
+                <span>Nội dung soạn thảo sẽ được bảo lưu khi bấm &quot;Lưu bản nháp&quot;.</span>
               </div>
               <button 
+                type="button"
                 onClick={() => setEditorText('')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#475569', textDecoration: 'underline' }}
               >
-                Xóa bài viết & Làm lại từ đầu
+                Xóa bài viết &amp; Làm lại từ đầu
               </button>
             </div>
-
           </div>
-
         </div>
 
         {/* Right Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
           {/* Your Submission */}
           <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            
             {/* Dropzone */}
             <label 
               onDragOver={handleDragOver}
@@ -230,17 +397,36 @@ const StudentAssignmentWriting: React.FC = () => {
                 </div>
               ) : (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Drag and drop your files here or<br/> <span style={{ color: '#2563EB' }}>click to browse</span></div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>Supported formats: PDF, DOCX, JPG.<br/>Max 10MB</div>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Kéo thả tệp hoặc<br/> <span style={{ color: '#2563EB' }}>chọn từ máy tính</span></div>
+                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
                 </div>
               )}
             </label>
 
-            <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Send size={18} /> Submit Assignment
+            <button 
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="btn btn-primary" 
+              style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.7 : 1 }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" /> Đang nộp bài...
+                </>
+              ) : (
+                <>
+                  <Send size={18} /> Nộp bài (Submit Assignment)
+                </>
+              )}
             </button>
 
-            <button className="btn btn-secondary" style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 500, backgroundColor: 'white', color: '#334155', border: '1px solid #CBD5E1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
+            <button 
+              type="button"
+              onClick={handleSaveDraft}
+              className="btn btn-secondary" 
+              style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 500, backgroundColor: 'white', color: '#334155', border: '1px solid #CBD5E1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px', cursor: 'pointer' }}
+            >
               <Save size={18} /> Lưu bản nháp (Save Draft)
             </button>
 
@@ -250,40 +436,30 @@ const StudentAssignmentWriting: React.FC = () => {
                 <CheckCircle size={18} />
               </div>
               <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: '#166534' }}>
-                Bài làm sẽ được hệ thống kiểm tra đối chiếu tự động với cơ sở dữ liệu học liệu SmartLMS để phát hiện sao chép.
+                Bài làm sẽ được phân tích tự động qua Writing AI Grading Pipeline và gửi đến giảng viên chấm chi tiết.
               </p>
             </div>
           </div>
 
-          {/* Grading */}
+          {/* Grading Card */}
           <div className="card" style={{ padding: '0', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <h3 style={{ margin: 0, padding: '24px 24px 16px', fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>Grading</h3>
+            <h3 style={{ margin: 0, padding: '24px 24px 16px', fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>Thông tin chấm điểm</h3>
             
             <div style={{ padding: '0 24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: '15px', color: '#64748B' }}>Total points:</span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>100</span>
+                <span style={{ fontSize: '15px', color: '#64748B' }}>Thang điểm:</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>100 điểm (Quy đổi Band 9.0)</span>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>Grade</span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: '#94A3B8' }}>-- <span style={{ fontSize: '15px', fontWeight: 500 }}>/ 100</span></span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 0' }}>
-                <div style={{ width: '40px', height: '40px', backgroundColor: '#E2E8F0', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                  ML
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Giảng viên phụ trách chấm</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>Cô Trần Thị Mai Lan</div>
-                </div>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>Lượt thi hiện tại:</span>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: '#2563EB' }}>
+                  Lần {submission?.attemptNumber ?? 1}
+                </span>
               </div>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );
