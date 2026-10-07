@@ -20,26 +20,31 @@ flowchart TD
         D[TruffleHog OSS Secret Scan]
         E[Frontend CI: ESLint + TypeScript + Vite Build]
         F[Backend CI: Postgres 16 Alpine + Flyway + JUnit 5 + Gradle Build]
+        F2[AI Service CI: Pytest MOCK_MODE + Docker Build]
     end
 
     subgraph Staging_Stage["3. Môi Trường Staging (Pre-release / UAT)"]
         G[Merge vào staging]
         H[Deploy Staging FE: Vercel Preview]
+        I2[Deploy AI Service: GHCR -> VPS/Home-Server (dùng chung prod & staging)]
         I[Deploy Staging BE: GHCR -> Tailscale -> VPS/Home-Server dev]
     end
 
     subgraph Prod_Stage["4. Môi Trường Production"]
         J[Merge vào main hoặc gắn Tag v*.*.*]
         K[Deploy Production FE: Vercel Production]
+        L2[Deploy AI Service: GHCR -> VPS/Home-Server (dùng chung prod & staging)]
         L[Deploy Production BE: GHCR -> Tailscale -> VPS Production]
     end
 
     A --> B --> C
-    C --> D & E & F
-    D & E & F -->|CI Pass & Review Approved| G
-    G --> H & I
+    C --> D & E & F & F2
+    D & E & F & F2 -->|CI Pass & Review Approved| G
+    G --> H & I2
+    I2 -->|AI CD xong| I
     G -->|UAT Tested & Ready| J
-    J --> K & L
+    J --> K & L2
+    L2 -->|AI CD xong| L
 ```
 
 ---
@@ -121,11 +126,24 @@ Hệ thống workflow nằm trong thư mục [`.github/workflows/`](file:///d:/C
   2. Chạy linter: `npm run lint` (ESLint).
   3. Kiểm tra kiểu TypeScript và build production bundle: `npm run build` (Vite).
 
+#### 4. Kiểm Thử & Đóng Gói AI Service: [`ci-ai-service.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/ci-ai-service.yml)
+- **Tên workflow**: `AI Service CI`
+- **Trigger**:
+  - `push` hoặc `pull_request` vào `main`, `staging`, `develop` khi có thay đổi trong `ai-service/**` hoặc `.github/workflows/ci-ai-service.yml`.
+- **Môi trường & Công cụ**:
+  - Runner: `ubuntu-latest`.
+  - Python 3.11 với cache pip tự động qua `ai-service/requirements.txt`.
+- **Các bước thực thi**:
+  1. Cài đặt dependencies: `pip install -r requirements.txt`.
+  2. Chạy unit tests: `pytest -v` (`tests/conftest.py` tự bật `MOCK_MODE=true` nên không cần API key).
+  3. Kiểm tra Dockerfile: `docker build`.
+- **Ý nghĩa với CD**: vì workflow này có filter `paths: ai-service/**`, việc nó (và CD tương ứng) chỉ chạy khi code AI service thay đổi chính là cơ chế "chỉ deploy khi có thay đổi" cho AI service.
+
 ---
 
 ### 4.2. Nhóm Triển Khai Staging (Staging CD)
 
-#### 4. Triển Khai Frontend Staging Lên Vercel: [`cd-frontend-development.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-frontend-development.yml)
+#### 5. Triển Khai Frontend Staging Lên Vercel: [`cd-frontend-development.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-frontend-development.yml)
 - **Tên workflow**: `Deploy staging Frontend to Vercel`
 - **Trigger**: `pull_request` mở vào nhánh `staging`.
 - **Các bước thực thi**:
@@ -135,48 +153,66 @@ Hệ thống workflow nằm trong thư mục [`.github/workflows/`](file:///d:/C
   4. Thực hiện `vercel build --prod` trực tiếp trên GitHub runner.
   5. Triển khai bản prebuilt lên Vercel (`vercel deploy --prebuilt --prod`).
 
-#### 5. Triển Khai Backend Staging Lên Máy Chủ Dev: [`cd-backend-development.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-backend-development.yml)
+#### 6. Triển Khai Backend Staging Lên Máy Chủ Dev: [`cd-backend-development.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-backend-development.yml)
 - **Tên workflow**: `Deploy development Backend to VPS/Home-Server`
-- **Trigger**: `push` (hoặc merge PR) vào nhánh `staging`.
-- **Các bước thực thi**:
+- **Trigger**: `workflow_run` — chạy khi workflow `Backend CI` hoàn tất trên nhánh `staging`.
+  - Vì `Backend CI` chỉ chạy khi có thay đổi trong `backend/**` → CD này cũng **chỉ chạy khi code Backend thay đổi**.
+  - Job `deploy` chỉ chạy khi `Backend CI` conclusion = `success`.
+- **Job `wait-ai-service` (bắt buộc chạy trước `deploy`)**:
+  - Nếu push có thay đổi `ai-service/**` (phát hiện qua việc tồn tại run của `AI Service CI` tại cùng commit): chờ `AI Service CI` chạy xong và phải `success`, rồi chờ workflow `Deploy AI Service` hoàn tất `success` → mới cho deploy Backend.
+  - Nếu push không đụng tới `ai-service/**`: bỏ qua việc chờ, deploy Backend ngay.
+  - Timeout 20 phút; AI service CI/CD thất bại → **chặn** deploy Backend.
+- **Các bước thực thi của job `deploy`**:
   1. **Kết nối mạng an toàn qua Tailscale Mesh VPN**: Sử dụng `tailscale/github-action@v2` với `TAILSCALE_AUTHKEY` để runner có thể truy cập an toàn vào IP nội bộ của máy chủ phát triển mà không cần mở cổng SSH ra ngoài Internet.
-  2. **Đóng gói Docker Image & Push lên GHCR**: Đăng nhập GitHub Container Registry (`ghcr.io`) và đóng gói image `ghcr.io/hotung9108/english-hub-backend` với 2 tag: `:latest` và `:${{ github.sha }}`.
+  2. **Đóng gói Docker Image & Push lên GHCR**: Đăng nhập GitHub Container Registry (`ghcr.io`) và đóng gói image `ghcr.io/hotung9108/english-hub-backend` với 2 tag: `:latest` và `:${{ head_sha của lần chạy Backend CI }}`.
   3. **Deploy qua SSH**:
-     - Kết nối SSH vào server dev (`SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`).
-     - Đăng nhập GHCR trên server bằng `GHCR_PAT`.
-     - Kéo Docker image mới theo SHA commit.
-     - Cập nhật biến `BACKEND_IMAGE` trong file `/home/${{ secrets.SERVER_USER }}/englishhub-dev/.env`.
-     - Chạy lại container: `docker compose -f docker-compose.prod.yml --profile cloudflare up -d --pull always`.
-     - Dọn dẹp image không sử dụng (`docker image prune -f`).
+    - Kết nối SSH vào server dev (`SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`).
+    - Đăng nhập GHCR trên server bằng `GHCR_PAT`.
+    - Kéo Docker image mới theo SHA commit.
+    - Đảm bảo network `englishhub_shared` tồn tại, rồi **khởi động Cloudflare Tunnel trước** tại `/home/${{ secrets.SERVER_USER }}/tunnel` (`docker compose up -d tunnel`).
+    - Cập nhật biến `BACKEND_IMAGE` trong file `/home/${{ secrets.SERVER_USER }}/englishhub-dev/.env`.
+    - Chạy lại container: `docker compose -f docker-compose.staging.yml up -d --pull always`.
+    - Dọn dẹp image không sử dụng (`docker image prune -f`).
 
 ---
 
 ### 4.3. Nhóm Triển Khai Production (Production CD)
 
-#### 6. Triển Khai Frontend Production Lên Vercel: [`cd-frontend.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-frontend.yml)
+#### 7. Triển Khai Frontend Production Lên Vercel: [`cd-frontend.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-frontend.yml)
 - **Tên workflow**: `Deploy production Frontend to Vercel`
 - **Trigger**: `pull_request` vào nhánh `main`.
 - **Các bước thực thi**:
   - Tương tự như staging nhưng sử dụng cấu hình và secrets Production: `VERCEL_ORG_ID` và `VERCEL_PROJECT_ID`.
 
-#### 7. Triển Khai Backend Production Lên Máy Chủ: [`cd-backend.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-backend.yml)
+#### 8. Triển Khai Backend Production Lên Máy Chủ: [`cd-backend.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-backend.yml)
 - **Tên workflow**: `Deploy production Backend to VPS/Home-Server`
-- **Trigger**: `push` vào nhánh `main`.
-- **Các bước thực thi**:
-  - Kết nối Tailscale mesh VPN -> Build & Push image lên GHCR -> SSH vào máy chủ -> Cập nhật `/home/${{ secrets.SERVER_USER }}/englishhub/.env` -> Khởi động lại container Production với profile Cloudflare tunnel.
+- **Trigger**: `workflow_run` — chạy khi workflow `Backend CI` hoàn tất trên nhánh `main`.
+  - Vì `Backend CI` chỉ chạy khi có thay đổi trong `backend/**` → CD này cũng **chỉ chạy khi code Backend thay đổi**.
+  - Job `deploy` chỉ chạy khi `Backend CI` conclusion = `success`.
+- **Job `wait-ai-service` (bắt buộc chạy trước `deploy`)**:
+  - Nếu push có thay đổi `ai-service/**`: chờ `AI Service CI` `success` rồi chờ workflow `Deploy AI Service` hoàn tất `success` → mới cho deploy Backend.
+  - Nếu không: bỏ qua chờ, deploy Backend ngay.
+  - AI service CI/CD thất bại → **chặn** deploy Backend (timeout 20 phút).
+- **Các bước thực thi của job `deploy`**:
+  - Kết nối Tailscale mesh VPN -> Build & Push image lên GHCR (`:latest` và `:${{ head_sha của lần chạy Backend CI }}`) -> SSH vào máy chủ -> Đảm bảo network `englishhub_shared` tồn tại và **khởi động Cloudflare Tunnel trước** tại `/home/${{ secrets.SERVER_USER }}/tunnel` -> Cập nhật `/home/${{ secrets.SERVER_USER }}/englishhub/.env` -> Khởi động lại container Production (`docker-compose.prod.yml`).
 
-#### 8. Pipeline Triển Khai Toàn Diện: [`cd-deploy.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-deploy.yml)
-- **Tên workflow**: `CD Pipeline (Build, Push & Deploy)`
-- **Trigger**:
-  - `push` vào `main`.
-  - Tạo Git Tag phiên bản phát hành (`v*.*.*`).
-  - Kích hoạt thủ công qua giao diện GitHub (`workflow_dispatch`).
-- **Điểm nổi bật**:
-  - Build đồng thời cả Backend và Frontend image bằng Docker Buildx.
-  - Hỗ trợ GitHub Actions Layer Caching (`cache-from/to: type=gha,mode=max`) giúp giảm thời gian build Docker.
-  - Tự động kiểm tra điều kiện secrets trước khi SSH: nếu chưa cấu hình SSH secrets, workflow sẽ thông báo và bỏ qua bước deploy mà không làm đỏ pipeline (`Skipping automatic SSH deployment`).
-  - Triển khai vào thư mục `/opt/englishhub`.
-  - **Post-Deploy Healthcheck**: Đợi 15 giây sau khi `docker compose up -d` rồi kiểm tra trạng thái thực tế của các container (`docker compose ps`).
+---
+
+### 4.4. Nhóm Triển Khai AI Service (Dùng Chung Staging & Production)
+
+#### 9. Triển Khai AI Service Lên Máy Chủ: [`cd-ai-service.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-ai-service.yml)
+- **Tên workflow**: `Deploy AI Service to VPS/Home-Server`
+- **Trigger**: `workflow_run` — chạy khi workflow `AI Service CI` hoàn tất trên nhánh `main` hoặc `staging`.
+  - Vì `AI Service CI` chỉ chạy khi có thay đổi trong `ai-service/**` → CD này cũng **chỉ chạy khi code AI service thay đổi**.
+  - Job `deploy` chỉ chạy khi `AI Service CI` conclusion = `success`.
+  - AI service được deploy **dùng chung cho Production và Staging** (backend gọi qua `http://ai-service:8001` trên network `englishhub_shared`), nên cả 2 nhánh đều trỏ về cùng thư mục `/home/${{ secrets.SERVER_USER }}/ai-service`.
+- **Các bước thực thi**:
+  1. Checkout đúng commit của lần chạy CI (`workflow_run.head_sha`).
+  2. Kết nối Tailscale mesh VPN.
+  3. Build & Push image `ghcr.io/hotung9108/english-hub-ai-service` với 2 tag: `:latest` và `:<head_sha>`.
+  4. Copy `docker-compose.ai-service.yml` và `env.ai-service.example` lên server qua SCP (file `.env` thật chỉ được tạo 1 lần, không bị ghi đè).
+  5. Deploy qua SSH: pull image mới -> cập nhật `AI_SERVICE_IMAGE` trong `/home/${{ secrets.SERVER_USER }}/ai-service/.env` -> đảm bảo network `englishhub_shared` tồn tại -> `docker compose -f docker-compose.ai-service.yml up -d --no-build --pull always` -> `docker image prune -f`.
+- **Thứ tự với Backend CD**: Backend CD (production lẫn staging) luôn **chờ** workflow này hoàn tất thành công trước khi deploy (xem job `wait-ai-service` ở mục 6 và 8).
 
 ---
 

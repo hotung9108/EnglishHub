@@ -28,12 +28,23 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import com.english_hub.core.infrastructure.persistence.entity.Answer;
+import com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse;
+import com.english_hub.core.modules.grading.presentation.rest.dto.AnswerAnnotationResponse;
+import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataAnswerRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class GradingService {
+
+	private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(GradingService.class);
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String GRADING_NOT_FOUND_MESSAGE = "Không tìm thấy bản chấm điểm.";
@@ -54,6 +65,29 @@ public class GradingService {
 	private final CurrentUserProvider currentUserProvider;
 	private final UserRepository userRepository;
 	private final GradingAiAnalysisService gradingAiAnalysisService;
+	private final SpringDataAnswerRepository answerRepository;
+
+	@Autowired
+	public GradingService(
+			GradingRepository gradingRepository,
+			AnswerAnnotationRepository answerAnnotationRepository,
+			GradingChangeLogRepository gradingChangeLogRepository,
+			GradingContextRepository gradingContextRepository,
+			ClassRepository classRepository,
+			CurrentUserProvider currentUserProvider,
+			UserRepository userRepository,
+			GradingAiAnalysisService gradingAiAnalysisService,
+			@Autowired(required = false) SpringDataAnswerRepository answerRepository) {
+		this.gradingRepository = gradingRepository;
+		this.answerAnnotationRepository = answerAnnotationRepository;
+		this.gradingChangeLogRepository = gradingChangeLogRepository;
+		this.gradingContextRepository = gradingContextRepository;
+		this.classRepository = classRepository;
+		this.currentUserProvider = currentUserProvider;
+		this.userRepository = userRepository;
+		this.gradingAiAnalysisService = gradingAiAnalysisService;
+		this.answerRepository = answerRepository;
+	}
 
 	public GradingService(
 			GradingRepository gradingRepository,
@@ -64,14 +98,16 @@ public class GradingService {
 			CurrentUserProvider currentUserProvider,
 			UserRepository userRepository,
 			GradingAiAnalysisService gradingAiAnalysisService) {
-		this.gradingRepository = gradingRepository;
-		this.answerAnnotationRepository = answerAnnotationRepository;
-		this.gradingChangeLogRepository = gradingChangeLogRepository;
-		this.gradingContextRepository = gradingContextRepository;
-		this.classRepository = classRepository;
-		this.currentUserProvider = currentUserProvider;
-		this.userRepository = userRepository;
-		this.gradingAiAnalysisService = gradingAiAnalysisService;
+		this(
+				gradingRepository,
+				answerAnnotationRepository,
+				gradingChangeLogRepository,
+				gradingContextRepository,
+				classRepository,
+				currentUserProvider,
+				userRepository,
+				gradingAiAnalysisService,
+				null);
 	}
 
 	public Grading getBySubmissionModuleId(long submissionModuleId) {
@@ -82,6 +118,118 @@ public class GradingService {
 				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
 	}
 
+	public AiGradingSuggestionResponse getAiSuggestion(long submissionModuleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		GradingContext context = requireSubmissionModuleContext(submissionModuleId);
+		requireSubmissionReadAccess(context, caller);
+
+		if (context.moduleSkill() != ModuleSkill.SPEAKING && context.moduleSkill() != ModuleSkill.WRITING) {
+			throw ApiException.badRequest("Gợi ý chấm AI chỉ hỗ trợ cho kỹ năng Nói (Speaking) và Viết (Writing).");
+		}
+
+		Grading grading = gradingRepository.findBySubmissionModuleId(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+
+		List<AnswerAnnotationResponse> annotations = List.of();
+		if (answerRepository != null) {
+			List<Answer> answers = answerRepository.findBySubmissionModuleId(submissionModuleId);
+			if (!answers.isEmpty()) {
+				annotations = answerAnnotationRepository.findByAnswerId(answers.getFirst().getId()).stream()
+						.map(AnswerAnnotationResponse::from)
+						.toList();
+			}
+		} else if (context.answerId() != null) {
+			annotations = answerAnnotationRepository.findByAnswerId(context.answerId()).stream()
+					.map(AnswerAnnotationResponse::from)
+					.toList();
+		}
+
+		JsonNode transcriptNode = null;
+		JsonNode criteriaScoresNode = null;
+		JsonNode metricsNode = null;
+		String modelUsed = null;
+		String providerUsed = null;
+
+		if (grading.aiTranscript() != null) {
+			JsonNode parsedNode = null;
+			if (grading.aiTranscript() instanceof JsonNode jn) {
+				parsedNode = jn;
+			} else {
+				try {
+					parsedNode = OBJECT_MAPPER.readTree(grading.aiTranscript().toString());
+				} catch (Exception e) {
+					LOGGER.warn("Failed to parse aiTranscript JSON for grading {}: {}", grading.id(), e.getMessage());
+				}
+			}
+
+			if (parsedNode != null) {
+				if (parsedNode.isArray()) {
+					transcriptNode = parsedNode;
+				} else if (parsedNode.isObject()) {
+					if (parsedNode.hasNonNull("transcript")) {
+						transcriptNode = parsedNode.get("transcript");
+					}
+					if (parsedNode.hasNonNull("criteriaScores")) {
+						criteriaScoresNode = parsedNode.get("criteriaScores");
+					}
+					if (parsedNode.hasNonNull("fluencyMetrics")) {
+						metricsNode = parsedNode.get("fluencyMetrics");
+					} else if (parsedNode.hasNonNull("textMetrics")) {
+						metricsNode = parsedNode.get("textMetrics");
+					} else if (parsedNode.hasNonNull("metrics")) {
+						metricsNode = parsedNode.get("metrics");
+					}
+					if (parsedNode.hasNonNull("modelUsed")) {
+						modelUsed = parsedNode.get("modelUsed").asText();
+					}
+					if (parsedNode.hasNonNull("providerUsed")) {
+						providerUsed = parsedNode.get("providerUsed").asText();
+					}
+				}
+			}
+		}
+
+		boolean canTriggerAi = grading.status() == GradingStatus.PENDING || grading.status() == GradingStatus.FAILED;
+		boolean fallbackManualGradingAvailable = true;
+		String fallbackMessage = switch (grading.status()) {
+			case FAILED -> "AI phân tích gặp lỗi hoặc quá thời gian chờ (timeout). Giáo viên có thể thử lại bằng nút 'Phân tích lại' hoặc thực hiện chấm thủ công theo cơ chế dự phòng PP R6 (gọi PUT /api/v1/gradings/" + grading.id() + ").";
+			case PENDING -> "AI đang xử lý hoặc chưa được phân tích. Giáo viên có thể chờ AI hoàn tất hoặc chủ động chấm thủ công ngay lập tức theo PP R6.";
+			case AI_GRADED -> "AI đã hoàn tất gợi ý chấm điểm. Giáo viên có thể duyệt gợi ý hoặc chỉnh sửa lại điểm số và nhận xét trước khi lưu chính thức.";
+			case COMPLETED -> "Bài làm đã được chấm điểm hoàn tất. Giáo viên vẫn có thể cập nhật lại điểm nếu cần thiết.";
+			default -> "Giáo viên có thể chấm điểm và nhận xét thủ công qua API [BE-19].";
+		};
+
+		BigDecimal suggestedScore = null;
+		if (criteriaScoresNode != null && criteriaScoresNode.hasNonNull("overallScore")) {
+			try {
+				suggestedScore = new BigDecimal(criteriaScoresNode.get("overallScore").asText());
+			} catch (Exception ignored) {
+				suggestedScore = BigDecimal.valueOf(criteriaScoresNode.get("overallScore").asDouble());
+			}
+		} else if (grading.status() == GradingStatus.AI_GRADED || grading.status() == GradingStatus.COMPLETED) {
+			suggestedScore = grading.finalScore();
+		}
+
+		return new AiGradingSuggestionResponse(
+				submissionModuleId,
+				grading.id(),
+				context.moduleSkill().name(),
+				grading.status().name(),
+				suggestedScore,
+				grading.maxScoreSnapshot(),
+				grading.aiFeedback(),
+				criteriaScoresNode,
+				metricsNode,
+				annotations,
+				transcriptNode,
+				modelUsed,
+				providerUsed,
+				canTriggerAi,
+				fallbackManualGradingAvailable,
+				fallbackMessage
+		);
+	}
+
 	public void requestAiAnalysis(long submissionModuleId) {
 		User teacher = requireTeacher();
 		GradingContext context = requireSubmissionModuleContext(submissionModuleId);
@@ -90,8 +238,11 @@ public class GradingService {
 				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
 		if (!context.submitted()
 				|| (context.moduleSkill() != ModuleSkill.WRITING && context.moduleSkill() != ModuleSkill.SPEAKING)
-				|| grading.status() != GradingStatus.PENDING) {
+				|| (grading.status() != GradingStatus.PENDING && grading.status() != GradingStatus.FAILED)) {
 			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
+		}
+		if (grading.status() == GradingStatus.FAILED) {
+			gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
 		}
 		gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
 	}

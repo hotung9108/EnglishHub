@@ -1,0 +1,71 @@
+# ==============================================================================
+# EnglishHub - Staging Docker Compose (Self-Host PC)
+# ==============================================================================
+# Hướng dẫn chạy:
+# 1. Tạo file .env từ env.production.example: cp env.production.example .env
+# 2. Điền thông tin kết nối Neon DB, JWT_SECRET vào .env
+# 3. Chạy backend staging:
+#      docker compose -f docker-compose.staging.yml up -d
+#
+# Lưu ý: AI service chạy độc lập bằng docker-compose.ai-service.yml và được
+# chia sẻ chung cho production + staging qua network external "englishhub_shared".
+# ==============================================================================
+
+services:
+  backend-staging:
+    image: ${BACKEND_IMAGE:-ghcr.io/hotung9108/englishhub/backend:latest}
+    container_name: englishhub-backend-staging
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8082}:${SERVER_PORT:-8082}"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # Kết nối trực tiếp tới Neon PostgreSQL Serverless (bắt buộc sslmode=require)
+      SPRING_DATASOURCE_URL: ${DB_URL:?Database connection URL (DB_URL) is required}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?Database username (DB_USER) is required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Database password (DB_PASSWORD) is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT secret key is required}
+      # Danh sách domain frontend được phép gọi API, phân tách bởi dấu phẩy.
+      # "*" = cho phép tất cả các origin (mặc định). Nên giới hạn theo domain thật khi đưa vào dùng.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Giới hạn RAM JVM cho Spring Boot để tối ưu tài nguyên máy tính cá nhân
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx768m}"
+      # Cấu hính thông tin S3-Compatible Storage cho backend
+      STORAGE_S3_ENABLED: ${STORAGE_S3_ENABLED:-true}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-}
+      STORAGE_S3_ACCESS_KEY_ID: ${STORAGE_S3_ACCESS_KEY_ID:-}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_ACCESS_KEY:-}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
+      STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
+      SERVER_PORT: ${SERVER_PORT:-8082}
+      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
+      # ===== AI Service (FastAPI Microservice) - khớp với application.properties =====
+      # AI service chạy độc lập (docker-compose.ai-service.yml), chia sẻ chung prod + staging
+      # qua network external "englishhub_shared" -> gọi qua http://ai-service:8001
+      AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
+      AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-60}
+      # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
+      AI_SERVICE_MODEL: ${AI_SERVICE_MODEL:-}
+      AI_SERVICE_PROVIDER: ${AI_SERVICE_PROVIDER:-}
+      # OpenAPI servers
+      APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
+      app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
+      app.openapi.server-description: ${APP_OPENAPI_SERVER_DESCRIPTION:-Staging (Cloudflare Tunnel)}
+    networks:
+      - englishhub_network
+      - englishhub_shared
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${SERVER_PORT:-8082}/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  englishhub_network:
+    driver: bridge
+  englishhub_shared:
+    external: true

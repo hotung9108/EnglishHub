@@ -8,6 +8,16 @@ export { useUsers } from './useUsers';
 export type { UseUsersOptions, UseUsersResult } from './useUsers';
 export { useGrading, useStudentGradingResult } from './useGrading';
 export type { UseGradingResult, UseStudentGradingResult } from './useGrading';
+export { useSubmission, useSubmissionAttempts } from './useSubmission';
+export { useStudentEvaluation } from './useStudentEvaluation';
+export type { UseStudentEvaluationOptions, UseStudentEvaluationResult } from './useStudentEvaluation';
+export { useReports } from './useReports';
+export type { UseReportsOptions, UseReportsResult } from './useReports';
+export type {
+  UseSubmissionAttemptsOptions,
+  UseSubmissionAttemptsResult,
+  UseSubmissionResult,
+} from './useSubmission';
 export type {
   CreatableRole,
   CreateUserPayload,

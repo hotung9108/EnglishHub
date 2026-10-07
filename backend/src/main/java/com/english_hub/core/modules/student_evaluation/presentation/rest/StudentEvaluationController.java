@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.student_evaluation.presentation.rest;
 
+import com.english_hub.core.common.ApiException;
 import com.english_hub.core.modules.student_evaluation.application.service.StudentEvaluationService;
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluationPage;
 import com.english_hub.core.modules.student_evaluation.presentation.rest.dto.CreateStudentEvaluationRequest;
@@ -8,6 +9,8 @@ import com.english_hub.core.modules.student_evaluation.presentation.rest.dto.Pag
 import com.english_hub.core.modules.student_evaluation.presentation.rest.dto.StudentEvaluationListResponse;
 import com.english_hub.core.modules.student_evaluation.presentation.rest.dto.StudentEvaluationResponse;
 import com.english_hub.core.modules.student_evaluation.presentation.rest.dto.UpdateStudentEvaluationRequest;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class StudentEvaluationController {
 
+	private static final String INVALID_DATE_RANGE_MESSAGE = "Khoảng thời gian không hợp lệ.";
+
 	private final StudentEvaluationService studentEvaluationService;
 
 	public StudentEvaluationController(StudentEvaluationService studentEvaluationService) {
@@ -35,9 +40,12 @@ public class StudentEvaluationController {
 	public ResponseEntity<StudentEvaluationListResponse> listForStudent(
 			@PathVariable long id,
 			@RequestParam(required = false) Long classId,
+			@RequestParam(required = false) String fromDate,
+			@RequestParam(required = false) String toDate,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
-		StudentEvaluationPage result = studentEvaluationService.listForStudent(id, classId, page, limit);
+		StudentEvaluationPage result = studentEvaluationService.listForStudent(
+				id, classId, parseDate(fromDate), parseDate(toDate), page, limit);
 		List<StudentEvaluationListResponse.Item> data = result.getContent().stream()
 				.map(StudentEvaluationListResponse.Item::from)
 				.toList();
@@ -72,5 +80,19 @@ public class StudentEvaluationController {
 	public ResponseEntity<MessageResponse> delete(@PathVariable long id) {
 		studentEvaluationService.delete(id);
 		return ResponseEntity.ok(new MessageResponse("Đã xoá đánh giá."));
+	}
+
+	private LocalDate parseDate(String value) {
+		if (value == null) {
+			return null;
+		}
+		if (!value.matches("\\d{4}-\\d{2}-\\d{2}")) {
+			throw ApiException.badRequest(INVALID_DATE_RANGE_MESSAGE);
+		}
+		try {
+			return LocalDate.parse(value);
+		} catch (DateTimeParseException exception) {
+			throw ApiException.badRequest(INVALID_DATE_RANGE_MESSAGE);
+		}
 	}
 }

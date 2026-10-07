@@ -611,7 +611,7 @@ Delete an annotation.
 ## 12. Student Evaluation
 
 ### GET `/api/v1/students/{id}/evaluations`
-Retrieve a paginated list of evaluations for a student, optionally filtered by class.
+Retrieve a paginated list of evaluations for a student, optionally filtered by class and creation date range.
 
 **Path Params:** `id` (int64)
 
@@ -620,8 +620,12 @@ Retrieve a paginated list of evaluations for a student, optionally filtered by c
 | Name | Type | Description |
 |------|------|-------------|
 | `classId` | int64 | Filter by class |
+| `fromDate` | date (`yyyy-MM-dd`) | Include evaluations created on or after this date in `Asia/Ho_Chi_Minh` time. |
+| `toDate` | date (`yyyy-MM-dd`) | Include evaluations created on or before this date in `Asia/Ho_Chi_Minh` time. |
 | `page` | integer | Page number |
 | `limit` | integer | Records per page |
+
+Both date boundaries are inclusive. Invalid dates or `fromDate` after `toDate` return HTTP 400 with `Khoảng thời gian không hợp lệ.`.
 
 **Response:** `StudentEvaluationListResponse`
 

@@ -1,0 +1,12 @@
+﻿{
+  \"env\": \"staging\",
+  \"frontend\": { \"baseUrl\": \"https://staging.englishhub.local\" },
+  \"backend\":  { \"baseUrl\": \"https://api-staging.englishhub.local\", \"apiPrefix\": \"/api/v1\" },
+  \"aiService\":{ \"baseUrl\": \"https://ai-staging.englishhub.local\" },
+  \"selenium\": { \"browser\": \"chrome\", \"headless\": true, \"timeout\": 60000 },
+  \"users\": {
+    \"admin\":   { \"email\": \"admin@utc-polyglot.edu.vn\", \"password\": \"Password123!\" },
+    \"teacher\": { \"email\": \"teacher01@gmail.com\", \"password\": \"Password123!\" },
+    \"student\": { \"email\": \"sv000001@gmail.com\", \"password\": \"Password123!\" }
+  }
+}

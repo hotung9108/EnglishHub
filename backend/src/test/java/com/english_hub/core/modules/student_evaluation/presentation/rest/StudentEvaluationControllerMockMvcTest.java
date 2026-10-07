@@ -17,6 +17,7 @@ import com.english_hub.core.modules.student_evaluation.application.service.Stude
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluation;
 import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluationPage;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,11 +48,14 @@ class StudentEvaluationControllerMockMvcTest {
 	void listReturnsOnlyTheContractDataAndPaginationEnvelope() throws Exception {
 		StudentEvaluation evaluation = new StudentEvaluation(
 				8L, 3L, 4L, 5L, "Teacher A", "Progress", Instant.parse("2026-09-26T10:00:00Z"));
-		when(studentEvaluationService.listForStudent(3L, 5L, 2, 7))
+		when(studentEvaluationService.listForStudent(
+				3L, 5L, LocalDate.of(2026, 9, 20), LocalDate.of(2026, 9, 22), 2, 7))
 				.thenReturn(new StudentEvaluationPage(List.of(evaluation), 2, 7, 10));
 
 		mockMvc.perform(get("/api/v1/students/3/evaluations")
 					.param("classId", "5")
+					.param("fromDate", "2026-09-20")
+					.param("toDate", "2026-09-22")
 					.param("page", "2")
 					.param("limit", "7"))
 				.andExpect(status().isOk())
@@ -69,7 +73,7 @@ class StudentEvaluationControllerMockMvcTest {
 
 	@Test
 	void listUsesDefaultPageAndLimit() throws Exception {
-		when(studentEvaluationService.listForStudent(3L, null, 1, 20))
+		when(studentEvaluationService.listForStudent(3L, null, null, null, 1, 20))
 				.thenReturn(new StudentEvaluationPage(List.of(), 1, 20, 0));
 
 		mockMvc.perform(get("/api/v1/students/3/evaluations"))
@@ -77,7 +81,7 @@ class StudentEvaluationControllerMockMvcTest {
 				.andExpect(jsonPath("$.pagination.page").value(1))
 				.andExpect(jsonPath("$.pagination.limit").value(20));
 
-		verify(studentEvaluationService).listForStudent(3L, null, 1, 20);
+		verify(studentEvaluationService).listForStudent(3L, null, null, null, 1, 20);
 	}
 
 	@Test

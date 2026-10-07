@@ -19,4 +19,23 @@ public class GradingAsyncConfiguration {
 		executor.setWaitForTasksToCompleteOnShutdown(true);
 		return executor;
 	}
+
+	/**
+	 * Dedicated pool for deterministic answer comparison, kept separate from {@code gradingAiExecutor}
+	 * so a burst of cheap scoring tasks can never be starved behind rate-limited AI calls.
+	 *
+	 * <p>Core equals the intended concurrency: {@code ThreadPoolTaskExecutor} only grows past the
+	 * core size once the queue is full, so a small core with a large queue would silently stay at the
+	 * core size.
+	 */
+	@Bean(name = "autoGradingExecutor")
+	public ThreadPoolTaskExecutor autoGradingExecutor() {
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(4);
+		executor.setMaxPoolSize(4);
+		executor.setQueueCapacity(50);
+		executor.setThreadNamePrefix("auto-grading-");
+		executor.setWaitForTasksToCompleteOnShutdown(true);
+		return executor;
+	}
 }

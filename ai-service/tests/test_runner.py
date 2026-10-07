@@ -1,0 +1,209 @@
+import unittest
+import base64
+import os
+import sys
+
+# Ensure app package is in python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+os.environ["MOCK_MODE"] = "true"
+os.environ["GEMINI_API_KEY"] = ""
+
+from fastapi.testclient import TestClient
+from app.main import app
+
+
+class TestSpeakingApi(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_health_check(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("EnglishHub AI Service", data["service"])
+        self.assertIn("activeProvider", data)
+        self.assertIn("openrouterConfigured", data)
+        self.assertIn("openrouterModel", data)
+
+    def test_analyze_speaking_qa21_benchmark(self):
+        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+        payload = {
+            "submissionModuleId": 14,
+            "audioBase64": mock_audio_b64,
+            "audioStorageKey": "submissions/speaking_14.mp3",
+            "moduleInstructions": "Describe a book you enjoyed reading recently.",
+            "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
+            "maxScore": 9.0
+        }
+
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+
+        data = response.json()
+        self.assertEqual(data["submissionModuleId"], 14)
+        self.assertTrue(6.5 <= data["overallScore"] <= 7.5)
+        self.assertIn("IELTS Speaking", data["aiFeedback"])
+
+        transcript = data["aiTranscript"]
+        self.assertIsInstance(transcript, list)
+        self.assertGreater(len(transcript), 0)
+        for w in transcript:
+            self.assertIn("word", w)
+            self.assertIn("start", w)
+            self.assertIn("end", w)
+            self.assertIn("confidence", w)
+
+        fluency = data["fluencyMetrics"]
+        self.assertGreater(fluency["wordsPerMinute"], 90.0)
+
+        criteria = data["criteriaScores"]
+        self.assertEqual(criteria["fluencyAndCoherence"], 7.0)
+        self.assertEqual(criteria["pronunciation"], 7.0)
+
+        annotations = data["annotations"]
+        self.assertGreaterEqual(len(annotations), 2)
+        for ann in annotations:
+            self.assertGreaterEqual(ann["startOffset"], 0)
+            self.assertGreater(ann["endOffset"], ann["startOffset"])
+            self.assertEqual(ann["errorType"], "PRONUNCIATION")
+
+    def test_analyze_speaking_missing_audio_rejects_400(self):
+        payload = {
+            "submissionModuleId": 14,
+            "moduleInstructions": "Describe a book",
+            "maxScore": 9.0
+        }
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        self.assertEqual(response.status_code, 400)
+
+    def test_analyze_speaking_direct_upload(self):
+        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
+        files = {
+            "file": ("test.mp3", fake_audio, "audio/mp3")
+        }
+        data = {
+            "submissionModuleId": 14,
+            "maxScore": "9.0"
+        }
+        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+        res_json = response.json()
+        self.assertEqual(res_json["submissionModuleId"], 14)
+        self.assertGreaterEqual(res_json["overallScore"], 6.5)
+
+    def test_analyze_speaking_dynamic_model_and_provider(self):
+        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+        payload = {
+            "submissionModuleId": 15,
+            "audioBase64": mock_audio_b64,
+            "moduleInstructions": "Describe your favorite hobby.",
+            "maxScore": 9.0,
+            "model": "anthropic/claude-3.5-sonnet",
+            "aiProvider": "openrouter"
+        }
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+        data = response.json()
+        self.assertEqual(data["submissionModuleId"], 15)
+        self.assertEqual(data["modelUsed"], "anthropic/claude-3.5-sonnet")
+        self.assertEqual(data["providerUsed"], "openrouter-mock")
+
+    def test_analyze_speaking_direct_upload_with_custom_model(self):
+        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
+        files = {
+            "file": ("test.mp3", fake_audio, "audio/mp3")
+        }
+        data = {
+            "submissionModuleId": 16,
+            "maxScore": "9.0",
+            "model": "google/gemini-1.5-pro",
+            "aiProvider": "gemini"
+        }
+        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        self.assertEqual(response.status_code, 200, f"Error: {response.text}")
+        res_json = response.json()
+        self.assertEqual(res_json["submissionModuleId"], 16)
+        self.assertEqual(res_json["modelUsed"], "google/gemini-1.5-pro")
+        self.assertEqual(res_json["providerUsed"], "gemini-mock")
+
+    def test_prompt_caching_structure_tier1(self):
+        from app.services.gemini_service import GeminiService
+
+        prompt1 = GeminiService._build_static_system_prompt(
+            module_instructions="Describe an interesting journey.",
+            ai_instruction_snapshot="CEFR B2 emphasis on past tenses",
+            max_score=9.0
+        )
+        prompt2 = GeminiService._build_static_system_prompt(
+            module_instructions="Describe an interesting journey.",
+            ai_instruction_snapshot="CEFR B2 emphasis on past tenses",
+            max_score=9.0
+        )
+
+        # 1. Determinism and prefix stability: prompt1 and prompt2 MUST be identical for cache hits
+        self.assertEqual(prompt1, prompt2)
+        self.assertIn("Topic / Instructions: Describe an interesting journey.", prompt1)
+        self.assertIn("Rubric Notes: CEFR B2 emphasis on past tenses", prompt1)
+        self.assertIn("Max Score: 9.0", prompt1)
+        self.assertIn("--- ASSIGNMENT CONTEXT (STATIC PREFIX FOR PROMPT CACHING) ---", prompt1)
+
+        # 2. Unified single-method verification for Writing skill
+        writing_prompt = GeminiService._build_static_system_prompt(
+            skill="writing",
+            module_instructions="Write an essay discussing advantages and disadvantages of online learning.",
+            ai_instruction_snapshot="Focus on Task Response and Coherence",
+            max_score=9.0
+        )
+        self.assertIn("Write an essay discussing advantages and disadvantages of online learning.", writing_prompt)
+        self.assertIn("Focus on Task Response and Coherence", writing_prompt)
+        self.assertIn("SCORING RUBRIC & CALIBRATION", writing_prompt)
+
+
+
+class TestWritingApi(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+        self.essay = (
+            "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
+            "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"
+            "First of all, engaging in voluntary activities allows teenagers to acquire practical experience. "
+            "Community service help teenagers understand social responsibilities and learn how to work effectively in a team. "
+            "Furthermore, participating in social work can make a big benefit for their future university applications because admissions officers always appreciate well-rounded candidates.\n"
+            "However they should not be overloaded with too many working hours, as academic study must remain their top priority. "
+            "In conclusion, mandatory community service is highly beneficial for high school students as long as it is reasonably arranged."
+        )
+
+    def test_analyze_writing_qa21_benchmark(self):
+        payload = {
+            "submissionModuleId": 15,
+            "content": self.essay,
+            "moduleInstructions": "Some people believe that unpaid community service should be a compulsory part of high school programmes. To what extent do you agree or disagree?",
+            "maxScore": 9.0,
+            "aiProvider": "mock"
+        }
+        response = self.client.post("/api/v1/analyze/writing", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["submissionModuleId"], 15)
+        self.assertEqual(data["overallScore"], 6.5)
+        self.assertIn("IELTS Writing", data["aiFeedback"])
+        self.assertIn("textMetrics", data)
+        self.assertEqual(data["textMetrics"]["wordCount"], 125)
+        self.assertIn("criteriaScores", data)
+        self.assertEqual(data["criteriaScores"]["taskResponse"], 7.0)
+        self.assertGreaterEqual(len(data["annotations"]), 1)
+
+    def test_analyze_writing_validation_missing_input(self):
+        payload = {
+            "submissionModuleId": 15,
+            "content": "   "
+        }
+        response = self.client.post("/api/v1/analyze/writing", json=payload)
+        self.assertIn(response.status_code, [400, 422])
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+

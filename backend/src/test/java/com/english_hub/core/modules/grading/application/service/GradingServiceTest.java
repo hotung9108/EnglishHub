@@ -25,6 +25,7 @@ import com.english_hub.core.modules.grading.domain.repository.GradingContextRepo
 import com.english_hub.core.modules.grading.domain.repository.GradingRepository;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
+import com.english_hub.core.modules.module.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -65,6 +66,9 @@ class GradingServiceTest {
 	@Mock
 	private GradingAiAnalysisService gradingAiAnalysisService;
 
+	@Mock
+	private com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataAnswerRepository answerRepository;
+
 	private GradingService gradingService;
 
 	@BeforeEach
@@ -77,7 +81,8 @@ class GradingServiceTest {
 				classRepository,
 				currentUserProvider,
 				userRepository,
-				gradingAiAnalysisService);
+				gradingAiAnalysisService,
+				answerRepository);
 	}
 
 	@Test
@@ -219,8 +224,8 @@ class GradingServiceTest {
 	void rejectsAnnotationOutsideAnswerContent() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
 		when(gradingContextRepository.findByAnswerId(8L))
-				.thenReturn(Optional.of(new GradingContext(14L, 8L, 7L, 3L, 2L, 20L, 41L,
-						ModuleSkill.WRITING, true, 16)));
+				.thenReturn(Optional.of(new GradingContext(14L, 6L, 8L, 7L, 3L, 2L, 20L, 41L,
+						ModuleSkill.WRITING, true, 16, ModuleTaskType.ESSAY, null)));
 
 		assertThatExceptionOfType(ApiException.class)
 				.isThrownBy(() -> gradingService.createTeacherAnnotation(
@@ -234,7 +239,8 @@ class GradingServiceTest {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
 		when(gradingContextRepository.findBySubmissionModuleId(14L))
 				.thenReturn(Optional.of(new GradingContext(
-						14L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null)));
+						14L, 6L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null,
+						ModuleTaskType.RECORDING, null)));
 		Grading pending = grading(5L, bd("10.00"), null, GradingStatus.PENDING);
 		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(pending));
 
@@ -244,6 +250,223 @@ class GradingServiceTest {
 		verify(gradingRepository, never()).saveTeacherGrade(any());
 		verifyNoInteractions(answerAnnotationRepository);
 		assertThat(pending.status()).isEqualTo(GradingStatus.PENDING);
+	}
+
+	@Test
+	void requestAiAnalysis_allowsRetryWhenStatusIsFailed() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(new GradingContext(
+						14L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null)));
+		Grading failed = grading(5L, bd("10.00"), null, GradingStatus.FAILED);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(failed));
+
+		gradingService.requestAiAnalysis(14L);
+
+		verify(gradingRepository).updateStatus(5L, GradingStatus.PENDING);
+		verify(gradingAiAnalysisService).analyzeSubmittedModule(14L);
+	}
+
+	@Test
+	void getAiSuggestion_speakingSkill_returnsAggregatedSuggestion() throws Exception {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.SPEAKING)));
+
+		com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+		com.fasterxml.jackson.databind.node.ObjectNode transcriptDetails = mapper.createObjectNode();
+		com.fasterxml.jackson.databind.node.ObjectNode criteria = transcriptDetails.putObject("criteriaScores");
+		criteria.put("fluencyAndCoherence", 7.0);
+		criteria.put("lexicalResource", 7.0);
+		criteria.put("grammaticalRangeAndAccuracy", 7.0);
+		criteria.put("pronunciation", 7.0);
+		criteria.put("overallScore", 7.0);
+		com.fasterxml.jackson.databind.node.ObjectNode metrics = transcriptDetails.putObject("fluencyMetrics");
+		metrics.put("wordsPerMinute", 120.0);
+		metrics.put("pauseCount", 3);
+		metrics.put("totalDurationSeconds", 45.0);
+		metrics.put("phonationTimeRatio", 0.85);
+		com.fasterxml.jackson.databind.node.ArrayNode transcriptArray = transcriptDetails.putArray("transcript");
+		com.fasterxml.jackson.databind.node.ObjectNode word = transcriptArray.addObject();
+		word.put("word", "Hello");
+		word.put("start", 0.0);
+		word.put("end", 0.5);
+		transcriptDetails.put("modelUsed", "benchmark/qa-21-deterministic");
+		transcriptDetails.put("providerUsed", "mock");
+
+		Grading grading = new Grading(
+				5L,
+				14L,
+				GradingMethod.AUTO,
+				GradingStatus.AI_GRADED,
+				"Overall good coherence and natural rhythm.",
+				bd("7.0"),
+				"Overall good coherence and natural rhythm.",
+				bd("9.0"),
+				null,
+				null,
+				null,
+				transcriptDetails,
+				null
+		);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(grading));
+
+		com.english_hub.core.infrastructure.persistence.entity.Answer answer =
+				new com.english_hub.core.infrastructure.persistence.entity.Answer(
+						14L, null, null, "audio.mp3", null, null, null, null, null, null, null, null);
+		org.springframework.test.util.ReflectionTestUtils.setField(answer, "id", 77L);
+		when(answerRepository.findBySubmissionModuleId(14L)).thenReturn(java.util.List.of(answer));
+
+		AnswerAnnotation annotation = AnswerAnnotation.ai(
+				77L, 0, 5, null, "pronunciation", "Slight mispronunciation", "Hello");
+		when(answerAnnotationRepository.findByAnswerId(77L)).thenReturn(java.util.List.of(annotation));
+
+		com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse response =
+				gradingService.getAiSuggestion(14L);
+
+		assertThat(response.submissionModuleId()).isEqualTo(14L);
+		assertThat(response.gradingId()).isEqualTo(5L);
+		assertThat(response.skill()).isEqualTo("SPEAKING");
+		assertThat(response.status()).isEqualTo("AI_GRADED");
+		assertThat(response.suggestedScore()).isEqualByComparingTo(bd("7.0"));
+		assertThat(response.maxScore()).isEqualByComparingTo(bd("9.0"));
+		assertThat(response.aiFeedback()).contains("Overall good coherence");
+		assertThat(response.criteriaScores().get("pronunciation").asDouble()).isEqualTo(7.0);
+		assertThat(response.metrics().get("wordsPerMinute").asDouble()).isEqualTo(120.0);
+		assertThat(response.transcript().isArray()).isTrue();
+		assertThat(response.transcript().size()).isEqualTo(1);
+		assertThat(response.modelUsed()).isEqualTo("benchmark/qa-21-deterministic");
+		assertThat(response.providerUsed()).isEqualTo("mock");
+		assertThat(response.canTriggerAi()).isFalse();
+		assertThat(response.fallbackManualGradingAvailable()).isTrue();
+		assertThat(response.annotations()).hasSize(1);
+		assertThat(response.annotations().get(0).errorType()).isEqualTo("pronunciation");
+	}
+
+	@Test
+	void getAiSuggestion_writingSkill_returnsAggregatedSuggestion() throws Exception {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+		com.fasterxml.jackson.databind.node.ObjectNode transcriptDetails = mapper.createObjectNode();
+		com.fasterxml.jackson.databind.node.ObjectNode criteria = transcriptDetails.putObject("criteriaScores");
+		criteria.put("taskResponse", 7.0);
+		criteria.put("coherenceAndCohesion", 6.5);
+		criteria.put("lexicalResource", 6.0);
+		criteria.put("grammaticalRangeAndAccuracy", 6.5);
+		criteria.put("overallScore", 6.5);
+		com.fasterxml.jackson.databind.node.ObjectNode metrics = transcriptDetails.putObject("textMetrics");
+		metrics.put("wordCount", 140);
+		metrics.put("sentenceCount", 5);
+		metrics.put("averageSentenceLength", 28.0);
+		metrics.put("lexicalDiversity", 0.67);
+		metrics.put("fleschKincaidGrade", 13.5);
+		transcriptDetails.put("modelUsed", "benchmark/qa-21-deterministic");
+		transcriptDetails.put("providerUsed", "mock");
+
+		Grading grading = new Grading(
+				5L,
+				14L,
+				GradingMethod.AUTO,
+				GradingStatus.AI_GRADED,
+				"Well organized essay with clear main ideas.",
+				bd("6.5"),
+				"Well organized essay with clear main ideas.",
+				bd("9.0"),
+				null,
+				null,
+				null,
+				transcriptDetails,
+				null
+		);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(grading));
+
+		com.english_hub.core.infrastructure.persistence.entity.Answer answer =
+				new com.english_hub.core.infrastructure.persistence.entity.Answer(
+						14L, null, "Essay text", null, null, null, null, null, null, null, null, null);
+		org.springframework.test.util.ReflectionTestUtils.setField(answer, "id", 88L);
+		when(answerRepository.findBySubmissionModuleId(14L)).thenReturn(java.util.List.of(answer));
+
+		AnswerAnnotation annotation = AnswerAnnotation.ai(
+				88L, 272, 305, null, "GRAMMAR", "Subject-verb agreement error", "helps");
+		when(answerAnnotationRepository.findByAnswerId(88L)).thenReturn(java.util.List.of(annotation));
+
+		com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse response =
+				gradingService.getAiSuggestion(14L);
+
+		assertThat(response.skill()).isEqualTo("WRITING");
+		assertThat(response.status()).isEqualTo("AI_GRADED");
+		assertThat(response.suggestedScore()).isEqualByComparingTo(bd("6.5"));
+		assertThat(response.criteriaScores().get("taskResponse").asDouble()).isEqualTo(7.0);
+		assertThat(response.metrics().get("wordCount").asInt()).isEqualTo(140);
+		assertThat(response.annotations()).hasSize(1);
+		assertThat(response.annotations().get(0).comment()).isEqualTo("Subject-verb agreement error");
+		assertThat(response.fallbackManualGradingAvailable()).isTrue();
+	}
+
+	@Test
+	void getAiSuggestion_failedStatus_providesManualFallbackGuidancePerPPR6() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		Grading failed = grading(5L, bd("9.0"), null, GradingStatus.FAILED);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(failed));
+
+		com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse response =
+				gradingService.getAiSuggestion(14L);
+
+		assertThat(response.status()).isEqualTo("FAILED");
+		assertThat(response.suggestedScore()).isNull();
+		assertThat(response.canTriggerAi()).isTrue();
+		assertThat(response.fallbackManualGradingAvailable()).isTrue();
+		assertThat(response.fallbackMessage()).contains("PUT /api/v1/gradings/5");
+		assertThat(response.fallbackMessage()).contains("thủ công theo cơ chế dự phòng PP R6");
+	}
+
+	@Test
+	void getAiSuggestion_pendingStatus_providesManualFallbackGuidance() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.SPEAKING)));
+
+		Grading pending = grading(5L, bd("9.0"), null, GradingStatus.PENDING);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(pending));
+
+		com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse response =
+				gradingService.getAiSuggestion(14L);
+
+		assertThat(response.status()).isEqualTo("PENDING");
+		assertThat(response.canTriggerAi()).isTrue();
+		assertThat(response.fallbackManualGradingAvailable()).isTrue();
+		assertThat(response.fallbackMessage()).contains("chủ động chấm thủ công ngay lập tức theo PP R6");
+	}
+
+	@Test
+	void getAiSuggestion_unsupportedSkill_throwsBadRequest() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.LISTENING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.getAiSuggestion(14L))
+				.satisfies(exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(exception.getMessage()).contains("Gợi ý chấm AI chỉ hỗ trợ");
+				});
+	}
+
+	@Test
+	void getAiSuggestion_nonOwnerTeacher_throwsForbidden() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.getAiSuggestion(14L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 	}
 
 	private Grading grading(Long id, BigDecimal maxScore, BigDecimal finalScore, GradingStatus status) {
@@ -264,7 +487,7 @@ class GradingServiceTest {
 	}
 
 	private GradingContext context(Long teacherId, ModuleSkill skill) {
-		return new GradingContext(14L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64);
+		return new GradingContext(14L, 6L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64, ModuleTaskType.ESSAY, null);
 	}
 
 	private User user(Long id, UserRole role) {

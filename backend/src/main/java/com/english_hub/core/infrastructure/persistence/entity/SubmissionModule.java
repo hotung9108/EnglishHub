@@ -46,4 +46,13 @@ public class SubmissionModule {
 		this.moduleId = moduleId;
 		this.status = status;
 	}
+
+	/**
+	 * Marks the module graded once its verdict is final. Reached only after the grading row is
+	 * written, because {@code GET /submission-modules/{id}} reveals {@code correctAnswer} only for
+	 * a graded module.
+	 */
+	public void markGraded() {
+		this.status = SubmissionStatus.GRADED;
+	}
 }

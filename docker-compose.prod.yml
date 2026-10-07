@@ -6,8 +6,10 @@
 # 2. Điền thông tin kết nối Neon DB, JWT_SECRET vào .env
 # 3. Chạy backend:
 #      docker compose -f docker-compose.prod.yml up -d
-# 4. (Tùy chọn) Chạy cả Cloudflare Tunnel qua Docker (nếu không cài tunnel app trên OS):
-#      docker compose -f docker-compose.prod.yml --profile cloudflare up -d
+#
+# Lưu ý: AI service KHÔNG chạy trong file này. Nó chạy độc lập bằng
+#   docker compose -f docker-compose.ai-service.yml up -d
+# và chia sẻ cho cả production + staging qua network external "englishhub_shared".
 # ==============================================================================
 
 services:
@@ -16,7 +18,7 @@ services:
     container_name: englishhub-backend-prod
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8080}:${SERVER_PORT:-8080}"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # Kết nối trực tiếp tới Neon PostgreSQL Serverless (bắt buộc sslmode=require)
@@ -38,31 +40,34 @@ services:
       STORAGE_S3_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_ACCESS_KEY:-}
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
+      # ===== AI Service (FastAPI Microservice) - khớp với application.properties =====
+      # AI service chạy độc lập (docker-compose.ai-service.yml) và tham gia network
+      # external "englishhub_shared" -> gọi qua http://ai-service:8001
+      # Nếu AI service chạy ở máy khác: AI_SERVICE_BASE_URL=http://<host-ai>:8001
+      AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
+      AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-60}
+      # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
+      AI_SERVICE_MODEL: ${AI_SERVICE_MODEL:-}
+      AI_SERVICE_PROVIDER: ${AI_SERVICE_PROVIDER:-}
+      # OpenAPI servers (có thể override theo domain production thực tế)
+      APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api.hotung9108.me}
+      app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api.hotung9108.me}
+      app.openapi.server-description: ${APP_OPENAPI_SERVER_DESCRIPTION:-Production (Cloudflare Tunnel)}
     networks:
       - englishhub_network
+      - englishhub_shared
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${SERVER_PORT:-8080}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 20s
 
-  # Cloudflare Tunnel Container (Tùy chọn: dùng profile cloudflare nếu muốn chạy qua docker)
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: englishhub-tunnel-prod
-    restart: unless-stopped
-    command: tunnel run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - englishhub_network
-    profiles:
-      - cloudflare
-
 networks:
   englishhub_network:
     driver: bridge
+  englishhub_shared:
+    external: true

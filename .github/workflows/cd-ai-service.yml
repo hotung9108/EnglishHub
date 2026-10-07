@@ -1,0 +1,117 @@
+name: Deploy AI Service to VPS/Home-Server
+
+# Chỉ chạy khi workflow "AI Service CI" hoàn tất (event workflow_run).
+# Job deploy chỉ chạy khi conclusion == success.
+# Vì "AI Service CI" chỉ chạy khi có thay đổi trong ai-service/**,
+# workflow CD này cũng chỉ chạy khi code của AI service thay đổi.
+#
+# Thư mục trên server: /home/<SERVER_USER>/ai-service
+# (docker-compose.ai-service.yml + env file riêng, xem env.ai-service.example)
+on:
+  workflow_run:
+    workflows:
+      - AI Service CI
+    types:
+      - completed
+    branches:
+      - main
+      - staging
+
+env:
+  IMAGE_NAME: ghcr.io/hotung9108/english-hub-ai-service
+
+jobs:
+  deploy:
+    name: Build & Deploy AI Service
+    runs-on: ubuntu-latest
+
+    # Chỉ deploy khi AI Service CI thành công
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      # workflow_run không set github.sha theo commit của lần chạy CI,
+      # nên phải lấy head_sha của lần chạy CI đã kích hoạt workflow này
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Checkout code (commit của lần chạy CI)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Connect to Tailscale
+        id: tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-dns=false
+        continue-on-error: true
+
+      - name: Show Tailscale diagnostics
+        if: steps.tailscale.outcome == 'failure'
+        run: |
+          sudo cat ~/tailscaled.log || true
+          exit 1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # context trỏ vào thư mục ai-service/ nơi có Dockerfile
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-service
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ env.DEPLOY_SHA }}
+
+      # Đảm bảo docker-compose + env template có trên server
+      # (env thật là .env, chỉ được tạo một lần ở bước Deploy, không bị ghi đè)
+      - name: Copy docker-compose & env template to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.ai-service.yml,env.ai-service.example"
+          target: /home/${{ secrets.SERVER_USER }}/ai-service
+          overwrite: true
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_NAME,DEPLOY_SHA
+          script: |
+            # Đăng nhập GHCR để pull image
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
+              -u ${{ secrets.SERVER_USER }} --password-stdin
+
+            # Pull image mới về trước
+            docker pull $IMAGE_NAME:$DEPLOY_SHA
+
+            # Cập nhật AI_SERVICE_IMAGE trong .env để compose dùng đúng tag
+            cd /home/${{ secrets.SERVER_USER }}/ai-service
+            [ -f .env ] || cp env.ai-service.example .env
+            sed -i "s|AI_SERVICE_IMAGE=.*|AI_SERVICE_IMAGE=$IMAGE_NAME:$DEPLOY_SHA|" .env
+
+            # Network chung với backend prod/staging (backend gọi http://ai-service:8001)
+            docker network inspect englishhub_shared >/dev/null 2>&1 \
+              || docker network create englishhub_shared
+
+            # Thay thế container (--no-build: image đã build trên CI)
+            docker compose -f docker-compose.ai-service.yml up -d --no-build --pull always
+
+            # Xóa image cũ không dùng nữa
+            docker image prune -f

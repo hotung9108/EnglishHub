@@ -50,6 +50,12 @@ public class GradingJpaAdapter implements GradingRepository {
 
 	@Override
 	@Transactional(readOnly = true)
+	public Optional<Grading> findBySubmissionModuleIdForUpdate(Long submissionModuleId) {
+		return jpaRepository.findBySubmissionModuleIdForUpdate(submissionModuleId).map(mapper::toDomain);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public GradingPage findPage(GradingFilter filter, int page, int limit) {
 		Pageable pageable = PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.DESC, "id"));
 		Page<com.english_hub.core.infrastructure.persistence.entity.Grading> result =
@@ -69,6 +75,44 @@ public class GradingJpaAdapter implements GradingRepository {
 		target.updateTeacherGrade(
 				source.finalScore(), source.finalFeedback(), source.reviewedBy(), source.reviewedAt());
 		return mapper.toDomain(jpaRepository.save(target));
+	}
+
+	@Override
+	@Transactional
+	public Grading saveAutoGrade(Grading source) {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target =
+				jpaRepository.findById(source.id()).orElseThrow();
+		target.applyAutoGrade(source.finalScore(), source.maxScoreSnapshot(), source.gradedAt());
+		return mapper.toDomain(jpaRepository.save(target));
+	}
+
+	@Override
+	@Transactional
+	public Grading saveAiGrade(Grading source) {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target =
+				jpaRepository.findById(source.id()).orElseThrow();
+		target.setMethod(com.english_hub.core.infrastructure.persistence.entity.GradingMethod.AUTO);
+		target.setStatus(com.english_hub.core.infrastructure.persistence.entity.GradingStatus.AI_GRADED);
+		target.setAiFeedback(source.aiFeedback());
+		target.setFinalScore(source.finalScore());
+		target.setFinalFeedback(source.finalFeedback());
+		target.setGradedAt(source.gradedAt());
+		if (source.aiTranscript() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode) {
+			target.setAiTranscript(jsonNode);
+		} else if (source.aiTranscript() != null) {
+			target.setAiTranscriptJson(source.aiTranscript().toString());
+		}
+		return mapper.toDomain(jpaRepository.save(target));
+	}
+
+	@Override
+	@Transactional
+	public void updateStatus(Long gradingId, com.english_hub.core.modules.grading.domain.model.GradingStatus status) {
+		jpaRepository.findById(gradingId).ifPresent(target -> {
+			target.setStatus(
+					com.english_hub.core.infrastructure.persistence.entity.GradingStatus.valueOf(status.name()));
+			jpaRepository.save(target);
+		});
 	}
 
 	private Specification<com.english_hub.core.infrastructure.persistence.entity.Grading> buildSpecification(

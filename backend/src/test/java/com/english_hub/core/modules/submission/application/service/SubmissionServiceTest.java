@@ -36,6 +36,7 @@ import com.english_hub.core.modules.submission.domain.model.Submission;
 import com.english_hub.core.modules.submission.domain.model.SubmissionModule;
 import com.english_hub.core.modules.submission.domain.model.SubmissionPage;
 import com.english_hub.core.modules.submission.domain.model.SubmissionStatus;
+import com.english_hub.core.modules.submission.domain.event.SubmissionModuleSubmittedEvent;
 import com.english_hub.core.modules.submission.domain.model.UploadStatus;
 import com.english_hub.core.modules.submission.domain.repository.AnswerRepository;
 import com.english_hub.core.modules.submission.domain.repository.AssignmentModuleRepository;
@@ -56,6 +57,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.springframework.context.ApplicationEventPublisher;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,6 +117,9 @@ class SubmissionServiceTest {
 	@Mock
 	private StorageService storageService;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	private static final JsonMapper JSON_READER = new JsonMapper();
 
 	private static final OffsetDateTime EXPIRES_AT = OffsetDateTime.parse("2026-09-24T10:00:00Z");
@@ -134,7 +140,8 @@ class SubmissionServiceTest {
 				moduleQuestionRepository,
 				currentUserProvider,
 				JSON_READER,
-				storageService);
+				storageService,
+				eventPublisher);
 	}
 
 	@Test
@@ -620,6 +627,40 @@ class SubmissionServiceTest {
 		assertThat(first.content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
 		verify(submissionModuleRepository).save(argThat(saved ->
 				saved.getId() == 100L && saved.getStatus() == SubmissionStatus.SUBMITTED));
+	}
+
+	@Test
+	void submittingAModuleAnnouncesItForAutoGrading() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule rewriteModule = module(10L);
+		rewriteModule.setId(101L);
+		when(submissionModuleRepository.findById(101L)).thenReturn(Optional.of(rewriteModule));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.REWRITE)));
+		when(moduleQuestionRepository.findByModuleId(10L)).thenReturn(List.of(
+				new ModuleQuestion(31L, 10L, QuestionType.SHORT_ANSWER, new BigDecimal("5.00"), 1)));
+		when(answerRepository.bulkCreate(eq(101L), anyList())).thenAnswer(invocation -> {
+			List<Answer> incoming = invocation.getArgument(1);
+			return incoming.stream()
+					.map(answer -> {
+						Answer saved = new Answer(
+								answer.getSubmissionModuleId(), answer.getQuestionId(), answer.getContent());
+						saved.setId(31L);
+						return saved;
+					})
+					.toList();
+		});
+
+		submissionService.submitModule(101L, List.of(shortAnswer(31L, "English")));
+
+		/*
+		 * The listener resolves eligibility and the max score itself, so the event carries the id
+		 * only: publishing a verdict-bearing event would let the producer and the grader disagree.
+		 */
+		verify(eventPublisher).publishEvent(new SubmissionModuleSubmittedEvent(101L));
 	}
 
 	@Test
@@ -1514,17 +1555,15 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void getDocumentUploadUrl_mapsDocxAndAcceptsRewrite() {
+	void getDocumentUploadUrl_rejectsRewriteBecauseRewriteIsAnsweredWithQuestions() {
 		ownedInProgressModule(151L, 88L, 10L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.REWRITE)));
-		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.docx",
-				"application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-				.thenReturn(presigned("https://bucket/essay.docx", "submissions/88/module-151/essay.docx"));
 
-		assertThat(submissionService.getDocumentUploadUrl(151L,
-				"application/vnd.openxmlformats-officedocument.wordprocessingml.document").storageKey())
-				.isEqualTo("submissions/88/module-151/essay.docx");
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+		verify(storageService, never()).generatePresignedPutUrl(any(), any());
 	}
 
 	@Test

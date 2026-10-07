@@ -101,12 +101,12 @@ class StudentEvaluationPersistenceIntegrationTest {
 		entityManager.flush();
 		entityManager.clear();
 
-		var firstPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null), 1, 1);
-		var secondPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null), 2, 1);
+		var firstPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null), 1, 1);
+		var secondPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null), 2, 1);
 		var classFiltered = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId, classOneId), 1, 20);
+				new StudentEvaluationFilter(studentId, classOneId, null, null), 1, 20);
 		var otherStudent = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId + 999, null), 1, 20);
+				new StudentEvaluationFilter(studentId + 999, null, null, null), 1, 20);
 
 		assertThat(firstPage.getTotalElements()).isEqualTo(3);
 		assertThat(firstPage.getContent()).extracting(com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluation::id)
