@@ -14,6 +14,9 @@ import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvalu
 import com.english_hub.core.modules.student_evaluation.domain.repository.StudentEvaluationRepository;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StudentEvaluationService {
 
+	// cùng múi giờ với ReportService.REPORT_ZONE
+	private static final ZoneId STUDENT_EVALUATION_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String STUDENT_NOT_FOUND_MESSAGE = "Không tìm thấy học viên.";
 	private static final String STUDENT_OR_CLASS_NOT_FOUND_MESSAGE = "Không tìm thấy học viên hoặc lớp học.";
@@ -28,6 +33,7 @@ public class StudentEvaluationService {
 	private static final String STUDENT_NOT_IN_CLASS_MESSAGE = "Học viên không thuộc lớp học này.";
 	private static final String EMPTY_CONTENT_MESSAGE = "Nội dung đánh giá không được để trống.";
 	private static final String INVALID_PAGE_MESSAGE = "Thông số phân trang hoặc bộ lọc không hợp lệ.";
+	private static final String INVALID_DATE_RANGE_MESSAGE = "Khoảng thời gian không hợp lệ.";
 	private static final String INVALID_REQUEST_MESSAGE = "Dữ liệu không hợp lệ.";
 
 	private final StudentEvaluationRepository studentEvaluationRepository;
@@ -47,18 +53,28 @@ public class StudentEvaluationService {
 	}
 
 	@Transactional(readOnly = true)
-	public StudentEvaluationPage listForStudent(long studentId, Long classId, int page, int limit) {
+	public StudentEvaluationPage listForStudent(
+			long studentId, Long classId, LocalDate fromDate, LocalDate toDate, int page, int limit) {
 		User caller = requireReader();
 		if (caller.role() == UserRole.STUDENT && !Objects.equals(caller.id(), studentId)) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		validatePage(studentId, classId, page, limit);
+		if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+			throw ApiException.badRequest(INVALID_DATE_RANGE_MESSAGE);
+		}
 		if (!classRepository.studentExists(studentId)) {
 			throw ApiException.notFound(STUDENT_NOT_FOUND_MESSAGE);
 		}
 
+		Instant createdAtFromInclusive = fromDate == null
+				? null
+				: fromDate.atStartOfDay(STUDENT_EVALUATION_ZONE).toInstant();
+		Instant createdAtToExclusive = toDate == null
+				? null
+				: toDate.plusDays(1).atStartOfDay(STUDENT_EVALUATION_ZONE).toInstant();
 		StudentEvaluationPage result = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId, classId), page, limit);
+				new StudentEvaluationFilter(studentId, classId, createdAtFromInclusive, createdAtToExclusive), page, limit);
 		return new StudentEvaluationPage(
 				result.getContent().stream().map(this::addTeacherName).toList(),
 				page,

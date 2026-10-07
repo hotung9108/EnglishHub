@@ -25,6 +25,10 @@ export interface UseStudentEvaluationOptions {
   initialClassId?: number;
   initialPage?: number;
   initialLimit?: number;
+  /** Initial inclusive start date in yyyy-MM-dd format. */
+  fromDate?: string;
+  /** Initial inclusive end date in yyyy-MM-dd format. */
+  toDate?: string;
   enabled?: boolean;
 }
 
@@ -63,7 +67,11 @@ export interface UseStudentEvaluationResult {
   evaluation: StudentEvaluationDetailResponse | null;
   selectedEvaluationId: number | undefined;
   pagination: ReturnType<typeof computePagination>;
-  filters: { classId: number | undefined };
+  filters: {
+    classId: number | undefined;
+    fromDate: string | undefined;
+    toDate: string | undefined;
+  };
 
   isLoading: boolean;
   isSuccess: boolean;
@@ -98,6 +106,12 @@ export interface UseStudentEvaluationResult {
   setClassId: (classId?: number) => void;
   setPage: (page: number) => void;
   setLimit: (limit: number) => void;
+  /** Sets the inclusive start date; an empty value clears the filter. */
+  setFromDate: (fromDate?: string) => void;
+  /** Sets the inclusive end date; an empty value clears the filter. */
+  setToDate: (toDate?: string) => void;
+  /** Sets both inclusive date filters in one update; empty values clear them. */
+  setDateRange: (fromDate?: string, toDate?: string) => void;
 }
 
 function isValidId(id?: number): id is number {
@@ -132,7 +146,14 @@ function createEmptyDetailState(studentId: number | undefined): StudentEvaluatio
 }
 
 function queryKey(studentId: number, params: StudentEvaluationQuery): string {
-  return JSON.stringify([studentId, params.classId, params.page, params.limit]);
+  return JSON.stringify([
+    studentId,
+    params.classId,
+    params.page,
+    params.limit,
+    params.fromDate,
+    params.toDate,
+  ]);
 }
 
 export function useStudentEvaluation(
@@ -145,6 +166,8 @@ export function useStudentEvaluation(
       classId: options.initialClassId,
       page: options.initialPage,
       limit: options.initialLimit,
+      fromDate: options.fromDate,
+      toDate: options.toDate,
     })
   );
   const [list, setList] = useState<StudentEvaluationListState>(() =>
@@ -426,6 +449,33 @@ export function useStudentEvaluation(
     updateParams(buildStudentEvaluationParams({ ...query.current, limit: clampLimit(limit), page: 1 }));
   }, [updateParams]);
 
+  const setFromDate = useCallback((fromDate?: string) => {
+    const next = buildStudentEvaluationParams({ ...query.current, fromDate, page: 1 });
+    if (next.fromDate === query.current.fromDate) {
+      return;
+    }
+    updateParams(next);
+  }, [updateParams]);
+
+  const setToDate = useCallback((toDate?: string) => {
+    const next = buildStudentEvaluationParams({ ...query.current, toDate, page: 1 });
+    if (next.toDate === query.current.toDate) {
+      return;
+    }
+    updateParams(next);
+  }, [updateParams]);
+
+  const setDateRange = useCallback((fromDate?: string, toDate?: string) => {
+    const next = buildStudentEvaluationParams({ ...query.current, fromDate, toDate, page: 1 });
+    if (
+      next.fromDate === query.current.fromDate &&
+      next.toDate === query.current.toDate
+    ) {
+      return;
+    }
+    updateParams(next);
+  }, [updateParams]);
+
   const createMutation = useMutation(
     ({ studentId: targetStudentId, payload }: CreateEvaluationVariables) =>
       studentEvaluationService.create(targetStudentId, payload),
@@ -441,7 +491,14 @@ export function useStudentEvaluation(
   const updateMutation = useMutation(
     ({ evaluationId, payload }: UpdateEvaluationVariables) =>
       studentEvaluationService.update(evaluationId, payload),
-    { onSuccess: () => { void refetch(); } }
+    {
+      onSuccess: (_response, variables) => {
+        void refetch();
+        if (selectedEvaluationId.current === variables.evaluationId) {
+          void refetchEvaluation();
+        }
+      },
+    }
   );
 
   const deleteMutation = useMutation(
@@ -468,7 +525,11 @@ export function useStudentEvaluation(
     evaluation: visibleDetail.evaluation,
     selectedEvaluationId: visibleDetail.selectedEvaluationId,
     pagination: visibleList.pagination,
-    filters: { classId: params.classId },
+    filters: {
+      classId: params.classId,
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+    },
     isLoading: visibleList.isLoading,
     isSuccess: visibleList.isSuccess,
     isError: visibleList.isError,
@@ -492,5 +553,8 @@ export function useStudentEvaluation(
     setClassId,
     setPage,
     setLimit,
+    setFromDate,
+    setToDate,
+    setDateRange,
   };
 }

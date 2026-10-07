@@ -7,6 +7,7 @@ import com.english_hub.core.modules.student_evaluation.domain.model.StudentEvalu
 import com.english_hub.core.modules.student_evaluation.domain.repository.StudentEvaluationRepository;
 import com.english_hub.core.modules.student_evaluation.infrastructure.mapper.StudentEvaluationPersistenceMapper;
 import jakarta.persistence.criteria.Predicate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -79,6 +80,14 @@ public class StudentEvaluationJpaAdapter implements StudentEvaluationRepository 
 			predicates.add(criteriaBuilder.equal(root.get("studentId"), filter.studentId()));
 			if (filter.classId() != null) {
 				predicates.add(criteriaBuilder.equal(root.get("classId"), filter.classId()));
+			}
+			if (filter.createdAtFromInclusive() != null) {
+				predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+						root.<Instant>get("createdAt"), filter.createdAtFromInclusive()));
+			}
+			if (filter.createdAtToExclusive() != null) {
+				predicates.add(criteriaBuilder.lessThan(
+						root.<Instant>get("createdAt"), filter.createdAtToExclusive()));
 			}
 			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
 		};
