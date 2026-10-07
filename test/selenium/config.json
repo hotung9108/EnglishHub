@@ -1,0 +1,9 @@
+﻿{
+  "baseUrl": "http://localhost:5173",
+  "apiBaseUrl": "http://localhost:8080/api/v1",
+  "aiServiceUrl": "http://localhost:8000",
+  "browser": "chrome",
+  "headless": false,
+  "timeout": 30000,
+  "testDataPath": "../fixtures/testdata"
+}

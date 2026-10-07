@@ -1,0 +1,417 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import axios from 'axios';
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { MemoryTokenStorage } from '../core/token-storage';
+import { TokenRefreshManager } from '../core/interceptors';
+import { AuthService } from '../services/auth.service';
+import { UserService } from '../services/user.service';
+import { ClassService } from '../services/class.service';
+import { buildListParams, computePagination, pageAfterEmptyRefetch } from '../../hooks/useUsers.utils';
+import { buildStudentEvaluationParams } from '../../hooks/useStudentEvaluation.utils';
+import type { CustomAxiosRequestConfig } from '../core/types';
+import { MockHttpClient } from './helpers/mock-http-client';
+
+// ==========================================
+// 1. AUTH SERVICE TESTS (SOLID & Session Lifecycle)
+// ==========================================
+test('AuthService - login sets tokens and session, logout clears session', async () => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+
+  assert.strictEqual(auth.isAuthenticated(), false);
+
+  mockHttp.mockResponse = {
+    message: 'Success',
+    accessToken: 'access-123',
+    refreshToken: 'refresh-456',
+    user: { id: 10, fullName: 'Lan Nguyen', email: 'teacher@englishhub.dev', role: 'TEACHER' },
+  };
+
+  const loginRes = await auth.login({ email: 'teacher@englishhub.dev', password: 'SecretPassword' });
+  assert.strictEqual(loginRes.accessToken, 'access-123');
+  assert.strictEqual(loginRes.user.role, 'teacher', 'role should be normalized to lowercase');
+  assert.strictEqual(storage.getAccessToken(), 'access-123');
+  assert.strictEqual(storage.getRefreshToken(), 'refresh-456');
+  assert.strictEqual(auth.isAuthenticated(), true);
+
+  // Logout
+  mockHttp.mockResponse = { message: 'Logged out' };
+  await auth.logout();
+  assert.strictEqual(storage.getAccessToken(), null);
+  assert.strictEqual(storage.getRefreshToken(), null);
+  assert.strictEqual(auth.isAuthenticated(), false);
+});
+
+test('AuthService - forgotPassword and resetPassword call correct public endpoints', async () => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+
+  mockHttp.mockResponse = {
+    message: 'OTP dispatched',
+    otpPreview: '123456',
+    token: 'reset-token-xyz',
+    expiresInSeconds: 900,
+  };
+
+  const forgotRes = await auth.forgotPassword({ email: 'student@englishhub.dev' });
+  assert.strictEqual(forgotRes.otpPreview, '123456');
+  assert.strictEqual(forgotRes.token, 'reset-token-xyz');
+  assert.strictEqual(mockHttp.calls[0].method, 'POST');
+  assert.strictEqual(mockHttp.calls[0].url, '/auth/forgot-password');
+
+  mockHttp.mockResponse = {
+    message: 'Password reset successful',
+  };
+
+  const resetRes = await auth.resetPassword({
+    email: 'student@englishhub.dev',
+    token: 'reset-token-xyz',
+    otp: '123456',
+    newPassword: 'BrandNewPassword123!',
+  });
+  assert.strictEqual(resetRes.message, 'Password reset successful');
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/auth/reset-password');
+});
+
+// ==========================================
+// 2. USER SERVICE TESTS
+// ==========================================
+test('UserService - routes user profile and admin endpoints correctly', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+
+  // getMyProfile -> /users/me
+  await userSvc.getMyProfile();
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/users/me');
+
+  // updateMyProfile -> /users/me
+  await userSvc.updateMyProfile({ fullName: 'New Name' });
+  assert.strictEqual(mockHttp.calls[1].method, 'PUT');
+  assert.strictEqual(mockHttp.calls[1].url, '/users/me');
+
+  // changePassword -> /users/me/password
+  await userSvc.changePassword({ currentPassword: 'old', newPassword: 'new' });
+  assert.strictEqual(mockHttp.calls[2].method, 'PATCH');
+  assert.strictEqual(mockHttp.calls[2].url, '/users/me/password');
+
+  // Admin user list -> /admin/users
+  mockHttp.mockResponse = { data: [], pagination: { page: 1, limit: 20, total: 0 } };
+  await userSvc.listUsers({ page: 1, limit: 20, role: 'TEACHER' });
+  assert.strictEqual(mockHttp.calls[3].method, 'GET');
+  assert.strictEqual(mockHttp.calls[3].url, '/admin/users');
+});
+
+test('UserService - trims list filters and maps BE pagination', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const expected = {
+    data: [{ id: 12, fullName: 'An Nguyen', email: 'an@example.test', role: 'STUDENT', status: 'ACTIVE' }],
+    pagination: { page: 2, limit: 10, total: 11 },
+  };
+  mockHttp.mockResponse = expected;
+
+  assert.deepStrictEqual(await userSvc.listUsers({ page: 2, limit: 10, q: ' An ', role: 'STUDENT' }), expected);
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 2, limit: 10, q: 'An', role: 'STUDENT' });
+});
+
+test('UserService - uses admin create, update, and delete routes', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const payload = { fullName: 'An Nguyen', email: 'an@example.test', password: 'StrongPass8', role: 'STUDENT' as const };
+  mockHttp.mockResponse = { message: 'created', user: { id: 12, email: payload.email, role: payload.role } };
+  assert.deepStrictEqual(await userSvc.createUser(payload), mockHttp.mockResponse);
+  mockHttp.mockResponse = { message: 'updated' };
+  assert.deepStrictEqual(await userSvc.updateUser(12, { fullName: 'An N.' }), mockHttp.mockResponse);
+  mockHttp.mockResponse = { message: 'deleted' };
+  assert.deepStrictEqual(await userSvc.deleteUser(12), mockHttp.mockResponse);
+  assert.deepStrictEqual(mockHttp.calls.map(({ method, url }) => [method, url]), [
+    ['POST', '/admin/users'],
+    ['PUT', '/admin/users/12'],
+    ['DELETE', '/admin/users/12'],
+  ]);
+});
+
+test('buildListParams clamps pagination and omits blank filters', () => {
+  assert.deepStrictEqual(buildListParams({ page: 0, limit: 101, q: '  ', role: undefined }), {
+    page: 1,
+    limit: 100,
+  });
+  assert.deepStrictEqual(buildListParams({ page: 2.8, limit: 0, q: ' An ', role: 'ADMIN' }), {
+    page: 2,
+    limit: 1,
+    q: 'An',
+    role: 'ADMIN',
+  });
+});
+
+test('computePagination derives page navigation', () => {
+  assert.deepStrictEqual(computePagination({ page: 2, limit: 20, total: 41 }), {
+    page: 2,
+    limit: 20,
+    total: 41,
+    totalPages: 3,
+    hasNext: true,
+    hasPrevious: true,
+  });
+});
+
+test('pageAfterEmptyRefetch moves back only when a page is empty', () => {
+  for (const [page, itemCount, expected] of [[3, 0, 2], [1, 0, 1], [3, 4, 3]]) {
+    assert.strictEqual(pageAfterEmptyRefetch(page, itemCount), expected);
+  }
+});
+
+test('buildStudentEvaluationParams defaults page and limit', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams(), { page: 1, limit: 20 });
+});
+
+test('buildStudentEvaluationParams clamps page and limit', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams({ page: 0, limit: 101 }), {
+    page: 1,
+    limit: 100,
+  });
+  assert.deepStrictEqual(buildStudentEvaluationParams({ page: 2.8, limit: 0 }), {
+    page: 2,
+    limit: 1,
+  });
+});
+
+test('buildStudentEvaluationParams keeps classId when present and omits it when absent', () => {
+  assert.deepStrictEqual(buildStudentEvaluationParams({ classId: 3 }), {
+    classId: 3,
+    page: 1,
+    limit: 20,
+  });
+  assert.deepStrictEqual(buildStudentEvaluationParams({ classId: undefined }), {
+    page: 1,
+    limit: 20,
+  });
+});
+
+// ==========================================
+// 3. CLASS SERVICE TESTS
+// ==========================================
+test('ClassService - list clamps params and returns the paginated envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  mockHttp.mockResponse = {
+    data: [{ id: 15, name: 'IELTS 6.5', status: 'ACTIVE', teacherId: 7 }],
+    pagination: { page: 2, limit: 10, total: 31 },
+  };
+  const classSvc = new ClassService(mockHttp);
+
+  const result = await classSvc.list({ page: 0, limit: 101, status: 'ACTIVE' });
+
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 1, limit: 100, status: 'ACTIVE' });
+  assert.strictEqual(result.data.length, 1);
+  assert.deepStrictEqual(result.pagination, { page: 2, limit: 10, total: 31 });
+
+  // status omitted -> no status key in query
+  await classSvc.list({ page: 3, limit: 20 });
+  assert.deepStrictEqual(mockHttp.calls[1].options?.params, { page: 3, limit: 20 });
+});
+
+test('ClassService - CRUD endpoints hit the documented paths and bodies', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  await classSvc.getDetail(15);
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15');
+
+  await classSvc.create({ name: 'IELTS 6.5', level: 'B1', teacherId: 7 });
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes');
+  assert.deepStrictEqual(mockHttp.calls[1].data, { name: 'IELTS 6.5', level: 'B1', teacherId: 7 });
+
+  await classSvc.update(15, { status: 'INACTIVE' });
+  assert.strictEqual(mockHttp.calls[2].method, 'PUT');
+  assert.strictEqual(mockHttp.calls[2].url, '/classes/15');
+  assert.deepStrictEqual(mockHttp.calls[2].data, { status: 'INACTIVE' });
+
+  await classSvc.delete(15);
+  assert.strictEqual(mockHttp.calls[3].method, 'DELETE');
+  assert.strictEqual(mockHttp.calls[3].url, '/classes/15');
+});
+
+test('ClassService - member sub-resources unwrap the data envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [{ memberId: 202, studentId: 101, fullName: 'Lan Nguyen', studentCode: 'STU-001' }],
+  };
+  const members = await classSvc.listMembers(15);
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/members');
+  assert.deepStrictEqual(members, [
+    { memberId: 202, studentId: 101, fullName: 'Lan Nguyen', studentCode: 'STU-001' },
+  ]);
+
+  await classSvc.addMember(15, 101);
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes/15/members');
+  assert.deepStrictEqual(mockHttp.calls[1].data, { studentId: 101 });
+
+  await classSvc.removeMember(15, 202);
+  assert.strictEqual(mockHttp.calls[2].method, 'DELETE');
+  assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members/202');
+});
+
+test('buildListParams passes through extra filters for non-user endpoints', () => {
+  assert.deepStrictEqual(buildListParams({ page: 2, limit: 10 }, { status: 'ACTIVE' }), {
+    page: 2,
+    limit: 10,
+    status: 'ACTIVE',
+  });
+});
+
+// ==========================================
+// 4. CONCURRENT 401 QUEUE & MUTEX RECOVERY TEST
+// ==========================================
+test('TokenRefreshManager - queues multiple concurrent 401s and resolves all once refreshed', async () => {
+  const storage = new MemoryTokenStorage();
+  storage.setAccessToken('old-expired-token');
+  storage.setRefreshToken('valid-refresh-token');
+
+  const manager = new TokenRefreshManager(storage);
+
+  let refreshCallCount = 0;
+  // Mock axios.post globally for the refresh endpoint
+  const originalPost = axios.post;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (axios as any).post = async (url: string) => {
+    if (url.includes('/auth/refresh')) {
+      refreshCallCount++;
+      // Simulate network delay
+      await new Promise(res => setTimeout(res, 50));
+      return {
+        data: { accessToken: 'brand-new-refreshed-token', message: 'Token refreshed' },
+      };
+    }
+    return originalPost(url);
+  };
+
+  try {
+    const mockAxiosInstance = (async (config: CustomAxiosRequestConfig) => {
+      return {
+        status: 200,
+        data: { retriedWith: config.headers?.Authorization },
+        config,
+      };
+    }) as unknown as AxiosInstance;
+
+    // Simulate 3 concurrent failed requests
+    const createReqError = (id: number) => ({
+      isAxiosError: true,
+      config: {
+        url: `/api/v1/resource/${id}`,
+        headers: new axios.AxiosHeaders(),
+      } as InternalAxiosRequestConfig,
+      response: { status: 401, data: {} },
+    });
+
+    const [res1, res2, res3] = (await Promise.all([
+      manager.handle401(createReqError(1) as unknown as import('axios').AxiosError, mockAxiosInstance),
+      manager.handle401(createReqError(2) as unknown as import('axios').AxiosError, mockAxiosInstance),
+      manager.handle401(createReqError(3) as unknown as import('axios').AxiosError, mockAxiosInstance),
+    ])) as Array<{ data: { retriedWith: string } }>;
+
+    // Verify: ONLY 1 refresh call was made! (Mutex pattern verified)
+    assert.strictEqual(refreshCallCount, 1, 'Only 1 refresh call should be made for concurrent 401s');
+
+    // Verify storage updated
+    assert.strictEqual(storage.getAccessToken(), 'brand-new-refreshed-token');
+
+    // Verify all 3 requests were retried with the new token
+    assert.strictEqual(res1.data.retriedWith, 'Bearer brand-new-refreshed-token');
+    assert.strictEqual(res2.data.retriedWith, 'Bearer brand-new-refreshed-token');
+    assert.strictEqual(res3.data.retriedWith, 'Bearer brand-new-refreshed-token');
+  } finally {
+    axios.post = originalPost;
+  }
+});
+
+// ==========================================
+// 3. ASSIGNMENT SERVICE TESTS
+// ==========================================
+test('AssignmentService - full CRUD with correct endpoints and params', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  // listAssignments -> GET /classes/{id}/assignments
+  mockHttp.mockResponse = {
+    data: [
+      { id: 1, title: 'HW1', status: 'PUBLISHED', closeAt: '2026-10-01T23:59:00Z' },
+    ],
+    pagination: { page: 1, limit: 20, total: 5 },
+  };
+  const list = await assignmentSvc.listAssignments(7, { page: 1, limit: 20, status: 'PUBLISHED' });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/7/assignments');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { page: 1, limit: 20, status: 'PUBLISHED' });
+  assert.strictEqual(list.pagination.total, 5);
+
+  // createAssignment -> POST /classes/{id}/assignments
+  mockHttp.mockResponse = { message: 'Created', id: 42 };
+  const created = await assignmentSvc.createAssignment(7, {
+    title: 'HW2',
+    description: 'Desc',
+    openAt: '2026-09-25T08:00:00Z',
+    closeAt: '2026-10-08T23:59:00Z',
+    maxSubmissions: 3,
+  });
+  assert.strictEqual(mockHttp.calls[1].method, 'POST');
+  assert.strictEqual(mockHttp.calls[1].url, '/classes/7/assignments');
+  assert.strictEqual((mockHttp.calls[1].data as { title: string }).title, 'HW2');
+  assert.strictEqual(created.id, 42);
+
+  // getAssignment -> GET /assignments/{id}
+  await assignmentSvc.getAssignment(42);
+  assert.strictEqual(mockHttp.calls[2].method, 'GET');
+  assert.strictEqual(mockHttp.calls[2].url, '/assignments/42');
+
+  // updateAssignment -> PUT /assignments/{id}
+  await assignmentSvc.updateAssignment(42, { title: 'Updated' });
+  assert.strictEqual(mockHttp.calls[3].method, 'PUT');
+  assert.strictEqual(mockHttp.calls[3].url, '/assignments/42');
+  assert.deepStrictEqual(mockHttp.calls[3].data, { title: 'Updated' });
+
+  // deleteAssignment -> DELETE /assignments/{id}
+  await assignmentSvc.deleteAssignment(42);
+  assert.strictEqual(mockHttp.calls[4].method, 'DELETE');
+  assert.strictEqual(mockHttp.calls[4].url, '/assignments/42');
+
+  // updateAssignmentStatus -> PATCH /assignments/{id}/status
+  await assignmentSvc.updateAssignmentStatus(42, 'CLOSED');
+  assert.strictEqual(mockHttp.calls[5].method, 'PATCH');
+  assert.strictEqual(mockHttp.calls[5].url, '/assignments/42/status');
+  assert.deepStrictEqual(mockHttp.calls[5].data, { status: 'CLOSED' });
+});
+
+test('AssignmentService - trims/clamps params and omits empty status', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  mockHttp.mockResponse = { data: [], pagination: { page: 1, limit: 20, total: 0 } };
+  await assignmentSvc.listAssignments(3, { page: 0, limit: 1000, status: '  PUBLISHED  ' });
+  const params = mockHttp.calls[0].options?.params as Record<string, number | string>;
+  assert.strictEqual(params.page, 1);
+  assert.strictEqual(params.limit, 100);
+  assert.strictEqual(params.status, 'PUBLISHED');
+
+  mockHttp.calls = [];
+  await assignmentSvc.listAssignments(3, { page: 2 });
+  const params2 = mockHttp.calls[0].options?.params as Record<string, number | string>;
+  assert.strictEqual(params2.page, 2);
+  assert.strictEqual(params2.limit, 20);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(params2, 'status'), false);
+});

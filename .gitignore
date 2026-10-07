@@ -1,0 +1,18 @@
+.env
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env*.example
+.vscode
+.idea/
+.DS_Store
+.agents/private/*
+.codegraphy/*
+*.dbdiagram
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

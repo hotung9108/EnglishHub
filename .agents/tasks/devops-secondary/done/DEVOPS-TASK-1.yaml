@@ -1,0 +1,7 @@
+id: DEVOPS-TASK-1
+title: "Setup CI/CD Pipelines & Production Orchestration"
+assignee: "@devops-secondary"
+status: "Done"
+priority: "High"
+description: "Implement GitHub Actions CI (frontend & backend), CD workflow (GHCR & deployment), docker-compose.prod.yml, env configs, and CI/CD guide."
+completedAt: "2026-09-14"

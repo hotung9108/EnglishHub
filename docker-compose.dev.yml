@@ -1,0 +1,151 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: englishhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-appdb}
+      POSTGRES_USER: ${DB_USER:-devuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata_fullstack_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-devuser} -d ${DB_NAME:-appdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - englishhub_dev_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: englishhub-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-appdb}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-devuser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-devpassword}
+      JWT_SECRET: ${JWT_SECRET:-englishhub-dev-jwt-secret-key-32chars-min}
+      # Danh sách domain frontend được phép gọi API, phân tách bởi dấu phẩy.
+      # "*" = cho phép tất cả các origin. Ví dụ: http://localhost:5173,https://englishhub.io
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STORAGE_S3_ENABLED: ${STORAGE_S3_ENABLED:-true}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-auto}
+      STORAGE_S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      STORAGE_S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
+      STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
+      AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+      ai-service:
+        condition: service_started
+    networks:
+      - englishhub_dev_network
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: englishhub-ai-service
+    restart: unless-stopped
+    environment:
+      PORT: 8001
+      AI_PROVIDER: ${AI_PROVIDER:-auto}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-2.5-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MOCK_MODE: ${AI_SERVICE_MOCK_MODE:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
+    ports:
+      - "${AI_SERVICE_PORT:-8001}:8001"
+    networks:
+      - englishhub_dev_network
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: englishhub-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data_dev:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - englishhub_dev_network
+
+  minio-setup:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: englishhub-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/"$$MINIO_BUCKET" &&
+        mc anonymous set download local/"$$MINIO_BUCKET"
+    networks:
+      - englishhub_dev_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: englishhub-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - englishhub_dev_network
+
+networks:
+  englishhub_dev_network:
+    driver: bridge
+
+volumes:
+  pgdata_fullstack_dev:
+    driver: local
+  minio_data_dev:
+    driver: local

@@ -1,0 +1,251 @@
+/* EnglishHub Student Portal: Assignment Overview & Attempts Styles */
+
+.overview-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 40px 24px;
+}
+
+.overview-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+  margin-bottom: 20px;
+  padding-top: 16px;
+  flex-wrap: wrap;
+}
+
+.overview-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-md, 8px);
+  background-color: var(--surface-container-low);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.overview-back-btn:hover {
+  background-color: var(--surface-container);
+  color: var(--primary);
+}
+
+/* Overview Main Card */
+.overview-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  padding: 32px;
+  margin-bottom: 28px;
+}
+
+.overview-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 768px) {
+  .overview-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.overview-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--on-surface);
+  margin: 0 0 6px 0;
+}
+
+.overview-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.overview-skill-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.overview-skill-badge.writing { background-color: #dbeafe; color: #1e40af; }
+.overview-skill-badge.speaking { background-color: #ede9fe; color: #5b21b6; }
+.overview-skill-badge.reading { background-color: #dcfce7; color: #166534; }
+.overview-skill-badge.listening { background-color: #ffedd5; color: #9a3412; }
+
+/* Rules Grid */
+.overview-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.overview-rule-item {
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.overview-rule-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.overview-rule-label {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.overview-rule-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin-top: 2px;
+}
+
+/* Instructions Box */
+.overview-instructions-box {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md, 10px);
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.overview-instructions-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-instructions-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #475569;
+  margin: 0;
+}
+
+/* Attempts Table */
+.overview-attempts-section {
+  margin-bottom: 28px;
+}
+
+.overview-attempts-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0 0 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.overview-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 10px);
+}
+
+.overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.overview-table th {
+  background-color: var(--surface-container-low);
+  padding: 12px 16px;
+  font-weight: 700;
+  color: var(--on-surface-variant);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.overview-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+}
+
+.overview-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* CTA Action Box */
+.overview-cta-box {
+  background: linear-gradient(135deg, #f8faff 0%, #eff6ff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-md, 12px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .overview-cta-box {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+.overview-cta-btn {
+  padding: 12px 28px;
+  border-radius: var(--radius-md, 8px);
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.overview-cta-btn:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}

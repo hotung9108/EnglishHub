@@ -1,0 +1,6 @@
+id: BE-TASK-3
+title: "Refactor backend User feature structure"
+assignee: "@be-primary"
+status: "Done"
+priority: "Medium"
+description: "Add backend-specific AGENTS rules and reorganize the User feature into controller, service, repository, model, and dto packages without changing API behavior."

@@ -1,0 +1,150 @@
+package com.english_hub.core.infrastructure.persistence.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "gradings")
+@Getter
+@Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Grading {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	@Column(name = "submission_module_id", nullable = false)
+	private Long submissionModuleId;
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(nullable = false, columnDefinition = "grading_method")
+	private GradingMethod method;
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.NAMED_ENUM)
+	@Column(nullable = false, columnDefinition = "grading_status")
+	private GradingStatus status;
+
+	@Column(name = "ai_feedback", columnDefinition = "TEXT")
+	private String aiFeedback;
+
+	@Column(name = "final_score", precision = 5, scale = 2)
+	private BigDecimal finalScore;
+
+	@Column(name = "final_feedback", columnDefinition = "TEXT")
+	private String finalFeedback;
+
+	@Column(name = "max_score_snapshot", precision = 5, scale = 2)
+	private BigDecimal maxScoreSnapshot;
+
+	@Column(name = "reviewed_by")
+	private Long reviewedBy;
+
+	@Column(name = "reviewed_at")
+	private OffsetDateTime reviewedAt;
+
+	@Column(name = "graded_at")
+	private OffsetDateTime gradedAt;
+
+	/*
+	 * Hibernate 7.4.5's default JSON format mapper uses Jackson 2. Using
+	 * tools.jackson.databind.JsonNode here fails during JSONB persistence, so
+	 * this field intentionally uses the com.fasterxml.jackson.databind type.
+	 */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "ai_transcript", columnDefinition = "jsonb")
+	private JsonNode aiTranscript;
+
+	@Column(name = "ai_instruction_snapshot", columnDefinition = "TEXT")
+	private String aiInstructionSnapshot;
+
+	public Grading(
+			Long submissionModuleId,
+			GradingMethod method,
+			GradingStatus status,
+			String aiFeedback,
+			BigDecimal finalScore,
+			String finalFeedback,
+			BigDecimal maxScoreSnapshot,
+			Long reviewedBy,
+			OffsetDateTime reviewedAt,
+			OffsetDateTime gradedAt,
+			String aiTranscript,
+			String aiInstructionSnapshot) {
+		this.submissionModuleId = submissionModuleId;
+		this.method = method;
+		this.status = status;
+		this.aiFeedback = aiFeedback;
+		this.finalScore = finalScore;
+		this.finalFeedback = finalFeedback;
+		this.maxScoreSnapshot = maxScoreSnapshot;
+		this.reviewedBy = reviewedBy;
+		this.reviewedAt = reviewedAt;
+		this.gradedAt = gradedAt;
+		this.aiTranscript = JsonbValueCodec.parse(aiTranscript, "ai_transcript");
+		this.aiInstructionSnapshot = aiInstructionSnapshot;
+	}
+
+	public String getAiTranscript() {
+		return JsonbValueCodec.serialize(aiTranscript);
+	}
+
+	public void setAiTranscriptJson(String json) {
+		this.aiTranscript = JsonbValueCodec.parse(json, "ai_transcript");
+	}
+
+	public void updateTeacherGrade(
+			BigDecimal finalScore,
+			String finalFeedback,
+			Long reviewedBy,
+			OffsetDateTime reviewedAt) {
+		this.method = GradingMethod.TEACHER_MANUAL;
+		this.status = GradingStatus.COMPLETED;
+		this.finalScore = finalScore;
+		this.finalFeedback = finalFeedback;
+		this.reviewedBy = reviewedBy;
+		this.reviewedAt = reviewedAt;
+		this.gradedAt = reviewedAt;
+	}
+
+	/**
+	 * Records a deterministic answer-comparison verdict. {@code reviewedBy} and {@code reviewedAt}
+	 * stay null because no teacher reviewed it; a later teacher override goes through
+	 * {@link #updateTeacherGrade} and is audited in {@code grading_change_logs}.
+	 */
+	public void applyAutoGrade(
+			BigDecimal finalScore,
+			BigDecimal maxScoreSnapshot,
+			OffsetDateTime gradedAt) {
+		this.method = GradingMethod.AUTO;
+		this.status = GradingStatus.COMPLETED;
+		this.finalScore = finalScore;
+		this.maxScoreSnapshot = maxScoreSnapshot;
+		this.gradedAt = gradedAt;
+	}
+
+	/** Marks the attempt so the teacher can see it failed instead of silently staying pending. */
+	public void markFailed() {
+		this.status = GradingStatus.FAILED;
+	}
+}

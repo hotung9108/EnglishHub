@@ -1,0 +1,6 @@
+id: BE-TASK-6
+title: "Remove legacy V1 columns and validate JPA schema"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Remove legacy V1 database columns through migration, align the JPA entities with the current V6 schema, and validate the backend schema with Hibernate ddl-auto=validate."

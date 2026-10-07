@@ -1,0 +1,13 @@
+﻿const fs = require('fs');
+const path = require('path');
+
+const testFiles = fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js'));
+
+async function runAll() {
+  for (const file of testFiles) {
+    console.log(\Running \...\);
+    await import(\./\\);
+  }
+}
+
+runAll();

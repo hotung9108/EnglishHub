@@ -1,0 +1,19 @@
+﻿{
+  \"name\": \"englishhub-tests\",
+  \"version\": \"1.0.0\",
+  \"description\": \"Comprehensive test suite for EnglishHub (dev & staging)\",
+  \"type\": \"module\",
+  \"scripts\": {
+    \"test:env:check\": \"node scripts/check-env.js\",
+    \"selenium:dev\": \"cross-env TEST_ENV=dev node selenium/suites/dev/run-dev.js\",
+    \"selenium:staging\": \"cross-env TEST_ENV=staging node selenium/suites/staging/run-staging.js\"
+  },
+  \"dependencies\": {
+    \"axios\": \"^1.6.5\",
+    \"chai\": \"^4.3.10\",
+    \"chromedriver\": \"^120.0.0\",
+    \"cross-env\": \"^7.0.3\",
+    \"mocha\": \"^10.2.0\",
+    \"selenium-webdriver\": \"^4.16.0\"
+  }
+}

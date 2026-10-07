@@ -1,0 +1,8 @@
+id: BE-TASK-16
+title: "Unified AI Grading & Suggestion API Aggregating Speaking & Writing Pipelines (UC25)"
+assignee: "@be-secondary"
+status: "Done"
+priority: "High"
+description: "Implement unified AI grading suggestion API for teachers (UC25). Aggregates Speaking (UC26) and Writing (UC27) evaluation pipelines into a single endpoint GET /api/v1/submission-modules/{id}/grading/ai-suggestion linked to core grading tables (gradings, answers, answer_annotations) and API [BE-19]. Provides structured 4-criteria IELTS scores, quantitative metrics, audio transcripts/metrics, character annotations, model provenance, and resilient manual grading fallback per PP R6 and PP 6.5.2 without subjective academic validation per TP 2.6.2."
+artifacts:
+  - "production_artifacts/be_to_tester/uc25-unified-ai-grading-suggestion-testing-instructions.md"

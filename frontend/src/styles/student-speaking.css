@@ -1,0 +1,760 @@
+/* EnglishHub Student Portal: Speaking Interactive Workspace Styles */
+
+.speaking-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 40px 24px;
+}
+
+/* Breadcrumbs & Navigation */
+.speaking-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+  margin-bottom: 20px;
+  padding-top: 16px;
+  flex-wrap: wrap;
+}
+
+.speaking-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-md, 8px);
+  background-color: var(--surface-container-low);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.speaking-back-btn:hover {
+  background-color: var(--surface-container);
+  color: var(--primary);
+}
+
+.speaking-breadcrumb-divider {
+  color: var(--outline-variant);
+}
+
+.speaking-breadcrumb-link {
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Header Banner */
+.speaking-header-banner {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 12px);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .speaking-header-banner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.speaking-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.speaking-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.speaking-skill-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--primary-fixed);
+  color: var(--primary);
+  border: 1px solid var(--primary-fixed-dim);
+}
+
+.speaking-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  flex-wrap: wrap;
+}
+
+.speaking-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.speaking-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.speaking-status-pill.submitted {
+  background-color: var(--secondary-container);
+  color: var(--on-secondary-container);
+  border: 1px solid var(--secondary-fixed);
+}
+
+.speaking-status-pill.draft {
+  background-color: var(--tertiary-container);
+  color: var(--on-tertiary-container);
+  border: 1px solid var(--tertiary-fixed);
+}
+
+.speaking-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+/* 2-Column Main Workspace */
+.speaking-workspace-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .speaking-workspace-grid {
+    grid-template-columns: 1fr 380px;
+    gap: 32px;
+  }
+}
+
+.speaking-column-left,
+.speaking-column-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Cards */
+.speaking-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.speaking-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--surface-container-low);
+}
+
+.speaking-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-surface);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.speaking-card-title-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--primary);
+}
+
+.speaking-card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Topic Cue Card */
+.speaking-cue-card {
+  background-color: #f8faff;
+  border: 1px solid #dbeafe;
+  border-radius: var(--radius-md, 8px);
+  padding: 18px;
+}
+
+.speaking-cue-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.speaking-cue-tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--primary);
+  letter-spacing: 0.05em;
+}
+
+.speaking-cue-timing {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.speaking-cue-question {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-surface);
+  margin: 0 0 10px 0;
+  line-height: 1.4;
+}
+
+.speaking-cue-hint-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  margin-bottom: 6px;
+}
+
+.speaking-cue-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--on-surface);
+  line-height: 1.6;
+}
+
+/* AI Live Transcription */
+.speaking-stt-box {
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  padding: 16px;
+  background-color: #fafbfc;
+}
+
+.speaking-stt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.speaking-stt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.speaking-stt-tag {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.speaking-confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.speaking-stt-paragraphs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--on-surface);
+}
+
+.speaking-stt-timestamp {
+  font-weight: 700;
+  color: var(--primary);
+  margin-right: 6px;
+}
+
+/* Speech Recorder & Audio Visualizer */
+.speaking-audio-widget {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.speaking-audio-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 640px) {
+  .speaking-audio-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.speaking-audio-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.speaking-play-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.speaking-play-btn:hover {
+  background-color: #1d4ed8;
+  transform: scale(1.04);
+}
+
+.speaking-audio-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.speaking-audio-meta {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  margin-top: 2px;
+}
+
+/* Waveform Visualizer */
+.waveform-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 12px;
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  justify-content: center;
+  width: 100%;
+  max-width: 240px;
+}
+
+.waveform-bar {
+  width: 4px;
+  background-color: var(--primary);
+  border-radius: 9999px;
+  transition: height 0.2s ease;
+}
+
+.waveform-container.playing .waveform-bar {
+  animation: soundWave 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes soundWave {
+  0% {
+    height: 6px;
+  }
+  50% {
+    height: 28px;
+  }
+  100% {
+    height: 12px;
+  }
+}
+
+.speaking-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.speaking-action-btn.re-record {
+  color: var(--error);
+  background-color: var(--error-container);
+  border: 1px solid #fca5a5;
+}
+
+.speaking-action-btn.re-record:hover {
+  background-color: #fecaca;
+}
+
+/* Comments & Teacher Notes */
+.teacher-note-card {
+  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  display: flex;
+  gap: 12px;
+}
+
+.teacher-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: #d97706;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.teacher-note-content {
+  flex: 1;
+  font-size: 12px;
+}
+
+.teacher-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.teacher-note-name {
+  font-weight: 700;
+  color: #78350f;
+}
+
+.teacher-note-time {
+  font-size: 11px;
+  color: #92400e;
+}
+
+.teacher-note-body {
+  margin: 0;
+  color: #78350f;
+  line-height: 1.6;
+}
+
+/* Student Notes Textarea */
+.speaking-notes-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.speaking-notes-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.speaking-notes-textarea {
+  width: 100%;
+  font-size: 13px;
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+  font-family: inherit;
+  resize: vertical;
+  background-color: var(--surface);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.speaking-notes-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-container);
+}
+
+.speaking-notes-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.speaking-btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.speaking-btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Submission Card */
+.submission-file-box {
+  border: 2px dashed var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  padding: 14px;
+  background-color: var(--surface-container-low);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}
+
+.submission-file-icon {
+  width: 44px;
+  height: 52px;
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #dc2626;
+  font-size: 9px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.submission-file-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.submission-file-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 2px 0;
+}
+
+.submission-file-meta {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  margin: 0 0 6px 0;
+}
+
+.submission-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.submission-file-size {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background-color: #eff6ff;
+  color: var(--primary);
+  border-radius: 4px;
+}
+
+.submission-remove-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.submission-remove-btn:hover {
+  color: var(--error);
+  background-color: var(--error-container);
+}
+
+.audio-attachment-box {
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+  background-color: var(--surface-container-low);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.audio-attachment-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: var(--primary-container);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-submit-speaking {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: var(--radius-md, 8px);
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-submit-speaking:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+.speaking-submit-note {
+  font-size: 11px;
+  text-align: center;
+  color: var(--on-surface-variant);
+  margin-top: 4px;
+}
+
+/* Grading Breakdown */
+.grading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--outline-variant);
+  font-size: 13px;
+}
+
+.grading-row:last-child {
+  border-bottom: none;
+}
+
+.grading-label {
+  font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
+.grading-val-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.grading-current-grade {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+}
+
+.grading-score-display {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.evaluator-profile-box {
+  padding: 12px;
+  background-color: var(--surface-container-low);
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.evaluator-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--on-surface);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.evaluator-role {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  letter-spacing: 0.05em;
+}
+
+.evaluator-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-surface);
+}

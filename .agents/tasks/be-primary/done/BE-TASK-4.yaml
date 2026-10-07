@@ -1,0 +1,6 @@
+id: BE-TASK-4
+title: "Create mock data seeders for the V6 dataset"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: "Create and validate development-only Java/Spring Data JPA mock seeders for the 16-table V6 dataset: users/profiles, classes/members, assignments/modules/questions, submissions/submission_modules, answers, gradings/annotations, grading change logs, refresh tokens, and student evaluations. Run under the seed profile with ordered Task 1-9 runners and provide the DATAMOCK runbook plus validation report in production_artifacts/be_to_tester/."
