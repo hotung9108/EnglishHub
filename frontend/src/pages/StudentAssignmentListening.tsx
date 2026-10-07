@@ -1,23 +1,140 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ArrowLeft, ChevronRight, Search, Bell, Headphones, 
-  Timer, Pause, Save, Send, Bookmark, ChevronLeft,
-  Play, Volume2, SkipBack, SkipForward
+  ArrowLeft, ChevronRight, Headphones, 
+  Timer, Bookmark, ChevronLeft,
+  Play, Pause, Volume2, SkipBack, SkipForward,
+  AlertCircle, RefreshCw, Loader2, CheckCircle2
 } from 'lucide-react';
+import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
+import { questionService, type QuestionResponse } from '../api/services/question.service';
+import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAuth } from '../contexts/AuthContext';
 
 const StudentAssignmentListening: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // The id can be used to fetch assignment details. Console log to avoid unused variable warning.
-  console.log('Assignment ID:', id);
-  
-  // Mock State
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [questions, setQuestions] = useState<QuestionResponse[]>([]);
+  const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(30);
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
 
-  const totalQuestions = 10;
+  const numericId = useMemo(() => {
+    const parsed = Number(id);
+    return Number.isFinite(parsed) ? parsed : 1;
+  }, [id]);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch assignment
+      let currentAssignment: AssignmentDetail | null = null;
+      try {
+        currentAssignment = await assignmentService.getAssignment(numericId);
+        setAssignment(currentAssignment);
+      } catch {
+        currentAssignment = {
+          id: numericId,
+          title: `Listening Practice #${id || '1'}`,
+          status: 'PUBLISHED',
+          modules: [{ id: 1, skill: 'LISTENING' }]
+        };
+        setAssignment(currentAssignment);
+      }
+
+      // 2. Fetch module and questions
+      let moduleId = currentAssignment?.modules?.[0]?.id;
+      if (!moduleId) {
+        try {
+          const modRes = await moduleService.listModules(numericId);
+          if (modRes.modules && modRes.modules.length > 0) {
+            moduleId = modRes.modules[0].id;
+          }
+        } catch {
+          // Fallback
+        }
+      }
+
+      if (moduleId) {
+        try {
+          const mod = await moduleService.getModule(moduleId);
+          setModuleDetail(mod);
+        } catch {
+          // Fallback
+        }
+
+        try {
+          const qRes = await questionService.listQuestions(moduleId);
+          if (qRes.questions && qRes.questions.length > 0) {
+            setQuestions(qRes.questions);
+          } else {
+            setQuestions([]);
+          }
+        } catch {
+          setQuestions([]);
+        }
+      } else {
+        setQuestions([]);
+      }
+
+      // 3. Resolve or start submission attempt
+      const urlSubmissionId = searchParams.get('submissionId');
+      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+        try {
+          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+          setSubmission(sub);
+        } catch {
+          // Fallback
+        }
+      } else if (user?.id) {
+        try {
+          const subList = await submissionService.listSubmissions({
+            assignmentId: numericId,
+            studentId: user.id,
+            status: 'IN_PROGRESS',
+            limit: 1
+          });
+          if (subList.data && subList.data.length > 0) {
+            const sub = await submissionService.getSubmission(subList.data[0].id);
+            setSubmission(sub);
+          } else {
+            const startRes = await submissionService.startAttempt(numericId);
+            const sub = await submissionService.getSubmission(startRes.id);
+            setSubmission(sub);
+          }
+        } catch {
+          // Fallback
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài nghe.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [numericId, id, searchParams, user?.id]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const totalQuestions = questions.length;
   const answeredCount = Object.keys(selectedAnswers).length;
 
   const handleSelectAnswer = (qId: number, answer: string) => {
@@ -28,6 +145,58 @@ const StudentAssignmentListening: React.FC = () => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const handleSubmit = async () => {
+    if (answeredCount === 0) {
+      if (!confirm('Bạn chưa trả lời câu hỏi nào. Bạn có chắc chắn muốn nộp bài?')) {
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const subId = submission?.id;
+      const subModuleId = submission?.modules?.[0]?.id;
+
+      if (subModuleId) {
+        const answersPayload = Object.entries(selectedAnswers).map(([qId, ans]) => ({
+          questionId: Number(qId),
+          content: { selectedOptionIds: [ans] }
+        }));
+
+        try {
+          await submissionService.submitModule(subModuleId, { answers: answersPayload });
+        } catch {
+          // Continue
+        }
+      }
+
+      if (subId) {
+        try {
+          await submissionService.submitSubmission(subId);
+        } catch {
+          // Continue
+        }
+      }
+
+      setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+      setTimeout(() => {
+        if (subId) {
+          navigate(`/student/submissions/${subId}`);
+        } else {
+          navigate(`/student/assignments/${id}/result`);
+        }
+      }, 1200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const currentQuestionItem = questions[activeQuestion - 1] || questions[0];
+
   return (
     <div style={{ 
       margin: 'calc(var(--margin-desktop, 40px) * -1)',
@@ -35,11 +204,11 @@ const StudentAssignmentListening: React.FC = () => {
       flexDirection: 'column', 
       backgroundColor: '#F8FAFC'
     }}>
-      
-      {/* Page Header (replaces standard header) */}
+      {/* Page Header */}
       <div style={{ padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <button 
+            type="button"
             onClick={() => navigate('/student/assignments')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}
           >
@@ -48,364 +217,305 @@ const StudentAssignmentListening: React.FC = () => {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B' }}>
             <span>Hệ thống</span> <ChevronRight size={14} />
-            <span>Lớp học của tôi</span> <ChevronRight size={14} />
-            <span>ENG-IELTS-6.5A</span> <ChevronRight size={14} />
-            <span style={{ color: '#2563EB', fontWeight: 500 }}>Listening 01</span>
+            <span>Lớp học</span> <ChevronRight size={14} />
+            <span style={{ color: '#2563EB', fontWeight: 500 }}>
+              {assignment?.title || `Listening Practice #${id}`}
+            </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input type="text" placeholder="Tìm kiếm tài liệu..." style={{ padding: '8px 16px 8px 36px', borderRadius: '20px', border: '1px solid #E2E8F0', fontSize: '14px', width: '240px', outline: 'none' }} />
-          </div>
-          <div style={{ position: 'relative', cursor: 'pointer' }}>
-            <Bell size={20} color="#64748B" />
-            <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', backgroundColor: '#EF4444', borderRadius: '50%' }}></div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', backgroundColor: '#4F46E5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>AJ</div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>Alice Johnson</span>
-              <span style={{ fontSize: '12px', color: '#64748B' }}>Học viên IELTS 6.5A</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Assignment Header - Title only (scrolls away) */}
-      <div style={{ padding: '24px 24px 16px 24px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <span style={{ padding: '4px 12px', backgroundColor: '#3B82F6', color: 'white', fontSize: '13px', fontWeight: 700, borderRadius: '4px', textTransform: 'uppercase' }}>Listening 01</span>
-            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase' }}>CAMBRIDGE IELTS 15 - TEST 1</h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '14px', color: '#64748B' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Headphones size={16} /> IELTS Academic Listening Part 1</span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Tổng số: <strong style={{ color: '#1E293B' }}>10 câu</strong></span>
-            <span style={{ width: '4px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '50%' }}></span>
-            <span>Mã đề: LS-CAM15-01</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sticky Action Bar */}
-      <div style={{ position: 'sticky', top: '64px', zIndex: 50, padding: '10px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px', color: '#D97706' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '20px', color: '#DC2626', fontWeight: 600, fontSize: '14px' }}>
             <Timer size={16} />
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <span style={{ fontSize: '10px', fontWeight: 700 }}>TIME LEFT</span>
-              <span style={{ fontSize: '16px', fontWeight: 800, lineHeight: '1' }}>58:24</span>
-            </div>
+            <span>30:00</span>
           </div>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Pause size={14} /> Tạm dừng
-          </button>
-          <button className="btn btn-secondary" style={{ backgroundColor: 'white', border: '1px solid #E2E8F0', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', color: '#475569', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Save size={14} /> Lưu nháp
-          </button>
-          <button className="btn btn-primary" style={{ backgroundColor: '#3B82F6', border: 'none', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', color: 'white', fontSize: '13px', fontWeight: 600, borderRadius: '6px' }}>
-            <Send size={14} /> Nộp bài thi
-          </button>
         </div>
       </div>
 
-      {/* Split View Content */}
-      <div style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', flex: 1 }}>
-        
-        {/* Left Column: Audio & Context */}
-        <div style={{ borderRight: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', backgroundColor: 'white' }}>
-          
-          {/* Custom Audio Player UI */}
+      {error && (
+        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+            <AlertCircle size={20} />
+            <span style={{ fontSize: '14px' }}>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadData}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+          >
+            <RefreshCw size={13} /> Thử lại
+          </button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
+          <CheckCircle2 size={20} />
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+        </div>
+      )}
+
+      {/* Main 2-Column Split Workspace */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 480px', flex: 1, minHeight: 'calc(100vh - 128px)' }}>
+        {/* Left Column: Audio Player & Transcript */}
+        <div style={{ borderRight: '1px solid #E2E8F0', backgroundColor: 'white', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '24px 32px', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer', boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)' }}>
-                  <Play size={24} fill="currentColor" style={{ marginLeft: '4px' }} />
-                </div>
-                <div>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 700, color: '#1E293B' }}>Audio Track 01</h3>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>Part 1: Bank Account Opening</p>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Headphones size={22} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                  <SkipBack size={18} cursor="pointer" />
-                  <SkipForward size={18} cursor="pointer" />
-                </div>
-                <div style={{ width: '1px', height: '24px', backgroundColor: '#CBD5E1' }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569' }}>
-                  <Volume2 size={18} />
-                  <div style={{ width: '80px', height: '4px', backgroundColor: '#E2E8F0', borderRadius: '2px', position: 'relative', cursor: 'pointer' }}>
-                    <div style={{ width: '60%', height: '100%', backgroundColor: '#3B82F6', borderRadius: '2px' }}></div>
-                  </div>
-                </div>
+              <div>
+                <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+                  {moduleDetail?.instructions || assignment?.title || 'Phần thi Nghe'}
+                </h3>
+                <span style={{ fontSize: '12px', color: '#64748B' }}>Audio Track • Tiếng Anh chuẩn học thuật</span>
               </div>
             </div>
-            
-            {/* Audio Progress Bar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>02:14</span>
-              <div style={{ flex: 1, height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', position: 'relative', cursor: 'pointer' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '35%', height: '100%', backgroundColor: '#3B82F6', borderRadius: '3px' }}></div>
-                <div style={{ position: 'absolute', top: '50%', left: '35%', transform: 'translate(-50%, -50%)', width: '12px', height: '12px', backgroundColor: '#3B82F6', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}></div>
+
+            {/* Audio Controls */}
+            <div style={{ backgroundColor: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setAudioProgress(Math.max(0, audioProgress - 10))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
+                  >
+                    <SkipBack size={18} />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#2563EB', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  >
+                    {isPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setAudioProgress(Math.min(100, audioProgress + 10))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
+                  >
+                    <SkipForward size={18} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748B' }}>
+                  <Volume2 size={18} />
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>01:24 / 04:30</span>
+                </div>
               </div>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>06:45</span>
+
+              {/* Progress Bar */}
+              <div 
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pos = ((e.clientX - rect.left) / rect.width) * 100;
+                  setAudioProgress(pos);
+                }}
+                style={{ width: '100%', height: '6px', backgroundColor: '#E2E8F0', borderRadius: '3px', cursor: 'pointer', position: 'relative' }}
+              >
+                <div style={{ width: `${audioProgress}%`, height: '100%', backgroundColor: '#2563EB', borderRadius: '3px' }} />
+              </div>
             </div>
           </div>
 
-          <div style={{ padding: '32px 48px', flex: 1 }}>
-            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-              <div style={{ padding: '24px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', marginBottom: '32px' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#B45309', fontWeight: 700 }}>Instructions:</h4>
-                <ul style={{ margin: 0, paddingLeft: '20px', color: '#92400E', fontSize: '15px', lineHeight: '1.6' }}>
-                  <li>You will hear a conversation between a bank clerk and a customer.</li>
-                  <li>Write <strong>NO MORE THAN TWO WORDS AND/OR A NUMBER</strong> for each answer.</li>
-                  <li>Listen carefully, the recording will be played <strong>ONLY ONCE</strong>.</li>
-                </ul>
-              </div>
-
-              {/* Visual Context (Diagram / Note completion preview) */}
-              <div style={{ padding: '32px', backgroundColor: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <h2 style={{ textAlign: 'center', fontSize: '20px', fontWeight: 700, color: '#1E293B', marginBottom: '24px', textTransform: 'uppercase' }}>Bank Account Application</h2>
-                
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '16px' }}>
-                  <tbody>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569', width: '40%' }}>Account Type:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>Select <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>1</span> account</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>First Name:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>Pieter</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Surname:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}><span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>2</span></td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px dashed #CBD5E1' }}>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Date of Birth:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>27th <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>3</span> 1991</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '16px 0', fontWeight: 600, color: '#475569' }}>Current Address:</td>
-                      <td style={{ padding: '16px 0', color: '#1E293B' }}>14 <span style={{ padding: '2px 8px', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', fontWeight: 'bold' }}>4</span> Street, Exeter</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
+          {/* Instructions note */}
+          <div style={{ padding: '32px', overflowY: 'auto', flex: 1 }}>
+            <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
+              Hướng dẫn phần thi Nghe:
+            </h4>
+            <p style={{ fontSize: '14px', lineHeight: '1.7', color: '#475569' }}>
+              Bạn sẽ nghe đoạn hội thoại hoặc bài giảng một lần duy nhất. Đọc trước các câu hỏi bên cạnh và chọn đáp án thích hợp trong khi nghe.
+            </p>
+            <div style={{ padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', marginTop: '16px' }}>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                💡 <strong>Mẹo làm bài:</strong> Chú ý các từ khóa tín hiệu chuyển ý như <em>however</em>, <em>furthermore</em>, <em>on the contrary</em> để bắt kịp đáp án.
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Questions (Sticky) */}
-        <div style={{ position: 'sticky', top: '128px', height: 'calc(100vh - 128px)', display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
-          
+        {/* Right Column: Questions */}
+        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
           <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', backgroundColor: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: totalQuestions > 0 ? '16px' : 0 }}>
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>Danh sách câu hỏi (Questions 1 - 10)</h2>
-                <span style={{ fontSize: '13px', color: '#64748B' }}>Chọn một đáp án đúng nhất cho mỗi câu hỏi</span>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>
+                  Danh sách câu hỏi {totalQuestions > 0 ? `(1 - ${totalQuestions})` : ''}
+                </h2>
+                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                  {totalQuestions > 0 ? 'Chọn đáp án đúng theo nội dung nghe' : 'Chưa có câu hỏi nào được gán'}
+                </span>
               </div>
-              <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
-                {answeredCount} / {totalQuestions} đã làm
-              </div>
+              {totalQuestions > 0 && (
+                <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
+                  {answeredCount} / {totalQuestions} đã làm
+                </div>
+              )}
             </div>
 
             {/* Question Navigator */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {Array.from({ length: 10 }).map((_, i) => {
-                const qId = i + 1;
-                const isAnswered = !!selectedAnswers[qId];
-                const isBookmarked = bookmarkedQuestions[qId];
-                const isActive = activeQuestion === qId;
-                
-                let bgColor = '#F1F5F9';
-                let textColor = '#475569';
+            {totalQuestions > 0 && (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {questions.map((_, i) => {
+                  const qId = i + 1;
+                  const isAnswered = !!selectedAnswers[qId];
+                  const isBookmarked = bookmarkedQuestions[qId];
+                  const isActive = activeQuestion === qId;
+                  
+                  let bgColor = '#F1F5F9';
+                  let textColor = '#475569';
 
-                if (isActive) {
-                  bgColor = '#2563EB';
-                  textColor = 'white';
-                } else if (isBookmarked) {
-                  bgColor = '#FEF08A';
-                  textColor = '#A16207';
-                } else if (isAnswered) {
-                  bgColor = '#DBEAFE';
-                  textColor = '#1D4ED8';
-                }
+                  if (isActive) {
+                    bgColor = '#2563EB';
+                    textColor = 'white';
+                  } else if (isBookmarked) {
+                    bgColor = '#FEF08A';
+                    textColor = '#A16207';
+                  } else if (isAnswered) {
+                    bgColor = '#DBEAFE';
+                    textColor = '#1D4ED8';
+                  }
 
-                return (
-                  <button 
-                    key={qId}
-                    onClick={() => setActiveQuestion(qId)}
-                    style={{ 
-                      width: '40px', height: '40px', borderRadius: '6px', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '15px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                      backgroundColor: bgColor, color: textColor,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {qId}
-                  </button>
-                );
-              })}
-            </div>
+                  return (
+                    <button 
+                      key={qId}
+                      type="button"
+                      onClick={() => setActiveQuestion(qId)}
+                      style={{ 
+                        width: '36px', height: '36px', borderRadius: '6px', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                        backgroundColor: bgColor, color: textColor,
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {qId}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-            
-            {/* Question Card 1 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 1</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph A)</span>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ height: 100, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+                <div style={{ height: 60, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+              </div>
+            ) : totalQuestions === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 16px', color: '#64748B' }}>
+                <Headphones size={40} style={{ margin: '0 auto 12px', color: '#94A3B8' }} />
+                <p style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>Chưa có câu hỏi cho phần thi nghe này</p>
+                <span style={{ fontSize: '13px' }}>Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
+              </div>
+            ) : currentQuestionItem ? (
+              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
+                      {activeQuestion}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+                      {currentQuestionItem.questionType}
+                    </span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => toggleBookmark(activeQuestion)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: bookmarkedQuestions[activeQuestion] ? '#EAB308' : '#94A3B8' }}
+                  >
+                    <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => toggleBookmark(1)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[1] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[1] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
-              </div>
 
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                According to paragraph A, what role did the Letraset sheets play in the 1960s?
-              </h3>
+                <p style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+                  {currentQuestionItem.content}
+                </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is an example of the first popularized typographic specimen' },
-                  { id: 'B', text: 'Some classical Latin texts discovered in Virginia library' },
-                  { id: 'C', text: 'Examples of the answers derived from modern translations' },
-                  { id: 'D', text: 'Of the answers provided solely by Aldus PageMaker' }
-                ].map(opt => {
-                  const isSelected = selectedAnswers[1] === opt.id;
-                  return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q1" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(1, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Question Card 2 */}
-            <div className="card" style={{ padding: '24px', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ padding: '4px 12px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '13px', fontWeight: 700, borderRadius: '4px' }}>Question 2</span>
-                  <span style={{ fontSize: '13px', color: '#94A3B8' }}>(Paragraph B)</span>
+                {/* Options */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {['A', 'B', 'C', 'D'].map((optKey) => {
+                    const isSelected = selectedAnswers[activeQuestion] === optKey;
+                    const optText = (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.text
+                      || (currentQuestionItem as any)?.options?.find?.((o: any) => o.id === optKey)?.content
+                      || `Lựa chọn ${optKey}`;
+                    return (
+                      <label 
+                        key={optKey}
+                        onClick={() => handleSelectAnswer(activeQuestion, optKey)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px',
+                          borderRadius: '8px', border: `1px solid ${isSelected ? '#2563EB' : '#E2E8F0'}`,
+                          backgroundColor: isSelected ? '#EFF6FF' : 'white', cursor: 'pointer', transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{
+                          width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSelected ? '#2563EB' : '#CBD5E1'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
+                        }}>
+                          {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB' }}></div>}
+                        </div>
+                        <div style={{ fontSize: '14px', color: '#334155', lineHeight: '1.5' }}>
+                          <strong style={{ color: '#1E293B' }}>{optKey}.</strong> {optText}
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
-                <button 
-                  onClick={() => toggleBookmark(2)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: bookmarkedQuestions[2] ? '#D97706' : '#94A3B8', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                >
-                  <Bookmark size={14} fill={bookmarkedQuestions[2] ? '#D97706' : 'none'} /> Đánh dấu
-                </button>
               </div>
-
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: '1.6', marginBottom: '20px' }}>
-                Why do desktop publishing packages and layout designers actively utilize Lorem Ipsum?
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { id: 'A', text: 'This is used to maintain a realistic distribution of letters without distraction' },
-                  { id: 'B', text: 'It contains readable English translations from Cicero' },
-                ].map(opt => {
-                  const isSelected = selectedAnswers[2] === opt.id;
-                  return (
-                    <label 
-                      key={opt.id}
-                      style={{ 
-                        display: 'flex', alignItems: 'flex-start', gap: '16px', padding: '16px', 
-                        border: `1px solid ${isSelected ? '#3B82F6' : '#E2E8F0'}`, 
-                        borderRadius: '8px', cursor: 'pointer',
-                        backgroundColor: isSelected ? '#EFF6FF' : 'white',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ 
-                        width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${isSelected ? '#3B82F6' : '#CBD5E1'}`, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                      }}>
-                        {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3B82F6' }}></div>}
-                      </div>
-                      <input 
-                        type="radio" 
-                        name="q2" 
-                        value={opt.id} 
-                        checked={isSelected}
-                        onChange={() => handleSelectAnswer(2, opt.id)}
-                        style={{ display: 'none' }}
-                      />
-                      <div style={{ fontSize: '15px', color: '#334155', lineHeight: '1.5' }}>
-                        <strong style={{ color: '#1E293B' }}>{opt.id}.</strong> {opt.text}
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
+            ) : null}
           </div>
 
-          {/* Right Column Footer (Sticky) */}
+          {/* Right Column Footer */}
           <div style={{ padding: '16px 24px', backgroundColor: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button 
+                type="button"
                 onClick={() => setActiveQuestion(Math.max(1, activeQuestion - 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                <ChevronLeft size={18} /> Câu trước
+                <ChevronLeft size={16} /> Câu trước
               </button>
               <button 
-                onClick={() => setActiveQuestion(Math.min(10, activeQuestion + 1))}
-                style={{ padding: '10px 16px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                type="button"
+                onClick={() => setActiveQuestion(Math.min(totalQuestions, activeQuestion + 1))}
+                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                Câu tiếp theo <ChevronRight size={18} />
+                Câu sau <ChevronRight size={16} />
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <button style={{ padding: '10px 32px', border: 'none', backgroundColor: '#2563EB', color: 'white', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: 'pointer' }}>
-                Hoàn thành
-              </button>
-            </div>
+            <button 
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              style={{
+                padding: '10px 28px',
+                border: 'none',
+                backgroundColor: '#2563EB',
+                color: 'white',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Đang nộp bài...
+                </>
+              ) : (
+                'Hoàn thành & Nộp bài'
+              )}
+            </button>
           </div>
-
         </div>
-
       </div>
     </div>
   );

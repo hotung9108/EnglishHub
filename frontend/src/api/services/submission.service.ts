@@ -71,6 +71,7 @@ export interface SubmissionModuleSummary {
 
 export interface SubmissionListItem {
   id: number;
+  assignmentId?: number;
   studentId: number;
   attemptNumber: number;
   status: SubmissionStatus;
@@ -93,6 +94,60 @@ export interface SubmitResponse {
   message: string;
   status: SubmissionStatus;
   submittedAt: string;
+}
+
+export interface SubmittedAnswerItem {
+  id: number;
+  questionId: number | null;
+  content: unknown;
+  docStorageKey?: string | null;
+  docMimeType?: string | null;
+  docUploadStatus?: string | null;
+  audioStorageKey?: string | null;
+  audioMimeType?: string | null;
+  audioUploadStatus?: string | null;
+}
+
+export interface SubmitModuleAnswerPayload {
+  questionId: number;
+  content: Record<string, unknown>;
+}
+
+export interface SubmitModulePayload {
+  answers?: SubmitModuleAnswerPayload[];
+}
+
+export interface SubmitModuleResponse {
+  message: string;
+  submissionModuleId: number;
+  status: SubmissionStatus;
+  answers: SubmittedAnswerItem[];
+}
+
+export interface UploadUrlResponse {
+  uploadUrl: string;
+  storageKey: string;
+  expiresAt: string;
+}
+
+export interface SubmissionModuleQuestionDetail {
+  id: number;
+  content: string;
+  questionType: string;
+  score: number;
+  orderIndex: number;
+  correctAnswer?: unknown;
+}
+
+export interface SubmissionModuleDetailResponse {
+  id: number;
+  moduleId: number;
+  skill: SubmissionSkill | null;
+  taskType: SubmissionTaskType | null;
+  status: SubmissionStatus;
+  grading: SubmissionGradingDetail | null;
+  questions: SubmissionModuleQuestionDetail[];
+  answers: SubmittedAnswerItem[];
 }
 
 export interface SubmissionListParams {
@@ -193,6 +248,52 @@ export class SubmissionService {
     return this.http.post<SubmitResponse>(
       '/submissions/' + submissionId + '/submit',
       undefined,
+      options
+    );
+  }
+
+  submitModule(
+    submissionModuleId: number,
+    payload?: SubmitModulePayload,
+    options?: ApiRequestOptions
+  ): Promise<SubmitModuleResponse> {
+    return this.http.post<SubmitModuleResponse>(
+      `/submission-modules/${submissionModuleId}/submit`,
+      payload ?? {},
+      options
+    );
+  }
+
+  getSubmissionModuleDetail(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionModuleDetailResponse> {
+    return this.http.get<SubmissionModuleDetailResponse>(
+      `/submission-modules/${submissionModuleId}`,
+      options
+    );
+  }
+
+  getAudioUploadUrl(
+    submissionModuleId: number,
+    mimeType?: string,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    return this.http.post<UploadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/audio-upload-url`,
+      mimeType ? { mimeType } : {},
+      options
+    );
+  }
+
+  getDocumentUploadUrl(
+    submissionModuleId: number,
+    mimeType?: string,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    return this.http.post<UploadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/document-upload-url`,
+      mimeType ? { mimeType } : {},
       options
     );
   }

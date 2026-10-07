@@ -1,104 +1,111 @@
-import React, { useState, useMemo } from 'react';
-import { Search, BookOpen, CheckCircle2, GraduationCap, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, BookOpen, CheckCircle2, GraduationCap, X, RotateCcw, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import StudentClassCard from '../components/classes/StudentClassCard';
 import type { StudentClassInfo } from '../components/classes/StudentClassCard';
-
-const MOCK_CLASSES: StudentClassInfo[] = [
-  {
-    id: '1',
-    code: 'ENG-IELTS-6.5A',
-    name: 'IELTS Intensive Band 6.5 - 7.5',
-    instructorName: 'Cô Trần Thị Mai Lan',
-    status: 'active',
-    stats: {
-      assigned: 15,
-      pending: 2,
-      avgScore: 7.2
-    }
-  },
-  {
-    id: '2',
-    code: 'ENG-GRAM-ADV',
-    name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao',
-    instructorName: 'Thầy Hoàng Minh Đức',
-    status: 'active',
-    stats: {
-      assigned: 8,
-      pending: 0,
-      avgScore: 8.0
-    }
-  },
-  {
-    id: '3',
-    code: 'ENG-TOEIC-750',
-    name: 'Luyện thi TOEIC Cấp tốc Mục tiêu 750+',
-    instructorName: 'Cô Nguyễn Thu Trang',
-    status: 'active',
-    stats: {
-      assigned: 12,
-      pending: 1,
-      avgScore: 7.8
-    }
-  },
-  {
-    id: '4',
-    code: 'ENG-SPK-WS',
-    name: 'IELTS Speaking & Pronunciation Workshop',
-    instructorName: 'Thầy Mark Reynolds',
-    status: 'active',
-    stats: {
-      assigned: 6,
-      pending: 0,
-      avgScore: 7.5
-    }
-  },
-  {
-    id: '5',
-    code: 'ENG-IELTS-5.0',
-    name: 'IELTS Pre-Intermediate Khóa 12',
-    instructorName: 'Thầy Hoàng Minh Đức',
-    status: 'completed',
-    hasCertificate: true,
-    stats: {
-      assigned: 20,
-      pending: 0,
-      result: 'Tốt',
-      finalScore: 7.5
-    }
-  },
-  {
-    id: '6',
-    code: 'ENG-COMM-B2',
-    name: 'Tiếng Anh Giao tiếp Chuyên sâu Trình độ B2',
-    instructorName: 'Thầy Mark Reynolds',
-    status: 'completed',
-    hasCertificate: true,
-    stats: {
-      assigned: 15,
-      pending: 0,
-      result: 'Xuất sắc',
-      finalScore: 8.0
-    }
-  }
-];
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 
 const StudentClasses: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [classesList, setClassesList] = useState<StudentClassInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
 
+  const fetchClasses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [classesRes, submissionsRes] = await Promise.allSettled([
+        classService.list(),
+        submissionService.listSubmissions({ studentId: user?.id })
+      ]);
+
+      const rawClasses: ClassSummary[] = classesRes.status === 'fulfilled'
+        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+        : [];
+      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+        : [];
+
+      if (rawClasses.length > 0) {
+        // Fetch assignments for each class
+        const assignmentsByClass = await Promise.all(
+          rawClasses.map(async (c) => {
+            try {
+              const res = await assignmentService.listAssignments(c.id);
+              return { classId: c.id, assignments: res.data || [] };
+            } catch {
+              return { classId: c.id, assignments: [] as AssignmentSummary[] };
+            }
+          })
+        );
+
+        const mapped: StudentClassInfo[] = rawClasses.map(c => {
+          const classAssignments = assignmentsByClass.find(item => item.classId === c.id)?.assignments || [];
+          const classSubmissions = submissions.filter(s => {
+            return classAssignments.some(a => a.id === s.assignmentId || a.id === s.id);
+          });
+
+          const graded = classSubmissions.filter(s => s.status === 'GRADED');
+          const avgScore = graded.length > 0 
+            ? parseFloat((graded.reduce((acc, curr) => acc + (curr.modules?.[0]?.grading?.finalScore || 0), 0) / (graded.length * 10)).toFixed(1))
+            : undefined;
+
+          const isCompleted = c.status === 'COMPLETED';
+
+          return {
+            id: String(c.id),
+            code: c.name.includes('-') ? c.name.split(' ')[0] : `ENG-CLS-${c.id}`,
+            name: c.name,
+            instructorName: 'Giáo viên phụ trách',
+            status: isCompleted ? 'completed' : 'active',
+            hasCertificate: isCompleted,
+            stats: {
+              assigned: classAssignments.length,
+              pending: Math.max(0, classAssignments.length - classSubmissions.length),
+              avgScore: avgScore ?? 0,
+              result: isCompleted ? 'Đạt' : undefined,
+              finalScore: isCompleted ? avgScore : undefined
+            }
+          };
+        });
+
+        setClassesList(mapped);
+      } else {
+        setClassesList([]);
+      }
+    } catch (err) {
+      console.error('Failed to load student classes', err);
+      setError('Không thể tải danh sách lớp học từ máy chủ.');
+      setClassesList([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchClasses();
+  }, [user?.id]);
+
   const counts = useMemo(() => ({
-    all: MOCK_CLASSES.length,
-    active: MOCK_CLASSES.filter(c => c.status === 'active').length,
-    completed: MOCK_CLASSES.filter(c => c.status === 'completed').length,
-    certificates: MOCK_CLASSES.filter(c => c.hasCertificate).length
-  }), []);
+    all: classesList.length,
+    active: classesList.filter(c => c.status === 'active').length,
+    completed: classesList.filter(c => c.status === 'completed').length,
+    certificates: classesList.filter(c => c.hasCertificate).length
+  }), [classesList]);
 
   const filteredClasses = useMemo(() => {
-    return MOCK_CLASSES.filter(c => {
+    return classesList.filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             c.instructorName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -107,7 +114,7 @@ const StudentClasses: React.FC = () => {
       if (filter === 'completed') return matchesSearch && c.status === 'completed';
       return matchesSearch;
     });
-  }, [searchTerm, filter]);
+  }, [classesList, searchTerm, filter]);
 
   const handleViewClass = (id: string) => {
     navigate(`/student/classes/${id}`);
@@ -116,6 +123,24 @@ const StudentClasses: React.FC = () => {
   const handleViewMaterials = (id: string) => {
     navigate(`/student/classes/${id}`);
   };
+
+  if (loading) {
+    return (
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 0 48px' }}>
+        <div className="skeleton mb-24" style={{ height: '36px', width: '240px', borderRadius: '8px' }}></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: '110px', borderRadius: '12px' }}></div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="skeleton" style={{ height: '260px', borderRadius: '14px' }}></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '48px' }}>
@@ -141,7 +166,20 @@ const StudentClasses: React.FC = () => {
         </p>
       </div>
 
-      {/* 2. Overview Metric Cards (Mobbin Dashboard Style) */}
+      {error && (
+        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+          <div className="flex items-center gap-12">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <button onClick={fetchClasses} className="btn btn-sm btn-secondary flex items-center gap-6">
+            <RotateCcw size={14} />
+            <span>Thử lại</span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Overview Metric Cards */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
@@ -376,26 +414,30 @@ const StudentClasses: React.FC = () => {
         }}>
           <BookOpen size={36} color="var(--on-surface-variant)" style={{ margin: '0 auto 12px' }} />
           <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>
-            Không tìm thấy lớp học phù hợp
+            {classesList.length === 0 ? 'Bạn chưa tham gia lớp học nào' : 'Không tìm thấy lớp học phù hợp'}
           </div>
           <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '16px' }}>
-            Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.
+            {classesList.length === 0 
+              ? 'Khi bạn được ghi danh vào lớp học, thông tin lớp và bài tập sẽ xuất hiện tại đây.' 
+              : 'Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.'}
           </div>
-          <button 
-            onClick={() => { setSearchTerm(''); setFilter('all'); }}
-            style={{
-              padding: '6px 16px',
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--primary-fixed)',
-              color: 'var(--primary)',
-              border: 'none',
-              fontWeight: 600,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
-            Đặt lại bộ lọc
-          </button>
+          {classesList.length > 0 && (
+            <button 
+              onClick={() => { setSearchTerm(''); setFilter('all'); }}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--primary-fixed)',
+                color: 'var(--primary)',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              Đặt lại bộ lọc
+            </button>
+          )}
         </div>
       ) : (
         <div className="student-classes-grid">
