@@ -6,6 +6,9 @@
 # 2. Điền thông tin kết nối Neon DB, JWT_SECRET vào .env
 # 3. Chạy backend staging:
 #      docker compose -f docker-compose.staging.yml up -d
+#
+# Lưu ý: AI service chạy độc lập bằng docker-compose.ai-service.yml và được
+# chia sẻ chung cho production + staging qua network external "englishhub_shared".
 # ==============================================================================
 
 services:
@@ -38,6 +41,15 @@ services:
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
       SERVER_PORT: ${SERVER_PORT:-8082}
       SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-framework}
+      # ===== AI Service (FastAPI Microservice) - khớp với application.properties =====
+      # AI service chạy độc lập (docker-compose.ai-service.yml), chia sẻ chung prod + staging
+      # qua network external "englishhub_shared" -> gọi qua http://ai-service:8001
+      AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
+      AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-60}
+      # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
+      AI_SERVICE_MODEL: ${AI_SERVICE_MODEL:-}
+      AI_SERVICE_PROVIDER: ${AI_SERVICE_PROVIDER:-}
       # OpenAPI servers
       APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
       app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}

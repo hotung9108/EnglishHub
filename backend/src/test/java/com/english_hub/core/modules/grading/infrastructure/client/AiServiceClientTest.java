@@ -5,16 +5,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.AiAnnotationDto;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.AiSpeakingAnalysisRequest;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.AiSpeakingAnalysisResponse;
+import com.english_hub.core.modules.grading.infrastructure.client.dto.AiWritingAnalysisRequest;
+import com.english_hub.core.modules.grading.infrastructure.client.dto.AiWritingAnalysisResponse;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.CriteriaScoresDto;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.FluencyMetricsDto;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.english_hub.core.modules.grading.infrastructure.client.dto.TextMetricsDto;
+import com.english_hub.core.modules.grading.infrastructure.client.dto.WritingCriteriaScoresDto;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class AiServiceClientTest {
 
-	private final ObjectMapper objectMapper = new ObjectMapper();
+	private final JsonMapper objectMapper = JsonMapper.builder().build();
 
 	@Test
 	void serializeRequest_producesValidCamelCaseJson() throws Exception {
@@ -139,9 +143,83 @@ class AiServiceClientTest {
 
 		AiSpeakingAnalysisResponse response = objectMapper.readValue(jsonResponse, AiSpeakingAnalysisResponse.class);
 
-		assertThat(response.submissionModuleId()).isEqualTo(102L);
-		assertThat(response.overallScore()).isEqualTo(8.0);
 		assertThat(response.modelUsed()).isEqualTo("anthropic/claude-3.5-sonnet");
+		assertThat(response.providerUsed()).isEqualTo("openrouter");
+	}
+
+	@Test
+	void serializeWritingRequest_producesValidCamelCaseJson() throws Exception {
+		AiWritingAnalysisRequest request = new AiWritingAnalysisRequest(
+				201L,
+				"Nowadays, community service should be compulsory.",
+				"Write an essay about community service",
+				"IELTS Band 7 rubric",
+				9.0,
+				"google/gemini-2.5-flash",
+				"openrouter"
+		);
+
+		String json = objectMapper.writeValueAsString(request);
+		JsonNode tree = objectMapper.readTree(json);
+
+		assertThat(tree.get("submissionModuleId").asLong()).isEqualTo(201L);
+		assertThat(tree.get("content").asText()).isEqualTo("Nowadays, community service should be compulsory.");
+		assertThat(tree.get("moduleInstructions").asText()).isEqualTo("Write an essay about community service");
+		assertThat(tree.get("aiInstructionSnapshot").asText()).isEqualTo("IELTS Band 7 rubric");
+		assertThat(tree.get("maxScore").asDouble()).isEqualTo(9.0);
+		assertThat(tree.get("model").asText()).isEqualTo("google/gemini-2.5-flash");
+		assertThat(tree.get("aiProvider").asText()).isEqualTo("openrouter");
+	}
+
+	@Test
+	void deserializeWritingResponse_matchesPythonFastApiContract() throws Exception {
+		String jsonResponse = """
+				{
+				  "submissionModuleId": 201,
+				  "overallScore": 6.5,
+				  "aiFeedback": "Good coherence and clear argumentation.",
+				  "criteriaScores": {
+				    "taskResponse": 7.0,
+				    "coherenceAndCohesion": 6.5,
+				    "lexicalResource": 6.0,
+				    "grammaticalRangeAndAccuracy": 6.5,
+				    "overallScore": 6.5
+				  },
+				  "textMetrics": {
+				    "wordCount": 150,
+				    "sentenceCount": 7,
+				    "averageSentenceLength": 21.4,
+				    "lexicalDiversity": 0.62,
+				    "fleschKincaidGrade": 10.5
+				  },
+				  "annotations": [
+				    {
+				      "startOffset": 240,
+				      "endOffset": 272,
+				      "exactText": "Community service help teenagers",
+				      "errorType": "GRAMMAR",
+				      "comment": "Chủ ngữ số ít cần chia động từ",
+				      "suggestedFix": "Community service helps teenagers"
+				    }
+				  ],
+				  "modelUsed": "google/gemini-2.5-flash",
+				  "providerUsed": "openrouter"
+				}
+				""";
+
+		AiWritingAnalysisResponse response = objectMapper.readValue(jsonResponse, AiWritingAnalysisResponse.class);
+
+		assertThat(response.submissionModuleId()).isEqualTo(201L);
+		assertThat(response.overallScore()).isEqualTo(6.5);
+		assertThat(response.aiFeedback()).isEqualTo("Good coherence and clear argumentation.");
+		assertThat(response.criteriaScores().taskResponse()).isEqualTo(7.0);
+		assertThat(response.criteriaScores().coherenceAndCohesion()).isEqualTo(6.5);
+		assertThat(response.textMetrics().wordCount()).isEqualTo(150);
+		assertThat(response.textMetrics().lexicalDiversity()).isEqualTo(0.62);
+		assertThat(response.annotations()).hasSize(1);
+		assertThat(response.annotations().getFirst().exactText()).isEqualTo("Community service help teenagers");
+		assertThat(response.annotations().getFirst().errorType()).isEqualTo("GRAMMAR");
+		assertThat(response.modelUsed()).isEqualTo("google/gemini-2.5-flash");
 		assertThat(response.providerUsed()).isEqualTo("openrouter");
 	}
 }

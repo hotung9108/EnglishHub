@@ -99,6 +99,8 @@ public class GradingJpaAdapter implements GradingRepository {
 		target.setGradedAt(source.gradedAt());
 		if (source.aiTranscript() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode) {
 			target.setAiTranscript(jsonNode);
+		} else if (source.aiTranscript() != null) {
+			target.setAiTranscriptJson(source.aiTranscript().toString());
 		}
 		return mapper.toDomain(jpaRepository.save(target));
 	}

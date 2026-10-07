@@ -11,6 +11,8 @@ export type { UseGradingResult, UseStudentGradingResult } from './useGrading';
 export { useSubmission, useSubmissionAttempts } from './useSubmission';
 export { useStudentEvaluation } from './useStudentEvaluation';
 export type { UseStudentEvaluationOptions, UseStudentEvaluationResult } from './useStudentEvaluation';
+export { useReports } from './useReports';
+export type { UseReportsOptions, UseReportsResult } from './useReports';
 export type {
   UseSubmissionAttemptsOptions,
   UseSubmissionAttemptsResult,
