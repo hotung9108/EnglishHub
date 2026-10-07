@@ -195,24 +195,11 @@ Hệ thống workflow nằm trong thư mục [`.github/workflows/`](file:///d:/C
 - **Các bước thực thi của job `deploy`**:
   - Kết nối Tailscale mesh VPN -> Build & Push image lên GHCR (`:latest` và `:${{ head_sha của lần chạy Backend CI }}`) -> SSH vào máy chủ -> Cập nhật `/home/${{ secrets.SERVER_USER }}/englishhub/.env` -> Khởi động lại container Production (`docker-compose.prod.yml`).
 
-#### 9. Pipeline Triển Khai Toàn Diện: [`cd-deploy.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-deploy.yml)
-- **Tên workflow**: `CD Pipeline (Build, Push & Deploy)`
-- **Trigger**:
-  - `push` vào `main`.
-  - Tạo Git Tag phiên bản phát hành (`v*.*.*`).
-  - Kích hoạt thủ công qua giao diện GitHub (`workflow_dispatch`).
-- **Điểm nổi bật**:
-  - Build đồng thời cả Backend và Frontend image bằng Docker Buildx.
-  - Hỗ trợ GitHub Actions Layer Caching (`cache-from/to: type=gha,mode=max`) giúp giảm thời gian build Docker.
-  - Tự động kiểm tra điều kiện secrets trước khi SSH: nếu chưa cấu hình SSH secrets, workflow sẽ thông báo và bỏ qua bước deploy mà không làm đỏ pipeline (`Skipping automatic SSH deployment`).
-  - Triển khai vào thư mục `/opt/englishhub`.
-  - **Post-Deploy Healthcheck**: Đợi 15 giây sau khi `docker compose up -d` rồi kiểm tra trạng thái thực tế của các container (`docker compose ps`).
-
 ---
 
 ### 4.4. Nhóm Triển Khai AI Service (Dùng Chung Staging & Production)
 
-#### 10. Triển Khai AI Service Lên Máy Chủ: [`cd-ai-service.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-ai-service.yml)
+#### 9. Triển Khai AI Service Lên Máy Chủ: [`cd-ai-service.yml`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.github/workflows/cd-ai-service.yml)
 - **Tên workflow**: `Deploy AI Service to VPS/Home-Server`
 - **Trigger**: `workflow_run` — chạy khi workflow `AI Service CI` hoàn tất trên nhánh `main` hoặc `staging`.
   - Vì `AI Service CI` chỉ chạy khi có thay đổi trong `ai-service/**` → CD này cũng **chỉ chạy khi code AI service thay đổi**.

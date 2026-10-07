@@ -18,9 +18,12 @@ Tài liệu hướng dẫn chi tiết quy trình Tích hợp liên tục (CI) v�
      │                                ├── Gradle Test
      │                                └── Spring Boot Build
      │
-     └─► Merge vào main          ──► [.github/workflows/cd-deploy.yml]
-                                      ├── Build & Push Docker Image lên ghcr.io
-                                      └── SSH Deploy lên VPS (docker-compose.prod.yml)
+     ├─► Merge vào main          ──► [.github/workflows/cd-backend.yml]
+     │                                ├── Build & Push Backend Image lên ghcr.io
+     │                                └── SSH Deploy lên VPS (docker-compose.prod.yml)
+     │
+     └─► Merge vào main          ──► [.github/workflows/cd-frontend.yml]
+                                      └── Deploy Frontend lên Vercel Production
 ```
 
 ---
@@ -49,20 +52,17 @@ Tài liệu hướng dẫn chi tiết quy trình Tích hợp liên tục (CI) v�
   - Ngăn chặn và chặn đứng (Block) PR nếu phát hiện lập trình viên vô tình commit API Keys (OpenAI, AWS, JWT Secret, Private Key, Database Credentials,...).
   - Chạy quét với chế độ xác thực trực tuyến và debug log, không gây false positive trên các file mẫu `.example`.
 
-### 2.4. CD Pipeline & Post-Deploy Healthcheck (`.github/workflows/cd-deploy.yml`)
-- **Kích hoạt**: Tự động khi merge code vào nhánh `main` hoặc gắn tag phiên bản (`v*.*.*`).
+### 2.4. CD Backend (`.github/workflows/cd-backend.yml`)
+- **Kích hoạt**: Tự động khi workflow `Backend CI` hoàn tất thành công trên nhánh `main` (event `workflow_run`) → chỉ chạy khi code `backend/**` thay đổi.
 - **Nhiệm vụ**:
-  1. Đăng nhập vào **GitHub Container Registry (`ghcr.io`)** bằng `GITHUB_TOKEN`.
-  2. Build và đẩy 2 Docker images lên registry:
-     - `ghcr.io/<github_username>/englishhub/backend:latest`
-     - `ghcr.io/<github_username>/englishhub/frontend:latest`
-  3. Tự động SSH vào máy chủ VPS/PC:
-     - Pull image mới nhất về máy chủ.
-     - Khởi động lại dịch vụ với `docker compose up -d`.
-     - **Post-deploy Healthcheck**: Đợi 15 giây để Spring Boot ổn định, kiểm tra trạng thái các container bằng `docker compose ps` để đảm bảo hệ thống không bị crash sau khi cập nhật.
+  1. Job `wait-ai-service`: nếu commit cũng thay đổi `ai-service/**`, chờ `AI Service CI` và `cd-ai-service.yml` hoàn tất `success` → mới tiếp tục (thất bại thì chặn deploy Backend).
+  2. Kết nối Tailscale mesh VPN, đăng nhập **GitHub Container Registry (`ghcr.io`)**.
+  3. Build và đẩy Backend image lên registry với 2 tag: `:latest` và `:<commit sha>`.
+  4. SSH vào máy chủ: cập nhật `BACKEND_IMAGE` trong `.env` rồi khởi động lại bằng `docker compose -f docker-compose.prod.yml up -d --pull always`.
 
-     docker image prune -f
-     ```
+### 2.5. CD Frontend (`.github/workflows/cd-frontend.yml`)
+- **Kích hoạt**: Khi merge vào nhánh `main`.
+- **Nhiệm vụ**: Lint, test, build bundle Frontend rồi deploy lên **Vercel Production** bằng Vercel CLI.
 
 ---
 
@@ -73,14 +73,14 @@ Tài liệu hướng dẫn chi tiết quy trình Tích hợp liên tục (CI) v�
 
 | Tên Secret | Bắt buộc | Ý nghĩa / Giá trị |
 | :--- | :--- | :--- |
-| `SERVER_HOST` | Tùy chọn | Địa chỉ IP Public của máy chủ VPS (ví dụ: `...`). |
-| `SERVER_USER` | Tùy chọn | Tên người dùng SSH (ví dụ: `...`). |
-| `SERVER_SSH_KEY` | Tùy chọn | Private Key SSH dùng để kết nối vào máy chủ (ví dụ: `...`). |
-| `SERVER_PORT` | Tùy chọn | Cổng SSH của server (ví dụ: `...`). |
-
+| `SERVER_HOST` | Bắt buộc | Địa chỉ IP của máy chủ (truy cập được qua Tailscale). |
+| `SERVER_USER` | Bắt buộc | Tên người dùng SSH trên máy chủ (ví dụ: `englishhub`). |
+| `SSH_PRIVATE_KEY` | Bắt buộc | Private Key SSH dùng để kết nối vào máy chủ. |
+| `TAILSCALE_AUTHKEY` | Bắt buộc | Auth key để workflow kết nối vào mesh VPN Tailscale. |
+| `GHCR_PAT` | Bắt buộc | Personal Access Token để push/pull image trên `ghcr.io`. |
 
 > [!NOTE]
-> Nếu chưa điền các Secrets trên, CD workflow sẽ **chỉ thực hiện bước Build & Push Image** lên `ghcr.io` và tự động bỏ qua bước SSH mà không gây lỗi đỏ pipeline.
+> Các secret này do **Admin/DevOps** cấu hình ở cấp Repository. Nếu thiếu secret, job deploy sẽ thất bại (fail đỏ) ngay tại bước kết nối — cố ý để cảnh báo thay vì âm thầm bỏ qua deploy.
 
 ---
 
@@ -104,7 +104,7 @@ cd /opt/englishhub
 ```
 
 ### Bước 3: Đưa file cấu hình lên máy chủ
-Copy 2 file từ repository lên `/opt/englishhub`:
+Copy 2 file từ repository vào thư mục deploy của Backend (mặc định `/home/<SERVER_USER>/englishhub`):
 1. `docker-compose.prod.yml`
 2. `env.production.example` -> Đổi tên thành `.env` và điền mật khẩu thật:
 ```bash
