@@ -72,7 +72,13 @@ export const StudentWorkspace: React.FC = () => {
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  const fetchWorkspaceDrafts = async () => {
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchWorkspaceDrafts = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -175,19 +181,27 @@ export const StudentWorkspace: React.FC = () => {
         console.warn('Could not read local draft items', e);
       }
 
-      setDrafts(dynamicDrafts);
-    } catch (err) {
-      console.error('Failed to load workspace drafts', err);
-      setError('Không thể tải các bản nháp đang làm.');
-      setDrafts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (isMounted) {
+          setDrafts(dynamicDrafts);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        console.error('Failed to load workspace drafts', err);
+        setError('Không thể tải các bản nháp đang làm.');
+        setDrafts([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-  useEffect(() => {
-    fetchWorkspaceDrafts();
-  }, [user?.id]);
+    void fetchWorkspaceDrafts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, isVi, reloadKey]);
 
   useEffect(() => {
     try {
@@ -360,7 +374,7 @@ export const StudentWorkspace: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchWorkspaceDrafts} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>{isVi ? 'Thử lại' : 'Retry'}</span>
           </button>

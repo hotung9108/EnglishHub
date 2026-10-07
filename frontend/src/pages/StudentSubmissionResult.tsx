@@ -193,45 +193,30 @@ export const StudentSubmissionResult: React.FC = () => {
     }
   }, []);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setNoSubmissionFound(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
-    try {
-      let currentSubmission: SubmissionDetail | null = null;
-      let targetAssignmentId = numericId;
+  useEffect(() => {
+    let isMounted = true;
 
-      if (isAssignmentRoute) {
-        // Path is /student/assignments/:id/result -> numericId is assignmentId
-        targetAssignmentId = numericId;
-        try {
-          const asg = await assignmentService.getAssignment(targetAssignmentId);
-          setAssignment(asg);
-        } catch {
-          // Continue
-        }
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      setNoSubmissionFound(false);
 
-        if (user?.id) {
-          const listRes = await submissionService.listSubmissions({
-            assignmentId: targetAssignmentId,
-            studentId: user.id,
-            limit: 10
-          });
-          if (listRes.data && listRes.data.length > 0) {
-            setAttempts(listRes.data);
-            currentSubmission = await submissionService.getSubmission(listRes.data[0].id);
-          } else {
-            setNoSubmissionFound(true);
+      try {
+        let currentSubmission: SubmissionDetail | null = null;
+        let targetAssignmentId = numericId;
+
+        if (isAssignmentRoute) {
+          // Path is /student/assignments/:id/result -> numericId is assignmentId
+          targetAssignmentId = numericId;
+          try {
+            const asg = await assignmentService.getAssignment(targetAssignmentId);
+            if (isMounted) setAssignment(asg);
+          } catch {
+            // Continue
           }
-        }
-      } else {
-        // Path is /student/submissions/:id -> numericId is submissionId
-        try {
-          currentSubmission = await submissionService.getSubmission(numericId);
-          targetAssignmentId = currentSubmission.assignmentId;
-          const asg = await assignmentService.getAssignment(targetAssignmentId);
-          setAssignment(asg);
 
           if (user?.id) {
             const listRes = await submissionService.listSubmissions({
@@ -240,14 +225,34 @@ export const StudentSubmissionResult: React.FC = () => {
               limit: 10
             });
             if (listRes.data && listRes.data.length > 0) {
-              setAttempts(listRes.data);
+              if (isMounted) setAttempts(listRes.data);
+              currentSubmission = await submissionService.getSubmission(listRes.data[0].id);
+            } else {
+              if (isMounted) setNoSubmissionFound(true);
             }
           }
-        } catch {
-          // If not found as submission, try assignment
+        } else {
+          // Path is /student/submissions/:id -> numericId is submissionId
           try {
+            currentSubmission = await submissionService.getSubmission(numericId);
+            targetAssignmentId = currentSubmission.assignmentId;
+            const asg = await assignmentService.getAssignment(targetAssignmentId);
+            if (isMounted) setAssignment(asg);
+
+            if (user?.id) {
+              const listRes = await submissionService.listSubmissions({
+                assignmentId: targetAssignmentId,
+                studentId: user.id,
+                limit: 10
+              });
+              if (listRes.data && listRes.data.length > 0) {
+                if (isMounted) setAttempts(listRes.data);
+              }
+            }
+          } catch {
+            // If not found as submission, try assignment
             const asg = await assignmentService.getAssignment(numericId);
-            setAssignment(asg);
+            if (isMounted) setAssignment(asg);
             if (user?.id) {
               const listRes = await submissionService.listSubmissions({
                 assignmentId: numericId,
@@ -255,38 +260,41 @@ export const StudentSubmissionResult: React.FC = () => {
                 limit: 10
               });
               if (listRes.data && listRes.data.length > 0) {
-                setAttempts(listRes.data);
+                if (isMounted) setAttempts(listRes.data);
                 currentSubmission = await submissionService.getSubmission(listRes.data[0].id);
               } else {
-                setNoSubmissionFound(true);
+                if (isMounted) setNoSubmissionFound(true);
               }
             }
-          } catch (fetchErr) {
-            throw fetchErr;
           }
         }
-      }
 
-      setSubmission(currentSubmission);
+        if (isMounted) setSubmission(currentSubmission);
 
-      if (currentSubmission && currentSubmission.modules && currentSubmission.modules.length > 0) {
-        const firstMod = currentSubmission.modules[0];
-        if (firstMod.skill) {
-          setSelectedSkill(firstMod.skill);
+        if (currentSubmission && currentSubmission.modules && currentSubmission.modules.length > 0) {
+          const firstMod = currentSubmission.modules[0];
+          if (firstMod.skill && isMounted) {
+            setSelectedSkill(firstMod.skill);
+          }
+          await loadModuleData(firstMod.id);
         }
-        await loadModuleData(firstMod.id);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu kết quả chấm bài.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu kết quả chấm bài.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [numericId, isAssignmentRoute, user?.id, loadModuleData]);
+    };
 
-  useEffect(() => {
     void loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, isAssignmentRoute, user?.id, loadModuleData, reloadKey]);
 
   // Handle switching attempts
   const handleSelectAttempt = async (attemptId: number) => {
@@ -606,7 +614,7 @@ export const StudentSubmissionResult: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
             <RefreshCw size={13} /> Thử lại

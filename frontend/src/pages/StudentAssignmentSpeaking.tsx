@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -53,76 +53,88 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return Number.isFinite(parsed) ? parsed : 1;
   }, [id]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch assignment details
-      let currentAssignment: AssignmentDetail | null = null;
-      try {
-        currentAssignment = await assignmentService.getAssignment(numericId);
-        setAssignment(currentAssignment);
-      } catch {
-        currentAssignment = {
-          id: numericId,
-          title: `Speaking Practice #${id || '1'}`,
-          status: 'PUBLISHED',
-          modules: [{ id: 1, skill: 'SPEAKING' }]
-        };
-        setAssignment(currentAssignment);
-      }
-
-      // 2. Fetch module details
-      const moduleId = currentAssignment?.modules?.[0]?.id;
-      if (moduleId) {
-        try {
-          const mod = await moduleService.getModule(moduleId);
-          setModuleDetail(mod);
-        } catch {
-          // Fallback
-        }
-      }
-
-      // 3. Resolve or start submission attempt
-      const urlSubmissionId = searchParams.get('submissionId');
-      if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
-        try {
-          const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-          setSubmission(sub);
-        } catch {
-          // Fallback
-        }
-      } else if (user?.id) {
-        try {
-          const subList = await submissionService.listSubmissions({
-            assignmentId: numericId,
-            studentId: user.id,
-            status: 'IN_PROGRESS',
-            limit: 1
-          });
-          if (subList.data && subList.data.length > 0) {
-            const sub = await submissionService.getSubmission(subList.data[0].id);
-            setSubmission(sub);
-          } else {
-            const startRes = await submissionService.startAttempt(numericId);
-            const sub = await submissionService.getSubmission(startRes.id);
-            setSubmission(sub);
-          }
-        } catch {
-          // Fallback
-        }
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải đề bài nói.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [numericId, id, searchParams, user?.id]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch assignment details
+        let currentAssignment: AssignmentDetail | null = null;
+        try {
+          currentAssignment = await assignmentService.getAssignment(numericId);
+          if (isMounted) setAssignment(currentAssignment);
+        } catch {
+          currentAssignment = {
+            id: numericId,
+            title: `Speaking Practice #${id || '1'}`,
+            status: 'PUBLISHED',
+            modules: [{ id: 1, skill: 'SPEAKING' }]
+          };
+          if (isMounted) setAssignment(currentAssignment);
+        }
+
+        // 2. Fetch module details
+        const moduleId = currentAssignment?.modules?.[0]?.id;
+        if (moduleId) {
+          try {
+            const mod = await moduleService.getModule(moduleId);
+            if (isMounted) setModuleDetail(mod);
+          } catch {
+            // Fallback
+          }
+        }
+
+        // 3. Resolve or start submission attempt
+        const urlSubmissionId = searchParams.get('submissionId');
+        if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
+          try {
+            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+            if (isMounted) setSubmission(sub);
+          } catch {
+            // Fallback
+          }
+        } else if (user?.id) {
+          try {
+            const subList = await submissionService.listSubmissions({
+              assignmentId: numericId,
+              studentId: user.id,
+              status: 'IN_PROGRESS',
+              limit: 1
+            });
+            if (subList.data && subList.data.length > 0) {
+              const sub = await submissionService.getSubmission(subList.data[0].id);
+              if (isMounted) setSubmission(sub);
+            } else {
+              const startRes = await submissionService.startAttempt(numericId);
+              const sub = await submissionService.getSubmission(startRes.id);
+              if (isMounted) setSubmission(sub);
+            }
+          } catch {
+            // Fallback
+          }
+        }
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : 'Không thể tải đề bài nói.';
+        setError(msg);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     void loadData();
-  }, [loadData]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [numericId, id, searchParams, user?.id, reloadKey]);
 
   // Timer effect while recording
   useEffect(() => {
@@ -239,7 +251,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={loadData}
+            onClick={handleRetry}
             style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
             <RefreshCw size={13} /> Thử lại

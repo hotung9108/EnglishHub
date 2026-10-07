@@ -55,7 +55,13 @@ export const StudentGrades: React.FC = () => {
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const fetchGradeData = async () => {
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReload = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchGradeData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -152,18 +158,24 @@ export const StudentGrades: React.FC = () => {
       }
 
     } catch (err: unknown) {
+      if (!isMounted) return;
       console.error('Failed to load student grade book', err);
       setError(isVi ? 'Không thể tải bảng điểm từ máy chủ.' : 'Failed to fetch student grade book from server.');
       setGrades([]);
       setOverallBand(null);
     } finally {
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     }
   };
 
-  useEffect(() => {
-    fetchGradeData();
-  }, [user?.id]);
+    void fetchGradeData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, isVi, reloadKey]);
 
   const classes = useMemo(() => {
     const set = new Set(grades.map(g => g.className));
@@ -250,7 +262,7 @@ export const StudentGrades: React.FC = () => {
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={fetchGradeData} className="btn btn-sm btn-secondary flex items-center gap-6">
+          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
             <RotateCcw size={14} />
             <span>{isVi ? 'Thử lại' : 'Retry'}</span>
           </button>
