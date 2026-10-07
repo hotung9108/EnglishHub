@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileEdit, BookOpen, Clock,
   ArrowRight, Plus, Trash2, CheckCircle2,
   Download, BookmarkCheck, PenTool, Mic, Headphones,
-  Copy, Check, FileText
+  Copy, Check, FileText, RotateCcw, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { classService, type ClassSummary } from '../api/services/class.service';
 
 interface DraftItem {
   id: string;
+  assignmentId: string;
   title: string;
   type: 'writing' | 'speaking' | 'reading' | 'listening';
   className: string;
@@ -41,75 +46,157 @@ interface StudyResource {
 export const StudentWorkspace: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const isVi = language === 'vi';
 
   const [activeTab, setActiveTab] = useState<'drafts' | 'notes' | 'resources'>('drafts');
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // In-progress drafts
-  const [drafts, setDrafts] = useState<DraftItem[]>([
-    {
-      id: 'draft-1',
-      title: 'Writing Task 2: Artificial Intelligence & Future Workforce',
-      type: 'writing',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      wordCount: 185,
-      lastSaved: isVi ? '15 phút trước' : '15 mins ago',
-      route: '/student/assignments/1',
-      progress: 74
-    },
-    {
-      id: 'draft-2',
-      title: 'Speaking Part 2: Environmental Pollution in Urban Cities',
-      type: 'speaking',
-      className: 'IELTS Speaking Master',
-      duration: '01:58 / 02:00',
-      lastSaved: isVi ? 'Hôm qua lúc 18:30' : 'Yesterday at 18:30',
-      route: '/student/assignments/speaking/2',
-      progress: 90
-    },
-    {
-      id: 'draft-3',
-      title: 'Reading Test 4: Section 2 - Biomimicry Innovation & Design',
-      type: 'reading',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      lastSaved: isVi ? '2 ngày trước' : '2 days ago',
-      route: '/student/assignments/reading/3',
-      progress: 45
-    }
-  ]);
+  const [drafts, setDrafts] = useState<DraftItem[]>([]);
 
   // Quick notes
-  const [notes, setNotes] = useState<QuickNote[]>([
-    {
-      id: 'note-1',
-      title: 'Academic Collocations for Writing Task 2',
-      category: 'Vocabulary',
-      content: '• Play a pivotal role in (= have crucial significance)\n• Exert a detrimental impact on (= severely damage)\n• Bridge the socioeconomic divide (= narrow the inequality gap)',
-      date: '2026-03-18'
-    },
-    {
-      id: 'note-2',
-      title: 'Speaking Fluency Checklist & Conversational Anchors',
-      category: 'Speaking',
-      content: '1. Avoid silent pauses -> Use conversational anchors: "Well, frankly speaking...", "From my personal perspective..."\n2. Stress key lexical words (nouns, main verbs) and link ending consonants to vowels.',
-      date: '2026-03-15'
-    },
-    {
-      id: 'note-3',
-      title: 'Complex Sentences: Inversion & Cleft Sentences',
-      category: 'Grammar',
-      content: '• "Not only does AI automate repetitive tasks, but it also creates novel job roles."\n• "It was the rapid industrialization that led to severe air degradation in metropolitan hubs."',
-      date: '2026-03-12'
+  const [notes, setNotes] = useState<QuickNote[]>(() => {
+    try {
+      const saved = localStorage.getItem('student_workspace_notes');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ]);
+  });
 
   const [newNoteTitle, setNewNoteTitle] = useState('');
   const [newNoteCategory, setNewNoteCategory] = useState<'Vocabulary' | 'Speaking' | 'Grammar' | 'General'>('Vocabulary');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  // Study resources
+  const fetchWorkspaceDrafts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [submissionsRes, classesRes] = await Promise.allSettled([
+        submissionService.listSubmissions({ studentId: user?.id, status: 'IN_PROGRESS' }),
+        classService.list()
+      ]);
+
+      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+        : [];
+      const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+        : [];
+
+      const assignmentsWithClass = (await Promise.all(
+        classes.map(async (c) => {
+          try {
+            const res = await assignmentService.listAssignments(c.id);
+            return (res.data || []).map((a) => ({ ...a, className: c.name, classId: c.id }));
+          } catch {
+            return [];
+          }
+        })
+      )).flat();
+
+      const assignmentMap = new Map<string, AssignmentSummary & { className: string; classId: number }>();
+      assignmentsWithClass.forEach(a => assignmentMap.set(String(a.id), a));
+
+      // Resolve real assignmentId for each in-progress submission
+      const detailedSubmissions = await Promise.all(
+        submissions.map(async (sub) => {
+          try {
+            const detail = await submissionService.getSubmission(sub.id);
+            return { ...sub, assignmentId: detail.assignmentId };
+          } catch {
+            return sub;
+          }
+        })
+      );
+
+      const dynamicDrafts: DraftItem[] = detailedSubmissions.map((sub) => {
+        const assignmentIdStr = String(sub.assignmentId || sub.id);
+        const assignment = assignmentMap.get(assignmentIdStr);
+        const className = assignment?.className || (classes.length > 0 ? classes[0].name : 'Lớp học của tôi');
+        
+        let type: 'writing' | 'speaking' | 'reading' | 'listening' = 'writing';
+        let route = `/student/assignments/${assignmentIdStr}`;
+        const titleLower = (assignment?.title || '').toLowerCase();
+        if (titleLower.includes('speak') || titleLower.includes('nói')) {
+          type = 'speaking';
+          route = `/student/assignments/speaking/${assignmentIdStr}`;
+        } else if (titleLower.includes('read') || titleLower.includes('đọc')) {
+          type = 'reading';
+          route = `/student/assignments/reading/${assignmentIdStr}`;
+        } else if (titleLower.includes('listen') || titleLower.includes('nghe')) {
+          type = 'listening';
+          route = `/student/assignments/listening/${assignmentIdStr}`;
+        }
+
+        return {
+          id: `draft-${sub.id}`,
+          assignmentId: assignmentIdStr,
+          title: assignment?.title || `Bản nháp bài tập #${assignmentIdStr}`,
+          type,
+          className,
+          lastSaved: isVi ? 'Vừa lưu gần đây' : 'Recently saved',
+          route,
+          progress: 50
+        };
+      });
+
+      // Also scan localStorage for cached client drafts
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('eh_draft_writing_') || key.startsWith('writing_draft_'))) {
+            const assignmentId = key.replace('eh_draft_writing_', '').replace('writing_draft_', '');
+            if (!dynamicDrafts.find(d => d.assignmentId === assignmentId)) {
+              const assignment = assignmentMap.get(assignmentId);
+              const className = assignment?.className || 'Lớp học của tôi';
+              const content = localStorage.getItem(key) || '';
+              const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+              dynamicDrafts.push({
+                id: `local-draft-${assignmentId}`,
+                assignmentId,
+                title: assignment?.title || `Bản nháp Writing Task #${assignmentId}`,
+                type: 'writing',
+                className,
+                wordCount,
+                lastSaved: isVi ? 'Lưu trong trình duyệt' : 'Local draft',
+                route: `/student/assignments/${assignmentId}`,
+                progress: Math.min(95, Math.round((wordCount / 250) * 100))
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not read local draft items', e);
+      }
+
+      setDrafts(dynamicDrafts);
+    } catch (err) {
+      console.error('Failed to load workspace drafts', err);
+      setError('Không thể tải các bản nháp đang làm.');
+      setDrafts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkspaceDrafts();
+  }, [user?.id]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('student_workspace_notes', JSON.stringify(notes));
+    } catch (e) {
+      console.warn('Could not persist notes to localStorage', e);
+    }
+  }, [notes]);
+
   const resources: StudyResource[] = [
     {
       id: 'res-1',
@@ -158,7 +245,13 @@ export const StudentWorkspace: React.FC = () => {
       content: newNoteContent.trim(),
       date: new Date().toISOString().split('T')[0]
     };
-    setNotes([note, ...notes]);
+    const updated = [note, ...notes];
+    setNotes(updated);
+    try {
+      localStorage.setItem('student_workspace_notes', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
     setNewNoteTitle('');
     setNewNoteContent('');
     setIsAddingNote(false);
@@ -166,11 +259,22 @@ export const StudentWorkspace: React.FC = () => {
 
   const handleDeleteDraft = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (id.startsWith('local-draft-')) {
+      const assignmentId = id.replace('local-draft-', '');
+      localStorage.removeItem(`eh_draft_writing_${assignmentId}`);
+      localStorage.removeItem(`writing_draft_${assignmentId}`);
+    }
     setDrafts(drafts.filter(d => d.id !== id));
   };
 
   const handleDeleteNote = (id: string) => {
-    setNotes(notes.filter(n => n.id !== id));
+    const updated = notes.filter(n => n.id !== id);
+    setNotes(updated);
+    try {
+      localStorage.setItem('student_workspace_notes', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
   };
 
   const handleCopyNote = (note: QuickNote) => {
@@ -208,6 +312,20 @@ export const StudentWorkspace: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="container p-24">
+        <div className="skeleton mb-24" style={{ height: '36px', width: '320px', borderRadius: '8px' }}></div>
+        <div className="skeleton mb-32" style={{ height: '44px', width: '400px', borderRadius: '8px' }}></div>
+        <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton" style={{ height: '240px', borderRadius: '12px' }}></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container p-24">
       {/* Header */}
@@ -235,6 +353,19 @@ export const StudentWorkspace: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+          <div className="flex items-center gap-12">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <button onClick={fetchWorkspaceDrafts} className="btn btn-sm btn-secondary flex items-center gap-6">
+            <RotateCcw size={14} />
+            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-12 mb-32 border-b">
@@ -312,21 +443,10 @@ export const StudentWorkspace: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Progress & metrics */}
-                  <div className="mt-16">
-                    <div className="flex-between text-on-surface-variant mb-6" style={{ fontSize: '12px' }}>
-                      <span>{isVi ? 'Tiến độ hoàn thành' : 'Completion'}</span>
-                      <span className="font-bold text-primary">{draft.progress}%</span>
-                    </div>
-                    <div className="w-full rounded-full" style={{ height: '6px', backgroundColor: '#E2E8F0' }}>
-                      <div className="rounded-full bg-primary" style={{ height: '100%', width: `${draft.progress}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div className="flex-between items-center mt-12 text-on-surface-variant" style={{ fontSize: '12px' }}>
+                  <div className="flex-between items-center mt-16 text-on-surface-variant" style={{ fontSize: '12px' }}>
                     <span>
-                      {draft.wordCount && `📝 ${draft.wordCount} ${isVi ? 'từ' : 'words'}`}
-                      {draft.duration && `🎙️ ${draft.duration}`}
+                      {draft.wordCount ? `📝 ${draft.wordCount} ${isVi ? 'từ' : 'words'}` : null}
+                      {draft.duration ? `🎙️ ${draft.duration}` : null}
                     </span>
                     <span className="inline-flex items-center gap-4">
                       <Clock size={12} />
@@ -453,61 +573,80 @@ export const StudentWorkspace: React.FC = () => {
           )}
 
           {/* Danh sách ghi chú */}
-          <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
-            {notes.map((note) => (
-              <div key={note.id} className="card bg-white p-20 flex-col justify-between">
-                <div>
-                  <div className="flex-between items-center mb-8">
-                    <span className="font-bold text-uppercase rounded text-primary" style={{ fontSize: '11px', padding: '3px 8px', backgroundColor: '#EFF6FF' }}>
-                      {note.category}
-                    </span>
-                    <span className="text-on-surface-variant" style={{ fontSize: '11.5px' }}>
-                      {note.date}
-                    </span>
+          {notes.length === 0 ? (
+            <div className="card text-center py-48">
+              <BookmarkCheck size={40} color="#94a3b8" className="mx-auto mb-12" />
+              <h3 className="m-0 font-bold mb-6" style={{ fontSize: '16px' }}>
+                {isVi ? 'Bạn chưa có ghi chú nào!' : 'No notes yet!'}
+              </h3>
+              <p className="text-on-surface-variant m-0 mb-20" style={{ fontSize: '13.5px' }}>
+                {isVi ? 'Hãy lưu lại các từ vựng, cấu trúc ngữ pháp hay để ôn tập trước kỳ thi.' : 'Save vocabulary and grammar structures to review anytime.'}
+              </p>
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={() => setIsAddingNote(true)}
+              >
+                {isVi ? 'Thêm ghi chú đầu tiên' : 'Add First Note'}
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-20" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+              {notes.map((note) => (
+                <div key={note.id} className="card bg-white p-20 flex-col justify-between">
+                  <div>
+                    <div className="flex-between items-center mb-8">
+                      <span className="font-bold text-uppercase rounded text-primary" style={{ fontSize: '11px', padding: '3px 8px', backgroundColor: '#EFF6FF' }}>
+                        {note.category}
+                      </span>
+                      <span className="text-on-surface-variant" style={{ fontSize: '11.5px' }}>
+                        {note.date}
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-on-surface m-0 mb-12" style={{ fontSize: '15px' }}>
+                      {note.title}
+                    </h4>
+
+                    <div className="leading-relaxed text-on-surface-variant p-12 rounded" style={{ fontSize: '13px', whiteSpace: 'pre-line', backgroundColor: '#F3F4F6' }}>
+                      {note.content}
+                    </div>
                   </div>
 
-                  <h4 className="font-bold text-on-surface m-0 mb-12" style={{ fontSize: '15px' }}>
-                    {note.title}
-                  </h4>
+                  <div className="flex-between items-center pt-12 mt-16 border-t">
+                    <button
+                      type="button"
+                      className="flex items-center gap-6 font-medium bg-transparent border cursor-pointer rounded p-6-12"
+                      style={{ fontSize: '12px', color: copiedNoteId === note.id ? '#16A34A' : '#475569', borderColor: copiedNoteId === note.id ? '#16A34A' : '#E2E8F0' }}
+                      onClick={() => handleCopyNote(note)}
+                    >
+                      {copiedNoteId === note.id ? (
+                        <>
+                          <Check size={13} color="#16a34a" />
+                          <span>{isVi ? 'Đã sao chép!' : 'Copied!'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} />
+                          <span>{isVi ? 'Sao chép' : 'Copy'}</span>
+                        </>
+                      )}
+                    </button>
 
-                  <div className="leading-relaxed text-on-surface-variant p-12 rounded" style={{ fontSize: '13px', whiteSpace: 'pre-line', backgroundColor: '#F3F4F6' }}>
-                    {note.content}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteNote(note.id)}
+                      className="flex items-center gap-6 font-medium bg-transparent border-none cursor-pointer text-error p-6-12"
+                      style={{ fontSize: '12px' }}
+                    >
+                      <Trash2 size={13} />
+                      <span>{isVi ? 'Xóa' : 'Delete'}</span>
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex-between items-center pt-12 mt-16 border-t">
-                  <button
-                    type="button"
-                    className="flex items-center gap-6 font-medium bg-transparent border cursor-pointer rounded p-6-12"
-                    style={{ fontSize: '12px', color: copiedNoteId === note.id ? '#16A34A' : '#475569', borderColor: copiedNoteId === note.id ? '#16A34A' : '#E2E8F0' }}
-                    onClick={() => handleCopyNote(note)}
-                  >
-                    {copiedNoteId === note.id ? (
-                      <>
-                        <Check size={13} color="#16a34a" />
-                        <span>{isVi ? 'Đã sao chép!' : 'Copied!'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} />
-                        <span>{isVi ? 'Sao chép' : 'Copy'}</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteNote(note.id)}
-                    className="flex items-center gap-6 font-medium bg-transparent border-none cursor-pointer text-error p-6-12"
-                    style={{ fontSize: '12px' }}
-                  >
-                    <Trash2 size={13} />
-                    <span>{isVi ? 'Xóa' : 'Delete'}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

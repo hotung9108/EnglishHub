@@ -275,3 +275,80 @@ test('SubmissionService preserves errors thrown by the HTTP client', async () =>
     (error: unknown) => error === postFailure
   );
 });
+
+test('SubmissionService - submitModule posts answers and returns response', async () => {
+  const http = new MockHttpClient();
+  const options = { signal: new AbortController().signal };
+  const response = {
+    message: 'Đã nộp phần làm bài.',
+    submissionModuleId: 44,
+    status: 'SUBMITTED' as const,
+    answers: [{ id: 101, questionId: 1, content: { selectedOptionIds: ['A'] } }],
+  };
+  http.mockResponse = response;
+
+  const result = await new SubmissionService(http).submitModule(44, {
+    answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+  }, options);
+
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'POST',
+      url: '/submission-modules/44/submit',
+      data: {
+        answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+      },
+      options,
+    },
+  ]);
+});
+
+test('SubmissionService - getSubmissionModuleDetail gets module detail', async () => {
+  const http = new MockHttpClient();
+  const response = {
+    id: 44,
+    moduleId: 12,
+    skill: 'READING' as const,
+    taskType: 'QUIZ' as const,
+    status: 'SUBMITTED' as const,
+    grading: null,
+    questions: [],
+    answers: [],
+  };
+  http.mockResponse = response;
+
+  const result = await new SubmissionService(http).getSubmissionModuleDetail(44);
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'GET',
+      url: '/submission-modules/44',
+      options: undefined,
+    },
+  ]);
+});
+
+test('SubmissionService - audio and document upload URLs', async () => {
+  const http = new MockHttpClient();
+  const audioResponse = {
+    uploadUrl: 'https://s3.example.com/audio.webm',
+    storageKey: 'submissions/1/module-44/audio.webm',
+    expiresAt: '2026-10-03T11:00:00Z',
+  };
+  http.mockResponse = audioResponse;
+
+  const audioResult = await new SubmissionService(http).getAudioUploadUrl(44, 'audio/webm');
+  assert.strictEqual(audioResult, audioResponse);
+
+  const docResponse = {
+    uploadUrl: 'https://s3.example.com/essay.pdf',
+    storageKey: 'submissions/1/module-44/essay.pdf',
+    expiresAt: '2026-10-03T11:00:00Z',
+  };
+  http.mockResponse = docResponse;
+
+  const docResult = await new SubmissionService(http).getDocumentUploadUrl(44, 'application/pdf');
+  assert.strictEqual(docResult, docResponse);
+});
+

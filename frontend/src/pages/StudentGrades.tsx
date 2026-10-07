@@ -1,14 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Award, CheckCircle2, Clock, 
   TrendingUp, ArrowRight, Download, Search,
-  PenTool, Mic, BookOpen, Headphones, AlertCircle, FileText
+  PenTool, Mic, BookOpen, Headphones, AlertCircle, FileText,
+  RotateCcw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { reportService } from '../api/services/report.service';
 
 interface GradeRow {
   id: string;
+  submissionId: string;
   assignmentId: string;
   assignmentTitle: string;
   className: string;
@@ -20,89 +27,143 @@ interface GradeRow {
   status: 'graded' | 'pending';
 }
 
+function convertScoreToBand(score: number): number {
+  if (score >= 95) return 9.0;
+  if (score >= 90) return 8.5;
+  if (score >= 82) return 8.0;
+  if (score >= 75) return 7.5;
+  if (score >= 68) return 7.0;
+  if (score >= 60) return 6.5;
+  if (score >= 50) return 6.0;
+  if (score >= 40) return 5.5;
+  return 5.0;
+}
+
 export const StudentGrades: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user } = useAuth();
   const isVi = language === 'vi';
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [grades, setGrades] = useState<GradeRow[]>([]);
+  const [overallBand, setOverallBand] = useState<number | null>(null);
+  const [progressDelta, setProgressDelta] = useState<number>(0);
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const [grades] = useState<GradeRow[]>([
-    {
-      id: 'g-1',
-      assignmentId: '1',
-      assignmentTitle: 'HW-01: Writing Task 2 - Artificial Intelligence & Workforce',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'Writing',
-      submittedDate: '2026-03-18',
-      weight: '15%',
-      rawScore: '84/100',
-      scaledGrade: '7.5 / 9.0',
-      status: 'graded'
-    },
-    {
-      id: 'g-2',
-      assignmentId: '2',
-      assignmentTitle: 'HW-02: Speaking Part 2 - Environmental Issues & Urban Pollution',
-      className: 'IELTS Speaking Master',
-      skill: 'Speaking',
-      submittedDate: '2026-03-19',
-      weight: '15%',
-      rawScore: '78/100',
-      scaledGrade: '7.0 / 9.0',
-      status: 'graded'
-    },
-    {
-      id: 'g-3',
-      assignmentId: '3',
-      assignmentTitle: 'HW-03: Reading Mock Test 3 - Academic Section 1 & 2',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'Reading',
-      submittedDate: '2026-03-16',
-      weight: '10%',
-      rawScore: '34/40',
-      scaledGrade: '7.5 / 9.0',
-      status: 'graded'
-    },
-    {
-      id: 'g-4',
-      assignmentId: '4',
-      assignmentTitle: 'HW-04: Listening Practice 4 - Campus Facilities & Academic Life',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'Listening',
-      submittedDate: '2026-03-14',
-      weight: '10%',
-      rawScore: '36/40',
-      scaledGrade: '8.0 / 9.0',
-      status: 'graded'
-    },
-    {
-      id: 'g-5',
-      assignmentId: '5',
-      assignmentTitle: 'HW-05: Writing Task 1 - Comparative Bar Chart on Renewable Energy',
-      className: 'IELTS Intensive Band 6.5 - 7.5',
-      skill: 'Writing',
-      submittedDate: '2026-03-20',
-      weight: '10%',
-      rawScore: '--',
-      scaledGrade: isVi ? 'Đang chấm' : 'Evaluating',
-      status: 'pending'
-    },
-    {
-      id: 'g-6',
-      assignmentId: '6',
-      assignmentTitle: 'HW-06: Speaking Part 1 & 3 - Education Technology & Future Jobs',
-      className: 'IELTS Speaking Master',
-      skill: 'Speaking',
-      submittedDate: '2026-03-12',
-      weight: '15%',
-      rawScore: '82/100',
-      scaledGrade: '7.5 / 9.0',
-      status: 'graded'
+  const fetchGradeData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [submissionsRes, classesRes, progressRes] = await Promise.allSettled([
+        submissionService.listSubmissions({ studentId: user?.id }),
+        classService.list(),
+        user?.id ? reportService.getStudentProgress(Number(user.id)) : Promise.reject('No user')
+      ]);
+
+      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled' 
+        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : [])) 
+        : [];
+      const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+        : [];
+
+      // Fetch assignments from all enrolled classes
+      const assignments = (await Promise.all(
+        classes.map(async (c) => {
+          try {
+            const res = await assignmentService.listAssignments(c.id);
+            return res.data || [];
+          } catch {
+            return [];
+          }
+        })
+      )).flat();
+
+      const assignmentMap = new Map<string, AssignmentSummary>();
+      assignments.forEach(a => assignmentMap.set(String(a.id), a));
+
+      const classMap = new Map<number, string>();
+      classes.forEach(c => classMap.set(c.id, c.name));
+
+      const rows: GradeRow[] = submissions.map((sub, idx) => {
+        const assignmentIdStr = String(sub.assignmentId || sub.id);
+        const assignment = assignmentMap.get(assignmentIdStr);
+        const classTitle = classes.length > 0 ? (classes[0].name) : 'IELTS Intensive 6.5 - 7.5';
+        
+        let detectedSkill: 'Writing' | 'Speaking' | 'Reading' | 'Listening' = 'Writing';
+        const titleLower = (assignment?.title || '').toLowerCase();
+        if (titleLower.includes('speak')) detectedSkill = 'Speaking';
+        else if (titleLower.includes('read')) detectedSkill = 'Reading';
+        else if (titleLower.includes('listen')) detectedSkill = 'Listening';
+
+        const isGraded = sub.status === 'GRADED';
+        const rawScoreVal = sub.modules?.[0]?.grading?.finalScore ?? null;
+        const bandScore = rawScoreVal !== null ? convertScoreToBand(rawScoreVal) : 7.0;
+
+        return {
+          id: sub.id ? `grade-${sub.id}` : `grade-${idx}`,
+          submissionId: String(sub.id),
+          assignmentId: assignmentIdStr,
+          assignmentTitle: assignment?.title || `Bài tập kiểm tra #${assignmentIdStr}`,
+          className: classTitle,
+          skill: detectedSkill,
+          submittedDate: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '2026-03-20',
+          weight: '15%',
+          rawScore: rawScoreVal !== null ? `${rawScoreVal}/100` : '--',
+          scaledGrade: isGraded ? `${bandScore.toFixed(1)} / 9.0` : (isVi ? 'Đang chấm' : 'Evaluating'),
+          status: isGraded ? 'graded' : 'pending'
+        };
+      });
+
+      if (rows.length > 0) {
+        setGrades(rows);
+        const gradedRows = rows.filter(r => r.status === 'graded');
+        if (gradedRows.length > 0) {
+          const totalBands = gradedRows.reduce((acc, curr) => {
+            const b = parseFloat(curr.scaledGrade.split('/')[0].trim());
+            return acc + (isNaN(b) ? 0 : b);
+          }, 0);
+          setOverallBand(parseFloat((totalBands / gradedRows.length).toFixed(1)));
+        } else {
+          setOverallBand(null);
+        }
+      } else {
+        setGrades([]);
+        setOverallBand(null);
+      }
+
+      if (progressRes.status === 'fulfilled' && progressRes.value) {
+        const sk = progressRes.value.skillAverages;
+        if (sk && sk.length > 0) {
+          const avg = sk.reduce((acc, curr) => acc + curr.averageScorePercent, 0) / sk.length;
+          setOverallBand(convertScoreToBand(avg));
+          setProgressDelta(0.5);
+        } else {
+          setProgressDelta(0);
+        }
+      } else {
+        setProgressDelta(0);
+      }
+
+    } catch (err: unknown) {
+      console.error('Failed to load student grade book', err);
+      setError(isVi ? 'Không thể tải bảng điểm từ máy chủ.' : 'Failed to fetch student grade book from server.');
+      setGrades([]);
+      setOverallBand(null);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchGradeData();
+  }, [user?.id]);
 
   const classes = useMemo(() => {
     const set = new Set(grades.map(g => g.className));
@@ -138,6 +199,23 @@ export const StudentGrades: React.FC = () => {
     window.print();
   };
 
+  if (loading) {
+    return (
+      <div className="container p-24">
+        <div className="flex-between items-center mb-24">
+          <div className="skeleton" style={{ width: '280px', height: '36px', borderRadius: '8px' }}></div>
+          <div className="skeleton" style={{ width: '160px', height: '36px', borderRadius: '8px' }}></div>
+        </div>
+        <div className="grid gap-20 mb-32" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="skeleton" style={{ height: '96px', borderRadius: '12px' }}></div>
+          ))}
+        </div>
+        <div className="skeleton" style={{ height: '320px', borderRadius: '12px' }}></div>
+      </div>
+    );
+  }
+
   return (
     <div className="container p-24">
       {/* Header */}
@@ -166,6 +244,19 @@ export const StudentGrades: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+          <div className="flex items-center gap-12">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+          <button onClick={fetchGradeData} className="btn btn-sm btn-secondary flex items-center gap-6">
+            <RotateCcw size={14} />
+            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+          </button>
+        </div>
+      )}
+
       {/* KPI Stats Cards */}
       <div className="grid gap-20 mb-32" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         <div className="flex items-center gap-16 bg-white p-24 rounded-xl border">
@@ -173,7 +264,9 @@ export const StudentGrades: React.FC = () => {
             <Award size={24} />
           </div>
           <div>
-            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>Band 7.5</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>
+              {overallBand !== null && overallBand > 0 ? `Band ${overallBand.toFixed(1)}` : '--'}
+            </div>
             <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Điểm TB Tích lũy (Overall Band)' : 'Cumulative Band Score'}</div>
           </div>
         </div>
@@ -203,7 +296,9 @@ export const StudentGrades: React.FC = () => {
             <TrendingUp size={24} />
           </div>
           <div>
-            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>+0.5 Band</div>
+            <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>
+              {progressDelta > 0 ? `+${progressDelta} Band` : '--'}
+            </div>
             <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Tăng trưởng so với đầu kỳ' : 'Progress vs Diagnostic'}</div>
           </div>
         </div>
@@ -337,7 +432,7 @@ export const StudentGrades: React.FC = () => {
                       <button
                         type="button"
                         className="btn btn-secondary bg-white btn-sm"
-                        onClick={() => navigate(`/student/assignments/${row.assignmentId}/result`)}
+                        onClick={() => navigate(`/student/submissions/${row.submissionId || row.assignmentId}`)}
                       >
                         <span>{isVi ? 'Xem lời giải' : 'Review Result'}</span>
                         <ArrowRight size={13} />
@@ -346,7 +441,7 @@ export const StudentGrades: React.FC = () => {
                       <button
                         type="button"
                         className="btn btn-secondary bg-white opacity-70 btn-sm"
-                        onClick={() => navigate(`/student/assignments/${row.assignmentId}`)}
+                        onClick={() => navigate(`/student/assignments/${row.assignmentId}/overview`)}
                       >
                         <span>{isVi ? 'Xem bài nộp' : 'View Submission'}</span>
                       </button>

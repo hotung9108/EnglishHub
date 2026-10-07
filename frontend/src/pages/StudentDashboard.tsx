@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
@@ -10,11 +10,198 @@ import {
   PenTool, 
   Mic, 
   TrendingUp,
-  Award
+  Award,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { reportService } from '../api/services/report.service';
+import type { ReportStudentProgressResponse } from '../types/report.types';
+import '../styles/student-dashboard.css';
+
+interface DashboardAssignmentItem extends AssignmentSummary {
+  className?: string;
+  classId: number;
+  submitted?: boolean;
+  score?: number | null;
+}
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [assignments, setAssignments] = useState<DashboardAssignmentItem[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
+  const [progress, setProgress] = useState<ReportStudentProgressResponse | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch student's classes
+      const classRes = await classService.list({ limit: 50 });
+      const activeClasses = classRes.data || [];
+      setClasses(activeClasses);
+
+      // 2. Fetch submissions for student
+      let subList: SubmissionListItem[] = [];
+      if (user?.id) {
+        try {
+          const subRes = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
+          subList = subRes.data || [];
+          setSubmissions(subList);
+        } catch {
+          // Fallback if submissions cannot be listed
+          setSubmissions([]);
+        }
+
+        // 3. Fetch progress report
+        try {
+          const progRes = await reportService.getStudentProgress(user.id);
+          setProgress(progRes);
+        } catch {
+          setProgress(null);
+        }
+      }
+
+      // 4. Fetch assignments for each class
+      const assignmentPromises = activeClasses.map(async (cls) => {
+        try {
+          const res = await assignmentService.listAssignments(cls.id, { limit: 20 });
+          const items = res.data || [];
+          return await Promise.all(
+            items.map(async (a) => {
+              let matchedSub: SubmissionListItem | undefined = undefined;
+              if (user?.id) {
+                try {
+                  const subRes = await submissionService.listSubmissions({
+                    assignmentId: a.id,
+                    studentId: user.id,
+                    limit: 1
+                  });
+                  if (subRes.data && subRes.data.length > 0) {
+                    matchedSub = subRes.data[0];
+                  }
+                } catch {
+                  // Fallback
+                }
+              }
+              return {
+                ...a,
+                className: cls.name,
+                classId: cls.id,
+                submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
+                score: matchedSub?.modules?.[0]?.grading?.finalScore ?? null,
+              };
+            })
+          );
+        } catch {
+          return [];
+        }
+      });
+
+      const assignmentResults = await Promise.all(assignmentPromises);
+      setAssignments(assignmentResults.flat());
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Không thể tải dữ liệu bảng điều khiển. Vui lòng thử lại sau.';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Derived statistics
+  const totalAssignments = assignments.length;
+  const completedAssignmentsCount = useMemo(() => {
+    return assignments.filter((a) => a.submitted).length;
+  }, [assignments]);
+
+  const pendingGradingCount = useMemo(() => {
+    return submissions.filter((s) => s.status === 'SUBMITTED').length;
+  }, [submissions]);
+
+  // Upcoming deadlines (unsubmitted assignments sorted by deadline)
+  const upcomingDeadlines = useMemo(() => {
+    return assignments
+      .filter((a) => !a.submitted && a.status === 'PUBLISHED')
+      .sort((a, b) => new Date(a.closeAt).getTime() - new Date(b.closeAt).getTime())
+      .slice(0, 4);
+  }, [assignments]);
+
+  // Average score derivation
+  const averageBand = useMemo(() => {
+    if (progress?.skillAverages && progress.skillAverages.length > 0) {
+      const sumPercent = progress.skillAverages.reduce((acc, curr) => acc + (Number(curr.averageScorePercent) || 0), 0);
+      const avgPercent = sumPercent / progress.skillAverages.length;
+      return (avgPercent / 100 * 9).toFixed(1);
+    }
+    const scores = assignments.map((a) => a.score).filter((s): s is number => s !== null && s !== undefined);
+    if (scores.length > 0) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      return (avg / 100 * 9).toFixed(1);
+    }
+    return '--';
+  }, [progress, assignments]);
+
+  // Skill scores for 4 skills
+  const skillScores = useMemo(() => {
+    const defaultSkills = [
+      { skill: 'LISTENING', name: 'Listening', band: '--', percent: 0, icon: Headphones, color: '#3b82f6', cls: 'listening' },
+      { skill: 'READING', name: 'Reading', band: '--', percent: 0, icon: BookOpen, color: '#10b981', cls: 'reading' },
+      { skill: 'WRITING', name: 'Writing', band: '--', percent: 0, icon: PenTool, color: '#f59e0b', cls: 'writing' },
+      { skill: 'SPEAKING', name: 'Speaking', band: '--', percent: 0, icon: Mic, color: '#8b5cf6', cls: 'speaking' },
+    ];
+
+    if (!progress?.skillAverages || progress.skillAverages.length === 0) {
+      return defaultSkills;
+    }
+
+    return defaultSkills.map((def) => {
+      const found = progress.skillAverages.find((item) => String(item.skill).toUpperCase() === def.skill);
+      if (found) {
+        const percent = Math.min(100, Math.max(0, Math.round(Number(found.averageScorePercent) || 0)));
+        const band = (percent / 100 * 9).toFixed(1);
+        return { ...def, percent, band };
+      }
+      return def;
+    });
+  }, [progress]);
+
+  const getAssignmentIcon = (title: string) => {
+    const lower = title.toLowerCase();
+    if (lower.includes('speaking') || lower.includes('nói')) return <Mic size={18} />;
+    if (lower.includes('reading') || lower.includes('đọc')) return <BookOpen size={18} />;
+    if (lower.includes('listening') || lower.includes('nghe')) return <Headphones size={18} />;
+    return <PenTool size={18} />;
+  };
+
+  const formatDeadline = (dateStr?: string) => {
+    if (!dateStr) return 'Không có hạn';
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = d.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays < 0) return 'Đã hết hạn';
+      if (diffDays === 0) return 'Hạn nộp: Hôm nay';
+      if (diffDays === 1) return 'Hạn nộp: Ngày mai';
+      return `Hạn nộp: Còn ${diffDays} ngày (${d.toLocaleDateString('vi-VN')})`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const studentDisplayName = user?.fullName || 'Học viên';
 
   return (
     <div className="std-dashboard-container">
@@ -22,9 +209,16 @@ const StudentDashboard: React.FC = () => {
       <section className="std-dash-hero">
         <div className="std-dash-hero-content">
           <div>
-            <h1 className="std-dash-greeting">Chào mừng trở lại, Alice Johnson! 👋</h1>
+            <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}! 👋</h1>
             <p className="std-dash-subgreeting">
-              Hôm nay là một ngày tuyệt vời để nâng cao kỹ năng Tiếng Anh. Bạn có <strong>2 bài tập</strong> sắp đến hạn cần hoàn thành trong 48 giờ tới.
+              {upcomingDeadlines.length > 0 ? (
+                <>
+                  Hôm nay là một ngày tuyệt vời để nâng cao kỹ năng Tiếng Anh. Bạn có{' '}
+                  <strong>{upcomingDeadlines.length} bài tập</strong> sắp đến hạn cần hoàn thành.
+                </>
+              ) : (
+                'Tất cả bài tập đã được nộp đúng hạn. Tiếp tục duy trì phong độ học tập xuất sắc!'
+              )}
             </p>
           </div>
 
@@ -42,6 +236,23 @@ const StudentDashboard: React.FC = () => {
         </div>
       </section>
 
+      {/* Error state alert */}
+      {error && (
+        <div style={{ margin: '16px 0', padding: '16px', borderRadius: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#991b1b' }}>
+            <AlertCircle size={20} />
+            <span style={{ fontSize: '14px' }}>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchDashboardData}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+          >
+            <RefreshCw size={14} /> Thử lại
+          </button>
+        </div>
+      )}
+
       {/* Quick Metrics Grid */}
       <section className="std-dash-stats-grid">
         <div className="std-dash-stat-card">
@@ -49,7 +260,9 @@ const StudentDashboard: React.FC = () => {
             <CheckCircle2 size={24} />
           </div>
           <div>
-            <div className="std-dash-stat-num">14 / 16</div>
+            <div className="std-dash-stat-num">
+              {isLoading ? '...' : `${completedAssignmentsCount} / ${totalAssignments}`}
+            </div>
             <div className="std-dash-stat-label">Bài tập đã hoàn thành</div>
           </div>
         </div>
@@ -59,7 +272,9 @@ const StudentDashboard: React.FC = () => {
             <Award size={24} />
           </div>
           <div>
-            <div className="std-dash-stat-num">Band 7.2</div>
+            <div className="std-dash-stat-num">
+              {isLoading ? '...' : `Band ${averageBand}`}
+            </div>
             <div className="std-dash-stat-label">Điểm TB 4 Kỹ năng</div>
           </div>
         </div>
@@ -69,7 +284,9 @@ const StudentDashboard: React.FC = () => {
             <Clock size={24} />
           </div>
           <div>
-            <div className="std-dash-stat-num">2 bài</div>
+            <div className="std-dash-stat-num">
+              {isLoading ? '...' : `${pendingGradingCount} bài`}
+            </div>
             <div className="std-dash-stat-label">Đang chờ chấm điểm</div>
           </div>
         </div>
@@ -87,10 +304,8 @@ const StudentDashboard: React.FC = () => {
 
       {/* Main Two Column Layout */}
       <div className="std-dash-main-grid">
-        
         {/* Left Column: Upcoming Deadlines & My Classes */}
         <div>
-          
           {/* Upcoming Deadlines */}
           <div className="std-dash-card">
             <div className="std-dash-card-header">
@@ -108,62 +323,50 @@ const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="std-dash-card-body" style={{ padding: '16px' }}>
-              {/* Item 1 */}
-              <div className="std-deadline-item">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <PenTool size={18} />
-                  </div>
-                  <div>
-                    <h3 className="std-deadline-title">HW-01: Renewable Energy Essay (Writing Task 2)</h3>
-                    <div className="std-deadline-meta">
-                      <span>ENG-IELTS-6.5A</span>
-                      <span>•</span>
-                      <span style={{ color: '#dc2626', fontWeight: 600 }}>Hạn nộp: 23:59 - Hôm nay</span>
-                    </div>
-                  </div>
+              {isLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+                  <div style={{ height: 48, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ height: 48, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
                 </div>
-
-                <button 
-                  type="button"
-                  className="btn-primary"
-                  style={{ padding: '6px 14px', fontSize: '12px' }}
-                  onClick={() => navigate('/student/assignments/HW-01/overview')}
-                >
-                  Làm bài
-                </button>
-              </div>
-
-              {/* Item 2 */}
-              <div className="std-deadline-item">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#ede9fe', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Mic size={18} />
-                  </div>
-                  <div>
-                    <h3 className="std-deadline-title">HW-05: Environment Problem Discussion (Speaking)</h3>
-                    <div className="std-deadline-meta">
-                      <span>ENG-GRAM-ADV</span>
-                      <span>•</span>
-                      <span style={{ color: '#d97706', fontWeight: 600 }}>Hạn nộp: 08/09/2026 (Còn 2 ngày)</span>
-                    </div>
-                  </div>
+              ) : upcomingDeadlines.length === 0 ? (
+                <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+                  <CheckCircle2 size={36} color="#16a34a" style={{ margin: '0 auto 8px auto' }} />
+                  <div style={{ fontWeight: 600, fontSize: '15px' }}>Không có bài tập nào sắp đến hạn!</div>
+                  <p style={{ fontSize: '13px', marginTop: 4 }}>Bạn đã hoàn thành tất cả các bài tập hiện có.</p>
                 </div>
+              ) : (
+                upcomingDeadlines.map((assignment) => (
+                  <div key={assignment.id} className="std-deadline-item">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {getAssignmentIcon(assignment.title)}
+                      </div>
+                      <div>
+                        <h3 className="std-deadline-title">{assignment.title}</h3>
+                        <div className="std-deadline-meta">
+                          <span>{assignment.className || 'Lớp học'}</span>
+                          <span>•</span>
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatDeadline(assignment.closeAt)}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                <button 
-                  type="button"
-                  className="btn-secondary"
-                  style={{ padding: '6px 14px', fontSize: '12px' }}
-                  onClick={() => navigate('/student/assignments/speaking/HW-05')}
-                >
-                  Thu âm
-                </button>
-              </div>
+                    <button 
+                      type="button"
+                      className="btn-primary"
+                      style={{ padding: '6px 14px', fontSize: '12px' }}
+                      onClick={() => navigate(`/student/assignments/${assignment.id}/overview`)}
+                    >
+                      Làm bài
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           {/* My Classes Snapshot */}
-          <div className="std-dash-card">
+          <div className="std-dash-card" style={{ marginTop: '24px' }}>
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
                 <BookOpen size={18} color="var(--primary)" />
@@ -179,45 +382,46 @@ const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="std-dash-card-body" style={{ padding: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                <div 
-                  onClick={() => navigate('/student/classes/1')}
-                  style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', cursor: 'pointer', transition: 'all 0.2s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; }}
-                >
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', marginBottom: 4 }}>ENG-IELTS-6.5A</div>
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: 6 }}>IELTS Intensive Band 6.5 - 7.5</div>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>GV: ThS. Trần Thị Mai Lan</div>
-                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                    <span>15 bài tập</span>
-                    <span style={{ color: '#16a34a', fontWeight: 600 }}>Điểm TB: 7.2</span>
-                  </div>
+              {isLoading ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  <div style={{ height: 100, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ height: 100, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
                 </div>
-
-                <div 
-                  onClick={() => navigate('/student/classes/2')}
-                  style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', cursor: 'pointer', transition: 'all 0.2s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; }}
-                >
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', marginBottom: 4 }}>ENG-GRAM-ADV</div>
-                  <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: 6 }}>Chuyên đề Ngữ pháp &amp; Viết nâng cao</div>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>GV: Thầy Hoàng Minh Đức</div>
-                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                    <span>8 bài tập</span>
-                    <span style={{ color: '#16a34a', fontWeight: 600 }}>Điểm TB: 8.0</span>
-                  </div>
+              ) : classes.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+                  <BookOpen size={32} style={{ margin: '0 auto 8px auto', opacity: 0.5 }} />
+                  <div>Chưa tham gia lớp học nào.</div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  {classes.slice(0, 4).map((cls) => {
+                    const classAssignments = assignments.filter((a) => a.classId === cls.id);
+                    return (
+                      <div 
+                        key={cls.id}
+                        onClick={() => navigate(`/student/classes/${cls.id}`)}
+                        style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', cursor: 'pointer', transition: 'all 0.2s' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', marginBottom: 4 }}>{cls.name}</div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: 6 }}>{cls.name}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>Trạng thái: {cls.status}</div>
+                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                          <span>{classAssignments.length} bài tập</span>
+                          <span style={{ color: '#16a34a', fontWeight: 600 }}>Chi tiết lớp →</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
-
         </div>
 
         {/* Right Column: 4-Skill Progress & AI Recommendations */}
         <div>
-          
           {/* 4-Skill Proficiency Bars */}
           <div className="std-dash-card">
             <div className="std-dash-card-header">
@@ -225,61 +429,37 @@ const StudentDashboard: React.FC = () => {
                 <TrendingUp size={18} color="var(--primary)" />
                 Năng Lực 4 Kỹ Năng
               </h2>
+              <button
+                type="button"
+                className="speaking-btn-link"
+                onClick={() => navigate('/student/analytics')}
+              >
+                Phân tích chi tiết →
+              </button>
             </div>
 
             <div className="std-dash-card-body">
-              <div className="skill-bar-row">
-                <div className="skill-bar-info">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Headphones size={15} color="#3b82f6" /> Listening
-                  </span>
-                  <span>Band 7.5</span>
-                </div>
-                <div className="skill-bar-track">
-                  <div className="skill-bar-fill listening" style={{ width: '83%' }}></div>
-                </div>
-              </div>
-
-              <div className="skill-bar-row">
-                <div className="skill-bar-info">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <BookOpen size={15} color="#10b981" /> Reading
-                  </span>
-                  <span>Band 7.0</span>
-                </div>
-                <div className="skill-bar-track">
-                  <div className="skill-bar-fill reading" style={{ width: '77%' }}></div>
-                </div>
-              </div>
-
-              <div className="skill-bar-row">
-                <div className="skill-bar-info">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <PenTool size={15} color="#f59e0b" /> Writing
-                  </span>
-                  <span>Band 6.5</span>
-                </div>
-                <div className="skill-bar-track">
-                  <div className="skill-bar-fill writing" style={{ width: '72%' }}></div>
-                </div>
-              </div>
-
-              <div className="skill-bar-row">
-                <div className="skill-bar-info">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Mic size={15} color="#8b5cf6" /> Speaking
-                  </span>
-                  <span>Band 7.0</span>
-                </div>
-                <div className="skill-bar-track">
-                  <div className="skill-bar-fill speaking" style={{ width: '77%' }}></div>
-                </div>
-              </div>
+              {skillScores.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <div key={item.skill} className="skill-bar-row">
+                    <div className="skill-bar-info">
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <IconComponent size={15} color={item.color} /> {item.name}
+                      </span>
+                      <span>Band {item.band}</span>
+                    </div>
+                    <div className="skill-bar-track">
+                      <div className={`skill-bar-fill ${item.cls}`} style={{ width: `${item.percent}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* AI Daily Recommendation */}
-          <div className="std-dash-card">
+          <div className="std-dash-card" style={{ marginTop: '24px' }}>
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
                 <Sparkles size={18} color="#16a34a" />
@@ -291,17 +471,17 @@ const StudentDashboard: React.FC = () => {
               <div className="ai-recommend-box">
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#166534', marginBottom: 2 }}>
-                    Khắc phục lỗi phát âm âm đuôi /s/ &amp; /z/
+                    Luyện tập Phát âm &amp; Ngữ điệu Speaking
                   </div>
                   <div style={{ fontSize: '11px', color: '#15803d', lineHeight: 1.4 }}>
-                    Dựa trên phân tích âm phổ của bài Speaking gần nhất, AI phát hiện bạn thường nuốt âm cuối ở số nhiều.
+                    Dựa trên đánh giá âm phổ gần nhất, cải thiện nối âm (linking sounds) và trọng âm từ sẽ giúp đẩy band Speaking lên 7.5+.
                   </div>
                   <button 
                     type="button"
                     style={{ marginTop: 8, padding: '4px 10px', fontSize: '11px', fontWeight: 700, backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                    onClick={() => navigate('/student/assignments/speaking/HW-02')}
+                    onClick={() => navigate('/student/assignments')}
                   >
-                    Luyện tập ngay (5 phút)
+                    Xem bài tập Nói
                   </button>
                 </div>
               </div>
@@ -312,22 +492,20 @@ const StudentDashboard: React.FC = () => {
                     Cấu trúc câu phức &amp; Mạo từ Writing
                   </div>
                   <div style={{ fontSize: '11px', color: '#1d4ed8', lineHeight: 1.4 }}>
-                    Ôn lại 3 mẫu câu phức ghép mệnh đề quan hệ để đẩy band Grammatical Range từ 6.5 lên 7.5.
+                    Luyện tập mệnh đề quan hệ rút gọn và câu điều kiện hỗn hợp để nâng cao chỉ số Grammatical Range.
                   </div>
                   <button 
                     type="button"
                     style={{ marginTop: 8, padding: '4px 10px', fontSize: '11px', fontWeight: 700, backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                    onClick={() => navigate('/student/assignments/HW-01/overview')}
+                    onClick={() => navigate('/student/assignments')}
                   >
-                    Làm bài test mẫu
+                    Xem bài tập Viết
                   </button>
                 </div>
               </div>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   );
