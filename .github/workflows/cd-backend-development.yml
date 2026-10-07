@@ -1,7 +1,17 @@
 name: Deploy development Backend to VPS/Home-Server
 
+# Chỉ chạy khi workflow "Backend CI" hoàn tất trên nhánh staging (event workflow_run).
+# Vì "Backend CI" chỉ chạy khi có thay đổi trong backend/**,
+# workflow CD này cũng chỉ chạy khi code của Backend thay đổi.
+#
+# Job "wait-ai-service" đảm bảo thứ tự deploy:
+#   CI Backend xong (điều kiện kích hoạt) → CI + CD của AI service xong (nếu push có thay đổi ai-service/**) → Deploy Backend.
 on:
-  push:
+  workflow_run:
+    workflows:
+      - Backend CI
+    types:
+      - completed
     branches:
       - staging
 
@@ -9,18 +19,103 @@ env:
   IMAGE_NAME: ghcr.io/hotung9108/english-hub-backend
 
 jobs:
+  wait-ai-service:
+    name: Wait for AI Service CI & CD
+    runs-on: ubuntu-latest
+
+    # Chỉ tiếp tục khi Backend CI thành công (failed/cancelled → skip, deploy không chạy)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+
+    steps:
+      - name: Wait for AI Service pipeline when ai-service was changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          POLL_INTERVAL=15
+          DEADLINE=$((SECONDS + 1200)) # 20 phút
+          AI_CI="ci-ai-service.yml"
+          AI_CD="cd-ai-service.yml"
+
+          # "AI Service CI" chỉ chạy khi push có thay đổi trong ai-service/**,
+          # nên nếu không có run nào tại commit này = không thay đổi AI service = không cần chờ.
+          ai_ci_count=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&per_page=1" \
+            --jq '.total_count' 2>/dev/null || echo 0)
+
+          if [ "$ai_ci_count" = "0" ]; then
+            echo "::notice::No AI Service CI run for $SHA — ai-service not changed, nothing to wait for."
+            exit 0
+          fi
+
+          echo "ai-service was changed in this push. Waiting for AI Service CI ($SHA) ..."
+          ai_ci_conclusion=""
+          while [ -z "$ai_ci_conclusion" ]; do
+            ai_ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CI/runs?head_sha=$SHA&status=completed&per_page=5" \
+              --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
+            if [ -z "$ai_ci_conclusion" ]; then
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "::error::Timed out waiting for AI Service CI ($SHA)"
+                exit 1
+              fi
+              sleep "$POLL_INTERVAL"
+            fi
+          done
+
+          if [ "$ai_ci_conclusion" != "success" ]; then
+            echo "::error::AI Service CI concluded '$ai_ci_conclusion' for $SHA — blocking backend deploy."
+            exit 1
+          fi
+
+          echo "AI Service CI passed. Waiting for 'Deploy AI Service' ($SHA) ..."
+          ai_cd_conclusion=""
+          while [ -z "$ai_cd_conclusion" ]; do
+            ai_cd_conclusion=$(gh api "repos/$REPO/actions/workflows/$AI_CD/runs?head_sha=$SHA&status=completed&per_page=5" \
+              --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
+            if [ -z "$ai_cd_conclusion" ]; then
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "::error::Timed out waiting for Deploy AI Service ($SHA)"
+                exit 1
+              fi
+              sleep "$POLL_INTERVAL"
+            fi
+          done
+
+          if [ "$ai_cd_conclusion" != "success" ]; then
+            echo "::error::Deploy AI Service concluded '$ai_cd_conclusion' for $SHA — blocking backend deploy."
+            exit 1
+          fi
+
+          echo "AI Service deployed ($SHA). Backend deploy can proceed."
+
   deploy:
+    name: Build & Deploy Backend
+    needs: wait-ai-service
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
       packages: write
 
+    env:
+      # workflow_run không set github.sha theo commit của lần chạy CI,
+      # nên phải lấy head_sha của lần chạy CI đã kích hoạt workflow này
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Connect to Tailscale
+        id: tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
@@ -48,7 +143,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:latest
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:${{ env.DEPLOY_SHA }}
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -56,18 +151,26 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_NAME,GITHUB_SHA
+          envs: IMAGE_NAME,DEPLOY_SHA
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
               -u ${{ secrets.SERVER_USER }} --password-stdin
 
             # Pull image mới về trước
-            docker pull $IMAGE_NAME:$GITHUB_SHA
+            docker pull $IMAGE_NAME:$DEPLOY_SHA
+
+            # Đảm bảo network chung tồn tại (tunnel + backend đều cần)
+            docker network inspect englishhub_shared >/dev/null 2>&1 \
+              || docker network create englishhub_shared >/dev/null
+
+            # Khởi động Cloudflare Tunnel trước khi khởi động Backend
+            cd /home/${{ secrets.SERVER_USER }}/tunnel
+            docker compose -f docker-compose.tunnel.yml up -d Tunnel
 
             # Cập nhật BACKEND_IMAGE trong .env để compose dùng đúng tag
             cd /home/${{ secrets.SERVER_USER }}/englishhub-dev
-            sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$GITHUB_SHA|" .env
+            sed -i "s|BACKEND_IMAGE=.*|BACKEND_IMAGE=$IMAGE_NAME:$DEPLOY_SHA|" .env
 
             # Thay thế container
             docker compose -f docker-compose.staging.yml up -d --pull always
