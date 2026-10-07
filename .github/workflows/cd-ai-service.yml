@@ -1,47 +1,89 @@
 name: Deploy AI Service to VPS/Home-Server
 
-# Chỉ chạy khi workflow "AI Service CI" hoàn tất (event workflow_run).
-# Job deploy chỉ chạy khi conclusion == success.
-# Vì "AI Service CI" chỉ chạy khi có thay đổi trong ai-service/**,
-# workflow CD này cũng chỉ chạy khi code của AI service thay đổi.
+# CD cho AI service trên nhánh main (production) và staging (development).
+#
+# Trigger: push vào main/staging có thay đổi ai-service/** (cùng paths filter
+# với AI Service CI), nên CD chạy đúng lúc code AI service thay đổi
+# và không phụ thuộc event workflow_run.
+#
+# Job "wait-for-ai-ci" đảm bảo thứ tự: AI Service CI xong (đạt success) → Deploy.
+# Job deploy chỉ chạy khi cả hai job chờ đều thành công.
 #
 # Thư mục trên server: /home/<SERVER_USER>/ai-service
 # (docker-compose.ai-service.yml + env file riêng, xem env.ai-service.example)
 on:
-  workflow_run:
-    workflows:
-      - AI Service CI
-    types:
-      - completed
+  push:
     branches:
       - main
       - staging
+    paths:
+      - 'ai-service/**'
+      - '.github/workflows/ci-ai-service.yml'
 
 env:
   IMAGE_NAME: ghcr.io/hotung9108/english-hub-ai-service
 
 jobs:
+  wait-for-ai-ci:
+    name: Wait for AI Service CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+
+    steps:
+      - name: Wait for AI Service CI when ai-service was changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CI_WORKFLOW: ci-ai-service.yml
+        run: |
+          set -euo pipefail
+
+          POLL_INTERVAL=15
+          DEADLINE=$((SECONDS + 1500)) # 25 phút
+
+          echo "Waiting for AI Service CI ($SHA) ..."
+          ci_conclusion=""
+          while [ -z "$ci_conclusion" ]; do
+            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&per_page=5" \
+              --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
+            if [ -z "$ci_conclusion" ]; then
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "::error::Timed out waiting for AI Service CI ($SHA)"
+                exit 1
+              fi
+              sleep "$POLL_INTERVAL"
+            fi
+          done
+
+          if [ "$ci_conclusion" != "success" ]; then
+            echo "::error::AI Service CI concluded '$ci_conclusion' for $SHA — blocking AI service deploy."
+            exit 1
+          fi
+
+          echo "AI Service CI passed ($SHA). Deploy can proceed."
+
   deploy:
     name: Build & Deploy AI Service
+    needs: wait-for-ai-ci
     runs-on: ubuntu-latest
-
-    # Chỉ deploy khi AI Service CI thành công
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     permissions:
       contents: read
       packages: write
 
     env:
-      # workflow_run không set github.sha theo commit của lần chạy CI,
-      # nên phải lấy head_sha của lần chạy CI đã kích hoạt workflow này
-      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      # Push event: github.sha chính là commit được push (= commit CI vừa test)
+      DEPLOY_SHA: ${{ github.sha }}
 
     steps:
-      - name: Checkout code (commit của lần chạy CI)
+      - name: Checkout code (commit vừa push)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - name: Connect to Tailscale
         id: tailscale
