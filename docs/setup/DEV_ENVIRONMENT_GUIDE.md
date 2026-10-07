@@ -82,4 +82,4 @@ docker compose -f docker-compose.dev.yml down
 
 `frontend/Dockerfile` là Dockerfile đa tầng (Multi-stage Build) hỗ trợ cả 2 mục đích:
 1. **Target `development`**: Được dùng bởi `docker-compose.dev.yml`, chạy Vite Dev Server ở cổng `5173`, mount volume mã nguồn `./frontend:/app` để hot reload code.
-2. **Target `production`**: Được dùng bởi CI/CD pipeline (`cd-deploy.yml`) và `docker-compose.prod.yml`, build ra file tĩnh tối ưu và chạy bằng web server **Nginx Alpine** siêu nhẹ ở cổng `80`.
+2. **Target `production`**: Được dùng bởi CI/CD pipeline (`cd-backend.yml`) và `docker-compose.prod.yml`, build ra file tĩnh tối ưu và chạy bằng web server **Nginx Alpine** siêu nhẹ ở cổng `80`.

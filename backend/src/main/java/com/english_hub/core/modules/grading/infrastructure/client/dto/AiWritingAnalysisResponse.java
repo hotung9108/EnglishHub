@@ -1,30 +1,27 @@
 package com.english_hub.core.modules.grading.infrastructure.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import tools.jackson.databind.JsonNode;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record AiSpeakingAnalysisResponse(
+public record AiWritingAnalysisResponse(
 		long submissionModuleId,
 		double overallScore,
 		String aiFeedback,
-		JsonNode aiTranscript,
-		FluencyMetricsDto fluencyMetrics,
-		CriteriaScoresDto criteriaScores,
+		WritingCriteriaScoresDto criteriaScores,
+		TextMetricsDto textMetrics,
 		List<AiAnnotationDto> annotations,
 		String modelUsed,
 		String providerUsed
 ) {
-	public AiSpeakingAnalysisResponse(
+	public AiWritingAnalysisResponse(
 			long submissionModuleId,
 			double overallScore,
 			String aiFeedback,
-			JsonNode aiTranscript,
-			FluencyMetricsDto fluencyMetrics,
-			CriteriaScoresDto criteriaScores,
+			WritingCriteriaScoresDto criteriaScores,
+			TextMetricsDto textMetrics,
 			List<AiAnnotationDto> annotations
 	) {
-		this(submissionModuleId, overallScore, aiFeedback, aiTranscript, fluencyMetrics, criteriaScores, annotations, null, null);
+		this(submissionModuleId, overallScore, aiFeedback, criteriaScores, textMetrics, annotations, null, null);
 	}
 }

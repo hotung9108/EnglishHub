@@ -94,6 +94,15 @@ test('GradingService #49 - POST AI analysis without a body', async () => {
   });
 });
 
+test('GradingService #49b - GET AI suggestion for submission module (UC25)', async () => {
+  const options = { signal: new AbortController().signal };
+  await assertEndpointCall(service => service.getAiSuggestion(7, options), {
+    method: 'GET',
+    url: '/submission-modules/7/grading/ai-suggestion',
+    options,
+  });
+});
+
 test('GradingService #50 - PUT final grade with request body', async () => {
   const payload = { finalScore: 8.5, finalFeedback: 'Good work', note: 'Reviewed' };
   await assertEndpointCall(service => service.submitGrade(5, payload), {
