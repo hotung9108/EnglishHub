@@ -4,7 +4,7 @@ import { ApiClientError } from '../core/errors';
 import { MockHttpClient } from './helpers/mock-http-client';
 import { StudentEvaluationService } from '../services/student-evaluation.service';
 
-test('StudentEvaluationService #58 - GET list with class and pagination params', async () => {
+test('StudentEvaluationService #58 - GET list with class, pagination, and date params', async () => {
   const http = new MockHttpClient();
   const service = new StudentEvaluationService(http);
   const response = {
@@ -19,11 +19,25 @@ test('StudentEvaluationService #58 - GET list with class and pagination params',
   };
   http.mockResponse = response;
 
-  assert.deepStrictEqual(await service.list(30, { classId: 3, page: 2, limit: 2 }), response);
+  assert.deepStrictEqual(await service.list(30, {
+    classId: 3,
+    page: 2,
+    limit: 2,
+    fromDate: '2026-09-01',
+    toDate: '2026-10-01',
+  }), response);
   assert.deepStrictEqual(http.calls, [{
     method: 'GET',
     url: '/students/30/evaluations',
-    options: { params: { classId: 3, page: 2, limit: 2 } },
+    options: {
+      params: {
+        classId: 3,
+        page: 2,
+        limit: 2,
+        fromDate: '2026-09-01',
+        toDate: '2026-10-01',
+      },
+    },
   }]);
   const params = http.calls[0].options?.params as Record<string, unknown>;
   assert.strictEqual(typeof params.classId, 'number');
@@ -40,6 +54,41 @@ test('StudentEvaluationService #58 - omits undefined query params', async () => 
   const params = http.calls[0].options?.params as Record<string, unknown>;
   assert.deepStrictEqual(params, { page: 1, limit: 20 });
   assert.strictEqual('classId' in params, false);
+
+  await service.list(30, {
+    page: 1,
+    limit: 20,
+    fromDate: undefined,
+    toDate: undefined,
+  });
+  await service.list(30, {
+    page: 1,
+    limit: 20,
+    fromDate: '',
+    toDate: '   ',
+  });
+
+  for (const call of http.calls.slice(1)) {
+    const dateParams = call.options?.params as Record<string, unknown>;
+    assert.strictEqual('fromDate' in dateParams, false);
+    assert.strictEqual('toDate' in dateParams, false);
+  }
+  assert.deepStrictEqual(http.calls[1].options?.params, { page: 1, limit: 20 });
+  assert.deepStrictEqual(http.calls[2].options?.params, { page: 1, limit: 20 });
+});
+
+test('StudentEvaluationService #58 - accepts either date filter independently', async () => {
+  for (const dateParams of [
+    { fromDate: '2026-09-01' },
+    { toDate: '2026-10-01' },
+  ]) {
+    const http = new MockHttpClient();
+    const service = new StudentEvaluationService(http);
+
+    await service.list(30, dateParams);
+
+    assert.deepStrictEqual(http.calls[0].options?.params, dateParams);
+  }
 });
 
 test('StudentEvaluationService #59 - POST creates an evaluation and returns its id', async () => {

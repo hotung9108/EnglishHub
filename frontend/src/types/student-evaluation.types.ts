@@ -3,7 +3,7 @@ import type { MessageResponse, PaginationResponse } from '../api/interfaces/api-
 export interface StudentEvaluationListItem {
   id: number;
   classId: number;
-  teacherName: string;
+  teacherName: string | null;
   content: string;
   createdAt: string;
 }
@@ -12,6 +12,10 @@ export interface StudentEvaluationListParams {
   classId?: number;
   page?: number;
   limit?: number;
+  /** Inclusive start date in yyyy-MM-dd format. */
+  fromDate?: string;
+  /** Inclusive end date in yyyy-MM-dd format. */
+  toDate?: string;
 }
 
 export interface StudentEvaluationListResponse {

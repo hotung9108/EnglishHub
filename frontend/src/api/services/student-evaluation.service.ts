@@ -26,6 +26,8 @@ export class StudentEvaluationService {
       ...(params.classId !== undefined ? { classId: params.classId } : {}),
       ...(params.page !== undefined ? { page: params.page } : {}),
       ...(params.limit !== undefined ? { limit: params.limit } : {}),
+      ...(params.fromDate?.trim() ? { fromDate: params.fromDate } : {}),
+      ...(params.toDate?.trim() ? { toDate: params.toDate } : {}),
     };
 
     return this.http.get<StudentEvaluationListResponse>(`/students/${studentId}/evaluations`, {
