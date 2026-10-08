@@ -12,7 +12,7 @@ jobs:
   wait-for-frontend-ci:
     name: Wait for Frontend CI
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     permissions:
       actions: read
