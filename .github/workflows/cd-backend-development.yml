@@ -1,4 +1,4 @@
-name: Deploy development Backend to VPS/Home-Server
+name: CD-Backend-Staging
 
 # CD cho Backend (development/staging) trên nhánh staging.
 #
