@@ -1,4 +1,4 @@
-name: Deploy AI Service to VPS/Home-Server
+name: CD-AI-Service
 
 # CD cho AI service trên nhánh main (production) và staging (development).
 #

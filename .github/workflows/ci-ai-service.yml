@@ -1,4 +1,4 @@
-name: AI Service CI
+name: CI-AI-Service
 
 on:
   push:

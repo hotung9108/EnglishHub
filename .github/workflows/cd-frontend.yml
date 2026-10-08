@@ -1,4 +1,4 @@
-name: Deploy production Frontend to Vercel
+name: CD-Frontend-Production
 
 on:
   pull_request:
