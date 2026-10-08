@@ -18,7 +18,7 @@ export const AdminSettings: React.FC = () => {
   // Form states
   const [aiModelWriting, setAiModelWriting] = useState('gemini-1.5-pro');
   const [aiModelSpeaking, setAiModelSpeaking] = useState('whisper-large-v3');
-  const [apiKey, setApiKey] = useState('AIzaSyD-mock991823-EnglishHubSecureKey');
+  const [apiKey, setApiKey] = useState('');
   const [temperature, setTemperature] = useState(0.2);
   const [autoApproveQuiz, setAutoApproveQuiz] = useState(true);
   const [requireTeacherReview, setRequireTeacherReview] = useState(true);
@@ -178,6 +178,7 @@ export const AdminSettings: React.FC = () => {
                     className="input"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={isVi ? 'Nhập AI API Key (vd: AIzaSy...)' : 'Enter AI API Key (e.g. AIzaSy...)'}
                     style={{ flex: 1, fontFamily: 'monospace' }}
                   />
                   <button 

@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Archive, ArrowLeft, Search, 
   RotateCcw, Download, 
   User, CheckCircle2, XCircle,
-  GraduationCap, Calendar, Award
+  GraduationCap, Calendar, Award, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService } from '../api/services/class.service';
+import { userService } from '../api/services/user.service';
+import type { ClassSummary } from '../api/services/class.service';
 
-interface ArchivedClass {
-  id: string;
+interface ArchivedClassItem {
+  id: number;
   code: string;
   name: string;
   teacher: string;
@@ -18,7 +21,6 @@ interface ArchivedClass {
   passRate: number;
   completedDate: string;
   status: 'COMPLETED' | 'CANCELLED';
-  reason?: string;
 }
 
 export const AdminClassArchive: React.FC = () => {
@@ -26,56 +28,86 @@ export const AdminClassArchive: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [classes, setClasses] = useState<ArchivedClassItem[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const [classes, setClasses] = useState<ArchivedClass[]>([
-    {
-      id: 'arch-1',
-      code: 'ENG-IELTS-5.0-K11',
-      name: 'IELTS Pre-Intermediate Khóa 11',
-      teacher: 'Cô Trần Thị Mai Lan',
-      enrolledStudents: 22,
-      avgFinalScore: 7.4,
-      passRate: 95.4,
-      completedDate: '2026-01-15',
-      status: 'COMPLETED'
-    },
-    {
-      id: 'arch-2',
-      code: 'ENG-TOEIC-650-K08',
-      name: 'Luyện thi TOEIC Cấp tốc 650+ (Khóa 8)',
-      teacher: 'Thầy Nguyễn Văn Nam',
-      enrolledStudents: 18,
-      avgFinalScore: 780,
-      passRate: 88.8,
-      completedDate: '2025-12-28',
-      status: 'COMPLETED'
-    },
-    {
-      id: 'arch-3',
-      code: 'ENG-SPEAK-ADV-K02',
-      name: 'Chuyên đề Nói & Thuyết trình Tiếng Anh Nâng cao',
-      teacher: 'Thầy David Miller',
-      enrolledStudents: 8,
-      avgFinalScore: 0,
-      passRate: 0,
-      completedDate: '2025-11-05',
-      status: 'CANCELLED',
-      reason: isVi ? 'Không đủ sĩ số tối thiểu mở lớp (< 10 học viên)' : 'Minimum enrollment quorum not met'
-    },
-    {
-      id: 'arch-4',
-      code: 'ENG-IELTS-7.0-SUMMER',
-      name: 'IELTS Master 7.5+ Khóa Hè Cấp Tốc',
-      teacher: 'Cô Lê Hoàng Oanh',
-      enrolledStudents: 25,
-      avgFinalScore: 7.8,
-      passRate: 100,
-      completedDate: '2025-08-30',
-      status: 'COMPLETED'
-    }
-  ]);
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadArchivedClasses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [classRes, teacherRes] = await Promise.allSettled([
+          classService.list({ page: 1, limit: 100 }),
+          userService.listUsers({ role: 'TEACHER', limit: 100 })
+        ]);
+
+        if (!isMounted) return;
+
+        const rawClasses: ClassSummary[] = classRes.status === 'fulfilled' ? classRes.value.data : [];
+        const teachers = teacherRes.status === 'fulfilled' ? teacherRes.value.data : [];
+        const teacherMap = new Map<number, string>();
+        teachers.forEach(t => teacherMap.set(t.id, t.fullName));
+
+        // Filter classes that are COMPLETED or CANCELLED or INACTIVE
+        const archivedRaw = rawClasses.filter(c => c.status === 'COMPLETED' || c.status === 'CANCELLED' || c.status === 'INACTIVE');
+
+        const items: ArchivedClassItem[] = await Promise.all(
+          archivedRaw.map(async (c) => {
+            let memberCount = 0;
+            let endDate = '—';
+            try {
+              const detail = await classService.getDetail(c.id);
+              if (detail.endDate) endDate = detail.endDate;
+              if (typeof detail.memberCount === 'number') {
+                memberCount = detail.memberCount;
+              }
+            } catch {
+              // fallback
+            }
+
+            const teacherName = c.teacherId && teacherMap.has(c.teacherId)
+              ? teacherMap.get(c.teacherId)!
+              : (isVi ? 'Chưa phân công' : 'Unassigned');
+
+            return {
+              id: c.id,
+              code: `ENG-${c.id}`,
+              name: c.name,
+              teacher: teacherName,
+              enrolledStudents: memberCount,
+              avgFinalScore: 7.5,
+              passRate: 95,
+              completedDate: endDate,
+              status: c.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED'
+            };
+          })
+        );
+
+        if (!isMounted) return;
+        setClasses(items);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : isVi ? 'Không thể tải kho lưu trữ lớp học.' : 'Failed to load archived classes.');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadArchivedClasses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi, refreshKey]);
 
   const filtered = classes.filter(cls => {
     if (statusFilter !== 'ALL' && cls.status !== statusFilter) return false;
@@ -90,16 +122,24 @@ export const AdminClassArchive: React.FC = () => {
     return true;
   });
 
-  const handleRestore = (code: string) => {
-    if (confirm(isVi ? `Xác nhận mở lại lớp ${code} về trạng thái ACTIVE?` : `Restore class ${code} to ACTIVE status?`)) {
-      setClasses(prev => prev.filter(c => c.code !== code));
-      alert(isVi ? `Đã khôi phục lớp ${code} thành công!` : `Class ${code} restored!`);
+  const handleRestore = async (cls: ArchivedClassItem) => {
+    if (confirm(isVi ? `Xác nhận mở lại lớp ${cls.name} (${cls.code}) về trạng thái ACTIVE?` : `Restore class ${cls.name} to ACTIVE status?`)) {
+      try {
+        await classService.update(cls.id, { status: 'ACTIVE' });
+        setRefreshKey(prev => prev + 1);
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : isVi ? 'Không thể khôi phục lớp học.' : 'Failed to restore class.');
+      }
     }
   };
 
   const handleExport = (code: string) => {
     alert(isVi ? `Đang kết xuất học bạ và bảng điểm cuối khóa của lớp ${code}...` : `Exporting final academic record for ${code}...`);
   };
+
+  const completedCount = classes.filter(c => c.status === 'COMPLETED').length;
+  const cancelledCount = classes.filter(c => c.status === 'CANCELLED').length;
+  const totalEnrolled = classes.reduce((sum, c) => sum + c.enrolledStudents, 0);
 
   return (
     <div className="adm-container">
@@ -128,6 +168,23 @@ export const AdminClassArchive: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* KPI Stats */}
       <div className="adm-kpi-grid">
         <div className="adm-kpi-card">
@@ -138,43 +195,43 @@ export const AdminClassArchive: React.FC = () => {
             </div>
           </div>
           <div className="adm-kpi-value-row">
-            <span className="adm-kpi-value">3</span>
-            <span className="adm-kpi-badge positive">Graduated</span>
+            <span className="adm-kpi-value">{completedCount}</span>
+            <span className="adm-kpi-badge positive">Concluded</span>
           </div>
           <div className="adm-kpi-footer">
-            <span>{isVi ? 'Tổng 65 học viên tốt nghiệp' : '65 alumni completed graduation'}</span>
+            <span>{isVi ? `Tổng ${totalEnrolled} học viên hoàn thành` : `${totalEnrolled} total students recorded`}</span>
           </div>
         </div>
 
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
-            <span className="adm-kpi-title">{isVi ? 'TỶ LỆ ĐỖ BÌNH QUÂN' : 'AVG PASS ATTAINMENT'}</span>
+            <span className="adm-kpi-title">{isVi ? 'TỔNG SỐ LỚP LƯU TRỮ' : 'TOTAL ARCHIVED'}</span>
             <div className="adm-kpi-icon-wrapper" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
               <Award size={18} />
             </div>
           </div>
           <div className="adm-kpi-value-row">
-            <span className="adm-kpi-value" style={{ color: '#16a34a' }}>94.7%</span>
-            <span className="adm-kpi-badge positive">High Retention</span>
+            <span className="adm-kpi-value" style={{ color: '#16a34a' }}>{classes.length}</span>
+            <span className="adm-kpi-badge positive">Archived</span>
           </div>
           <div className="adm-kpi-footer">
-            <span>{isVi ? 'Đạt cam kết hợp đồng đào tạo' : 'Met academic service SLA'}</span>
+            <span>{isVi ? 'Lưu trữ hồ sơ học tập an toàn' : 'Records stored securely'}</span>
           </div>
         </div>
 
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
-            <span className="adm-kpi-title">{isVi ? 'LỚP HỦY DO THIẾU SĨ SỐ' : 'CANCELLED ENROLLMENTS'}</span>
+            <span className="adm-kpi-title">{isVi ? 'LỚP ĐÃ HỦY' : 'CANCELLED ENROLLMENTS'}</span>
             <div className="adm-kpi-icon-wrapper" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' }}>
               <XCircle size={18} />
             </div>
           </div>
           <div className="adm-kpi-value-row">
-            <span className="adm-kpi-value" style={{ color: '#dc2626' }}>1</span>
-            <span className="adm-kpi-badge neutral">&lt; 10 Students</span>
+            <span className="adm-kpi-value" style={{ color: '#dc2626' }}>{cancelledCount}</span>
+            <span className="adm-kpi-badge neutral">Cancelled</span>
           </div>
           <div className="adm-kpi-footer">
-            <span>{isVi ? 'Đã hoàn tiền hoặc chuyển lớp' : 'Refunded or migrated cohort'}</span>
+            <span>{isVi ? 'Lớp dừng đào tạo hoặc đóng sớm' : 'Closed cohorts'}</span>
           </div>
         </div>
       </div>
@@ -228,92 +285,97 @@ export const AdminClassArchive: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>{isVi ? 'MÃ LỚP' : 'CLASS CODE'}</th>
-                <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                <th>{isVi ? 'GIÁO VIÊN PHỤ TRÁCH' : 'INSTRUCTOR'}</th>
-                <th>{isVi ? 'SĨ SỐ' : 'STUDENTS'}</th>
-                <th>{isVi ? 'ĐIỂM TB KẾT KHÓA' : 'FINAL AVG'}</th>
-                <th>{isVi ? 'TỶ LỆ ĐỖ' : 'PASS RATE'}</th>
-                <th>{isVi ? 'NGÀY KẾT THÚC' : 'CONCLUDED DATE'}</th>
-                <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((cls) => (
-                <tr key={cls.id}>
-                  <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                  <td className="font-medium" style={{ fontSize: '14.5px' }}>{cls.name}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={14} className="text-on-surface-variant" />
-                      <span>{cls.teacher}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="adm-badge" style={{ backgroundColor: 'var(--surface-container-high)', color: 'var(--on-surface)' }}>
-                      <GraduationCap size={12} style={{ marginRight: '4px' }} />
-                      {cls.enrolledStudents} {isVi ? 'học viên' : 'students'}
-                    </span>
-                  </td>
-                  <td className="font-semibold font-mono">
-                    {cls.status === 'COMPLETED' ? cls.avgFinalScore : '—'}
-                  </td>
-                  <td>
-                    {cls.status === 'COMPLETED' ? (
-                      <span className="adm-badge badge-active">{cls.passRate}%</span>
-                    ) : (
-                      <span className="text-on-surface-variant">—</span>
-                    )}
-                  </td>
-                  <td className="text-on-surface-variant font-mono" style={{ fontSize: '13px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Calendar size={13} />
-                      <span>{cls.completedDate}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {cls.status === 'COMPLETED' ? (
-                      <span className="adm-badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle2 size={12} /> {isVi ? 'Đã hoàn thành' : 'Completed'}
-                      </span>
-                    ) : (
-                      <span className="adm-badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <XCircle size={12} /> {isVi ? 'Đã hủy' : 'Cancelled'}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <button 
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleExport(cls.code)}
-                        title={t('classArchive.btnExport')}
-                        style={{ padding: '6px 10px' }}
-                      >
-                        <Download size={14} />
-                      </button>
-                      <button 
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => handleRestore(cls.code)}
-                        title={t('classArchive.btnRestore')}
-                        style={{ padding: '6px 10px' }}
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  </td>
+        {loading ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+            <div>{isVi ? 'Đang tải kho lưu trữ...' : 'Loading archive...'}</div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Archive size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+            <div style={{ fontSize: '15px', fontWeight: 600 }}>
+              {isVi ? 'Kho lưu trữ hiện chưa có lớp học nào' : 'No archived classes found'}
+            </div>
+            <div style={{ fontSize: '13px', marginTop: '4px' }}>
+              {isVi ? 'Các lớp học khi hoàn thành khóa hoặc đóng sẽ hiển thị tại đây.' : 'Classes will appear here once they conclude or are archived.'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ LỚP' : 'CLASS CODE'}</th>
+                  <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                  <th>{isVi ? 'GIÁO VIÊN PHỤ TRÁCH' : 'INSTRUCTOR'}</th>
+                  <th>{isVi ? 'SĨ SỐ' : 'STUDENTS'}</th>
+                  <th>{isVi ? 'NGÀY KẾT THÚC' : 'CONCLUDED DATE'}</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map((cls) => (
+                  <tr key={cls.id}>
+                    <td className="font-semibold text-primary font-mono">{cls.code}</td>
+                    <td className="font-medium" style={{ fontSize: '14.5px' }}>{cls.name}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <User size={14} className="text-on-surface-variant" />
+                        <span>{cls.teacher}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="adm-badge" style={{ backgroundColor: 'var(--surface-container-high)', color: 'var(--on-surface)' }}>
+                        <GraduationCap size={12} style={{ marginRight: '4px' }} />
+                        {cls.enrolledStudents} {isVi ? 'học viên' : 'students'}
+                      </span>
+                    </td>
+                    <td className="text-on-surface-variant font-mono" style={{ fontSize: '13px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Calendar size={13} />
+                        <span>{cls.completedDate}</span>
+                      </div>
+                    </td>
+                    <td>
+                      {cls.status === 'COMPLETED' ? (
+                        <span className="adm-badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckCircle2 size={12} /> {isVi ? 'Đã hoàn thành' : 'Completed'}
+                        </span>
+                      ) : (
+                        <span className="adm-badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <XCircle size={12} /> {isVi ? 'Đã hủy' : 'Cancelled'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button 
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleExport(cls.code)}
+                          title={t('classArchive.btnExport')}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          <Download size={14} />
+                        </button>
+                        <button 
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleRestore(cls)}
+                          title={t('classArchive.btnRestore')}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

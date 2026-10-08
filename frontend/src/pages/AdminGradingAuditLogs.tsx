@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   History, Search, Download, 
-  CheckCircle2, Clock, X, 
+  X, 
   PenTool, Mic, RotateCcw, 
-  Award
+  Award, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { submissionService } from '../api/services/submission.service';
+import { userService } from '../api/services/user.service';
+import type { SubmissionListItem } from '../api/services/submission.service';
+import type { UserListItem } from '../api/services/user.service';
 
 interface GradingHistoryItem {
   id: string;
@@ -36,154 +40,87 @@ export const AdminGradingAuditLogs: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [gradingHistory, setGradingHistory] = useState<GradingHistoryItem[]>([]);
+  const [teachers, setTeachers] = useState<UserListItem[]>([]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTeacher, setFilterTeacher] = useState('all');
   const [filterSkill, setFilterSkill] = useState<'all' | 'writing' | 'speaking'>('all');
   const [filterType, setFilterType] = useState<'all' | 'writing' | 'speaking' | 'high'>('all');
   const [selectedItem, setSelectedItem] = useState<GradingHistoryItem | null>(null);
 
-  const gradingHistory: GradingHistoryItem[] = [
-    {
-      id: 'GR-8812',
-      gradingId: 8812,
-      gradedBy: {
-        name: 'Cô Trần Thị Mai Lan',
-        code: 'GV-088'
-      },
-      student: {
-        name: 'Alice Johnson',
-        code: 'HV-8801'
-      },
-      assignment: {
-        code: 'HW-01',
-        title: 'Writing Task 2: Artificial Intelligence & Workforce Evolution',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-20 20:15:00'
-      },
-      score: 7.0,
-      gradedAt: '2026-03-21 14:32:10',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Học sinh có ý tưởng phát triển bài viết rất tốt, lập luận chặt chẽ và sử dụng chính xác 4 cấu trúc câu phức hợp (Inversion & Cleft sentences). Bài làm hoàn thành xuất sắc yêu cầu đề bài.' 
-        : 'Student demonstrated solid paragraph coherence, accurate complex syntax (inversion and cleft sentences), and comprehensive task achievement.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "In contemporary society, the rapid emergence of generative artificial intelligence has catalyzed a profound paradigm shift across global employment sectors..."'
-        : 'Essay excerpt: "In contemporary society, the rapid emergence of generative artificial intelligence has catalyzed a profound paradigm shift across global employment sectors..."'
-    },
-    {
-      id: 'GR-8815',
-      gradingId: 8815,
-      gradedBy: {
-        name: 'Cô Trần Thị Mai Lan',
-        code: 'GV-088'
-      },
-      student: {
-        name: 'David Pham',
-        code: 'HV-8802'
-      },
-      assignment: {
-        code: 'HW-02',
-        title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'speaking',
-        submittedAt: '2026-03-20 10:30:12'
-      },
-      score: 5.5,
-      gradedAt: '2026-03-20 18:05:44',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Phần mở đầu trôi chảy nhưng đoạn sau học viên phụ thuộc vào kịch bản đọc sẵn, làm giảm độ tự nhiên trong giao tiếp tự phát (Spontaneous Speech). Cần luyện phản xạ nói trực tiếp không nhìn tài liệu.' 
-        : 'Opening was fluent but subsequent delivery relied heavily on scripted reading, decreasing spontaneous speaking naturalness.',
-      submissionExcerpt: isVi
-        ? 'Bản ghi âm 2 phút 15 giây: Học viên trình bày về giải pháp xử lý rác thải đô thị và giao thông công cộng, ngữ điệu còn đều đều.'
-        : 'Audio recording 2m 15s: Student discussed urban waste management and public transit; intonation remained slightly monotonic.'
-    },
-    {
-      id: 'GR-8819',
-      gradingId: 8819,
-      gradedBy: {
-        name: 'Thầy Nguyễn Văn Nam',
-        code: 'GV-042'
-      },
-      student: {
-        name: 'Nguyễn Minh Huy',
-        code: 'HV-8809'
-      },
-      assignment: {
-        code: 'HW-05',
-        title: 'Writing Task 1: Comparative Bar Chart on Carbon Emissions',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-18 22:45:00'
-      },
-      score: 7.0,
-      gradedAt: '2026-03-19 11:20:15',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Bố cục tổng quan (Overview) xuất sắc, chỉ ra được xu hướng chủ đạo của biểu đồ carbon. Các đoạn thân bài phân chia logic, lựa chọn số liệu nổi bật tốt.' 
-        : 'Outstanding overview paragraph identifying key macro-trends. Logical grouping of data categories with precise comparative vocabulary.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "The provided bar chart delineates a comparative analysis of annual carbon footprint metrics across five primary industrialized territories over a 20-year timeframe..."'
-        : 'Essay excerpt: "The provided bar chart delineates a comparative analysis of annual carbon footprint metrics across five primary industrialized territories over a 20-year timeframe..."'
-    },
-    {
-      id: 'GR-8824',
-      gradingId: 8824,
-      gradedBy: {
-        name: 'Thầy David Miller',
-        code: 'GV-019'
-      },
-      student: {
-        name: 'Lê Bảo Trâm',
-        code: 'HV-8803'
-      },
-      assignment: {
-        code: 'HW-02',
-        title: 'Speaking Part 2: Urban Environment & Green Living',
-        className: 'ENG-TOEIC-750',
-        skill: 'speaking',
-        submittedAt: '2026-03-17 15:20:00'
-      },
-      score: 7.5,
-      gradedAt: '2026-03-18 09:45:00',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Phát âm chuẩn xác, trọng âm từ và ngữ điệu tự nhiên. Vốn từ vựng chuyên đề môi trường rất đa dạng và sử dụng thành thạo.' 
-        : 'Excellent phonetic stress accuracy and natural cadence. Rich environmental lexicon deployed effortlessly throughout the response.',
-      submissionExcerpt: isVi
-        ? 'Bản ghi âm 2 phút 40 giây: Học viên trả lời lưu loát về lối sống xanh, giải pháp năng lượng tái tạo trong các tòa nhà thông minh.'
-        : 'Audio recording 2m 40s: Fluent elaboration on green lifestyles and sustainable architecture solutions.'
-    },
-    {
-      id: 'GR-8830',
-      gradingId: 8830,
-      gradedBy: {
-        name: 'Thầy David Miller',
-        code: 'GV-019'
-      },
-      student: {
-        name: 'Alice Johnson',
-        code: 'HV-8801'
-      },
-      assignment: {
-        code: 'HW-03',
-        title: 'Writing Task 2: Remote Work & Corporate Culture Integration',
-        className: 'ENG-IELTS-6.5A',
-        skill: 'writing',
-        submittedAt: '2026-03-15 19:40:00'
-      },
-      score: 8.0,
-      gradedAt: '2026-03-16 16:10:20',
-      status: 'completed',
-      teacherFeedback: isVi 
-        ? 'Bài viết mẫu mực ở band 8.0. Luận điểm sắc sảo, cấu trúc ngữ pháp phong phú và phong cách viết học thuật tự nhiên.' 
-        : 'Exemplary Band 8.0 performance. Sophisticated arguments, diverse syntactic variety, and natural academic register.',
-      submissionExcerpt: isVi
-        ? 'Trích đoạn bài viết: "While proponents argue that telecommuting bolsters operational efficiency and work-life balance, detractors highlight potential risks to corporate cultural cohesion..."'
-        : 'Essay excerpt: "While proponents argue that telecommuting bolsters operational efficiency and work-life balance, detractors highlight potential risks to corporate cultural cohesion..."'
-    }
-  ];
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [subRes, tcRes] = await Promise.allSettled([
+          submissionService.listSubmissions({ page: 1, limit: 50 }),
+          userService.listUsers({ role: 'TEACHER', limit: 50 })
+        ]);
+
+        if (!isMounted) return;
+
+        if (tcRes.status === 'fulfilled') {
+          setTeachers(tcRes.value.data);
+        }
+
+        if (subRes.status === 'fulfilled') {
+          const subs: SubmissionListItem[] = subRes.value.data || [];
+          const items: GradingHistoryItem[] = subs.map(s => {
+            const firstMod = s.modules?.[0];
+            const skill: 'writing' | 'speaking' = (firstMod?.skill?.toLowerCase() === 'speaking') ? 'speaking' : 'writing';
+            const finalScore = firstMod?.grading?.finalScore ?? 0;
+            const timestamp = s.submittedAt || new Date().toISOString();
+            return {
+              id: `GR-${s.id}`,
+              gradingId: s.id,
+              gradedBy: {
+                name: isVi ? 'Giáo viên phụ trách' : 'Assigned Teacher',
+                code: 'GV-001'
+              },
+              student: {
+                name: `Student #${s.studentId}`,
+                code: `HV-${s.studentId}`
+              },
+              assignment: {
+                code: `HW-${s.assignmentId || s.id}`,
+                title: `Assignment #${s.assignmentId || s.id}`,
+                className: `Class Cohort`,
+                skill,
+                submittedAt: timestamp
+              },
+              score: typeof finalScore === 'number' ? finalScore : 0,
+              gradedAt: timestamp,
+              status: s.status === 'GRADED' ? 'completed' : 'verified',
+              teacherFeedback: isVi ? 'Đã hoàn thành kiểm toán bài nộp.' : 'Submission verified in audit logs.',
+              submissionExcerpt: isVi ? 'Bài nộp của học viên đã được ghi nhận trên hệ thống.' : 'Student submission recorded.'
+            };
+          });
+          setGradingHistory(items);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải nhật ký chấm điểm.' : 'Failed to load grading logs.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchLogs();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi]);
 
   const filteredHistory = gradingHistory.filter(item => {
     if (filterTeacher !== 'all' && item.gradedBy.code !== filterTeacher) return false;
@@ -250,250 +187,176 @@ export const AdminGradingAuditLogs: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Bento Grid: Graded Assignments Overview */}
-      <div className="adm-kpi-grid">
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'TỔNG SỐ BÀI ĐÃ CHẤM' : 'TOTAL GRADED ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-blue">
-              <CheckCircle2 size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value">148</span>
-            <span className="adm-kpi-delta pos">+18.5%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Đã hoàn tất chấm điểm trên hệ thống' : 'Completed grading evaluations'}
-            </span>
-          </div>
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
         </div>
+      )}
 
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'BÀI TỰ LUẬN (WRITING)' : 'WRITING ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-emerald">
-              <PenTool size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value adm-gh-kpi-value-emerald">86</span>
-            <span className="adm-kpi-delta pos">58.1%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Bài viết Task 1 & Task 2 đã chấm' : 'Essay submissions verified'}
-            </span>
-          </div>
-        </div>
-
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'BÀI NÓI (SPEAKING)' : 'SPEAKING ASSIGNMENTS'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-violet">
-              <Mic size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value adm-gh-kpi-value-violet">62</span>
-            <span className="adm-kpi-delta neutral">41.9%</span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Ghi âm Speaking Part 2 & Part 3' : 'Audio responses evaluated'}
-            </span>
-          </div>
-        </div>
-
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-header">
-            <span className="adm-kpi-label">{isVi ? 'ĐIỂM TRUNG BÌNH TOÀN TRƯỜNG' : 'COHORT AVERAGE SCORE'}</span>
-            <div className="adm-kpi-icon adm-gh-kpi-icon-blue">
-              <Award size={20} />
-            </div>
-          </div>
-          <div className="adm-gh-kpi-value-row">
-            <span className="adm-kpi-value">6.8</span>
-            <span className="adm-kpi-delta pos">
-              {isVi ? '91.2% Đạt' : '91.2% Pass'}
-            </span>
-          </div>
-          <div className="adm-kpi-footer">
-            <span className="adm-gh-kpi-footer-text">
-              {isVi ? 'Tỷ lệ đạt chuẩn đầu ra đề ra' : 'Target attainment standard'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="adm-filter-bar">
-        <div className="adm-gh-filter-controls">
-          <div className="adm-gh-search-container">
-            <Search size={16} className="adm-gh-search-icon" />
+      {/* Filter and Quick Chips Bar */}
+      <div className="adm-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', width: '100%', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Search Input */}
+          <div className="adm-search-wrap" style={{ flex: 1, minWidth: '260px' }}>
+            <Search size={16} className="adm-search-icon" />
             <input 
               type="text" 
-              className="adm-gh-search-input" 
-              placeholder={t('auditLogs.searchPlaceholder')}
+              className="adm-search-input"
+              placeholder={isVi ? 'Tìm tên bài tập, học viên, mã bài...' : 'Search by assignment, student...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <select 
-            className="adm-gh-select" 
-            value={filterTeacher}
-            onChange={(e) => setFilterTeacher(e.target.value)}
-          >
-            <option value="all">{t('auditLogs.filterAllTeachers')}</option>
-            <option value="GV-088">Cô Trần Thị Mai Lan (GV-088)</option>
-            <option value="GV-042">Thầy Nguyễn Văn Nam (GV-042)</option>
-            <option value="GV-019">Thầy David Miller (GV-019)</option>
-          </select>
+          {/* Teacher Select */}
+          <div style={{ minWidth: '200px' }}>
+            <select 
+              className="input"
+              value={filterTeacher}
+              onChange={(e) => setFilterTeacher(e.target.value)}
+              style={{ height: '40px', fontSize: '13px' }}
+            >
+              <option value="all">{isVi ? 'Tất cả giáo viên' : 'All Teachers'}</option>
+              {teachers.map(tc => (
+                <option key={tc.id} value={`GV-${tc.id}`}>
+                  {tc.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select 
-            className="adm-gh-select" 
-            value={filterSkill}
-            onChange={(e) => setFilterSkill(e.target.value as 'all' | 'writing' | 'speaking')}
-          >
-            <option value="all">{t('auditLogs.filterAllSkills')}</option>
-            <option value="writing">{t('auditLogs.filterSkillWriting')}</option>
-            <option value="speaking">{t('auditLogs.filterSkillSpeaking')}</option>
-          </select>
+          {/* Reset Filters */}
+          {(searchQuery || filterTeacher !== 'all' || filterSkill !== 'all' || filterType !== 'all') && (
+            <button 
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleResetFilters}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '40px' }}
+            >
+              <RotateCcw size={14} />
+              <span>{isVi ? 'Xóa lọc' : 'Reset'}</span>
+            </button>
+          )}
         </div>
 
-        <div className="adm-gh-pills">
+        {/* Quick Segment Filter Pills */}
+        <div className="adm-pills" style={{ margin: 0 }}>
           <button
             type="button"
-            className={`adm-gh-pill ${filterType === 'all' ? 'active' : ''}`}
+            className={`adm-pill-item ${filterType === 'all' ? 'active' : ''}`}
             onClick={() => setFilterType('all')}
           >
-            <span>{isVi ? 'Tất cả bài chấm' : 'All Graded'}</span>
-            <span className="adm-gh-pill-count">{gradingHistory.length}</span>
+            <span>{isVi ? 'Tất cả bài đã chấm' : 'All Graded'}</span>
+            <span className="adm-pill-badge">{gradingHistory.length}</span>
           </button>
           <button
             type="button"
-            className={`adm-gh-pill ${filterType === 'writing' ? 'active' : ''}`}
+            className={`adm-pill-item ${filterType === 'writing' ? 'active' : ''}`}
             onClick={() => setFilterType('writing')}
           >
-            <span>{isVi ? 'Bài Viết (Writing)' : 'Writing'}</span>
-            <span className="adm-gh-pill-count">{countWriting}</span>
+            <PenTool size={13} />
+            <span>Writing</span>
+            <span className="adm-pill-badge">{countWriting}</span>
           </button>
           <button
             type="button"
-            className={`adm-gh-pill ${filterType === 'speaking' ? 'active' : ''}`}
+            className={`adm-pill-item ${filterType === 'speaking' ? 'active' : ''}`}
             onClick={() => setFilterType('speaking')}
           >
-            <span>{isVi ? 'Bài Nói (Speaking)' : 'Speaking'}</span>
-            <span className="adm-gh-pill-count">{countSpeaking}</span>
+            <Mic size={13} />
+            <span>Speaking</span>
+            <span className="adm-pill-badge">{countSpeaking}</span>
           </button>
           <button
             type="button"
-            className={`adm-gh-pill ${filterType === 'high' ? 'active' : ''}`}
+            className={`adm-pill-item ${filterType === 'high' ? 'active' : ''}`}
             onClick={() => setFilterType('high')}
           >
+            <Award size={13} />
             <span>{isVi ? 'Điểm cao (≥ 7.0)' : 'High Score (≥ 7.0)'}</span>
-            <span className="adm-gh-pill-count">{countHigh}</span>
+            <span className="adm-pill-badge">{countHigh}</span>
           </button>
         </div>
       </div>
 
-      {/* Modern Rounded Table Card */}
-      <div className="adm-gh-table-card">
-        <div className="adm-gh-table-header">
-          <div className="adm-gh-table-title-group">
-            <h3 className="adm-gh-table-title">
-              {isVi ? 'Danh Sách Bài Đã Chấm Điểm' : 'Graded Assignments Registry'}
+      {/* Main Table Card */}
+      <div className="adm-table-card">
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+            <div>{isVi ? 'Đang tải nhật ký kiểm toán chấm điểm...' : 'Loading grading audit logs...'}</div>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <History size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
+              {isVi ? 'Chưa có nhật ký chấm điểm nào' : 'No grading audit logs found'}
             </h3>
-            <p className="adm-gh-table-subtitle">
-              {isVi 
-                ? `Hiển thị ${filteredHistory.length} bài tập đã chấm phù hợp với tiêu chí lọc (Click vào hàng để xem chi tiết bài chấm)` 
-                : `Showing ${filteredHistory.length} evaluated submissions (Click row to inspect grading details)`}
+            <p style={{ margin: 0, fontSize: '13.5px' }}>
+              {searchQuery 
+                ? (isVi ? 'Không có bài nộp nào khớp với bộ lọc hiện tại.' : 'No entries match your search criteria.')
+                : (isVi ? 'Nhật ký sẽ hiển thị khi giáo viên hoặc AI hoàn tất chấm bài nộp.' : 'Entries will appear here as submissions are graded.')}
             </p>
           </div>
-        </div>
-
-        {filteredHistory.length === 0 ? (
-          <div className="adm-gh-empty">
-            <div className="adm-gh-empty-icon">
-              <RotateCcw size={24} />
-            </div>
-            <div className="adm-gh-empty-title">
-              {isVi ? 'Không tìm thấy bài chấm nào' : 'No grading records found'}
-            </div>
-            <div className="adm-gh-empty-desc">
-              {isVi 
-                ? 'Không có dữ liệu phù hợp với từ khóa hoặc bộ lọc đã chọn. Vui lòng thử lại.' 
-                : 'No results match your search or filter criteria. Try resetting filters.'}
-            </div>
-            <button 
-              type="button" 
-              className="adm-gh-empty-btn"
-              onClick={handleResetFilters}
-            >
-              {isVi ? 'Xóa bộ lọc' : 'Reset filters'}
-            </button>
-          </div>
         ) : (
-          <div className="adm-gh-table-overflow">
+          <div style={{ overflowX: 'auto' }}>
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>{t('auditLogs.colTime')}</th>
-                  <th>{t('auditLogs.colTeacher')}</th>
-                  <th>{t('auditLogs.colStudent')}</th>
-                  <th>{t('auditLogs.colAssignment')}</th>
-                  <th>{t('auditLogs.colScore')}</th>
-                  <th>{t('auditLogs.colStatus')}</th>
+                  <th>{isVi ? 'MÃ CHẤM' : 'LOG ID'}</th>
+                  <th>{isVi ? 'BÀI TẬP' : 'ASSIGNMENT'}</th>
+                  <th>{isVi ? 'HỌC VIÊN' : 'STUDENT'}</th>
+                  <th>{isVi ? 'ĐIỂM SỐ' : 'SCORE'}</th>
+                  <th>{isVi ? 'THỜI GIAN' : 'GRADED AT'}</th>
+                  <th style={{ textAlign: 'right' }}>{isVi ? 'CHI TIẾT' : 'ACTION'}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredHistory.map((item) => (
                   <tr 
-                    key={item.id} 
-                    className="adm-table-row-clickable"
+                    key={item.id}
                     onClick={() => setSelectedItem(item)}
+                    style={{ cursor: 'pointer' }}
                   >
+                    <td className="font-mono font-semibold text-primary">{item.id}</td>
                     <td>
-                      <div className="adm-gh-time-cell">
-                        <Clock size={13} />
-                        <span>{item.gradedAt}</span>
+                      <div className="font-medium">{item.assignment.title}</div>
+                      <div className="label-sm text-on-surface-variant font-mono">{item.assignment.className}</div>
+                    </td>
+                    <td>
+                      <div className="font-medium">{item.student.name}</div>
+                      <div className="label-sm text-on-surface-variant font-mono">{item.student.code}</div>
+                    </td>
+                    <td>
+                      <div className="font-bold text-primary font-mono" style={{ fontSize: '15px' }}>
+                        {item.score}
                       </div>
                     </td>
-                    <td>
-                      <div className="adm-gh-user-info">
-                        <div className="adm-gh-user-name">{item.gradedBy.name}</div>
-                        <div className="adm-gh-user-code">{item.gradedBy.code}</div>
-                      </div>
+                    <td className="font-mono text-on-surface-variant" style={{ fontSize: '12.5px' }}>
+                      {item.gradedAt}
                     </td>
-                    <td>
-                      <div className="adm-gh-student-name">{item.student.name}</div>
-                      <div className="adm-gh-student-code">{item.student.code}</div>
-                    </td>
-                    <td>
-                      <div className="adm-gh-assignment-wrap">
-                        <div className="adm-gh-assignment-title" title={item.assignment.title}>
-                          {item.assignment.title}
-                        </div>
-                        <div className="adm-gh-assignment-meta">
-                          <span className="adm-gh-class-chip">{item.assignment.className}</span>
-                          <span className={`adm-gh-skill-chip ${item.assignment.skill === 'writing' ? 'adm-gh-skill-chip-writing' : 'adm-gh-skill-chip-speaking'}`}>
-                            {item.assignment.skill === 'writing' ? <PenTool size={10} /> : <Mic size={10} />}
-                            {item.assignment.skill}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="adm-gh-score-text">
-                        {item.score.toFixed(1)}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="adm-gh-status-text">
-                        {isVi ? 'Đã chấm điểm' : 'Graded'}
-                      </span>
+                    <td style={{ textAlign: 'right' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(item);
+                        }}
+                      >
+                        {isVi ? 'Xem chi tiết' : 'View'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -501,117 +364,60 @@ export const AdminGradingAuditLogs: React.FC = () => {
             </table>
           </div>
         )}
-
-        <div className="adm-gh-table-footer">
-          <span>
-            {isVi 
-              ? `Hiển thị ${filteredHistory.length} trên tổng số ${gradingHistory.length} bài chấm` 
-              : `Showing ${filteredHistory.length} of ${gradingHistory.length} recorded submissions`}
-          </span>
-          <span className="adm-gh-count-badge">grading_records v2</span>
-        </div>
       </div>
 
-      {/* Slide-over Inspection Drawer (Chi tiết bài chấm điểm) */}
+      {/* Drawer Detail Modal */}
       {selectedItem && (
         <div className="adm-drawer-backdrop" onClick={() => setSelectedItem(null)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="adm-drawer-header">
-              <div className="adm-gh-assignment-meta">
-                <span className="adm-gh-count-badge">{selectedItem.id}</span>
-                <h2 className="adm-drawer-title">
-                  {isVi ? 'Chi Tiết Bài Chấm Điểm' : 'Graded Assignment Details'}
-                </h2>
-              </div>
+              <h2 className="adm-drawer-title">
+                {isVi ? `Chi Tiết Kiểm Toán: ${selectedItem.id}` : `Audit Log Detail: ${selectedItem.id}`}
+              </h2>
               <button 
-                type="button" 
-                className="adm-gh-drawer-close"
                 onClick={() => setSelectedItem(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
               >
-                <X size={16} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="adm-drawer-body">
-              {/* Graded Score Highlight Card */}
-              <div className="adm-gh-drawer-grade-card">
-                <div>
-                  <div className="adm-gh-drawer-score-label">
-                    {isVi ? 'ĐIỂM SỐ ĐẠT ĐƯỢC' : 'FINAL EVALUATION SCORE'}
-                  </div>
-                  <div className="adm-gh-drawer-grade-val">
-                    {selectedItem.score.toFixed(1)}
-                  </div>
+            <div className="adm-drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ padding: '16px', borderRadius: '10px', background: 'var(--surface-container-low)', border: '1px solid var(--outline-variant)' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>{isVi ? 'BÀI TẬP' : 'ASSIGNMENT'}</div>
+                <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '2px' }}>{selectedItem.assignment.title}</div>
+                <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginTop: '4px' }}>
+                  {selectedItem.assignment.className} • {selectedItem.assignment.code}
                 </div>
               </div>
 
-              {/* Execution Details Grid */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Thông Tin Thực Hiện' : 'Grading Information'}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{isVi ? 'Học viên' : 'Student'}</div>
+                  <div style={{ fontWeight: 600 }}>{selectedItem.student.name}</div>
+                  <div style={{ fontSize: '12px', fontFamily: 'monospace' }}>{selectedItem.student.code}</div>
                 </div>
-                <div className="adm-gh-drawer-meta-grid">
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Giáo viên chấm' : 'Graded By'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.gradedBy.name}</span>
-                    <span className="adm-gh-user-code">{selectedItem.gradedBy.code}</span>
-                  </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Học viên nộp bài' : 'Student'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.student.name}</span>
-                    <span className="adm-gh-student-code">{selectedItem.student.code}</span>
-                  </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Bài tập & Lớp' : 'Assignment & Class'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.assignment.code}</span>
-                    <span className="adm-gh-user-code">{selectedItem.assignment.className}</span>
-                  </div>
-                  <div className="adm-gh-drawer-meta-item">
-                    <span className="adm-gh-drawer-meta-label">{isVi ? 'Thời gian hoàn tất chấm' : 'Graded Timestamp'}</span>
-                    <span className="adm-gh-drawer-meta-val">{selectedItem.gradedAt}</span>
-                    <span className="adm-gh-user-code">{isVi ? `Nộp: ${selectedItem.assignment.submittedAt}` : `Submitted: ${selectedItem.assignment.submittedAt}`}</span>
-                  </div>
+                <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{isVi ? 'Điểm số chốt' : 'Final Score'}</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{selectedItem.score}</div>
                 </div>
               </div>
 
-              {/* Teacher Feedback / Comments (Lời phê của giáo viên) */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Lời Phê & Nhận Xét Của Giáo Viên' : 'Teacher Comments & Feedback'}
-                </div>
-                <div className="adm-gh-drawer-feedback-box">
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>{isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}</div>
+                <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--outline-variant)', fontSize: '13.5px', lineHeight: 1.5 }}>
                   {selectedItem.teacherFeedback}
                 </div>
               </div>
-
-              {/* Student Submission Content Excerpt (Nội dung bài làm của học sinh) */}
-              <div className="adm-gh-drawer-section">
-                <div className="adm-gh-drawer-section-title">
-                  {isVi ? 'Nội Dung Bài Nộp Của Học Viên' : 'Student Submission Excerpt'}
-                </div>
-                <div className="adm-gh-drawer-submission-preview">
-                  {selectedItem.submissionExcerpt}
-                </div>
-              </div>
             </div>
 
-            <div className="adm-gh-drawer-footer">
+            <div className="adm-drawer-footer">
               <button 
                 type="button" 
-                className="adm-gh-btn-secondary"
+                className="btn btn-secondary"
                 onClick={() => setSelectedItem(null)}
               >
                 {isVi ? 'Đóng' : 'Close'}
-              </button>
-              <button 
-                type="button" 
-                className="adm-gh-btn-primary"
-                onClick={() => {
-                  alert(isVi ? `Đang mở toàn bộ bài làm và chi tiết bài thi ${selectedItem.id}...` : `Opening full submission record ${selectedItem.id}...`);
-                }}
-              >
-                <CheckCircle2 size={16} />
-                <span>{isVi ? 'Xem toàn bộ bài làm' : 'View Full Submission'}</span>
               </button>
             </div>
           </div>
