@@ -4,9 +4,57 @@ on:
   pull_request:
     branches:
       - staging
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
 
 jobs:
+  wait-for-frontend-ci:
+    name: Wait for Frontend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      actions: read
+
+    steps:
+      - name: Wait for Frontend CI when frontend was changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CI_WORKFLOW: ci-frontend.yml
+        run: |
+          set -euo pipefail
+
+          POLL_INTERVAL=15
+          DEADLINE=$((SECONDS + 1500)) # 25 phút
+
+          echo "Waiting for Frontend CI ($SHA) ..."
+          ci_conclusion=""
+          while [ -z "$ci_conclusion" ]; do
+            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&per_page=5" \
+              --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
+            if [ -z "$ci_conclusion" ]; then
+              if [ "$SECONDS" -ge "$DEADLINE" ]; then
+                echo "::error::Timed out waiting for Frontend CI ($SHA)"
+                exit 1
+              fi
+              sleep "$POLL_INTERVAL"
+            fi
+          done
+
+          if [ "$ci_conclusion" != "success" ]; then
+            echo "::error::Frontend CI concluded '$ci_conclusion' for $SHA — blocking frontend deploy."
+            exit 1
+          fi
+
+          echo "Frontend CI passed ($SHA)."
+
   deploy:
+    name: Build & Deploy Frontend
+    needs:
+      - wait-for-frontend-ci
     runs-on: ubuntu-latest
 
     defaults:

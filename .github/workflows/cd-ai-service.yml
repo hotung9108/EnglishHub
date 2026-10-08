@@ -12,7 +12,7 @@ name: CD-AI-Service
 # Thư mục trên server: /home/<SERVER_USER>/ai-service
 # (docker-compose.ai-service.yml + env file riêng, xem env.ai-service.example)
 on:
-  push:
+  pull_request:
     branches:
       - main
       - staging
