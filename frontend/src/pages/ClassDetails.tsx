@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Users, Download, 
-  Award, BookOpen, Plus,
+  Award, BookOpen, Plus, UserPlus,
   Loader2, AlertCircle, Trash2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import { assignmentService } from '../api/services/assignment.service';
+import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
 import type { ClassDetail, ClassMember } from '../api/services/class.service';
 import type { AssignmentSummary } from '../api/services/assignment.service';
 
@@ -24,6 +25,7 @@ export const ClassDetails: React.FC = () => {
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [studentsRoster, setStudentsRoster] = useState<ClassMember[]>([]);
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
+  const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
 
   // Settings tab form state
   const [settingsForm, setSettingsForm] = useState({
@@ -263,18 +265,29 @@ export const ClassDetails: React.FC = () => {
           {/* Tab 1: Student Roster */}
           {activeTab === 'roster' && (
             <div className="adm-table-card">
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
                   {isVi ? 'Danh Sách Học Viên Đang Theo Học' : 'Active Enrolled Students'}
                 </h3>
-                <button 
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => navigate('/admin/students/create')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Plus size={14} />
-                  <span>{isVi ? 'Thêm học viên vào lớp' : 'Add Student'}</span>
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setShowSelectStudentsModal(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <UserPlus size={14} />
+                    <span>{isVi ? 'Chọn học viên có sẵn' : 'Add Existing Student'}</span>
+                  </button>
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => navigate('/admin/students/create')}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title={isVi ? 'Tạo mới hồ sơ học viên' : 'Create new student profile'}
+                  >
+                    <Plus size={14} />
+                    <span>{isVi ? 'Tạo mới' : 'Create New'}</span>
+                  </button>
+                </div>
               </div>
 
               {studentsRoster.length === 0 ? (
@@ -284,7 +297,25 @@ export const ClassDetails: React.FC = () => {
                     {isVi ? 'Lớp học chưa có học viên nào' : 'No students enrolled in this class'}
                   </div>
                   <div style={{ fontSize: '13px', marginTop: '4px' }}>
-                    {isVi ? 'Hãy ghi danh học viên mới hoặc thêm từ danh bạ.' : 'Enroll new students into this cohort.'}
+                    {isVi ? 'Hãy chọn học viên đã có trong hệ thống hoặc tạo hồ sơ học viên mới.' : 'Select existing students from directory or create new students.'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '16px' }}>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => setShowSelectStudentsModal(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <UserPlus size={16} />
+                      <span>{isVi ? 'Chọn học viên đã có trong hệ thống' : 'Select Existing Students'}</span>
+                    </button>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => navigate('/admin/students/create')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Plus size={16} />
+                      <span>{isVi ? 'Tạo mới học viên' : 'Create New Student'}</span>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -438,6 +469,25 @@ export const ClassDetails: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal: Chọn học viên đã có trong hệ thống */}
+      {showSelectStudentsModal && (
+        <SelectExistingStudentsModal
+          isOpen={showSelectStudentsModal}
+          onClose={() => setShowSelectStudentsModal(false)}
+          classId={classNumericId}
+          classNameTitle={classDetail?.name}
+          enrolledStudentIds={studentsRoster.map(s => s.studentId)}
+          onSuccess={async () => {
+            try {
+              const members = await classService.listMembers(classNumericId);
+              setStudentsRoster(members);
+            } catch {
+              // Keep current roster if reload fails
+            }
+          }}
+        />
       )}
     </div>
   );
