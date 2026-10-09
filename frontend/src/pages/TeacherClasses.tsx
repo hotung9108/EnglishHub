@@ -109,15 +109,15 @@ export const TeacherClasses: React.FC = () => {
 
             const avgScore = gradedScores.length > 0 
               ? Math.round((gradedScores.reduce((a, b) => a + b, 0) / gradedScores.length) * 10) / 10 
-              : 7.2;
+              : 0;
 
             return {
               id: String(cls.id),
               code: `CLASS-${cls.id.toString().padStart(2, '0')}`,
               name: cls.name,
               teacher: user?.fullName || (isVi ? 'Quý Thầy/Cô' : 'Teacher'),
-              room: 'Phòng học EnglishHub',
-              schedule: isVi ? 'Lịch cố định trong tuần' : 'Regular weekly schedule',
+              room: isVi ? 'Lớp học trực tuyến' : 'Online Classroom',
+              schedule: isVi ? 'Theo thời khóa biểu' : 'Per timetable',
               status: cls.status === 'ACTIVE' ? 'active' : 'completed',
               enrolledStudents: membersCount,
               stats: {
@@ -167,10 +167,10 @@ export const TeacherClasses: React.FC = () => {
     const completed = classes.filter((c) => c.status === 'completed').length;
     const totalStudents = classes.reduce((sum, c) => sum + c.enrolledStudents, 0);
     const totalPending = classes.reduce((sum, c) => sum + c.stats.pending, 0);
-    const scores = classes.map((c) => c.stats.avgScore);
+    const scores = classes.map((c) => c.stats.avgScore).filter((s) => s > 0);
     const overallAvg = scores.length > 0 
       ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) 
-      : '7.2';
+      : '0.0';
 
     return {
       all: classes.length,
@@ -473,7 +473,7 @@ export const TeacherClasses: React.FC = () => {
                   <div className="teacher-mini-kpi-item">
                     <span className="teacher-mini-kpi-label">{isVi ? 'Điểm TB' : 'Avg Score'}</span>
                     <span className="teacher-mini-kpi-val" style={{ color: cls.stats.avgScore >= 7.0 ? '#16a34a' : 'inherit' }}>
-                      {cls.stats.avgScore.toFixed(1)}/10
+                      {cls.stats.avgScore > 0 ? `${cls.stats.avgScore.toFixed(1)}/10` : '—'}
                     </span>
                   </div>
                 </div>

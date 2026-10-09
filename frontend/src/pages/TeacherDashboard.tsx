@@ -272,13 +272,13 @@ export const TeacherDashboard: React.FC = () => {
 
       const avgScore = gradedScores.length > 0 
         ? Math.round((gradedScores.reduce((a, b) => a + b, 0) / gradedScores.length) * 10) / 10 
-        : 7.0;
+        : 0;
 
       const totalPossibleSubmissions = ec.assignments.length * Math.max(1, totalEnrolled);
       const submittedCount = ec.submissions.length;
       const progressPercent = totalPossibleSubmissions > 0 
         ? Math.min(100, Math.round((submittedCount / totalPossibleSubmissions) * 100))
-        : 65;
+        : 0;
 
       return {
         id: String(cls.id),
@@ -289,7 +289,7 @@ export const TeacherDashboard: React.FC = () => {
         avgScore,
         nextSession: isVi ? 'Lịch học trong tuần' : 'Scheduled this week',
         schedule: isVi ? 'Theo thời khóa biểu' : 'Regular Schedule',
-        progressPercent: progressPercent || 60
+        progressPercent
       };
     });
   }, [enrichedClasses, isVi]);
@@ -314,42 +314,58 @@ export const TeacherDashboard: React.FC = () => {
       }
     }
 
-    const calcAvg = (scores: number[], fallback: number) => {
-      if (scores.length === 0) return fallback;
-      return Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
+    const calcAvg = (scores: number[]) => {
+      const valid = scores.filter((sc) => sc > 0);
+      if (valid.length === 0) return 0;
+      return Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10;
+    };
+
+    const calcSkillSubmissionRate = (skill: TeacherSkill) => {
+      let possible = 0;
+      let actual = 0;
+      for (const ec of enrichedClasses) {
+        const matchingAssigns = ec.assignments.filter((a) => mapSkill(a.title) === skill);
+        possible += matchingAssigns.length * ec.members.length;
+        for (const s of ec.submissions) {
+          if (s.modules.some((m) => mapSkill(m.skill) === skill)) {
+            actual++;
+          }
+        }
+      }
+      return possible > 0 ? Math.min(100, Math.round((actual / possible) * 100)) : 0;
     };
 
     return [
       {
         skill: 'writing',
         skillName: 'Writing',
-        avgScore: calcAvg(skillScores.writing, 6.8),
+        avgScore: calcAvg(skillScores.writing),
         benchmark: 7.0,
-        submissionRate: 90,
+        submissionRate: calcSkillSubmissionRate('writing'),
         needsReviewCount: queueCounts.writing
       },
       {
         skill: 'speaking',
         skillName: 'Speaking',
-        avgScore: calcAvg(skillScores.speaking, 7.2),
+        avgScore: calcAvg(skillScores.speaking),
         benchmark: 7.0,
-        submissionRate: 88,
+        submissionRate: calcSkillSubmissionRate('speaking'),
         needsReviewCount: queueCounts.speaking
       },
       {
         skill: 'reading',
         skillName: 'Reading',
-        avgScore: calcAvg(skillScores.reading, 7.5),
+        avgScore: calcAvg(skillScores.reading),
         benchmark: 7.5,
-        submissionRate: 95,
+        submissionRate: calcSkillSubmissionRate('reading'),
         needsReviewCount: queueCounts.reading
       },
       {
         skill: 'listening',
         skillName: 'Listening',
-        avgScore: calcAvg(skillScores.listening, 7.4),
+        avgScore: calcAvg(skillScores.listening),
         benchmark: 7.0,
-        submissionRate: 94,
+        submissionRate: calcSkillSubmissionRate('listening'),
         needsReviewCount: queueCounts.listening
       }
     ];
@@ -443,7 +459,8 @@ export const TeacherDashboard: React.FC = () => {
   }, [enrichedClasses]);
 
   const overallAvgBand = useMemo(() => {
-    const scores = skillPerformances.map((s) => s.avgScore);
+    const scores = skillPerformances.map((s) => s.avgScore).filter((s) => s > 0);
+    if (scores.length === 0) return 'Band 0.0';
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
     return `Band ${avg.toFixed(1)}`;
   }, [skillPerformances]);
@@ -619,8 +636,8 @@ export const TeacherDashboard: React.FC = () => {
               <div className="teacher-dash-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
                 <Award size={22} />
               </div>
-              <span className="teacher-dash-kpi-trend positive">
-                <ArrowUpRight size={12} /> Target Met
+              <span className={`teacher-dash-kpi-trend ${overallAvgBand !== 'Band 0.0' ? 'positive' : 'neutral'}`}>
+                <ArrowUpRight size={12} /> {overallAvgBand !== 'Band 0.0' ? (isVi ? 'Đang đạt chuẩn' : 'Target Met') : (isVi ? 'Chưa có điểm' : 'No data')}
               </span>
             </div>
             <div className="teacher-dash-kpi-body">
@@ -790,7 +807,7 @@ export const TeacherDashboard: React.FC = () => {
                         {item.skillName}
                       </span>
                       <span className="teacher-dash-skill-score">
-                        {item.avgScore}
+                        {item.avgScore > 0 ? item.avgScore : '—'}
                       </span>
                     </div>
 

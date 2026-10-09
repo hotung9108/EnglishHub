@@ -65,7 +65,8 @@ export const TeacherClassProgress: React.FC = () => {
   const getScoreClass = (score: number) => {
     if (score >= 7.5) return 'high';
     if (score >= 6.5) return 'medium';
-    return 'low';
+    if (score > 0) return 'low';
+    return 'none';
   };
 
   const detectSkill = (title: string): ClassSkill => {
@@ -205,7 +206,7 @@ export const TeacherClassProgress: React.FC = () => {
       setClassAssignments(mappedAssignments);
 
       // 7. Build Student Grade Roster
-      const rosterRows: StudentGradeRow[] = members.map((member, index) => {
+      const rosterRows: StudentGradeRow[] = members.map((member) => {
         const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
         const completedCount = studentSubs.length;
 
@@ -227,16 +228,19 @@ export const TeacherClassProgress: React.FC = () => {
           }
         }
 
-        const avgOf = (arr: number[], fallback: number) => {
-          if (arr.length === 0) return fallback;
+        const avgOf = (arr: number[]) => {
+          if (arr.length === 0) return 0;
           return Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10;
         };
 
-        const w = avgOf(writingScores, 7.0);
-        const sp = avgOf(speakingScores, 7.0);
-        const r = avgOf(readingScores, 7.5);
-        const l = avgOf(listeningScores, 7.5);
-        const overall = Math.round(((w + sp + r + l) / 4) * 10) / 10;
+        const w = avgOf(writingScores);
+        const sp = avgOf(speakingScores);
+        const r = avgOf(readingScores);
+        const l = avgOf(listeningScores);
+        const scoredSkills = [w, sp, r, l].filter((sc) => sc > 0);
+        const overall = scoredSkills.length > 0 
+          ? Math.round((scoredSkills.reduce((x, y) => x + y, 0) / scoredSkills.length) * 10) / 10 
+          : 0;
 
         let status: 'exceed' | 'ontime' | 'support' = 'ontime';
         let statusLabel = isVi ? 'Đạt chuẩn' : 'On-track';
@@ -244,10 +248,24 @@ export const TeacherClassProgress: React.FC = () => {
         if (overall >= 7.8 && completedCount >= rawAssignments.length * 0.8) {
           status = 'exceed';
           statusLabel = isVi ? 'Vượt trội' : 'Exceeding';
-        } else if (overall < 6.0 || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
+        } else if ((overall > 0 && overall < 6.0) || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
           status = 'support';
           statusLabel = isVi ? 'Cần hỗ trợ' : 'Needs Support';
         }
+
+        const attendance = rawAssignments.length > 0 
+          ? Math.round((completedCount / rawAssignments.length) * 100) 
+          : 100;
+
+        const sortedSubs = [...studentSubs].sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+        const latestSub = sortedSubs[0];
+        const lastActive = latestSub?.submittedAt 
+          ? new Date(latestSub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') 
+          : '—';
+
+        const recentFeedback = completedCount > 0 
+          ? (isVi ? `Đã hoàn thành ${completedCount} bài nộp.` : `Submitted ${completedCount} assignments.`)
+          : (isVi ? 'Chưa có bài nộp nào.' : 'No submissions yet.');
 
         return {
           id: `std-${member.studentId}`,
@@ -255,9 +273,9 @@ export const TeacherClassProgress: React.FC = () => {
           name: member.fullName,
           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.fullName)}`,
           email: `${member.studentCode?.toLowerCase() || `student${member.studentId}`}@englishhub.edu.vn`,
-          attendance: Math.max(70, Math.min(100, 95 - (index % 5) * 5)),
+          attendance,
           assignmentsCompleted: completedCount,
-          totalAssignments: Math.max(1, rawAssignments.length),
+          totalAssignments: rawAssignments.length,
           scores: {
             writing: w,
             speaking: sp,
@@ -267,10 +285,8 @@ export const TeacherClassProgress: React.FC = () => {
           },
           status,
           statusLabel,
-          lastActive: isVi ? 'Hôm nay' : 'Today',
-          recentFeedback: isVi 
-            ? 'Tham gia bài học tích cực, hoàn thành bài tập nộp đầy đủ.' 
-            : 'Active class participation and submitted assignments on time.'
+          lastActive,
+          recentFeedback
         };
       });
 
@@ -296,21 +312,27 @@ export const TeacherClassProgress: React.FC = () => {
 
   // Overall Class KPI Metrics
   const classKpis = useMemo(() => {
-    const totalStudents = Math.max(1, enrolledMembers.length);
-    const totalAssignmentsCount = Math.max(1, classAssignments.length);
+    const totalStudents = enrolledMembers.length;
+    const totalAssignmentsCount = classAssignments.length;
     const totalPossibleSubs = totalStudents * totalAssignmentsCount;
 
     const totalActualSubs = classAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
-    const completionRate = Math.min(100, Math.round((totalActualSubs / totalPossibleSubs) * 100)) || 85;
+    const completionRate = totalPossibleSubs > 0 
+      ? Math.min(100, Math.round((totalActualSubs / totalPossibleSubs) * 100)) 
+      : 0;
 
-    const scores = studentsRoster.map((s) => s.scores.overall);
+    const scores = studentsRoster.map((s) => s.scores.overall).filter((sc) => sc > 0);
     const avgScore = scores.length > 0 
       ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-      : '7.2';
+      : '0.0';
 
     const supportCount = studentsRoster.filter((s) => s.status === 'support').length;
-    const onTimeRate = 92.5;
-    const targetAttainment = Math.round(((totalStudents - supportCount) / totalStudents) * 100);
+    const onTimeRate = totalActualSubs > 0 
+      ? Math.min(100, Math.round((classAssignments.reduce((acc, a) => acc + (a.status !== 'closed' ? a.submittedCount : Math.round(a.submittedCount * 0.9)), 0) / totalActualSubs) * 100)) 
+      : 0;
+    const targetAttainment = studentsRoster.length > 0 
+      ? Math.round(((studentsRoster.length - supportCount) / studentsRoster.length) * 100) 
+      : 0;
 
     return {
       completionRate,
@@ -338,55 +360,96 @@ export const TeacherClassProgress: React.FC = () => {
 
   // 4-Skill Analytics Data calculated live
   const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => {
-    const getAvg = (skill: 'writing' | 'speaking' | 'reading' | 'listening', fallback: number) => {
-      const vals = studentsRoster.map((s) => s.scores[skill]);
-      if (vals.length === 0) return fallback;
+    const getAvg = (skill: 'writing' | 'speaking' | 'reading' | 'listening') => {
+      const vals = studentsRoster.map((s) => s.scores[skill]).filter((v) => v > 0);
+      if (vals.length === 0) return 0;
       return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
     };
+
+    const getSkillCompletion = (skill: 'writing' | 'speaking' | 'reading' | 'listening') => {
+      const skillAssignments = classAssignments.filter((a) => a.skill === skill);
+      if (skillAssignments.length === 0 || enrolledMembers.length === 0) return 0;
+      const possible = skillAssignments.length * enrolledMembers.length;
+      const actual = skillAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+      return Math.min(100, Math.round((actual / possible) * 100));
+    };
+
+    const generateSkillInsights = (name: string, avg: number) => {
+      if (avg === 0) {
+        return {
+          strengths: [] as string[],
+          weaknesses: [] as string[],
+          aiRecommendation: isVi 
+            ? `Chưa có bài làm kỹ năng ${name} được chấm điểm để tạo báo cáo chi tiết.` 
+            : `No graded submissions available for ${name} to generate AI diagnosis.`
+        };
+      }
+      if (avg >= 7.0) {
+        return {
+          strengths: isVi 
+            ? ['Đạt chuẩn hoặc vượt band mục tiêu của lớp', 'Điểm số ổn định qua các bài nộp'] 
+            : ['Meets or exceeds target band level', 'Consistent performance across submissions'],
+          weaknesses: isVi 
+            ? ['Cần thử thách các chủ đề phức tạp hơn'] 
+            : ['Ready for higher complexity prompts and timed drills'],
+          aiRecommendation: isVi 
+            ? `Lớp duy trì năng lực tốt ở kỹ năng ${name} (TB: ${avg}). Tiếp tục giao bài tập nâng cao.` 
+            : `Class demonstrates strong proficiency in ${name} (Avg: ${avg}). Continue with advanced practice.`
+        };
+      }
+      return {
+        strengths: isVi 
+          ? ['Học viên đã nắm được cấu trúc cơ bản của bài thi'] 
+          : ['Familiar with core exam rubric and task structure'],
+        weaknesses: isVi 
+          ? [`Điểm trung bình (${avg}) thấp hơn mục tiêu 7.0`, 'Cần tăng tốc độ hoàn thành và độ chính xác'] 
+          : [`Average score (${avg}) is below class target 7.0`, 'Needs improvement in accuracy and pacing'],
+        aiRecommendation: isVi 
+          ? `Tăng cường bài tập bổ trợ cho kỹ năng ${name} và dành thời gian chữa bài trực tiếp trên lớp.` 
+          : `Provide targeted reinforcement exercises for ${name} and conduct in-class reviews.`
+      };
+    };
+
+    const writingAvg = getAvg('writing');
+    const speakingAvg = getAvg('speaking');
+    const readingAvg = getAvg('reading');
+    const listeningAvg = getAvg('listening');
 
     return [
       {
         skill: 'writing',
         name: 'Writing',
-        avgScore: getAvg('writing', 6.8),
+        avgScore: writingAvg,
         targetScore: 7.0,
-        completionRate: classKpis.completionRate,
-        strengths: ['Bố cục bài viết chuẩn mực', 'Dẫn chứng thực tế phong phú', 'Paraphrase mở bài tốt'],
-        weaknesses: ['Lỗi ngữ pháp chia thì câu phức', 'Thiếu Collocations C1', 'Quá thời gian Task 2'],
-        aiRecommendation: 'Tăng cường bài tập luyện collocation chuyên đề và bấm giờ 40 phút cho mỗi bài Task 2.'
+        completionRate: getSkillCompletion('writing'),
+        ...generateSkillInsights('Writing', writingAvg)
       },
       {
         skill: 'speaking',
         name: 'Speaking',
-        avgScore: getAvg('speaking', 7.2),
+        avgScore: speakingAvg,
         targetScore: 7.0,
-        completionRate: 88,
-        strengths: ['Phản xạ Part 1 lưu loát', 'Ngữ điệu tự nhiên', 'Tự sửa lỗi linh hoạt'],
-        weaknesses: ['Ngắt quãng ở Part 2 khi thiếu ý', 'Lỗi âm cuối /s/, /t/, /d/', 'Lặp từ vựng Part 3'],
-        aiRecommendation: 'Tập trung luyện kỹ thuật mở rộng ý tưởng bằng phương pháp P.E.E.L cho Part 3.'
+        completionRate: getSkillCompletion('speaking'),
+        ...generateSkillInsights('Speaking', speakingAvg)
       },
       {
         skill: 'reading',
         name: 'Reading',
-        avgScore: getAvg('reading', 7.5),
+        avgScore: readingAvg,
         targetScore: 7.0,
-        completionRate: 98,
-        strengths: ['Kỹ năng Skimming cực tốt', 'Làm chính xác dạng Gap Fill', 'Tốc độ đọc trung bình cao'],
-        weaknesses: ['Dễ nhầm lẫn dạng True/False/Not Given', 'Mất nhiều thời gian ở Matching Headings'],
-        aiRecommendation: 'Củng cố chiến lược phân biệt rõ giữa "False" và "Not Given".'
+        completionRate: getSkillCompletion('reading'),
+        ...generateSkillInsights('Reading', readingAvg)
       },
       {
         skill: 'listening',
         name: 'Listening',
-        avgScore: getAvg('listening', 7.4),
+        avgScore: listeningAvg,
         targetScore: 7.0,
-        completionRate: 95,
-        strengths: ['Nghe số điện thoại, tên riêng chính xác', 'Bắt từ khóa Section 1, 2 nhạy bén'],
-        weaknesses: ['Bị đánh lừa bởi từ bẫy (Distractors)', 'Dạng trắc nghiệm Section 3 dài'],
-        aiRecommendation: 'Rèn luyện thói quen gạch chân từ khóa then chốt trước khi đoạn băng phát 30 giây.'
+        completionRate: getSkillCompletion('listening'),
+        ...generateSkillInsights('Listening', listeningAvg)
       }
     ];
-  }, [studentsRoster, classKpis.completionRate]);
+  }, [studentsRoster, classAssignments, enrolledMembers, isVi]);
 
   // Syllabus Lessons dynamically created based on assignments
   const syllabusLessons: SyllabusLessonItem[] = useMemo(() => {
@@ -396,7 +459,7 @@ export const TeacherClassProgress: React.FC = () => {
       date: hw.dueDate,
       focusSkill: hw.skill,
       status: hw.status === 'closed' ? 'completed' : hw.status === 'open' ? 'current' : 'upcoming',
-      materialsCount: 3,
+      materialsCount: hw.skill ? 1 : 0,
       homeworkAttached: hw.code
     }));
   }, [classAssignments]);
@@ -866,30 +929,30 @@ export const TeacherClassProgress: React.FC = () => {
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.writing)}`}>
-                        {std.scores.writing}
+                        {std.scores.writing > 0 ? std.scores.writing : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.speaking)}`}>
-                        {std.scores.speaking}
+                        {std.scores.speaking > 0 ? std.scores.speaking : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.reading)}`}>
-                        {std.scores.reading}
+                        {std.scores.reading > 0 ? std.scores.reading : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.listening)}`}>
-                        {std.scores.listening}
+                        {std.scores.listening > 0 ? std.scores.listening : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
-                      <span className="tcd-overall-score">{std.scores.overall}</span>
+                      <span className="tcd-overall-score">{std.scores.overall > 0 ? std.scores.overall : '—'}</span>
                     </td>
 
                     <td>
@@ -1059,7 +1122,7 @@ export const TeacherClassProgress: React.FC = () => {
                   </span>
 
                   <div className="tcd-skill-score-box">
-                    <span className="tcd-skill-avg-score">{sk.avgScore}</span>
+                    <span className="tcd-skill-avg-score">{sk.avgScore > 0 ? sk.avgScore : '—'}</span>
                     <span className="tcd-skill-target-score">/ {sk.targetScore}</span>
                   </div>
                 </div>
@@ -1080,9 +1143,15 @@ export const TeacherClassProgress: React.FC = () => {
                     {isVi ? '✓ Điểm mạnh của lớp:' : '✓ Class Strengths:'}
                   </div>
                   <div className="tcd-tags-list">
-                    {sk.strengths.map((str, idx) => (
-                      <span key={idx} className="tcd-tag-item strength">{str}</span>
-                    ))}
+                    {sk.strengths.length > 0 ? (
+                      sk.strengths.map((str, idx) => (
+                        <span key={idx} className="tcd-tag-item strength">{str}</span>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        {isVi ? 'Chưa có đủ dữ liệu đánh giá' : 'Insufficient data'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1092,9 +1161,15 @@ export const TeacherClassProgress: React.FC = () => {
                     {isVi ? '⚠ Điểm yếu cần khắc phục:' : '⚠ Common Weaknesses:'}
                   </div>
                   <div className="tcd-tags-list">
-                    {sk.weaknesses.map((wk, idx) => (
-                      <span key={idx} className="tcd-tag-item weakness">{wk}</span>
-                    ))}
+                    {sk.weaknesses.length > 0 ? (
+                      sk.weaknesses.map((wk, idx) => (
+                        <span key={idx} className="tcd-tag-item weakness">{wk}</span>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        {isVi ? 'Chưa có đủ dữ liệu đánh giá' : 'Insufficient data'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1251,7 +1326,9 @@ export const TeacherClassProgress: React.FC = () => {
               }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{isVi ? 'Điểm trung bình (Overall)' : 'Overall Band'}</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>Band {selectedStudent.scores.overall}</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>
+                    {selectedStudent.scores.overall > 0 ? `Band ${selectedStudent.scores.overall}` : '—'}
+                  </div>
                 </div>
                 <span className={`tcd-status-chip ${selectedStudent.status}`}>
                   {selectedStudent.statusLabel}
@@ -1266,19 +1343,27 @@ export const TeacherClassProgress: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                   <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>Writing</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>Band {selectedStudent.scores.writing}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>
+                      {selectedStudent.scores.writing > 0 ? `Band ${selectedStudent.scores.writing}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#faf5ff', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#9333ea', fontWeight: 600 }}>Speaking</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>Band {selectedStudent.scores.speaking}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>
+                      {selectedStudent.scores.speaking > 0 ? `Band ${selectedStudent.scores.speaking}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Reading</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>Band {selectedStudent.scores.reading}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>
+                      {selectedStudent.scores.reading > 0 ? `Band ${selectedStudent.scores.reading}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#f0fdfa', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#0d9488', fontWeight: 600 }}>Listening</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>Band {selectedStudent.scores.listening}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>
+                      {selectedStudent.scores.listening > 0 ? `Band ${selectedStudent.scores.listening}` : '—'}
+                    </div>
                   </div>
                 </div>
               </div>

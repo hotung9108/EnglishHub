@@ -44,13 +44,7 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
     id: `new-${Date.now()}`,
     code: initialSkill === 'speaking' ? 'HW-SP' : initialSkill === 'reading' ? 'HW-RD' : initialSkill === 'listening' ? 'HW-LS' : 'HW-WR',
-    title: initialSkill === 'speaking' 
-      ? 'Speaking Part 2: Environmental Solutions' 
-      : initialSkill === 'reading' 
-      ? 'IELTS Reading Mock: Emerging Clean Energy Tech' 
-      : initialSkill === 'listening' 
-      ? 'IELTS Listening: Campus Orientation & Library Guide' 
-      : 'IELTS Writing Task 2 - Sustainable Urban Development',
+    title: '',
     skill: initialSkill,
     className: '',
     startDate: new Date().toISOString().slice(0, 16),
@@ -63,7 +57,7 @@ export const TeacherCreateAssignment: React.FC = () => {
     maxSubmissions: 3,
     writing: {
       taskType: 'task2',
-      promptText: 'As global urbanization accelerates, metropolitan areas encounter significant environmental challenges. Discuss the main issues caused by rapid city growth and suggest practical measures governments and citizens can undertake to achieve sustainable urban development. (Write at least 250 words).',
+      promptText: '',
       minWords: 250,
       scale: '9.0',
       rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },

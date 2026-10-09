@@ -419,6 +419,15 @@ export const TeacherExamBank: React.FC = () => {
     };
   }, [examTemplates]);
 
+  const totalDeploys = useMemo(() => {
+    return examTemplates.reduce((sum, e) => sum + e.usageCount, 0);
+  }, [examTemplates]);
+
+  const avgRating = useMemo(() => {
+    if (examTemplates.length === 0) return '5.0';
+    return (examTemplates.reduce((sum, e) => sum + e.rating, 0) / examTemplates.length).toFixed(1);
+  }, [examTemplates]);
+
   const handleConfirmAssign = async (form: QuickAssignForm) => {
     try {
       const targetClassId = Number(form.classId);
@@ -586,7 +595,7 @@ export const TeacherExamBank: React.FC = () => {
             <Layers size={22} />
           </div>
           <div>
-            <div className="exam-stat-num">420+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
+            <div className="exam-stat-num">{totalDeploys}+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
             <div className="exam-stat-label">{isVi ? 'Giáo viên đã sử dụng trong học kỳ' : 'Deployed across classrooms'}</div>
           </div>
         </div>
@@ -596,7 +605,7 @@ export const TeacherExamBank: React.FC = () => {
             <Star size={22} />
           </div>
           <div>
-            <div className="exam-stat-num">4.9 / 5.0</div>
+            <div className="exam-stat-num">{avgRating} / 5.0</div>
             <div className="exam-stat-label">{isVi ? 'Đánh giá độ sát đề thi thật' : 'Exam Fidelity Rating'}</div>
           </div>
         </div>

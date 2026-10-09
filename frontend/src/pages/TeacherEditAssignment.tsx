@@ -43,7 +43,7 @@ export const TeacherEditAssignment: React.FC = () => {
   // Class & Stats
   const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
-  const [turnoutStats, setTurnoutStats] = useState<{ total: number; submitted: number }>({ total: 24, submitted: 0 });
+  const [turnoutStats, setTurnoutStats] = useState<{ total: number; submitted: number }>({ total: 0, submitted: 0 });
   const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
 
   // Assignment Editor state
@@ -159,7 +159,7 @@ export const TeacherEditAssignment: React.FC = () => {
           const members = await classService.listMembers(matchedClass.id);
           const subs = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
           setTurnoutStats({
-            total: Math.max(1, members.length),
+            total: members.length,
             submitted: subs.data?.length || 0
           });
         } catch {
@@ -694,7 +694,7 @@ export const TeacherEditAssignment: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
               <span style={{ color: '#64748b' }}>{isVi ? 'Số bài đã nộp:' : 'Submitted:'}</span>
               <strong style={{ color: '#16a34a' }}>
-                {turnoutStats.submitted} {isVi ? 'bài' : 'items'} ({Math.round((turnoutStats.submitted / Math.max(1, turnoutStats.total)) * 100)}%)
+                {turnoutStats.submitted} {isVi ? 'bài' : 'items'} ({turnoutStats.total > 0 ? Math.round((turnoutStats.submitted / turnoutStats.total) * 100) : 0}%)
               </strong>
             </div>
             {lastSavedTime && (

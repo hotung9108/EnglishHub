@@ -37,7 +37,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [classSubmissions, setClassSubmissions] = useState<Array<{ studentId: number; name?: string }>>([]);
 
   // Form State
-  const [finalScoreInput, setFinalScoreInput] = useState<string>('7.5');
+  const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
   const [teacherNote, setTeacherNote] = useState<string>('');
 
@@ -137,7 +137,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
             setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
           }
           if (aiRes.suggestedScore !== null && aiRes.suggestedScore !== undefined) {
-            setFinalScoreInput((prev) => (prev === '7.5' ? String(aiRes.suggestedScore) : prev));
+            setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
           }
         } catch {
           // ignore
@@ -604,6 +604,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   step="0.5" 
                   min="0" 
                   max="10"
+                  placeholder="0.0"
                   value={finalScoreInput}
                   onChange={(e) => setFinalScoreInput(e.target.value)}
                   style={{

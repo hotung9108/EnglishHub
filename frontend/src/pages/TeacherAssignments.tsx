@@ -110,12 +110,12 @@ export const TeacherAssignments: React.FC = () => {
         const loadedItems: AssignmentDisplayItem[] = [];
 
         for (const cls of targetClasses) {
-          let membersCount = 20;
+          let membersCount = 0;
           try {
             const members = await classService.listMembers(cls.id);
             membersCount = members.length;
           } catch {
-            membersCount = 20;
+            membersCount = 0;
           }
 
           let rawAssignments: AssignmentSummary[] = [];
@@ -178,7 +178,7 @@ export const TeacherAssignments: React.FC = () => {
               className: cls.name,
               dueDate: dueDateStr,
               daysLeft,
-              totalStudents: Math.max(1, membersCount),
+              totalStudents: membersCount,
               submittedCount,
               pendingGradingCount,
               status
@@ -484,7 +484,9 @@ export const TeacherAssignments: React.FC = () => {
       {!isLoading && !error && (
         <div className="teacher-assignments-list">
           {filteredAssignments.map((item) => {
-            const submissionPercent = Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100));
+            const submissionPercent = item.totalStudents > 0 
+              ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100)) 
+              : 0;
 
             return (
               <div key={item.id} className="teacher-assignment-card">

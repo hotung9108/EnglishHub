@@ -219,11 +219,11 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
     const scores = students
       .map((s) => s.finalScore)
-      .filter((sc): sc is number => sc !== null && sc !== undefined);
+      .filter((sc): sc is number => sc !== null && sc !== undefined && sc > 0);
 
     const avgBand = scores.length > 0 
       ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-      : '7.0';
+      : '0.0';
 
     const gradedPercentage = submittedCount > 0 
       ? Math.round((gradedCount / submittedCount) * 100) 
@@ -462,7 +462,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '8px' }}>
             <div style={{ fontSize: '32px', fontWeight: 700, color: '#2563EB' }}>
-              {metrics.avgBand}
+              {metrics.avgBand !== '0.0' ? metrics.avgBand : '—'}
             </div>
             <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: 500 }}>
               {t('assignmentDetails.bandSuffix')}
