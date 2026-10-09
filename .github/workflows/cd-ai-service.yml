@@ -27,7 +27,7 @@ jobs:
   wait-for-ai-ci:
     name: Wait for AI Service CI
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     permissions:
       actions: read
@@ -48,7 +48,7 @@ jobs:
           echo "Waiting for AI Service CI ($SHA) ..."
           ci_conclusion=""
           while [ -z "$ci_conclusion" ]; do
-            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&per_page=5" \
+            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&event=push&per_page=5" \
               --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
             if [ -z "$ci_conclusion" ]; then
               if [ "$SECONDS" -ge "$DEADLINE" ]; then
@@ -126,7 +126,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_NAME,DEPLOY_SHA
           timeout: 2m
-          command_timeout: 60m
+          command_timeout: 120m
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
