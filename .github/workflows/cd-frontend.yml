@@ -1,7 +1,7 @@
 name: CD-Frontend-Production
 
 on:
-  pull_request:
+  push:
     branches:
       - main
     paths:
@@ -33,7 +33,7 @@ jobs:
           echo "Waiting for Frontend CI ($SHA) ..."
           ci_conclusion=""
           while [ -z "$ci_conclusion" ]; do
-            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&per_page=5" \
+            ci_conclusion=$(gh api "repos/$REPO/actions/workflows/$CI_WORKFLOW/runs?head_sha=$SHA&status=completed&event=push&per_page=5" \
               --jq '.workflow_runs[0].conclusion // empty' 2>/dev/null || true)
             if [ -z "$ci_conclusion" ]; then
               if [ "$SECONDS" -ge "$DEADLINE" ]; then

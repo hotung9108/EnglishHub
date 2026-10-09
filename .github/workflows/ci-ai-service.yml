@@ -1,6 +1,13 @@
 name: CI-AI-Service
 
 on:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'ai-service/**'
+      - '.github/workflows/ci-ai-service.yml'
   pull_request:
     branches:
       - main
