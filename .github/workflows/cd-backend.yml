@@ -11,7 +11,7 @@ name: CD-Backend-Production
 #   wait-ai-service     : chờ AI Service CI + "Deploy AI Service" hoàn tất
 #                         (nếu push này có thay đổi ai-service/**).
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -25,7 +25,7 @@ jobs:
   wait-for-backend-ci:
     name: Wait for Backend CI
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     permissions:
       actions: read
@@ -67,7 +67,7 @@ jobs:
   wait-ai-service:
     name: Wait for AI Service CI & CD
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     permissions:
       actions: read
@@ -198,7 +198,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_NAME,DEPLOY_SHA
           timeout: 2m
-          command_timeout: 60m
+          command_timeout: 120m
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \

@@ -12,7 +12,7 @@ name: CD-AI-Service
 # Thư mục trên server: /home/<SERVER_USER>/ai-service
 # (docker-compose.ai-service.yml + env file riêng, xem env.ai-service.example)
 on:
-  push:
+  pull_request:
     branches:
       - main
       - staging
@@ -27,7 +27,7 @@ jobs:
   wait-for-ai-ci:
     name: Wait for AI Service CI
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     permissions:
       actions: read
@@ -126,7 +126,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_NAME,DEPLOY_SHA
           timeout: 2m
-          command_timeout: 60m
+          command_timeout: 120m
           script: |
             # Đăng nhập GHCR để pull image
             echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io \
