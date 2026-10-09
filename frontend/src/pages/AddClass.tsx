@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, Check, 
-  User, Clock, MapPin, Loader2, AlertCircle
+  User, Clock, MapPin, Loader2, AlertCircle, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
@@ -25,6 +25,8 @@ export const AddClass: React.FC = () => {
     code: '',
     level: 'IELTS 6.5+',
     room: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: '',
     teacherId: '',
     teacherName: '',
     schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
@@ -75,7 +77,18 @@ export const AddClass: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) {
+      setSubmitError(isVi ? 'Vui lòng nhập tên lớp học.' : 'Please enter class name.');
+      return;
+    }
+    if (!formData.startDate) {
+      setSubmitError(isVi ? 'Vui lòng chọn ngày bắt đầu.' : 'Please select start date.');
+      return;
+    }
+    if (formData.endDate && formData.endDate < formData.startDate) {
+      setSubmitError(isVi ? 'Ngày kết thúc phải sau ngày bắt đầu.' : 'End date must be after start date.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -85,6 +98,8 @@ export const AddClass: React.FC = () => {
         name: formData.name.trim(),
         level: formData.level,
         description: formData.notes ? `${formData.schedule} • ${formData.room} • ${formData.notes}` : `${formData.schedule} • ${formData.room}`,
+        startDate: formData.startDate,
+        endDate: formData.endDate || undefined,
         teacherId: formData.teacherId ? Number(formData.teacherId) : undefined
       });
 
@@ -198,6 +213,30 @@ export const AddClass: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="adm-form-grid">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Ngày bắt đầu (Khai giảng)' : 'Start Date'} *</label>
+                    <input 
+                      type="date"
+                      className="input"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Ngày kết thúc dự kiến' : 'Estimated End Date'}</label>
+                    <input 
+                      type="date"
+                      className="input"
+                      value={formData.endDate}
+                      min={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Phòng học / Link trực tuyến' : 'Room / Virtual Link'}</label>
                   <input 
@@ -213,8 +252,15 @@ export const AddClass: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-primary"
-                    disabled={!formData.name.trim()}
-                    onClick={() => setCurrentStep(2)}
+                    disabled={!formData.name.trim() || !formData.startDate}
+                    onClick={() => {
+                      if (formData.endDate && formData.endDate < formData.startDate) {
+                        setSubmitError(isVi ? 'Ngày kết thúc phải sau ngày bắt đầu.' : 'End date must be after start date.');
+                        return;
+                      }
+                      setSubmitError(null);
+                      setCurrentStep(2);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addClass.btnNextStep2')}</span>
@@ -330,7 +376,7 @@ export const AddClass: React.FC = () => {
                   <button 
                     type="submit" 
                     className="btn btn-primary"
-                    disabled={submitting || !formData.name.trim()}
+                    disabled={submitting || !formData.name.trim() || !formData.startDate}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
@@ -370,6 +416,15 @@ export const AddClass: React.FC = () => {
                 <Clock size={15} />
                 <span>{formData.schedule}</span>
               </div>
+              {formData.startDate && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={15} />
+                  <span>
+                    {isVi ? 'Khai giảng: ' : 'Starts: '}{formData.startDate}
+                    {formData.endDate ? ` → ${formData.endDate}` : ''}
+                  </span>
+                </div>
+              )}
               {formData.room && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MapPin size={15} />
