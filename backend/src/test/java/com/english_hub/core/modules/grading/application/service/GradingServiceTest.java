@@ -19,6 +19,7 @@ import com.english_hub.core.modules.grading.domain.model.GradingContext;
 import com.english_hub.core.modules.grading.domain.model.GradingMethod;
 import com.english_hub.core.modules.grading.domain.model.GradingStatus;
 import com.english_hub.core.modules.grading.domain.model.ReviewStatus;
+import com.english_hub.core.modules.grading.application.port.AiAnalysisInFlightRegistry;
 import com.english_hub.core.modules.grading.domain.repository.AnswerAnnotationRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingChangeLogRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingContextRepository;
@@ -30,6 +31,7 @@ import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class GradingServiceTest {
@@ -67,6 +72,12 @@ class GradingServiceTest {
 	private GradingAiAnalysisService gradingAiAnalysisService;
 
 	@Mock
+	private GradingAiResultPersistenceService gradingAiResultPersistenceService;
+
+	@Mock
+	private AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry;
+
+	@Mock
 	private com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataAnswerRepository answerRepository;
 
 	private GradingService gradingService;
@@ -82,13 +93,15 @@ class GradingServiceTest {
 				currentUserProvider,
 				userRepository,
 				gradingAiAnalysisService,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
 				answerRepository);
 	}
 
 	@Test
 	void rejectsFinalScoreAboveMaxScoreSnapshot() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 
@@ -102,7 +115,7 @@ class GradingServiceTest {
 	@Test
 	void rejectsNegativeFinalScore() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 
@@ -116,7 +129,7 @@ class GradingServiceTest {
 	@Test
 	void savesTeacherGradeAndAppendsChangeLogWhenScoreChanges() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 		when(gradingRepository.saveTeacherGrade(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -140,7 +153,7 @@ class GradingServiceTest {
 	@Test
 	void acceptsFinalScoreEqualToMaxScoreSnapshot() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 		when(gradingRepository.saveTeacherGrade(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -154,7 +167,7 @@ class GradingServiceTest {
 	@Test
 	void numericallyEqualScoreDoesNotAppendChangeLog() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 		when(gradingRepository.saveTeacherGrade(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -168,7 +181,7 @@ class GradingServiceTest {
 	@Test
 	void feedbackOnlyChangeDoesNotAppendChangeLog() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
 				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 		when(gradingRepository.saveTeacherGrade(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -182,8 +195,6 @@ class GradingServiceTest {
 	@Test
 	void forbidsTeacherWhoDoesNotOwnTheClassFromChangingScore() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
-		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
-				GradingStatus.PENDING)));
 		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(99L, ModuleSkill.WRITING)));
 
 		assertThatExceptionOfType(ApiException.class)
@@ -242,11 +253,23 @@ class GradingServiceTest {
 						14L, 6L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null,
 						ModuleTaskType.RECORDING, null)));
 		Grading pending = grading(5L, bd("10.00"), null, GradingStatus.PENDING);
-		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(pending));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(pending));
+		when(aiAnalysisInFlightRegistry.tryClaim(14L)).thenReturn(true);
 
-		gradingService.requestAiAnalysis(14L);
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			gradingService.requestAiAnalysis(14L);
+			verifyNoInteractions(gradingAiAnalysisService);
+			List<TransactionSynchronization> synchronizations =
+					TransactionSynchronizationManager.getSynchronizations();
+			synchronizations.forEach(TransactionSynchronization::afterCommit);
+			synchronizations.forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
 
 		verify(gradingAiAnalysisService).analyzeSubmittedModule(14L);
+		verify(aiAnalysisInFlightRegistry, never()).release(14L);
 		verify(gradingRepository, never()).saveTeacherGrade(any());
 		verifyNoInteractions(answerAnnotationRepository);
 		assertThat(pending.status()).isEqualTo(GradingStatus.PENDING);
@@ -259,12 +282,80 @@ class GradingServiceTest {
 				.thenReturn(Optional.of(new GradingContext(
 						14L, null, 7L, 3L, 2L, 20L, 41L, ModuleSkill.SPEAKING, true, null)));
 		Grading failed = grading(5L, bd("10.00"), null, GradingStatus.FAILED);
-		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(failed));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(failed));
+		when(aiAnalysisInFlightRegistry.tryClaim(14L)).thenReturn(true);
 
-		gradingService.requestAiAnalysis(14L);
+		requestAndCommitAiAnalysis(14L);
 
 		verify(gradingRepository).updateStatus(5L, GradingStatus.PENDING);
 		verify(gradingAiAnalysisService).analyzeSubmittedModule(14L);
+	}
+
+	@Test
+	void requestAiAnalysis_whenAlreadyInFlight_rejectsDuplicateTrigger() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.SPEAKING)));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, bd("10.00"), null, GradingStatus.PENDING)));
+		when(aiAnalysisInFlightRegistry.tryClaim(14L)).thenReturn(false);
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.requestAiAnalysis(14L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+		verify(gradingAiAnalysisService, never()).analyzeSubmittedModule(14L);
+	}
+
+	@Test
+	void requestAiAnalysis_releasesClaimWhenRequestTransactionRollsBack() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.SPEAKING)));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, bd("10.00"), null, GradingStatus.PENDING)));
+		when(aiAnalysisInFlightRegistry.tryClaim(14L)).thenReturn(true);
+
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			gradingService.requestAiAnalysis(14L);
+			TransactionSynchronizationManager.getSynchronizations().forEach(
+					sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
+
+		verify(aiAnalysisInFlightRegistry).release(14L);
+		verifyNoInteractions(gradingAiAnalysisService);
+	}
+
+	@Test
+	void requestAiAnalysis_whenExecutorRejects_marksPendingFailedAndReleasesClaim() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.SPEAKING)));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, bd("10.00"), null, GradingStatus.PENDING)));
+		when(aiAnalysisInFlightRegistry.tryClaim(14L)).thenReturn(true);
+		org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException())
+				.when(gradingAiAnalysisService).analyzeSubmittedModule(14L);
+
+		requestAndCommitAiAnalysis(14L);
+
+		verify(aiAnalysisInFlightRegistry).release(14L);
+		verify(gradingAiResultPersistenceService).markFailedIfStillPending(14L);
+	}
+
+	@Test
+	void updateFinalGrade_whenPessimisticLockTimesOut_returnsBadRequest() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenThrow(new PessimisticLockingFailureException("lock timeout"));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("8.50"), "Feedback", null))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 	}
 
 	@Test
@@ -372,7 +463,7 @@ class GradingServiceTest {
 				GradingMethod.AUTO,
 				GradingStatus.AI_GRADED,
 				"Well organized essay with clear main ideas.",
-				bd("6.5"),
+				bd("8.0"),
 				"Well organized essay with clear main ideas.",
 				bd("9.0"),
 				null,
@@ -424,6 +515,25 @@ class GradingServiceTest {
 		assertThat(response.fallbackManualGradingAvailable()).isTrue();
 		assertThat(response.fallbackMessage()).contains("PUT /api/v1/gradings/5");
 		assertThat(response.fallbackMessage()).contains("thủ công theo cơ chế dự phòng PP R6");
+	}
+
+	@Test
+	void getAiSuggestion_withoutCriteriaOverallScore_doesNotFallbackToFinalScore() throws Exception {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		com.fasterxml.jackson.databind.node.ObjectNode details =
+				new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+		details.putObject("criteriaScores").put("taskResponse", 7.0);
+		Grading aiGraded = new Grading(
+				5L, 14L, GradingMethod.AUTO, GradingStatus.AI_GRADED, "AI feedback", bd("8.0"),
+				"AI feedback", bd("9.0"), null, null, null, details, null);
+		when(gradingRepository.findBySubmissionModuleId(14L)).thenReturn(Optional.of(aiGraded));
+
+		com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse response =
+				gradingService.getAiSuggestion(14L);
+
+		assertThat(response.suggestedScore()).isNull();
 	}
 
 	@Test
@@ -484,6 +594,19 @@ class GradingServiceTest {
 				null,
 				null,
 				null);
+	}
+
+	private void requestAndCommitAiAnalysis(long submissionModuleId) {
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			gradingService.requestAiAnalysis(submissionModuleId);
+			List<TransactionSynchronization> synchronizations =
+					TransactionSynchronizationManager.getSynchronizations();
+			synchronizations.forEach(TransactionSynchronization::afterCommit);
+			synchronizations.forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
 	}
 
 	private GradingContext context(Long teacherId, ModuleSkill skill) {
