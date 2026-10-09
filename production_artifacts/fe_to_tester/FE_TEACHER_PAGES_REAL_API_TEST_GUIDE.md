@@ -130,7 +130,36 @@ Xác nhận toàn bộ các trang thuộc phân hệ **Giáo viên** (Teacher Po
 
 ---
 
-## 4. Báo Cáo Chất Lượng Mã Nguồn (Quality Gate)
+## 4. Chi Tiết Rà Soát & Xóa Bỏ Dữ Liệu Mock (Mock Data Purge)
+Toàn bộ các giá trị giả lập, hằng số hardcode, công thức tính toán nhân tạo đã được dọn sạch hoàn toàn:
+- **`TeacherClassProgress.tsx`**:
+  - Xóa bỏ fallback band điểm giả (`7.0`, `7.5`, `7.2`); hiển thị `0` hoặc `'—'` khi học viên chưa có bài làm được chấm.
+  - Loại bỏ công thức chuyên cần nhân tạo `95 - (index % 5) * 5`; tính toán tỷ lệ chuyên cần/nộp bài thực tế từ số bài tập đã nộp so với tổng bài tập lớp.
+  - Loại bỏ nhãn ngày giả (`'Hôm nay'`) và nhận xét tĩnh (`'Tham gia bài học tích cực...'`); tính toán ngày nộp bài gần nhất thực tế và thông tin nộp bài.
+  - Xóa bỏ số liệu KPI cứng (`|| 85`, `'7.2'`, `onTimeRate = 92.5`); tính toán tỷ lệ hoàn thành, điểm TB, tỷ lệ đúng hạn từ dữ liệu submissions thực tế.
+  - 4-Skill Analytics: Xóa bỏ các nhận xét Cambridge tĩnh (strengths, weaknesses, AI recommendation); sinh động dựa trên kết quả trung bình thực tế hoặc hiển thị thông báo rỗng khi lớp chưa có bài nộp được chấm.
+  - Syllabus Lessons: Xóa bỏ `materialsCount: 3` hardcode.
+- **`TeacherClasses.tsx`**:
+  - Xóa bỏ điểm TB mặc định `7.2`; thay bằng `0` và hiển thị `'—'` khi lớp chưa có điểm.
+  - Xóa bỏ phòng học và lịch cứng; sử dụng lịch và mô tả động từ lớp học.
+- **`TeacherAssignments.tsx`**:
+  - Xóa bỏ fallback sĩ số `20` học viên khi lỗi mạng hoặc chưa tải xong; thay bằng `0` và chặn lỗi chia cho 0 trong tính phần trăm nộp bài.
+- **`TeacherEditAssignment.tsx`**:
+  - Khởi tạo `turnoutStats` từ `{ total: 0, submitted: 0 }` thay vì `{ total: 24, submitted: 0 }`.
+- **`TeacherSubmissionDetails.tsx`**:
+  - Khởi tạo ô nhập điểm chính thức từ `''` thay vì mặc định `7.5`.
+  - Tự động điền điểm gợi ý từ AI chỉ khi ô điểm đang trống.
+- **`TeacherExamBank.tsx`**:
+  - Tính toán động tổng số lượt giao bài (`totalDeploys`) và điểm đánh giá (`avgRating`) từ danh sách templates thay vì số liệu cứng `420+` và `4.9 / 5.0`.
+- **`TeacherDashboard.tsx`**:
+  - Xóa bỏ fallback band `7.0`, tỷ lệ nộp bài tĩnh `90, 88, 95, 94%`, tiến độ giả lập `65%`.
+  - Tính toán động tỷ lệ nộp bài theo từng kỹ năng từ số submissions/assignments thực tế.
+  - Hiển thị `'—'` khi kỹ năng chưa có dữ liệu điểm.
+
+---
+
+## 5. Báo Cáo Chất Lượng Mã Nguồn (Quality Gate)
 - **Unit Test**: 73/73 tests passed (`pass 73, fail 0`).
-- **Production Build**: `npm run build` (`tsc -b && vite build`) hoàn thành thành công trong 938ms, 0 lỗi biên dịch type hoặc bundle.
-- **Mock Data**: 0 hardcoded arrays / static objects còn lại trong các trang giáo viên.
+- **TypeScript & Production Build**: `npm run build` (`tsc -b && vite build`) hoàn thành thành công, 0 lỗi biên dịch type hoặc bundle.
+- **Linting & Code Quality**: `npm run lint` (`eslint .`) không có bất kỳ warning hoặc error nào; tuân thủ quy tắc React 19 / React Compiler.
+- **Mock Data**: 0 hardcoded arrays / static fallback scores còn tồn tại trong phân hệ Giáo viên.
