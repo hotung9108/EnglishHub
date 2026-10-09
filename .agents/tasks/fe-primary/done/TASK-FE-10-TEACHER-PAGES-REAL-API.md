@@ -5,7 +5,7 @@ role: fe-primary
 assignee: Maloque18705
 status: "Done"
 created_at: 2026-10-09T16:05:00+07:00
-updated_at: 2026-10-09T16:36:00+07:00
+updated_at: 2026-10-09T20:18:00+07:00
 priority: P0
 tags: [frontend, teacher-portal, real-api, assignments, grading, gradebook, classes, exam-bank, fe-05, fe-10]
 ---
