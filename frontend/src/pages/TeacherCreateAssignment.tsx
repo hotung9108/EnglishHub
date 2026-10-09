@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Bell
+  Calendar, Eye, Save, Send, CheckCircle2, Bell, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentSkill as ApiSkill } from '../api/services/assignment.service';
+import { moduleService } from '../api/services/module.service';
 import type { 
   AssignmentEditorData, AssignmentSkill 
 } from '../types/assignment-editor.types';
@@ -30,21 +33,26 @@ export const TeacherCreateAssignment: React.FC = () => {
     ? querySkill 
     : 'writing';
 
+  const queryClassId = searchParams.get('classId') || searchParams.get('class');
+
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(queryClassId ? Number(queryClassId) : null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
     id: `new-${Date.now()}`,
-    code: initialSkill === 'speaking' ? 'HW-02-NEW' : initialSkill === 'reading' ? 'HW-03-NEW' : initialSkill === 'listening' ? 'HW-04-NEW' : 'HW-06',
+    code: initialSkill === 'speaking' ? 'HW-SP' : initialSkill === 'reading' ? 'HW-RD' : initialSkill === 'listening' ? 'HW-LS' : 'HW-WR',
     title: initialSkill === 'speaking' 
       ? 'Speaking Part 2: Environmental Solutions' 
       : initialSkill === 'reading' 
       ? 'IELTS Reading Mock: Emerging Clean Energy Tech' 
       : initialSkill === 'listening' 
       ? 'IELTS Listening: Campus Orientation & Library Guide' 
-      : 'HW-06: IELTS Writing Task 2 - Sustainable Urban Development',
+      : 'IELTS Writing Task 2 - Sustainable Urban Development',
     skill: initialSkill,
-    className: 'ENG-IELTS-6.5A',
+    className: '',
     startDate: new Date().toISOString().slice(0, 16),
     dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
     durationMinutes: initialSkill === 'reading' ? 60 : initialSkill === 'listening' ? 30 : 60,
@@ -63,14 +71,7 @@ export const TeacherCreateAssignment: React.FC = () => {
       aiInstruction: 'Khắt khe với các lỗi diễn đạt chung chung; gạch chân cấu trúc ngữ pháp Band 7.5+ và collocations cao cấp.',
       enablePlagiarismCheck: true,
       modelAnswer: '',
-      attachments: [
-        {
-          id: 'att-new-1',
-          name: 'IELTS_Writing_Task2_Guide.pdf',
-          size: '1.1 MB',
-          extension: 'pdf'
-        }
-      ]
+      attachments: []
     },
     speaking: {
       partType: 'part2',
@@ -84,7 +85,7 @@ export const TeacherCreateAssignment: React.FC = () => {
       prepTimeSeconds: 60,
       speakingTimeSeconds: 120,
       maxRetries: 3,
-      examinerSampleAudioUrl: 'https://cdn.englishhub.edu.vn/audio/speaking/sample-hw02.mp3',
+      examinerSampleAudioUrl: '',
       examinerTranscript: 'You have one minute to prepare your speech on this topic.',
       followUpQuestions: [
         {
@@ -112,12 +113,6 @@ export const TeacherCreateAssignment: React.FC = () => {
           label: 'A',
           title: 'The Rise of Smart Cities',
           content: 'Smart cities leverage IoT sensors, real-time analytics, and energy-efficient building materials to minimize greenhouse gas emissions and enhance civic infrastructure.'
-        },
-        {
-          id: 'p-new-2',
-          label: 'B',
-          title: 'Renewable Power Integration',
-          content: 'Solar façades and distributed wind micro-turbines now supply substantial electricity directly to high-density commercial districts, reducing reliance on fossil fuels.'
         }
       ],
       questions: [
@@ -133,7 +128,7 @@ export const TeacherCreateAssignment: React.FC = () => {
             'To conduct surveillance on residential neighborhoods'
           ],
           correctAnswer: 'To monitor energy consumption and minimize greenhouse emissions',
-          explanation: 'Đoạn A khẳng định: "minimize greenhouse gas emissions and enhance civic infrastructure".',
+          explanation: 'Paragraph A confirms: "minimize greenhouse gas emissions and enhance civic infrastructure".',
           paragraphRef: 'A',
           points: 1
         }
@@ -141,11 +136,10 @@ export const TeacherCreateAssignment: React.FC = () => {
     },
     listening: {
       audioTitle: 'Campus_Orientation_Eco_Initiatives.mp3',
-      audioUrl: 'https://cdn.englishhub.edu.vn/audio/listening/campus-orientation.mp3',
+      audioUrl: '',
       audioDurationSeconds: 1200,
       playbackLimit: 'single',
-      transcript: `[00:10] Speaker 1: Good morning and welcome to the university environmental seminar.
-[00:30] Speaker 2: We would like to register our student society for the campus recycling initiative.`,
+      transcript: 'Campus orientation audio track.',
       hideTranscriptUntilGraded: true,
       activeSection: 'section1',
       enableAiDistractorCheck: true,
@@ -166,20 +160,147 @@ export const TeacherCreateAssignment: React.FC = () => {
     }
   }));
 
+  // Fetch classes from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchClasses = async () => {
+      try {
+        const res = await classService.list({ limit: 100 });
+        const list = res.data || [];
+        if (isMounted) {
+          setClasses(list);
+          if (list.length > 0) {
+            const initialId = queryClassId ? Number(queryClassId) : list[0].id;
+            setSelectedClassId(initialId);
+            const matched = list.find((c) => c.id === initialId) || list[0];
+            setAssignmentData((prev) => ({ ...prev, className: matched.name }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load classes for assignment creation:', err);
+      }
+    };
+    fetchClasses();
+    return () => { isMounted = false; };
+  }, [queryClassId]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const handleClassSelectionChange = (classIdNum: number) => {
+    setSelectedClassId(classIdNum);
+    const matched = classes.find((c) => c.id === classIdNum);
+    if (matched) {
+      setAssignmentData((prev) => ({ ...prev, className: matched.name }));
+    }
+  };
+
+  const getInstructionsForSkill = (): string => {
+    switch (assignmentData.skill) {
+      case 'writing':
+        return assignmentData.writing.promptText;
+      case 'speaking':
+        return `${assignmentData.speaking.cueCardTopic}\n${assignmentData.speaking.cueCardBullets.join('\n')}`;
+      case 'reading':
+        return `${assignmentData.reading.passageTitle}\n${assignmentData.reading.paragraphs.map(p => p.content).join('\n')}`;
+      case 'listening':
+        return `${assignmentData.listening.audioTitle}\n${assignmentData.listening.transcript}`;
+      default:
+        return 'Complete assignment according to prompt.';
+    }
+  };
+
+  const executeCreateAssignment = async (status: 'DRAFT' | 'PUBLISHED') => {
+    if (!selectedClassId) {
+      showToast(isVi ? 'Vui lòng chọn lớp học trước khi tạo đề!' : 'Please select a class!');
+      return;
+    }
+
+    if (!assignmentData.title.trim()) {
+      showToast(isVi ? 'Tiêu đề bài tập không được để trống!' : 'Title cannot be empty!');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const openDate = assignmentData.startDate 
+        ? new Date(assignmentData.startDate).toISOString() 
+        : new Date().toISOString();
+      const closeDate = assignmentData.dueDate 
+        ? new Date(assignmentData.dueDate).toISOString() 
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // 1. Create assignment on backend
+      const res = await assignmentService.createAssignment(selectedClassId, {
+        title: assignmentData.title,
+        description: getInstructionsForSkill(),
+        openAt: openDate,
+        closeAt: closeDate,
+        maxSubmissions: assignmentData.maxSubmissions || 3
+      });
+
+      const newAssignmentId = res.id;
+
+      // 2. Create corresponding module for the selected skill
+      const apiSkillMap: Record<AssignmentSkill, ApiSkill> = {
+        writing: 'WRITING',
+        speaking: 'SPEAKING',
+        reading: 'READING',
+        listening: 'LISTENING'
+      };
+
+      const taskTypeMap: Record<AssignmentSkill, 'ESSAY' | 'RECORDING' | 'QUIZ'> = {
+        writing: 'ESSAY',
+        speaking: 'RECORDING',
+        reading: 'QUIZ',
+        listening: 'QUIZ'
+      };
+
+      try {
+        await moduleService.createModule(newAssignmentId, {
+          skill: apiSkillMap[assignmentData.skill],
+          taskType: taskTypeMap[assignmentData.skill],
+          orderIndex: 1,
+          instructions: getInstructionsForSkill(),
+          aiInstruction: assignmentData.writing.aiInstruction || undefined,
+          maxScore: 10
+        });
+      } catch (modErr) {
+        console.warn('Module creation fallback:', modErr);
+      }
+
+      // If status is PUBLISHED and backend requires explicit publish
+      if (status === 'PUBLISHED') {
+        try {
+          await assignmentService.updateAssignmentStatus(newAssignmentId, 'PUBLISHED');
+        } catch {
+          // Status might already be active
+        }
+      }
+
+      showToast(isVi 
+        ? (status === 'PUBLISHED' ? 'Giao bài tập mới thành công!' : 'Đã lưu bản nháp bài tập mới!') 
+        : (status === 'PUBLISHED' ? 'Assignment published successfully!' : 'Assignment draft saved!'));
+
+      setTimeout(() => {
+        navigate('/teacher/assignments');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to create assignment:', err);
+      showToast(isVi ? 'Có lỗi xảy ra khi tạo bài tập. Vui lòng thử lại!' : 'Failed to create assignment. Please try again!');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSaveDraft = () => {
-    showToast(isVi ? 'Đã lưu bản nháp bài tập mới!' : 'Draft assignment saved!');
+    executeCreateAssignment('DRAFT');
   };
 
   const handlePublish = () => {
-    showToast(isVi ? 'Đã giao bài tập mới thành công!' : 'Assignment created and published successfully!');
-    setTimeout(() => {
-      navigate('/teacher/assignments');
-    }, 1200);
+    executeCreateAssignment('PUBLISHED');
   };
 
   return (
@@ -195,7 +316,7 @@ export const TeacherCreateAssignment: React.FC = () => {
           <span>{isVi ? 'Quản lý bài tập' : 'Assignments Library'}</span>
         </button>
         <span>/</span>
-        <span>{assignmentData.className}</span>
+        <span>{assignmentData.className || (isVi ? 'Chọn lớp học' : 'Class')}</span>
         <span>/</span>
         <span style={{ fontWeight: 700, color: 'var(--on-surface, #111827)' }}>
           {isVi ? 'Giao bài tập mới' : 'Create New Assignment'}
@@ -226,8 +347,8 @@ export const TeacherCreateAssignment: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <select 
-            value={assignmentData.className}
-            onChange={(e) => setAssignmentData({ ...assignmentData, className: e.target.value })}
+            value={selectedClassId ? String(selectedClassId) : ''}
+            onChange={(e) => handleClassSelectionChange(Number(e.target.value))}
             style={{ 
               padding: '8px 14px', 
               fontSize: '13px', 
@@ -237,9 +358,11 @@ export const TeacherCreateAssignment: React.FC = () => {
               fontWeight: 600
             }}
           >
-            <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A (Intensive)</option>
-            <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV (Ngữ pháp)</option>
-            <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750 (Cấp tốc)</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                Lớp: {c.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -452,7 +575,7 @@ export const TeacherCreateAssignment: React.FC = () => {
                     onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
                     style={{ accentColor: '#2563eb' }}
                   />
-                  {isVi ? 'Toàn bộ học viên trong lớp (24 học viên)' : 'All class students (24)'}
+                  {isVi ? 'Toàn bộ học viên trong lớp' : 'All class students'}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
                   <input 
@@ -520,6 +643,7 @@ export const TeacherCreateAssignment: React.FC = () => {
             <button 
               type="button"
               className="btn btn-secondary bg-white btn-sm"
+              disabled={isSubmitting}
               onClick={handleSaveDraft}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
@@ -530,11 +654,16 @@ export const TeacherCreateAssignment: React.FC = () => {
             <button 
               type="button"
               className="btn btn-primary btn-sm"
+              disabled={isSubmitting}
               onClick={handlePublish}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
             >
-              <Send size={14} />
-              <span>{isVi ? 'Giao bài tập' : 'Create & Publish'}</span>
+              {isSubmitting ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              <span>{isSubmitting ? (isVi ? 'Đang giao bài...' : 'Publishing...') : (isVi ? 'Giao bài tập' : 'Create & Publish')}</span>
             </button>
           </div>
         }

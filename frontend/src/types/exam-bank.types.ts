@@ -61,6 +61,7 @@ export interface ExamTemplateItem {
 
 export interface QuickAssignForm {
   templateId: string;
+  classId: number | string;
   className: string;
   assignmentTitle: string;
   assignmentCode: string;
@@ -69,3 +70,4 @@ export interface QuickAssignForm {
   allowLate: boolean;
   notifyStudents: boolean;
 }
+
