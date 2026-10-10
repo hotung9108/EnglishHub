@@ -15,26 +15,79 @@ export const AdminSettings: React.FC = () => {
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const STORAGE_KEY = 'englishhub_admin_system_settings';
+
+  // Read saved settings once at initialization
+  const initialConfig = (() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {};
+  })();
+
   // Form states
-  const [aiModelWriting, setAiModelWriting] = useState('gemini-1.5-pro');
-  const [aiModelSpeaking, setAiModelSpeaking] = useState('whisper-large-v3');
-  const [apiKey, setApiKey] = useState('');
-  const [temperature, setTemperature] = useState(0.2);
-  const [autoApproveQuiz, setAutoApproveQuiz] = useState(true);
-  const [requireTeacherReview, setRequireTeacherReview] = useState(true);
-  const [plagiarismThreshold, setPlagiarismThreshold] = useState(30);
-  const [slaHours, setSlaHours] = useState(24);
-  const [emailStudentOnGraded, setEmailStudentOnGraded] = useState(true);
-  const [emailParentDigest, setEmailParentDigest] = useState(true);
-  const [jwtLifetimeMinutes, setJwtLifetimeMinutes] = useState(15);
-  const [maxConcurrentDevices, setMaxConcurrentDevices] = useState(2);
+  const [aiModelWriting, setAiModelWriting] = useState(initialConfig.aiModelWriting || 'gemini-1.5-pro');
+  const [aiModelSpeaking, setAiModelSpeaking] = useState(initialConfig.aiModelSpeaking || 'whisper-large-v3');
+  const [apiKey, setApiKey] = useState(initialConfig.apiKey || '');
+  const [temperature, setTemperature] = useState(typeof initialConfig.temperature === 'number' ? initialConfig.temperature : 0.2);
+  const [autoApproveQuiz, setAutoApproveQuiz] = useState(typeof initialConfig.autoApproveQuiz === 'boolean' ? initialConfig.autoApproveQuiz : true);
+  const [requireTeacherReview, setRequireTeacherReview] = useState(typeof initialConfig.requireTeacherReview === 'boolean' ? initialConfig.requireTeacherReview : true);
+  const [plagiarismThreshold, setPlagiarismThreshold] = useState(typeof initialConfig.plagiarismThreshold === 'number' ? initialConfig.plagiarismThreshold : 30);
+  const [slaHours, setSlaHours] = useState(typeof initialConfig.slaHours === 'number' ? initialConfig.slaHours : 24);
+  const [emailStudentOnGraded, setEmailStudentOnGraded] = useState(typeof initialConfig.emailStudentOnGraded === 'boolean' ? initialConfig.emailStudentOnGraded : true);
+  const [emailParentDigest, setEmailParentDigest] = useState(typeof initialConfig.emailParentDigest === 'boolean' ? initialConfig.emailParentDigest : true);
+  const [jwtLifetimeMinutes, setJwtLifetimeMinutes] = useState(typeof initialConfig.jwtLifetimeMinutes === 'number' ? initialConfig.jwtLifetimeMinutes : 15);
+  const [maxConcurrentDevices, setMaxConcurrentDevices] = useState(typeof initialConfig.maxConcurrentDevices === 'number' ? initialConfig.maxConcurrentDevices : 2);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      const config = {
+        aiModelWriting,
+        aiModelSpeaking,
+        apiKey,
+        temperature,
+        autoApproveQuiz,
+        requireTeacherReview,
+        plagiarismThreshold,
+        slaHours,
+        emailStudentOnGraded,
+        emailParentDigest,
+        jwtLifetimeMinutes,
+        maxConcurrentDevices,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    } catch {
+      // storage error fallback
+    }
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
     }, 2500);
+  };
+
+  const handleReset = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // fallback
+    }
+    setAiModelWriting('gemini-1.5-pro');
+    setAiModelSpeaking('whisper-large-v3');
+    setApiKey('');
+    setTemperature(0.2);
+    setAutoApproveQuiz(true);
+    setRequireTeacherReview(true);
+    setPlagiarismThreshold(30);
+    setSlaHours(24);
+    setEmailStudentOnGraded(true);
+    setEmailParentDigest(true);
+    setJwtLifetimeMinutes(15);
+    setMaxConcurrentDevices(2);
+    alert(isVi ? 'Đã khôi phục các thiết lập chuẩn ban đầu.' : 'Defaults restored.');
   };
 
   return (
@@ -57,7 +110,7 @@ export const AdminSettings: React.FC = () => {
           <button 
             type="button" 
             className="btn btn-secondary"
-            onClick={() => alert(isVi ? 'Đã khôi phục các thiết lập chuẩn ban đầu.' : 'Defaults restored.')}
+            onClick={handleReset}
             style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <RotateCcw size={16} />

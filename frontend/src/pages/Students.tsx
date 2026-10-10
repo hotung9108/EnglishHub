@@ -282,15 +282,34 @@ export const Students: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/admin/students/${st.id}`);
-                      }}
-                    >
-                      {isVi ? 'Chi tiết' : 'Profile'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const nextStatus = st.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+                          try {
+                            await userService.updateStatus(st.id, nextStatus);
+                            setStudentsData(prev => prev.map(item => item.id === st.id ? { ...item, status: nextStatus } : item));
+                          } catch {
+                            alert(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
+                          }
+                        }}
+                      >
+                        {st.status === 'ACTIVE' ? (isVi ? 'Khóa' : 'Lock') : (isVi ? 'Mở' : 'Unlock')}
+                      </button>
+                      <button 
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/students/${st.id}`);
+                        }}
+                      >
+                        {isVi ? 'Chi tiết' : 'Profile'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
