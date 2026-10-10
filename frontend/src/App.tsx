@@ -47,8 +47,20 @@ import AdminClassArchive from './pages/AdminClassArchive';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { useAuth } from './hooks/useAuth';
 import NotFound from './pages/NotFound';
 import Forbidden from './pages/Forbidden';
+
+function ReportsRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'teacher') {
+    return <Navigate to="/teacher/classes" replace />;
+  }
+  if (user?.role === 'student') {
+    return <Navigate to="/student/analytics" replace />;
+  }
+  return <Navigate to="/admin/reports" replace />;
+}
 
 function App() {
   return (
@@ -92,7 +104,7 @@ function App() {
         </Route>
 
         {/* Global Redirects */}
-        <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
+        <Route path="/reports" element={<ReportsRedirect />} />
         <Route path="/progress" element={<Navigate to="/teacher/classes" replace />} />
 
         {/* Teacher Routes */}

@@ -2,39 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { 
   History, Search, Download, 
   X, 
-  PenTool, Mic, RotateCcw, 
-  Award, Loader2, AlertCircle
+  Award, Loader2, AlertCircle,
+  RotateCcw, CheckCircle2, Clock, FileText
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { submissionService } from '../api/services/submission.service';
-import { userService } from '../api/services/user.service';
-import type { SubmissionListItem } from '../api/services/submission.service';
-import type { UserListItem } from '../api/services/user.service';
-
-interface GradingHistoryItem {
-  id: string;
-  gradingId: number;
-  gradedBy: {
-    name: string;
-    code: string;
-  };
-  student: {
-    name: string;
-    code: string;
-  };
-  assignment: {
-    code: string;
-    title: string;
-    className: string;
-    skill: 'writing' | 'speaking';
-    submittedAt: string;
-  };
-  score: number;
-  gradedAt: string;
-  status: 'completed' | 'verified';
-  teacherFeedback: string;
-  submissionExcerpt: string;
-}
+import { gradingService } from '../api/services/grading.service';
+import { gradingChangeLogService } from '../api/services/grading-change-log.service';
+import type { 
+  GradingSummaryResponse, 
+  GradingStatus, 
+  GradingDetailResponse 
+} from '../api/services/grading.service';
+import type { GradingChangeLog } from '../api/services/grading-change-log.service';
 
 export const AdminGradingAuditLogs: React.FC = () => {
   const { t, language } = useLanguage();
@@ -42,71 +21,39 @@ export const AdminGradingAuditLogs: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gradingHistory, setGradingHistory] = useState<GradingHistoryItem[]>([]);
-  const [teachers, setTeachers] = useState<UserListItem[]>([]);
-
+  const [gradings, setGradings] = useState<GradingSummaryResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTeacher, setFilterTeacher] = useState('all');
-  const [filterSkill, setFilterSkill] = useState<'all' | 'writing' | 'speaking'>('all');
-  const [filterType, setFilterType] = useState<'all' | 'writing' | 'speaking' | 'high'>('all');
-  const [selectedItem, setSelectedItem] = useState<GradingHistoryItem | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | GradingStatus>('ALL');
+
+  // Drawer / Inspection
+  const [selectedGradingId, setSelectedGradingId] = useState<number | null>(null);
+  const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
+  const [changeLogs, setChangeLogs] = useState<GradingChangeLog[]>([]);
+  const [loadingDrawer, setLoadingDrawer] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
 
-    const fetchLogs = async () => {
+    const loadGradings = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const [subRes, tcRes] = await Promise.allSettled([
-          submissionService.listSubmissions({ page: 1, limit: 50 }),
-          userService.listUsers({ role: 'TEACHER', limit: 50 })
-        ]);
+        const params = {
+          page: 1,
+          limit: 100,
+          status: statusFilter === 'ALL' ? undefined : statusFilter,
+        };
 
-        if (!isMounted) return;
-
-        if (tcRes.status === 'fulfilled') {
-          setTeachers(tcRes.value.data);
-        }
-
-        if (subRes.status === 'fulfilled') {
-          const subs: SubmissionListItem[] = subRes.value.data || [];
-          const items: GradingHistoryItem[] = subs.map(s => {
-            const firstMod = s.modules?.[0];
-            const skill: 'writing' | 'speaking' = (firstMod?.skill?.toLowerCase() === 'speaking') ? 'speaking' : 'writing';
-            const finalScore = firstMod?.grading?.finalScore ?? 0;
-            const timestamp = s.submittedAt || new Date().toISOString();
-            return {
-              id: `GR-${s.id}`,
-              gradingId: s.id,
-              gradedBy: {
-                name: isVi ? 'Giáo viên phụ trách' : 'Assigned Teacher',
-                code: 'GV-001'
-              },
-              student: {
-                name: `Student #${s.studentId}`,
-                code: `HV-${s.studentId}`
-              },
-              assignment: {
-                code: `HW-${s.assignmentId || s.id}`,
-                title: `Assignment #${s.assignmentId || s.id}`,
-                className: `Class Cohort`,
-                skill,
-                submittedAt: timestamp
-              },
-              score: typeof finalScore === 'number' ? finalScore : 0,
-              gradedAt: timestamp,
-              status: s.status === 'GRADED' ? 'completed' : 'verified',
-              teacherFeedback: isVi ? 'Đã hoàn thành kiểm toán bài nộp.' : 'Submission verified in audit logs.',
-              submissionExcerpt: isVi ? 'Bài nộp của học viên đã được ghi nhận trên hệ thống.' : 'Student submission recorded.'
-            };
-          });
-          setGradingHistory(items);
+        const res = await gradingService.listGradings(params);
+        if (isMounted) {
+          setGradings(res.data || []);
         }
       } catch (err: unknown) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải nhật ký chấm điểm.' : 'Failed to load grading logs.');
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải nhật ký chấm điểm.' : 'Failed to load grading audit records.');
         }
       } finally {
         if (isMounted) {
@@ -115,45 +62,82 @@ export const AdminGradingAuditLogs: React.FC = () => {
       }
     };
 
-    fetchLogs();
+    loadGradings();
 
     return () => {
       isMounted = false;
     };
-  }, [isVi]);
+  }, [statusFilter, refreshKey, isVi]);
 
-  const filteredHistory = gradingHistory.filter(item => {
-    if (filterTeacher !== 'all' && item.gradedBy.code !== filterTeacher) return false;
-    if (filterSkill !== 'all' && item.assignment.skill !== filterSkill) return false;
-    if (filterType === 'writing' && item.assignment.skill !== 'writing') return false;
-    if (filterType === 'speaking' && item.assignment.skill !== 'speaking') return false;
-    if (filterType === 'high' && item.score < 7.0) return false;
+  // Open inspection drawer
+  const handleOpenDetail = async (gradingId: number) => {
+    setSelectedGradingId(gradingId);
+    setGradingDetail(null);
+    setChangeLogs([]);
+    setDrawerError(null);
+    setLoadingDrawer(true);
 
+    try {
+      const [detailRes, logsRes] = await Promise.allSettled([
+        gradingService.getById(gradingId),
+        gradingChangeLogService.getChangeLogs(gradingId)
+      ]);
+
+      if (detailRes.status === 'fulfilled') {
+        setGradingDetail(detailRes.value);
+      } else {
+        throw detailRes.reason;
+      }
+
+      if (logsRes.status === 'fulfilled') {
+        setChangeLogs(logsRes.value.data || []);
+      }
+    } catch (err: unknown) {
+      setDrawerError(err instanceof Error ? err.message : isVi ? 'Không thể tải chi tiết bài chấm và lịch sử sửa điểm.' : 'Failed to load grading details and change logs.');
+    } finally {
+      setLoadingDrawer(false);
+    }
+  };
+
+  const handleCloseDrawer = () => {
+    setSelectedGradingId(null);
+    setGradingDetail(null);
+    setChangeLogs([]);
+  };
+
+  const filteredGradings = gradings.filter(item => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
+      const code = `GR-${item.id}`.toLowerCase();
       return (
-        item.gradedBy.name.toLowerCase().includes(q) ||
-        item.student.name.toLowerCase().includes(q) ||
-        item.assignment.title.toLowerCase().includes(q) ||
-        item.assignment.code.toLowerCase().includes(q)
+        code.includes(q) ||
+        item.status.toLowerCase().includes(q)
       );
     }
     return true;
   });
 
-  const countWriting = gradingHistory.filter(i => i.assignment.skill === 'writing').length;
-  const countSpeaking = gradingHistory.filter(i => i.assignment.skill === 'speaking').length;
-  const countHigh = gradingHistory.filter(i => i.score >= 7.0).length;
+  const countCompleted = gradings.filter(i => i.status === 'COMPLETED').length;
+  const countAiGraded = gradings.filter(i => i.status === 'AI_GRADED').length;
+  const countPending = gradings.filter(i => i.status === 'PENDING').length;
 
   const handleExportCsv = () => {
-    alert(isVi ? 'Đang trích xuất danh sách bài đã chấm ra tập tin CSV...' : 'Exporting graded assignments list to CSV...');
+    alert(isVi ? 'Đang trích xuất nhật ký kiểm toán chấm điểm ra tập tin CSV...' : 'Exporting grading audit records to CSV...');
   };
 
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setFilterTeacher('all');
-    setFilterSkill('all');
-    setFilterType('all');
+  const formatStatusBadge = (status: GradingStatus) => {
+    switch (status) {
+      case 'COMPLETED':
+        return <span className="badge badge-active">{isVi ? 'Đã hoàn thành' : 'Completed'}</span>;
+      case 'AI_GRADED':
+        return <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#7e22ce' }}>{isVi ? 'AI Đã Chấm' : 'AI Graded'}</span>;
+      case 'PENDING':
+        return <span className="badge badge-onleave">{isVi ? 'Đang chờ duyệt' : 'Pending'}</span>;
+      case 'FAILED':
+        return <span className="badge" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>{isVi ? 'Thất bại' : 'Failed'}</span>;
+      default:
+        return <span className="badge">{status}</span>;
+    }
   };
 
   return (
@@ -167,7 +151,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
             </div>
             <span>{t('auditLogs.title')}</span>
             <span className="adm-gh-count-badge">
-              {filteredHistory.length} {isVi ? 'bài đã chấm' : 'graded submissions'}
+              {filteredGradings.length} {isVi ? 'hồ sơ chấm điểm' : 'grading records'}
             </span>
           </h1>
           <p className="adm-subtitle">
@@ -196,11 +180,20 @@ export const AdminGradingAuditLogs: React.FC = () => {
           color: '#b91c1c',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          justifyContent: 'space-between',
           marginBottom: '20px'
         }}>
-          <AlertCircle size={18} />
-          <span>{error}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+          <button 
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setRefreshKey(prev => prev + 1)}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </button>
         </div>
       )}
 
@@ -213,79 +206,61 @@ export const AdminGradingAuditLogs: React.FC = () => {
             <input 
               type="text" 
               className="adm-search-input"
-              placeholder={isVi ? 'Tìm tên bài tập, học viên, mã bài...' : 'Search by assignment, student...'}
+              placeholder={isVi ? 'Tìm theo mã chấm (GR-...) hoặc trạng thái...' : 'Search by grading ID (GR-...) or status...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          {/* Teacher Select */}
-          <div style={{ minWidth: '200px' }}>
-            <select 
-              className="input"
-              value={filterTeacher}
-              onChange={(e) => setFilterTeacher(e.target.value)}
-              style={{ height: '40px', fontSize: '13px' }}
-            >
-              <option value="all">{isVi ? 'Tất cả giáo viên' : 'All Teachers'}</option>
-              {teachers.map(tc => (
-                <option key={tc.id} value={`GV-${tc.id}`}>
-                  {tc.fullName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Reset Filters */}
-          {(searchQuery || filterTeacher !== 'all' || filterSkill !== 'all' || filterType !== 'all') && (
+          {searchQuery && (
             <button 
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={handleResetFilters}
+              onClick={() => setSearchQuery('')}
               style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '40px' }}
             >
               <RotateCcw size={14} />
-              <span>{isVi ? 'Xóa lọc' : 'Reset'}</span>
+              <span>{isVi ? 'Xóa tìm kiếm' : 'Clear Search'}</span>
             </button>
           )}
         </div>
 
-        {/* Quick Segment Filter Pills */}
+        {/* Status Segment Filter Pills */}
         <div className="adm-pills" style={{ margin: 0 }}>
           <button
             type="button"
-            className={`adm-pill-item ${filterType === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterType('all')}
+            className={`adm-pill-item ${statusFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('ALL')}
           >
-            <span>{isVi ? 'Tất cả bài đã chấm' : 'All Graded'}</span>
-            <span className="adm-pill-badge">{gradingHistory.length}</span>
+            <span>{isVi ? 'Tất cả bài chấm' : 'All Gradings'}</span>
+            <span className="adm-pill-badge">{gradings.length}</span>
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${filterType === 'writing' ? 'active' : ''}`}
-            onClick={() => setFilterType('writing')}
+            className={`adm-pill-item ${statusFilter === 'COMPLETED' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('COMPLETED')}
           >
-            <PenTool size={13} />
-            <span>Writing</span>
-            <span className="adm-pill-badge">{countWriting}</span>
+            <CheckCircle2 size={13} color="#16a34a" />
+            <span>{isVi ? 'Đã hoàn tất' : 'Completed'}</span>
+            <span className="adm-pill-badge">{countCompleted}</span>
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${filterType === 'speaking' ? 'active' : ''}`}
-            onClick={() => setFilterType('speaking')}
+            className={`adm-pill-item ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('AI_GRADED')}
           >
-            <Mic size={13} />
-            <span>Speaking</span>
-            <span className="adm-pill-badge">{countSpeaking}</span>
+            <Award size={13} color="#7e22ce" />
+            <span>{isVi ? 'AI Đã chấm' : 'AI Graded'}</span>
+            <span className="adm-pill-badge">{countAiGraded}</span>
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${filterType === 'high' ? 'active' : ''}`}
-            onClick={() => setFilterType('high')}
+            className={`adm-pill-item ${statusFilter === 'PENDING' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('PENDING')}
           >
-            <Award size={13} />
-            <span>{isVi ? 'Điểm cao (≥ 7.0)' : 'High Score (≥ 7.0)'}</span>
-            <span className="adm-pill-badge">{countHigh}</span>
+            <Clock size={13} color="#d97706" />
+            <span>{isVi ? 'Chờ duyệt' : 'Pending'}</span>
+            <span className="adm-pill-badge">{countPending}</span>
           </button>
         </div>
       </div>
@@ -295,18 +270,18 @@ export const AdminGradingAuditLogs: React.FC = () => {
         {loading ? (
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
             <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-            <div>{isVi ? 'Đang tải nhật ký kiểm toán chấm điểm...' : 'Loading grading audit logs...'}</div>
+            <div>{isVi ? 'Đang tải danh sách hồ sơ chấm điểm từ máy chủ...' : 'Loading grading records from server...'}</div>
           </div>
-        ) : filteredHistory.length === 0 ? (
+        ) : filteredGradings.length === 0 ? (
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
             <History size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
             <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
-              {isVi ? 'Chưa có nhật ký chấm điểm nào' : 'No grading audit logs found'}
+              {isVi ? 'Chưa có hồ sơ chấm điểm nào' : 'No grading records found'}
             </h3>
             <p style={{ margin: 0, fontSize: '13.5px' }}>
               {searchQuery 
-                ? (isVi ? 'Không có bài nộp nào khớp với bộ lọc hiện tại.' : 'No entries match your search criteria.')
-                : (isVi ? 'Nhật ký sẽ hiển thị khi giáo viên hoặc AI hoàn tất chấm bài nộp.' : 'Entries will appear here as submissions are graded.')}
+                ? (isVi ? 'Không tìm thấy kết quả phù hợp với từ khóa.' : 'No entries match your search criteria.')
+                : (isVi ? 'Nhật ký sẽ hiển thị khi học sinh nộp bài và bài làm được xử lý chấm.' : 'Entries will appear here as submissions are processed.')}
             </p>
           </div>
         ) : (
@@ -314,37 +289,25 @@ export const AdminGradingAuditLogs: React.FC = () => {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>{isVi ? 'MÃ CHẤM' : 'LOG ID'}</th>
-                  <th>{isVi ? 'BÀI TẬP' : 'ASSIGNMENT'}</th>
-                  <th>{isVi ? 'HỌC VIÊN' : 'STUDENT'}</th>
-                  <th>{isVi ? 'ĐIỂM SỐ' : 'SCORE'}</th>
-                  <th>{isVi ? 'THỜI GIAN' : 'GRADED AT'}</th>
-                  <th style={{ textAlign: 'right' }}>{isVi ? 'CHI TIẾT' : 'ACTION'}</th>
+                  <th>{isVi ? 'MÃ CHẤM' : 'GRADING ID'}</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th>{isVi ? 'ĐIỂM CHỐT' : 'FINAL SCORE'}</th>
+                  <th style={{ textAlign: 'right' }}>{isVi ? 'NHẬT KÝ SỬA ĐIỂM' : 'AUDIT ACTION'}</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredHistory.map((item) => (
+                {filteredGradings.map((item) => (
                   <tr 
                     key={item.id}
-                    onClick={() => setSelectedItem(item)}
+                    onClick={() => handleOpenDetail(item.id)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td className="font-mono font-semibold text-primary">{item.id}</td>
+                    <td className="font-mono font-semibold text-primary">GR-{item.id}</td>
+                    <td>{formatStatusBadge(item.status)}</td>
                     <td>
-                      <div className="font-medium">{item.assignment.title}</div>
-                      <div className="label-sm text-on-surface-variant font-mono">{item.assignment.className}</div>
-                    </td>
-                    <td>
-                      <div className="font-medium">{item.student.name}</div>
-                      <div className="label-sm text-on-surface-variant font-mono">{item.student.code}</div>
-                    </td>
-                    <td>
-                      <div className="font-bold text-primary font-mono" style={{ fontSize: '15px' }}>
-                        {item.score}
-                      </div>
-                    </td>
-                    <td className="font-mono text-on-surface-variant" style={{ fontSize: '12.5px' }}>
-                      {item.gradedAt}
+                      <span className="font-bold font-mono" style={{ fontSize: '15px', color: item.finalScore !== null ? 'var(--primary)' : 'var(--on-surface-variant)' }}>
+                        {item.finalScore !== null ? item.finalScore : (isVi ? 'Chưa có điểm' : 'Unscored')}
+                      </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button 
@@ -352,10 +315,10 @@ export const AdminGradingAuditLogs: React.FC = () => {
                         className="btn btn-secondary btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedItem(item);
+                          handleOpenDetail(item.id);
                         }}
                       >
-                        {isVi ? 'Xem chi tiết' : 'View'}
+                        {isVi ? 'Xem lịch sử sửa điểm' : 'Audit Logs'}
                       </button>
                     </td>
                   </tr>
@@ -366,56 +329,141 @@ export const AdminGradingAuditLogs: React.FC = () => {
         )}
       </div>
 
-      {/* Drawer Detail Modal */}
-      {selectedItem && (
-        <div className="adm-drawer-backdrop" onClick={() => setSelectedItem(null)}>
-          <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
+      {/* Drawer: Detailed Inspection and Change Logs */}
+      {selectedGradingId !== null && (
+        <div className="adm-drawer-backdrop" onClick={handleCloseDrawer}>
+          <div className="adm-drawer" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px' }}>
             <div className="adm-drawer-header">
-              <h2 className="adm-drawer-title">
-                {isVi ? `Chi Tiết Kiểm Toán: ${selectedItem.id}` : `Audit Log Detail: ${selectedItem.id}`}
-              </h2>
+              <div>
+                <h2 className="adm-drawer-title">
+                  {isVi ? `Chi Tiết Kiểm Toán & Lịch Sử Sửa Điểm: GR-${selectedGradingId}` : `Grading Audit & Change Logs: GR-${selectedGradingId}`}
+                </h2>
+                <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '2px' }}>
+                  Hồ sơ chấm điểm #GR-{selectedGradingId}
+                </div>
+              </div>
               <button 
-                onClick={() => setSelectedItem(null)}
+                type="button"
+                onClick={handleCloseDrawer}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="adm-drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ padding: '16px', borderRadius: '10px', background: 'var(--surface-container-low)', border: '1px solid var(--outline-variant)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>{isVi ? 'BÀI TẬP' : 'ASSIGNMENT'}</div>
-                <div style={{ fontSize: '15px', fontWeight: 700, marginTop: '2px' }}>{selectedItem.assignment.title}</div>
-                <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginTop: '4px' }}>
-                  {selectedItem.assignment.className} • {selectedItem.assignment.code}
+            <div className="adm-drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {loadingDrawer ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+                  <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                  <div>{isVi ? 'Đang truy xuất thông tin chấm và nhật ký chỉnh sửa...' : 'Fetching grading context and change history...'}</div>
                 </div>
-              </div>
+              ) : drawerError ? (
+                <div style={{ padding: '16px', background: '#fef2f2', color: '#b91c1c', borderRadius: '8px' }}>
+                  {drawerError}
+                </div>
+              ) : gradingDetail ? (
+                <>
+                  {/* Status & Scores Strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Trạng thái' : 'Status'}</div>
+                      <div style={{ marginTop: '4px' }}>{formatStatusBadge(gradingDetail.status)}</div>
+                    </div>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Phương thức' : 'Method'}</div>
+                      <div className="font-semibold" style={{ fontSize: '14px', marginTop: '4px' }}>{gradingDetail.method}</div>
+                    </div>
+                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                      <div className="label-sm text-on-surface-variant">{isVi ? 'Điểm chốt hiện tại' : 'Final Score'}</div>
+                      <div className="font-bold text-primary font-mono" style={{ fontSize: '20px', marginTop: '2px' }}>
+                        {gradingDetail.finalScore !== null ? gradingDetail.finalScore : '-'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{isVi ? 'Học viên' : 'Student'}</div>
-                  <div style={{ fontWeight: 600 }}>{selectedItem.student.name}</div>
-                  <div style={{ fontSize: '12px', fontFamily: 'monospace' }}>{selectedItem.student.code}</div>
-                </div>
-                <div style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{isVi ? 'Điểm số chốt' : 'Final Score'}</div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{selectedItem.score}</div>
-                </div>
-              </div>
+                  {/* Feedback Notes */}
+                  {gradingDetail.finalFeedback && (
+                    <div className="card" style={{ padding: '16px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FileText size={15} color="var(--primary)" />
+                        <span>{isVi ? 'Lời phê chính thức' : 'Official Instructor Feedback'}</span>
+                      </div>
+                      <div style={{ fontSize: '13.5px', lineHeight: 1.5, color: 'var(--on-surface)' }}>
+                        {gradingDetail.finalFeedback}
+                      </div>
+                    </div>
+                  )}
 
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>{isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}</div>
-                <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--outline-variant)', fontSize: '13.5px', lineHeight: 1.5 }}>
-                  {selectedItem.teacherFeedback}
-                </div>
-              </div>
+                  {gradingDetail.aiFeedback && (
+                    <div className="card" style={{ padding: '16px', background: 'rgba(126, 34, 206, 0.04)', borderColor: 'rgba(126, 34, 206, 0.15)' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', color: '#7e22ce' }}>
+                        {isVi ? 'Nhận xét từ AI Engine' : 'AI Engine Feedback'}
+                      </div>
+                      <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
+                        {gradingDetail.aiFeedback}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* REAL CHANGE LOGS SECTION */}
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <History size={16} color="var(--primary)" />
+                      <span>{isVi ? 'Nhật Ký Các Lần Sửa Điểm (Change Logs Audit)' : 'Grading Adjustment History'}</span>
+                    </h3>
+
+                    {changeLogs.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-container-low)', borderRadius: '8px', color: 'var(--on-surface-variant)' }}>
+                        <CheckCircle2 size={28} style={{ margin: '0 auto 8px', color: '#16a34a', opacity: 0.8 }} />
+                        <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                          {isVi ? 'Chưa có lượt sửa điểm nào' : 'No grade changes recorded'}
+                        </div>
+                        <p style={{ margin: '4px 0 0', fontSize: '12.5px' }}>
+                          {isVi 
+                            ? 'Điểm số của bài làm này vẫn giữ nguyên vẹn từ lần chấm đầu tiên.' 
+                            : 'The score for this submission remains unchanged from the initial evaluation.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--outline-variant)', borderRadius: '8px' }}>
+                        <table className="adm-table" style={{ margin: 0 }}>
+                          <thead>
+                            <tr>
+                              <th>{isVi ? 'NGƯỜI ĐIỀU CHỈNH' : 'CHANGED BY'}</th>
+                              <th>{isVi ? 'ĐIỂM CŨ' : 'OLD'}</th>
+                              <th>{isVi ? 'ĐIỂM MỚI' : 'NEW'}</th>
+                              <th>{isVi ? 'LÝ DO / GHI CHÚ' : 'REASON / NOTE'}</th>
+                              <th>{isVi ? 'THỜI GIAN' : 'TIMESTAMP'}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {changeLogs.map((log, idx) => (
+                              <tr key={idx}>
+                                <td className="font-medium">{log.changedBy}</td>
+                                <td className="font-mono text-on-surface-variant">{log.oldScore ?? '-'}</td>
+                                <td className="font-mono font-bold text-primary">{log.newScore ?? '-'}</td>
+                                <td style={{ maxWidth: '200px', fontSize: '13px' }}>
+                                  {log.note || <span className="text-on-surface-variant italic">{isVi ? 'Không có ghi chú' : 'No note provided'}</span>}
+                                </td>
+                                <td className="font-mono text-on-surface-variant" style={{ fontSize: '12px' }}>
+                                  {log.changedAt}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <div className="adm-drawer-footer">
               <button 
                 type="button" 
                 className="btn btn-secondary"
-                onClick={() => setSelectedItem(null)}
+                onClick={handleCloseDrawer}
               >
                 {isVi ? 'Đóng' : 'Close'}
               </button>

@@ -31,6 +31,8 @@ export const StudentDetails: React.FC = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 1 : 1;
 
@@ -81,6 +83,26 @@ export const StudentDetails: React.FC = () => {
     };
   }, [numericId, isVi]);
 
+  const handleToggleSuspend = async () => {
+    if (!studentUser) return;
+    const nextStatus = studentUser.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
+    try {
+      setIsTogglingStatus(true);
+      await userService.updateStatus(studentUser.id, nextStatus);
+      setStudentUser(prev => prev ? { ...prev, status: nextStatus } : null);
+      setStatusMessage(
+        nextStatus === 'LOCKED'
+          ? (isVi ? 'Đã tạm khóa tài khoản học viên.' : 'Student account suspended.')
+          : (isVi ? 'Đã kích hoạt lại tài khoản học viên.' : 'Student account reactivated.')
+      );
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword.trim() || !studentUser) return;
@@ -119,6 +141,24 @@ export const StudentDetails: React.FC = () => {
           <span>{isVi ? 'Quay lại danh sách' : 'Back to Students'}</span>
         </button>
       </div>
+
+      {statusMessage && (
+        <div style={{
+          padding: '12px 18px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          color: '#15803d',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <CheckCircle2 size={18} />
+          <span>{statusMessage}</span>
+        </div>
+      )}
 
       {error && (
         <div style={{
@@ -172,6 +212,15 @@ export const StudentDetails: React.FC = () => {
                   <span className={`badge ${isActive ? 'badge-active' : 'badge-onleave'}`}>
                     {isActive ? (isVi ? 'Đang học' : 'Active') : (isVi ? 'Tạm khóa' : 'Locked')}
                   </span>
+                  <button 
+                    type="button"
+                    disabled={isTogglingStatus}
+                    className={`btn ${!isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                    onClick={handleToggleSuspend}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--on-surface-variant)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
