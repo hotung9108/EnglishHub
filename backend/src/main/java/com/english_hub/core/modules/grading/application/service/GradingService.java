@@ -14,6 +14,7 @@ import com.english_hub.core.modules.grading.domain.model.GradingFilter;
 import com.english_hub.core.modules.grading.domain.model.GradingPage;
 import com.english_hub.core.modules.grading.domain.model.GradingStatus;
 import com.english_hub.core.modules.grading.domain.model.ReviewStatus;
+import com.english_hub.core.modules.grading.application.port.AiAnalysisInFlightRegistry;
 import com.english_hub.core.modules.grading.domain.repository.AnswerAnnotationRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingChangeLogRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingContextRepository;
@@ -37,6 +38,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.PessimisticLockingFailureException;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -56,6 +62,8 @@ public class GradingService {
 			"Vị trí kết thúc phải lớn hơn hoặc bằng vị trí bắt đầu.";
 	private static final String INVALID_ANNOTATION_REVIEW_MESSAGE = "Không thể duyệt chú thích này.";
 	private static final String INVALID_AI_ANALYSIS_MESSAGE = "Không thể phân tích AI cho module này.";
+	private static final String AI_ANALYSIS_LOCK_TIMEOUT_MESSAGE =
+			"Không thể khóa bản chấm để cập nhật. Vui lòng thử lại.";
 
 	private final GradingRepository gradingRepository;
 	private final AnswerAnnotationRepository answerAnnotationRepository;
@@ -65,6 +73,8 @@ public class GradingService {
 	private final CurrentUserProvider currentUserProvider;
 	private final UserRepository userRepository;
 	private final GradingAiAnalysisService gradingAiAnalysisService;
+	private final GradingAiResultPersistenceService gradingAiResultPersistenceService;
+	private final AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry;
 	private final SpringDataAnswerRepository answerRepository;
 
 	@Autowired
@@ -77,6 +87,8 @@ public class GradingService {
 			CurrentUserProvider currentUserProvider,
 			UserRepository userRepository,
 			GradingAiAnalysisService gradingAiAnalysisService,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry,
 			@Autowired(required = false) SpringDataAnswerRepository answerRepository) {
 		this.gradingRepository = gradingRepository;
 		this.answerAnnotationRepository = answerAnnotationRepository;
@@ -86,6 +98,8 @@ public class GradingService {
 		this.currentUserProvider = currentUserProvider;
 		this.userRepository = userRepository;
 		this.gradingAiAnalysisService = gradingAiAnalysisService;
+		this.gradingAiResultPersistenceService = gradingAiResultPersistenceService;
+		this.aiAnalysisInFlightRegistry = aiAnalysisInFlightRegistry;
 		this.answerRepository = answerRepository;
 	}
 
@@ -97,7 +111,9 @@ public class GradingService {
 			ClassRepository classRepository,
 			CurrentUserProvider currentUserProvider,
 			UserRepository userRepository,
-			GradingAiAnalysisService gradingAiAnalysisService) {
+			GradingAiAnalysisService gradingAiAnalysisService,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry) {
 		this(
 				gradingRepository,
 				answerAnnotationRepository,
@@ -107,6 +123,8 @@ public class GradingService {
 				currentUserProvider,
 				userRepository,
 				gradingAiAnalysisService,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
 				null);
 	}
 
@@ -158,7 +176,10 @@ public class GradingService {
 				try {
 					parsedNode = OBJECT_MAPPER.readTree(grading.aiTranscript().toString());
 				} catch (Exception e) {
-					LOGGER.warn("Failed to parse aiTranscript JSON for grading {}: {}", grading.id(), e.getMessage());
+					LOGGER.warn(
+							"Failed to parse AI transcript JSON for grading {}: {}",
+							grading.id(),
+							e.getClass().getSimpleName());
 				}
 			}
 
@@ -206,8 +227,6 @@ public class GradingService {
 			} catch (Exception ignored) {
 				suggestedScore = BigDecimal.valueOf(criteriaScoresNode.get("overallScore").asDouble());
 			}
-		} else if (grading.status() == GradingStatus.AI_GRADED || grading.status() == GradingStatus.COMPLETED) {
-			suggestedScore = grading.finalScore();
 		}
 
 		return new AiGradingSuggestionResponse(
@@ -230,29 +249,40 @@ public class GradingService {
 		);
 	}
 
+	@Transactional
 	public void requestAiAnalysis(long submissionModuleId) {
 		User teacher = requireTeacher();
 		GradingContext context = requireSubmissionModuleContext(submissionModuleId);
 		requireTeacherOwnsContext(context, teacher);
-		Grading grading = gradingRepository.findBySubmissionModuleId(submissionModuleId)
-				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+		Grading grading = requireGradingForUpdate(submissionModuleId);
 		if (!context.submitted()
 				|| (context.moduleSkill() != ModuleSkill.WRITING && context.moduleSkill() != ModuleSkill.SPEAKING)
 				|| (grading.status() != GradingStatus.PENDING && grading.status() != GradingStatus.FAILED)) {
 			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
 		}
-		if (grading.status() == GradingStatus.FAILED) {
-			gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
+		if (!aiAnalysisInFlightRegistry.tryClaim(submissionModuleId)) {
+			throw ApiException.badRequest(INVALID_AI_ANALYSIS_MESSAGE);
 		}
-		gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
+		try {
+			registerAiWorkerAfterCommit(submissionModuleId);
+			if (grading.status() == GradingStatus.FAILED) {
+				gradingRepository.updateStatus(grading.id(), GradingStatus.PENDING);
+			}
+		} catch (RuntimeException exception) {
+			aiAnalysisInFlightRegistry.release(submissionModuleId);
+			throw exception;
+		}
 	}
 
 	@Transactional
 	public void updateFinalGrade(long gradingId, BigDecimal finalScore, String finalFeedback, String note) {
 		User teacher = requireTeacher();
-		Grading current = requireGrading(gradingId);
 		GradingContext context = requireGradingContext(gradingId);
 		requireTeacherOwnsContext(context, teacher);
+		Grading current = requireGradingForUpdate(context.submissionModuleId());
+		if (!Objects.equals(current.id(), gradingId)) {
+			throw ApiException.notFound(GRADING_NOT_FOUND_MESSAGE);
+		}
 		if (!isValidScore(finalScore, current.maxScoreSnapshot())) {
 			throw ApiException.badRequest(INVALID_SCORE_MESSAGE);
 		}
@@ -271,6 +301,41 @@ public class GradingService {
 						note,
 						changedAt));
 		}
+	}
+
+	private void registerAiWorkerAfterCommit(long submissionModuleId) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			throw new IllegalStateException("AI analysis requests require an active transaction synchronization.");
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				try {
+					gradingAiAnalysisService.analyzeSubmittedModule(submissionModuleId);
+				} catch (RuntimeException exception) {
+					aiAnalysisInFlightRegistry.release(submissionModuleId);
+					LOGGER.warn(
+							"AI analysis worker could not be scheduled for submission module {}: {}",
+							submissionModuleId,
+							exception.getClass().getSimpleName());
+					try {
+						gradingAiResultPersistenceService.markFailedIfStillPending(submissionModuleId);
+					} catch (RuntimeException failure) {
+						LOGGER.error(
+								"Could not mark rejected AI analysis as failed for submission module {}: {}",
+								submissionModuleId,
+								failure.getClass().getSimpleName());
+					}
+				}
+			}
+
+			@Override
+			public void afterCompletion(int status) {
+				if (status != STATUS_COMMITTED) {
+					aiAnalysisInFlightRegistry.release(submissionModuleId);
+				}
+			}
+		});
 	}
 
 	public Grading getById(long gradingId) {
@@ -428,6 +493,15 @@ public class GradingService {
 	private Grading requireGrading(long gradingId) {
 		return gradingRepository.findById(gradingId)
 				.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+	}
+
+	private Grading requireGradingForUpdate(long submissionModuleId) {
+		try {
+			return gradingRepository.findBySubmissionModuleIdForUpdate(submissionModuleId)
+					.orElseThrow(() -> ApiException.notFound(GRADING_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException | LockTimeoutException | PessimisticLockException exception) {
+			throw ApiException.badRequest(AI_ANALYSIS_LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private AnswerAnnotation requireAnnotation(long annotationId) {

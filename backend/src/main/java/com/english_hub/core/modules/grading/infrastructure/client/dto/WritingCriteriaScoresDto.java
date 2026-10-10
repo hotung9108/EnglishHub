@@ -5,5 +5,5 @@ public record WritingCriteriaScoresDto(
 		double coherenceAndCohesion,
 		double lexicalResource,
 		double grammaticalRangeAndAccuracy,
-		double overallScore
+		Double overallScore
 ) {}
