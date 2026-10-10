@@ -2,91 +2,107 @@ import React, { useState } from 'react';
 import { 
   Users, UserPlus, Search, 
   X, Check, Lock, Unlock,
-  Shield, Mail, Phone, Edit3
+  Shield, Mail, Phone, Edit3, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateFullName } from '../utils/nameValidation';
-
-interface AccountUser {
-  id: string;
-  avatar: string;
-  name: string;
-  email: string;
-  phone: string;
-  role: 'Student' | 'Teacher' | 'Admin';
-  status: 'Active' | 'Blocked';
-  joinedDate: string;
-}
+import { useUsers } from '../hooks/useUsers';
+import { userService } from '../api/services/user.service';
+import type { UserListItem } from '../api/services/user.service';
 
 export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
-  const [users, setUsers] = useState<AccountUser[]>([
-    { id: 'HV-8801', avatar: 'AJ', name: 'Alice Johnson', email: 'alice@center.edu.vn', phone: '0987-654-321', role: 'Student', status: 'Active', joinedDate: '2025-10-15' },
-    { id: 'GV-001', avatar: 'TL', name: 'Trần Thị Mai Lan', email: 'mailan@center.edu.vn', phone: '0912-345-678', role: 'Teacher', status: 'Active', joinedDate: '2024-08-20' },
-    { id: 'HV-8802', avatar: 'DP', name: 'David Pham', email: 'david@center.edu.vn', phone: '0933-111-222', role: 'Student', status: 'Blocked', joinedDate: '2025-11-01' },
-    { id: 'AD-001', avatar: 'NV', name: 'Nguyễn Văn Hùng', email: 'hung@center.edu.vn', phone: '0944-555-666', role: 'Admin', status: 'Active', joinedDate: '2024-01-10' },
-  ]);
-
+  const [roleFilter, setRoleFilter] = useState<'All' | 'STUDENT' | 'TEACHER' | 'ADMIN'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'All' | 'Student' | 'Teacher' | 'Admin'>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Blocked'>('All');
+
+  const {
+    users,
+    isLoading,
+    error,
+    createUser,
+    updateUser,
+    refetch
+  } = useUsers({
+    initialLimit: 100,
+  });
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<AccountUser | null>(null);
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    role: 'Student' as 'Student' | 'Teacher' | 'Admin',
-    status: 'Active' as 'Active' | 'Blocked'
+    password: '',
+    role: 'STUDENT' as 'STUDENT' | 'TEACHER' | 'ADMIN',
+    status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
   const [nameError, setNameError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const filteredUsers = users.filter(user => {
     if (roleFilter !== 'All' && user.role !== roleFilter) return false;
     if (statusFilter !== 'All' && user.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
+      const code = formatUserCode(user.id, user.role).toLowerCase();
       return (
-        user.name.toLowerCase().includes(q) ||
+        user.fullName.toLowerCase().includes(q) ||
         user.email.toLowerCase().includes(q) ||
-        user.id.toLowerCase().includes(q) ||
-        user.phone.includes(q)
+        code.includes(q)
       );
     }
     return true;
   });
 
+  function formatUserCode(id: number, role: string) {
+    const pad = String(id).padStart(4, '0');
+    if (role === 'ADMIN') return `AD-${pad}`;
+    if (role === 'TEACHER') return `GV-${pad}`;
+    return `HV-${pad}`;
+  }
+
+  function getAvatarInitials(name: string) {
+    if (!name.trim()) return 'U';
+    const parts = name.trim().split(/\s+/);
+    return parts.map(p => p[0]).slice(-2).join('').toUpperCase();
+  }
+
   const handleOpenCreateDrawer = () => {
     setEditingUser(null);
     setNameError('');
+    setActionError('');
     setFormData({
       name: '',
       email: '',
       phone: '',
-      role: 'Student',
-      status: 'Active'
+      password: '',
+      role: 'STUDENT',
+      status: 'ACTIVE'
     });
     setIsDrawerOpen(true);
   };
 
-  const handleOpenEditDrawer = (user: AccountUser) => {
+  const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
+    setActionError('');
     setFormData({
-      name: user.name,
+      name: user.fullName,
       email: user.email,
-      phone: user.phone,
+      phone: '',
+      password: '',
       role: user.role,
-      status: user.status
+      status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE'
     });
     setIsDrawerOpen(true);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) return;
 
@@ -96,45 +112,61 @@ export const Accounts: React.FC = () => {
       return;
     }
     setNameError('');
+    setActionError('');
     const cleanName = valResult.normalized;
 
-    if (editingUser) {
-      setUsers(prev => prev.map(u => u.id === editingUser.id ? {
-        ...u,
-        ...formData,
-        name: cleanName
-      } : u));
-    } else {
-      const newId = formData.role === 'Admin' ? `AD-00${users.length + 1}` : formData.role === 'Teacher' ? `GV-00${users.length + 1}` : `HV-880${users.length + 1}`;
-      const initials = cleanName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
-      const newUser: AccountUser = {
-        id: newId,
-        avatar: initials,
-        name: cleanName,
-        email: formData.email,
-        phone: formData.phone || 'Chưa cập nhật',
-        role: formData.role,
-        status: formData.status,
-        joinedDate: new Date().toISOString().split('T')[0]
-      };
-      setUsers(prev => [newUser, ...prev]);
+    try {
+      setActionLoading(true);
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          fullName: cleanName,
+          phone: formData.phone || undefined
+        });
+        if (editingUser.status !== formData.status) {
+          await userService.updateStatus(editingUser.id, formData.status);
+        }
+      } else {
+        if (formData.role === 'TEACHER') {
+          await createUser({
+            role: 'TEACHER',
+            fullName: cleanName,
+            email: formData.email,
+            password: formData.password || 'Teacher123!'
+          });
+        } else {
+          await createUser({
+            role: 'STUDENT',
+            fullName: cleanName,
+            email: formData.email,
+            password: formData.password || 'Student123!',
+            parentPhone: formData.phone || undefined
+          });
+        }
+      }
+      await refetch();
+      setIsDrawerOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi lưu tài khoản.' : 'Failed to save account.';
+      setActionError(msg);
+    } finally {
+      setActionLoading(false);
     }
-    setIsDrawerOpen(false);
   };
 
-  const handleToggleStatus = (id: string) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === id) {
-        return { ...u, status: u.status === 'Active' ? 'Blocked' : 'Active' };
-      }
-      return u;
-    }));
+  const handleToggleStatus = async (user: UserListItem) => {
+    const nextStatus = user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+    try {
+      await userService.updateStatus(user.id, nextStatus);
+      await refetch();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : isVi ? 'Không thể thay đổi trạng thái tài khoản.' : 'Failed to update account status.');
+    }
   };
 
   const getRoleBadgeStyle = (role: string) => {
     switch (role) {
-      case 'Admin': return { background: '#0f172a', color: '#ffffff' };
-      case 'Teacher': return { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
+      case 'ADMIN': return { background: '#0f172a', color: '#ffffff' };
+      case 'TEACHER': return { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
       default: return { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' };
     }
   };
@@ -169,13 +201,13 @@ export const Accounts: React.FC = () => {
         {/* Role & Status Pills */}
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="adm-pills">
-            {(['All', 'Student', 'Teacher', 'Admin'] as const).map(role => (
+            {(['All', 'STUDENT', 'TEACHER', 'ADMIN'] as const).map(role => (
               <button
                 key={role}
                 onClick={() => setRoleFilter(role)}
                 className={`adm-pill ${roleFilter === role ? 'active' : ''}`}
               >
-                <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role}</span>
+                <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role === 'STUDENT' ? 'Student' : role === 'TEACHER' ? 'Teacher' : 'Admin'}</span>
                 <span className="adm-pill-badge">
                   {role === 'All' ? users.length : users.filter(u => u.role === role).length}
                 </span>
@@ -184,14 +216,14 @@ export const Accounts: React.FC = () => {
           </div>
 
           <div className="adm-pills">
-            {(['All', 'Active', 'Blocked'] as const).map(status => (
+            {(['All', 'ACTIVE', 'LOCKED'] as const).map(status => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
                 className={`adm-pill ${statusFilter === status ? 'active' : ''}`}
                 style={{ fontSize: '12px', padding: '4px 10px' }}
               >
-                <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'Active' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
+                <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
               </button>
             ))}
           </div>
@@ -211,114 +243,149 @@ export const Accounts: React.FC = () => {
         </div>
       </div>
 
+      {/* Error notification if load failed */}
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '16px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{error.message || (isVi ? 'Không thể tải danh sách tài khoản từ hệ thống.' : 'Failed to load users from server.')}</span>
+        </div>
+      )}
+
       {/* Modern Data Table */}
       <div className="adm-table-card">
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th>{t('accounts.colIdAvatar')}</th>
-              <th>{t('accounts.colEmailPhone')}</th>
-              <th>{t('accounts.colRole')}</th>
-              <th>{t('accounts.colStatus')}</th>
-              <th>{isVi ? 'NGÀY TẠO' : 'JOINED DATE'}</th>
-              <th style={{ textAlign: 'right' }}>{t('accounts.colActions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map(user => (
-              <tr key={user.id}>
-                <td>
-                  <div className="adm-cell-user">
-                    <div 
-                      className="adm-avatar"
-                      style={{ 
-                        backgroundColor: user.role === 'Admin' ? '#0f172a' : user.role === 'Teacher' ? '#2563eb' : '#059669',
-                        position: 'relative'
-                      }}
-                    >
-                      {user.avatar}
-                      <span 
-                        style={{
-                          position: 'absolute',
-                          bottom: '-1px',
-                          right: '-1px',
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          backgroundColor: user.status === 'Active' ? '#22c55e' : '#ef4444',
-                          border: '2px solid white'
-                        }}
-                      />
-                    </div>
-                    <div className="adm-avatar-info">
-                      <div className="adm-avatar-name">{user.name}</div>
-                      <div className="adm-avatar-meta font-mono">{user.id}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--on-surface)' }}>{user.email}</span>
-                    <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>{user.phone}</span>
-                  </div>
-                </td>
-                <td>
-                  <span 
-                    className="badge" 
-                    style={{ 
-                      ...getRoleBadgeStyle(user.role),
-                      padding: '4px 10px', 
-                      borderRadius: 'var(--radius-full)', 
-                      fontSize: '11.5px',
-                      fontWeight: 700 
-                    }}
-                  >
-                    {user.role}
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge ${user.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
-                    {user.status === 'Active' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                  </span>
-                </td>
-                <td className="font-mono text-on-surface-variant" style={{ fontSize: '12.5px' }}>
-                  {user.joinedDate}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', gap: '8px' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleOpenEditDrawer(user)}
-                      title={t('accounts.actionEdit')}
-                      style={{ padding: '6px 10px' }}
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button 
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleToggleStatus(user.id)}
-                      title={user.status === 'Active' ? t('accounts.actionLock') : t('accounts.actionUnlock')}
-                      style={{ padding: '6px 10px', color: user.status === 'Active' ? '#dc2626' : '#16a34a' }}
-                    >
-                      {user.status === 'Active' ? <Lock size={14} /> : <Unlock size={14} />}
-                    </button>
-                  </div>
-                </td>
+        {isLoading ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+            <div>{isVi ? 'Đang tải danh sách tài khoản...' : 'Loading accounts...'}</div>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Users size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+            <div style={{ fontSize: '15px', fontWeight: 600 }}>
+              {isVi ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
+            </div>
+            <div style={{ fontSize: '13px', marginTop: '4px' }}>
+              {searchQuery ? (isVi ? 'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc' : 'Try adjusting your search query or filters') : (isVi ? 'Hệ thống hiện chưa có tài khoản nào trong danh mục này' : 'No accounts currently exist in this category')}
+            </div>
+          </div>
+        ) : (
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>{t('accounts.colIdAvatar')}</th>
+                <th>{t('accounts.colEmailPhone')}</th>
+                <th>{t('accounts.colRole')}</th>
+                <th>{t('accounts.colStatus')}</th>
+                <th style={{ textAlign: 'right' }}>{t('accounts.colActions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredUsers.map(user => {
+                const code = formatUserCode(user.id, user.role);
+                const initials = getAvatarInitials(user.fullName);
+                const isActive = user.status === 'ACTIVE';
+
+                return (
+                  <tr key={user.id}>
+                    <td>
+                      <div className="adm-cell-user">
+                        <div 
+                          className="adm-avatar"
+                          style={{ 
+                            backgroundColor: user.role === 'ADMIN' ? '#0f172a' : user.role === 'TEACHER' ? '#2563eb' : '#059669',
+                            position: 'relative'
+                          }}
+                        >
+                          {initials}
+                          <span 
+                            style={{
+                              position: 'absolute',
+                              bottom: '-1px',
+                              right: '-1px',
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              backgroundColor: isActive ? '#22c55e' : '#ef4444',
+                              border: '2px solid white'
+                            }}
+                          />
+                        </div>
+                        <div className="adm-avatar-info">
+                          <div className="adm-avatar-name">{user.fullName}</div>
+                          <div className="adm-avatar-meta font-mono">{code}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontSize: '13px', color: 'var(--on-surface)' }}>{user.email}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span 
+                        className="badge" 
+                        style={{ 
+                          ...getRoleBadgeStyle(user.role),
+                          padding: '4px 10px', 
+                          borderRadius: 'var(--radius-full)', 
+                          fontSize: '11.5px',
+                          fontWeight: 700 
+                        }}
+                      >
+                        {user.role}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${isActive ? 'badge-active' : 'badge-onleave'}`}>
+                        {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: '8px' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenEditDrawer(user)}
+                          title={t('accounts.actionEdit')}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleToggleStatus(user)}
+                          title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
+                          style={{ padding: '6px 10px', color: isActive ? '#dc2626' : '#16a34a' }}
+                        >
+                          {isActive ? <Lock size={14} /> : <Unlock size={14} />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Slide-over Drawer (Mobbin / Linear Sheet Pattern) */}
+      {/* Slide-over Drawer */}
       {isDrawerOpen && (
         <div className="adm-drawer-backdrop" onClick={() => setIsDrawerOpen(false)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
-            {/* Drawer Header */}
             <div className="adm-drawer-header">
               <h2 className="adm-drawer-title">
                 {editingUser 
-                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.name}` : `Edit Account: ${editingUser.name}`)
+                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`)
                   : (isVi ? 'Khởi Tạo Tài Khoản Người Dùng Mới' : 'Create New User Account')}
               </h2>
               <button 
@@ -329,9 +396,22 @@ export const Accounts: React.FC = () => {
               </button>
             </div>
 
-            {/* Drawer Body Form */}
             <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="adm-drawer-body">
+                {actionError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#b91c1c',
+                    fontSize: '13px',
+                    marginBottom: '14px'
+                  }}>
+                    {actionError}
+                  </div>
+                )}
+
                 <div className="adm-form-group">
                   <label className="adm-form-label">
                     {t('accounts.colName')} <span style={{ color: 'var(--error)' }}>*</span>
@@ -380,10 +460,26 @@ export const Accounts: React.FC = () => {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       style={{ paddingLeft: '36px', width: '100%' }}
+                      disabled={!!editingUser}
                       required
                     />
                   </div>
                 </div>
+
+                {!editingUser && (
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">
+                      {isVi ? 'Mật khẩu ban đầu' : 'Initial Password'}
+                    </label>
+                    <input 
+                      type="password" 
+                      className="input"
+                      placeholder={isVi ? 'Để trống dùng mặc định' : 'Leave empty for default'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
@@ -408,11 +504,12 @@ export const Accounts: React.FC = () => {
                     <select 
                       className="input"
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'Student' | 'Teacher' | 'Admin' })}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
+                      disabled={!!editingUser}
                     >
-                      <option value="Student">Student (Học viên)</option>
-                      <option value="Teacher">Teacher (Giáo viên)</option>
-                      <option value="Admin">Admin (Quản trị viên)</option>
+                      <option value="STUDENT">Student (Học viên)</option>
+                      <option value="TEACHER">Teacher (Giáo viên)</option>
+                      <option value="ADMIN">Admin (Quản trị viên)</option>
                     </select>
                   </div>
 
@@ -421,10 +518,10 @@ export const Accounts: React.FC = () => {
                     <select 
                       className="input"
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'Active' | 'Blocked' })}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'LOCKED' })}
                     >
-                      <option value="Active">{isVi ? 'Hoạt động (Active)' : 'Active'}</option>
-                      <option value="Blocked">{isVi ? 'Tạm khóa (Blocked)' : 'Blocked'}</option>
+                      <option value="ACTIVE">{isVi ? 'Hoạt động (Active)' : 'Active'}</option>
+                      <option value="LOCKED">{isVi ? 'Tạm khóa (Blocked)' : 'Blocked'}</option>
                     </select>
                   </div>
                 </div>
@@ -435,22 +532,27 @@ export const Accounts: React.FC = () => {
                     {isVi ? 'Chính sách bảo mật tài khoản' : 'Security Credential Policy'}
                   </div>
                   {isVi 
-                    ? 'Tài khoản mới sẽ nhận mật khẩu tạm thời gửi qua email và bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên.' 
-                    : 'A temporary credentials email will be dispatched and must be refreshed on initial login.'}
+                    ? 'Tài khoản mới sẽ có hiệu lực trực tiếp trên cơ sở dữ liệu hệ thống.' 
+                    : 'Created user credentials will sync directly with the production authentication service.'}
                 </div>
               </div>
 
-              {/* Drawer Footer */}
               <div className="adm-drawer-footer">
                 <button 
                   type="button" 
                   className="btn btn-secondary" 
                   onClick={() => setIsDrawerOpen(false)}
+                  disabled={actionLoading}
                 >
                   {isVi ? 'Hủy' : 'Cancel'}
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Check size={16} />
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={actionLoading}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                   <span>{isVi ? 'Lưu tài khoản' : 'Save User'}</span>
                 </button>
               </div>

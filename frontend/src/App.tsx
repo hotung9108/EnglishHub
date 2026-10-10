@@ -93,7 +93,7 @@ function App() {
 
         {/* Global Redirects */}
         <Route path="/reports" element={<Navigate to="/admin/reports" replace />} />
-        <Route path="/progress" element={<Navigate to="/teacher/classes/ENG-IELTS-6.5A/progress" replace />} />
+        <Route path="/progress" element={<Navigate to="/teacher/classes" replace />} />
 
         {/* Teacher Routes */}
         <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>

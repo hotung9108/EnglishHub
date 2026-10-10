@@ -11,6 +11,8 @@ import type {
 } from '../types/exam-bank.types';
 import { ExamDetailModal } from '../components/exam-bank/ExamDetailModal';
 import { QuickAssignModal } from '../components/exam-bank/QuickAssignModal';
+import { assignmentService, type AssignmentSkill } from '../api/services/assignment.service';
+import { moduleService, type ModuleTaskType } from '../api/services/module.service';
 import '../styles/teacher-exam-bank.css';
 
 export const TeacherExamBank: React.FC = () => {
@@ -417,11 +419,77 @@ export const TeacherExamBank: React.FC = () => {
     };
   }, [examTemplates]);
 
-  const handleConfirmAssign = (form: QuickAssignForm) => {
-    setAssigningExam(null);
-    showToast(isVi 
-      ? `Đã giao đề "${form.assignmentTitle}" thành công cho lớp ${form.className}!` 
-      : `Successfully deployed "${form.assignmentTitle}" to ${form.className}!`);
+  const totalDeploys = useMemo(() => {
+    return examTemplates.reduce((sum, e) => sum + e.usageCount, 0);
+  }, [examTemplates]);
+
+  const avgRating = useMemo(() => {
+    if (examTemplates.length === 0) return '5.0';
+    return (examTemplates.reduce((sum, e) => sum + e.rating, 0) / examTemplates.length).toFixed(1);
+  }, [examTemplates]);
+
+  const handleConfirmAssign = async (form: QuickAssignForm) => {
+    try {
+      const targetClassId = Number(form.classId);
+      if (!targetClassId || Number.isNaN(targetClassId)) {
+        showToast(isVi ? 'Vui lòng chọn lớp học hợp lệ!' : 'Please select a valid classroom!');
+        return;
+      }
+
+      // 1. Create live assignment in DB
+      const newAssignment = await assignmentService.createAssignment(targetClassId, {
+        title: form.assignmentTitle,
+        description: assigningExam?.description || 'Bài tập được giao từ Ngân hàng đề thi',
+        openAt: form.startDate ? new Date(form.startDate).toISOString() : new Date().toISOString(),
+        closeAt: form.dueDate ? new Date(form.dueDate).toISOString() : new Date(Date.now() + 7 * 86400000).toISOString(),
+        maxSubmissions: 3,
+      });
+
+      // 2. Publish assignment
+      try {
+        await assignmentService.updateAssignmentStatus(newAssignment.id, 'PUBLISHED');
+      } catch {
+        // Handled if default is active
+      }
+
+      // 3. Create module corresponding to the exam skill
+      if (assigningExam) {
+        let skillType: AssignmentSkill = 'WRITING';
+        let taskType: ModuleTaskType = 'ESSAY';
+        if (assigningExam.skill === 'speaking') {
+          skillType = 'SPEAKING';
+          taskType = 'RECORDING';
+        } else if (assigningExam.skill === 'reading') {
+          skillType = 'READING';
+          taskType = 'QUIZ';
+        } else if (assigningExam.skill === 'listening') {
+          skillType = 'LISTENING';
+          taskType = 'QUIZ';
+        }
+
+        const instructions = assigningExam.details?.prompt || 
+          assigningExam.details?.passage?.title || 
+          assigningExam.details?.cueCard?.topic || 
+          assigningExam.description;
+
+        await moduleService.createModule(newAssignment.id, {
+          skill: skillType,
+          taskType: taskType,
+          orderIndex: 0,
+          instructions: instructions,
+          aiInstruction: assigningExam.details?.rubricsSummary || 'Chấm điểm chi tiết theo tiêu chuẩn Cambridge IELTS',
+          maxScore: 10,
+        });
+      }
+
+      setAssigningExam(null);
+      showToast(isVi 
+        ? `Đã giao đề "${form.assignmentTitle}" thành công cho lớp ${form.className}!` 
+        : `Successfully deployed "${form.assignmentTitle}" to ${form.className}!`);
+    } catch (err) {
+      console.error('Failed to assign exam to class:', err);
+      showToast(isVi ? 'Không thể giao đề thi cho lớp học. Vui lòng thử lại.' : 'Failed to deploy exam. Please try again.');
+    }
   };
 
   const handleCloneTemplate = (exam: ExamTemplateItem) => {
@@ -527,7 +595,7 @@ export const TeacherExamBank: React.FC = () => {
             <Layers size={22} />
           </div>
           <div>
-            <div className="exam-stat-num">420+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
+            <div className="exam-stat-num">{totalDeploys}+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
             <div className="exam-stat-label">{isVi ? 'Giáo viên đã sử dụng trong học kỳ' : 'Deployed across classrooms'}</div>
           </div>
         </div>
@@ -537,7 +605,7 @@ export const TeacherExamBank: React.FC = () => {
             <Star size={22} />
           </div>
           <div>
-            <div className="exam-stat-num">4.9 / 5.0</div>
+            <div className="exam-stat-num">{avgRating} / 5.0</div>
             <div className="exam-stat-label">{isVi ? 'Đánh giá độ sát đề thi thật' : 'Exam Fidelity Rating'}</div>
           </div>
         </div>

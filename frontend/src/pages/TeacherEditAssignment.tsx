@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Users, Bell
+  Calendar, Eye, Save, Send, CheckCircle2, Users, Bell,
+  RefreshCw, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService, type ClassSummary } from '../api/services/class.service';
+import { assignmentService, type AssignmentDetail, type AssignmentStatus } from '../api/services/assignment.service';
+import { moduleService, type ModuleSummary } from '../api/services/module.service';
+import { submissionService } from '../api/services/submission.service';
 import type { 
   AssignmentEditorData, AssignmentSkill 
 } from '../types/assignment-editor.types';
@@ -24,443 +29,328 @@ export const TeacherEditAssignment: React.FC = () => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
-  // Preview Modal state
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
+
+  // Preview Modal state & toast
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<string>('20:25');
+  const [lastSavedTime, setLastSavedTime] = useState<string>('');
 
-  // Initial assignment data mapping based on ID
-  const getInitialAssignmentData = (assignmentId?: string): AssignmentEditorData => {
-    switch (assignmentId) {
-      case '2': // HW-02 Speaking
-        return {
-          id: '2',
-          code: 'HW-02',
-          title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-          skill: 'speaking',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-12T08:00',
-          dueDate: '2026-03-20T23:59',
-          durationMinutes: 15,
-          allowLate: true,
-          status: 'active',
-          targetAudience: 'all',
-          notifyStudents: true,
-          maxSubmissions: 3,
-          writing: {
-            taskType: 'task2',
-            promptText: 'Discuss environmental policies in developing countries...',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: 'Focus on cohesion and academic collocations.',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: 'Describe an environmental problem that has occurred in your city or country.',
-            cueCardBullets: [
-              'What the problem is and where it occurs',
-              'What causes this environmental hazard',
-              'What effect it has on residents and wildlife',
-              'And explain what measures should be taken to mitigate this issue.'
-            ],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 3,
-            examinerSampleAudioUrl: 'https://cdn.englishhub.edu.vn/audio/speaking/sample-hw02.mp3',
-            examinerTranscript: 'All right, you will have one minute to prepare your monologue. After that, you should speak for two minutes about the environmental issue.',
-            followUpQuestions: [
-              {
-                id: 'sq-1',
-                order: 1,
-                question: 'Do you think individuals or governments have more power to stop urban air pollution?',
-                hint: 'Mention regulations, public transport investment vs individual recycling habits.'
-              },
-              {
-                id: 'sq-2',
-                order: 2,
-                question: 'How might green architecture improve air quality in crowded megacities?',
-                hint: 'Discuss vertical gardens, rooftop solar panels and eco-friendly concrete.'
-              }
-            ],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3 Speech Diagnostic',
-            aiInstruction: 'Chú ý đánh giá phát âm âm đuôi /s/, /z/, /t/, /d/ và nhịp điệu ngắt nghỉ (intonation).'
-          },
-          reading: {
-            passageTitle: 'Biomimicry Innovation & Engineering',
-            passageSubtitle: 'Nature-Inspired Technologies in Clean Energy',
-            passageSource: 'Cambridge 19 Academic Reading',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Renewable Energy Seminar Discussion',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section3',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
-          }
-        };
+  // Class & Stats
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [turnoutStats, setTurnoutStats] = useState<{ total: number; submitted: number }>({ total: 0, submitted: 0 });
+  const [activeModuleId, setActiveModuleId] = useState<number | null>(null);
 
-      case '3': // HW-03 Reading
-        return {
-          id: '3',
-          code: 'HW-03',
-          title: 'Cambridge 19 - Academic Reading Passage: Biomimicry Innovation',
-          skill: 'reading',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-10T08:00',
-          dueDate: '2026-03-18T21:00',
-          durationMinutes: 20,
-          allowLate: false,
-          status: 'closed',
-          targetAudience: 'all',
-          notifyStudents: true,
-          writing: {
-            taskType: 'task2',
-            promptText: '',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: '',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: '',
-            cueCardBullets: [],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 1,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: 'The Origin and Enduring Legacy of Typesetting Standards',
-            passageSubtitle: 'Excerpts from Classical Typography & Publication Archival Studies',
-            passageSource: 'Cambridge Academic Reading Passage 1',
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: 'Giải thích chi tiết tại sao các phương án nhiễu (distractors) lại sai.',
-            paragraphs: [
-              {
-                id: 'p-1',
-                label: 'A',
-                title: 'What is Lorem Ipsum?',
-                content: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. Designers at Letraset and James Mosley, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset's Body Type sheets."
-              },
-              {
-                id: 'p-2',
-                label: 'B',
-                title: 'Why do we use it?',
-                content: "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text."
-              },
-              {
-                id: 'p-3',
-                label: 'C',
-                title: 'Where does it come from?',
-                content: 'Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, discovered the undoubtable source from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" by Cicero.'
-              },
-              {
-                id: 'p-4',
-                label: 'D',
-                title: 'The Transition to Digital Publishing',
-                content: 'With the advent of digital typesetting in the late 20th century, the role of dummy text became even more critical. Graphical user interfaces (GUI) required designers to map out visual hierarchy before final copy was approved. This led to Lorem Ipsum being hardcoded into early design software like Aldus PageMaker.'
-              }
-            ],
-            questions: [
-              {
-                id: 'rq-1',
-                order: 1,
-                type: 'multiple_choice',
-                prompt: 'According to Paragraph A, what was the original purpose of scrambling the 1914 Cicero translation?',
-                options: [
-                  'To create dummy text for Letraset Body Type sheets',
-                  'To publish an academic translation of Latin literature',
-                  'To teach typography apprentices how to set type',
-                  'To hide confidential printing technology from competitors'
-                ],
-                correctAnswer: 'To create dummy text for Letraset Body Type sheets',
-                explanation: 'Đoạn A nói rõ: "scrambled it to make dummy text for Letraset\'s Body Type sheets".',
-                paragraphRef: 'A',
-                points: 1
-              },
-              {
-                id: 'rq-2',
-                order: 2,
-                type: 'true_false_not_given',
-                prompt: 'Lorem Ipsum was invented in the 21st century by modern digital web designers.',
-                correctAnswer: 'FALSE',
-                explanation: 'Đoạn A và C khẳng định Lorem Ipsum có nguồn gốc từ năm 1500 và văn học Latin năm 45 BC, nên phát biểu này là FALSE.',
-                paragraphRef: 'C',
-                points: 1
-              },
-              {
-                id: 'rq-3',
-                order: 3,
-                type: 'gap_fill',
-                prompt: 'Richard McClintock was a professor of [ _____ ] at Hampden-Sydney College.',
-                correctAnswer: 'Latin',
-                explanation: 'Đoạn C đề cập: "Richard McClintock, a Latin professor at Hampden-Sydney College".',
-                paragraphRef: 'C',
-                points: 1,
-                wordLimit: 1
-              }
-            ]
-          },
-          listening: {
-            audioTitle: '',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section1',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
-          }
-        };
-
-      case '4': // HW-04 Listening
-        return {
-          id: '4',
-          code: 'HW-04',
-          title: 'IELTS Listening Practice: Campus Life & Renewable Energy Seminar',
-          skill: 'listening',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-08T08:00',
-          dueDate: '2026-03-15T21:00',
-          durationMinutes: 30,
-          allowLate: true,
-          status: 'closed',
-          targetAudience: 'all',
-          notifyStudents: true,
-          writing: {
-            taskType: 'task2',
-            promptText: '',
-            minWords: 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: '',
-            enablePlagiarismCheck: true,
-            modelAnswer: '',
-            attachments: []
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: '',
-            cueCardBullets: [],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 1,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: '',
-            passageSubtitle: '',
-            passageSource: '',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Cambridge_15_Test1_Listening_Full.mp3',
-            audioUrl: 'https://cdn.englishhub.edu.vn/audio/listening/cam15-test1.mp3',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: `[00:15] Narrator: Section 1. You will hear a conversation between a student and a campus housing officer.
-[00:45] Officer: Good morning, welcome to the university housing administration. How can I assist you today?
-[01:05] Student: Hello, I would like to inquire about accommodation near Central Park campus.
-[01:25] Officer: Certainly. Could you please state your full name and intended duration of stay?
-[02:10] Student: My name is Alice Johnson, and I will be staying for 2 semesters starting September.`,
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section1',
-            enableAiDistractorCheck: true,
-            aiInstruction: 'Lưu ý người nói có sửa thông tin về thời gian thuê phòng từ 1 kỳ thành 2 kỳ.',
-            questions: [
-              {
-                id: 'lq-1',
-                order: 1,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Name of applicant: [ Alice Johnson ]',
-                correctAnswer: 'Alice Johnson',
-                acceptableAnswers: ['alice johnson', 'Johnson, Alice'],
-                timestampClue: '02:10',
-                points: 1
-              },
-              {
-                id: 'lq-2',
-                order: 2,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Preferred location near: [ _____ ] campus',
-                correctAnswer: 'Central Park',
-                acceptableAnswers: ['central park', 'The Central Park'],
-                timestampClue: '01:05',
-                points: 1
-              },
-              {
-                id: 'lq-3',
-                order: 3,
-                section: 'section1',
-                type: 'form_completion',
-                prompt: 'Duration of accommodation requested: [ _____ ] semesters',
-                correctAnswer: '2',
-                acceptableAnswers: ['two', '2 semesters'],
-                timestampClue: '02:10',
-                points: 1
-              }
-            ]
-          }
-        };
-
-      default: // Default: HW-01 or HW-05 Writing Task 2
-        return {
-          id: assignmentId || '1',
-          code: assignmentId === '5' ? 'HW-05' : 'HW-01',
-          title: assignmentId === '5' 
-            ? 'IELTS Writing Task 1: Comparative Bar Chart on Carbon Emissions'
-            : 'IELTS Writing Task 2: Artificial Intelligence & Workforce Evolution',
-          skill: 'writing',
-          className: 'ENG-IELTS-6.5A',
-          startDate: '2026-03-15T08:00',
-          dueDate: '2026-03-22T23:59',
-          durationMinutes: 60,
-          allowLate: true,
-          status: 'active',
-          targetAudience: 'all',
-          notifyStudents: true,
-          maxSubmissions: 3,
-          writing: {
-            taskType: assignmentId === '5' ? 'task1' : 'task2',
-            promptText: assignmentId === '5'
-              ? 'The chart below gives information about global carbon emissions in metric gigatons across six economic sectors between 2000 and 2025. Summarise the information by selecting and reporting the main features, and make comparisons where relevant. (Write at least 150 words).'
-              : 'The rapid development of artificial intelligence and machine automation is poised to transform the global workforce. Some argue that AI will eliminate millions of traditional jobs, while others believe it will create new employment opportunities. Discuss both views and give your own opinion. (Write at least 250 words).',
-            minWords: assignmentId === '5' ? 150 : 250,
-            scale: '9.0',
-            rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-            enableAi: true,
-            aiInstruction: 'Khắt khe với các lỗi diễn đạt chung chung (vague generalisations); ưu tiên phát hiện câu phức và cấu trúc đảo ngữ (inversion).',
-            enablePlagiarismCheck: true,
-            modelAnswer: 'In contemporary society, the relentless advancement of artificial intelligence (AI) has sparked intense deliberation concerning the future landscape of the global labour market...',
-            chartImageUrl: assignmentId === '5' ? 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80' : undefined,
-            attachments: [
-              {
-                id: 'att-1',
-                name: 'IELTS_Writing_Task2_Topic_Sheet.pdf',
-                size: '1.2 MB',
-                extension: 'pdf'
-              },
-              {
-                id: 'att-2',
-                name: 'Official_IELTS_Band_Descriptors.pdf',
-                size: '450 KB',
-                extension: 'pdf'
-              }
-            ]
-          },
-          speaking: {
-            partType: 'part2',
-            cueCardTopic: 'Describe an AI technology that you find particularly useful.',
-            cueCardBullets: ['What the technology is', 'How often you use it', 'Why it is helpful', 'And explain how it impacts your daily routine.'],
-            prepTimeSeconds: 60,
-            speakingTimeSeconds: 120,
-            maxRetries: 3,
-            followUpQuestions: [],
-            rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-            enableAi: true,
-            aiModel: 'Whisper V3',
-            aiInstruction: ''
-          },
-          reading: {
-            passageTitle: 'The Future of Neural Networks and Computation',
-            passageSubtitle: 'Academic Reading Passage 2',
-            passageSource: 'Cambridge 18 Academic',
-            paragraphs: [],
-            questions: [],
-            timeLimitMinutes: 20,
-            enableAiExplanation: true,
-            aiInstruction: ''
-          },
-          listening: {
-            audioTitle: 'Campus Lecture on Robotics',
-            audioUrl: '',
-            audioDurationSeconds: 1800,
-            playbackLimit: 'single',
-            transcript: '',
-            hideTranscriptUntilGraded: true,
-            activeSection: 'section4',
-            questions: [],
-            enableAiDistractorCheck: true,
-            aiInstruction: ''
-          }
-        };
+  // Assignment Editor state
+  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
+    id: id || '1',
+    code: `HW-${(id || '1').padStart(2, '0')}`,
+    title: '',
+    skill: 'writing',
+    className: '',
+    startDate: new Date().toISOString().slice(0, 16),
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    durationMinutes: 60,
+    allowLate: true,
+    status: 'active',
+    targetAudience: 'all',
+    notifyStudents: true,
+    maxSubmissions: 3,
+    writing: {
+      taskType: 'task2',
+      promptText: '',
+      minWords: 250,
+      scale: '9.0',
+      rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
+      enableAi: true,
+      aiInstruction: '',
+      enablePlagiarismCheck: true,
+      modelAnswer: '',
+      attachments: []
+    },
+    speaking: {
+      partType: 'part2',
+      cueCardTopic: '',
+      cueCardBullets: [],
+      prepTimeSeconds: 60,
+      speakingTimeSeconds: 120,
+      maxRetries: 3,
+      examinerSampleAudioUrl: '',
+      examinerTranscript: '',
+      followUpQuestions: [],
+      rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
+      enableAi: true,
+      aiModel: 'Whisper V3 Speech Diagnostic',
+      aiInstruction: ''
+    },
+    reading: {
+      passageTitle: '',
+      passageSubtitle: '',
+      passageSource: '',
+      timeLimitMinutes: 20,
+      enableAiExplanation: true,
+      aiInstruction: '',
+      paragraphs: [],
+      questions: []
+    },
+    listening: {
+      audioTitle: '',
+      audioUrl: '',
+      audioDurationSeconds: 1200,
+      playbackLimit: 'single',
+      transcript: '',
+      hideTranscriptUntilGraded: true,
+      activeSection: 'section1',
+      enableAiDistractorCheck: true,
+      aiInstruction: '',
+      questions: []
     }
+  }));
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
   };
-
-  const [prevId, setPrevId] = useState(id);
-  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => getInitialAssignmentData(id));
-
-  if (id !== prevId) {
-    setPrevId(id);
-    setAssignmentData(getInitialAssignmentData(id));
-  }
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    if (!id) return;
+
+    const loadAssignmentData = async () => {
+      try {
+        const assignmentIdNum = Number(id);
+
+      // 1. Fetch assignment details
+      const detail: AssignmentDetail = await assignmentService.getAssignment(assignmentIdNum);
+      
+      // 2. Fetch classes
+      const classRes = await classService.list({ limit: 100 });
+      const classList = classRes.data || [];
+      setClasses(classList);
+
+      // Find which class contains this assignment
+      let matchedClass: ClassSummary | undefined = undefined;
+      for (const cls of classList) {
+        try {
+          const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+          if (assignList.data?.some((a) => a.id === assignmentIdNum)) {
+            matchedClass = cls;
+            break;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (matchedClass) {
+        setSelectedClassId(matchedClass.id);
+        try {
+          const members = await classService.listMembers(matchedClass.id);
+          const subs = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
+          setTurnoutStats({
+            total: members.length,
+            submitted: subs.data?.length || 0
+          });
+        } catch {
+          // Fallback
+        }
+      }
+
+      // 3. Fetch modules
+      let modules: ModuleSummary[] = [];
+      try {
+        const modRes = await moduleService.listModules(assignmentIdNum);
+        modules = modRes.modules || [];
+      } catch {
+        modules = [];
+      }
+
+      let detectedSkill: AssignmentSkill = 'writing';
+      let instructionsText = '';
+
+      if (modules.length > 0) {
+        const firstMod = modules[0];
+        setActiveModuleId(firstMod.id);
+        const modSkill = firstMod.skill?.toLowerCase();
+        if (modSkill?.includes('speak')) detectedSkill = 'speaking';
+        else if (modSkill?.includes('read')) detectedSkill = 'reading';
+        else if (modSkill?.includes('listen')) detectedSkill = 'listening';
+        else detectedSkill = 'writing';
+
+        try {
+          const modDetail = await moduleService.getModule(firstMod.id);
+          instructionsText = modDetail.instructions || '';
+        } catch {
+          instructionsText = '';
+        }
+      }
+
+      const statusMap: Record<AssignmentStatus, 'active' | 'draft' | 'closed'> = {
+        PUBLISHED: 'active',
+        DRAFT: 'draft',
+        CLOSED: 'closed'
+      };
+
+      setAssignmentData((prev) => ({
+        ...prev,
+        id: String(detail.id),
+        code: `HW-${detail.id.toString().padStart(2, '0')}`,
+        title: detail.title,
+        skill: detectedSkill,
+        className: matchedClass ? matchedClass.name : (classList[0]?.name || 'Lớp tiếng Anh'),
+        status: statusMap[detail.status] || 'active',
+        writing: {
+          ...prev.writing,
+          promptText: instructionsText || prev.writing.promptText
+        },
+        speaking: {
+          ...prev.speaking,
+          cueCardTopic: instructionsText || prev.speaking.cueCardTopic
+        },
+        reading: {
+          ...prev.reading,
+          passageTitle: instructionsText ? instructionsText.slice(0, 80) : prev.reading.passageTitle
+        },
+        listening: {
+          ...prev.listening,
+          transcript: instructionsText || prev.listening.transcript
+        }
+      }));
+    } catch (err) {
+      console.error('Failed to load assignment detail for edit:', err);
+      if (isMounted) {
+        setError(isVi ? 'Không thể tải thông tin bài tập. Vui lòng thử lại.' : 'Failed to load assignment details. Please retry.');
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  loadAssignmentData();
+
+  return () => {
+    isMounted = false;
+  };
+}, [id, isVi, reloadKey]);
+
+  const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
+    if (!id) return;
+    setIsSaving(true);
+    try {
+      const assignmentIdNum = Number(id);
+
+      const openDate = assignmentData.startDate 
+        ? new Date(assignmentData.startDate).toISOString() 
+        : new Date().toISOString();
+      const closeDate = assignmentData.dueDate 
+        ? new Date(assignmentData.dueDate).toISOString() 
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      let instructions = '';
+      if (assignmentData.skill === 'writing') instructions = assignmentData.writing.promptText;
+      else if (assignmentData.skill === 'speaking') instructions = assignmentData.speaking.cueCardTopic;
+      else if (assignmentData.skill === 'reading') instructions = assignmentData.reading.passageTitle;
+      else instructions = assignmentData.listening.transcript;
+
+      // 1. Update assignment
+      await assignmentService.updateAssignment(assignmentIdNum, {
+        title: assignmentData.title,
+        description: instructions,
+        openAt: openDate,
+        closeAt: closeDate,
+        maxSubmissions: assignmentData.maxSubmissions || 3
+      });
+
+      // 2. Update status if specified
+      if (publishStatus) {
+        await assignmentService.updateAssignmentStatus(assignmentIdNum, publishStatus);
+      }
+
+      // 3. Update module if exists
+      if (activeModuleId) {
+        try {
+          await moduleService.updateModule(activeModuleId, {
+            instructions,
+            aiInstruction: assignmentData.writing.aiInstruction || undefined
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      setLastSavedTime(timeStr);
+
+      showToast(isVi ? 'Cập nhật bài tập thành công!' : 'Assignment updated successfully!');
+      if (publishStatus === 'PUBLISHED') {
+        setTimeout(() => navigate('/teacher/assignments'), 1000);
+      }
+    } catch (err) {
+      console.error('Failed to update assignment:', err);
+      showToast(isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please retry!');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveDraft = () => {
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    setLastSavedTime(timeStr);
-    showToast(isVi ? 'Đã lưu bản nháp bài tập thành công!' : 'Assignment draft saved successfully!');
+    saveAssignmentChanges('DRAFT');
   };
 
   const handleSaveAndPublish = () => {
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    setLastSavedTime(timeStr);
-    showToast(isVi ? 'Cập nhật và xuất bản bài tập thành công!' : 'Assignment updated and published successfully!');
-    setTimeout(() => {
-      navigate('/teacher/assignments');
-    }, 1200);
+    saveAssignmentChanges('PUBLISHED');
   };
 
   const handleSkillChange = (newSkill: AssignmentSkill) => {
-    setAssignmentData(prev => ({ ...prev, skill: newSkill }));
+    setAssignmentData((prev) => ({ ...prev, skill: newSkill }));
   };
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
+        <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
+        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+          {isVi ? 'Đang tải thông tin bài tập từ hệ thống...' : 'Loading assignment details...'}
+        </h3>
+        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+          {isVi ? 'Đang đồng bộ nội dung đề bài, hạn nộp và lớp học.' : 'Syncing instructions, deadlines, and classroom.'}
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <AlertCircle size={24} color="#dc2626" />
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>{error}</h3>
+        </div>
+        <button 
+          className="btn btn-secondary bg-white btn-sm"
+          onClick={handleRetry}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <RefreshCw size={14} />
+          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="assignment-edit-container">
@@ -505,8 +395,13 @@ export const TeacherEditAssignment: React.FC = () => {
         {/* Status indicator & class badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <select 
-            value={assignmentData.className}
-            onChange={(e) => setAssignmentData({ ...assignmentData, className: e.target.value })}
+            value={selectedClassId ? String(selectedClassId) : ''}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setSelectedClassId(val);
+              const m = classes.find((c) => c.id === val);
+              if (m) setAssignmentData((prev) => ({ ...prev, className: m.name }));
+            }}
             style={{ 
               padding: '8px 14px', 
               fontSize: '13px', 
@@ -516,9 +411,11 @@ export const TeacherEditAssignment: React.FC = () => {
               fontWeight: 600
             }}
           >
-            <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A</option>
-            <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV</option>
-            <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
 
           <div style={{ 
@@ -682,7 +579,7 @@ export const TeacherEditAssignment: React.FC = () => {
                   style={{ width: '90px' }}
                 />
                 <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                  {isVi ? 'phút (để trống nếu không giới hạn)' : 'minutes'}
+                  {isVi ? 'phút' : 'minutes'}
                 </span>
               </div>
             </div>
@@ -751,7 +648,7 @@ export const TeacherEditAssignment: React.FC = () => {
                     onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
                     style={{ accentColor: '#2563eb' }}
                   />
-                  {isVi ? 'Toàn bộ học viên trong lớp (24 học viên)' : 'All class students (24)'}
+                  {isVi ? `Toàn bộ học viên trong lớp (${turnoutStats.total} học viên)` : `All class students (${turnoutStats.total})`}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
                   <input 
@@ -792,16 +689,19 @@ export const TeacherEditAssignment: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
               <span style={{ color: '#64748b' }}>{isVi ? 'Sĩ số lớp:' : 'Class size:'}</span>
-              <strong style={{ color: '#0f172a' }}>24 học viên</strong>
+              <strong style={{ color: '#0f172a' }}>{turnoutStats.total} {isVi ? 'học viên' : 'students'}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
               <span style={{ color: '#64748b' }}>{isVi ? 'Số bài đã nộp:' : 'Submitted:'}</span>
-              <strong style={{ color: '#16a34a' }}>22 bài (91.6%)</strong>
+              <strong style={{ color: '#16a34a' }}>
+                {turnoutStats.submitted} {isVi ? 'bài' : 'items'} ({turnoutStats.total > 0 ? Math.round((turnoutStats.submitted / turnoutStats.total) * 100) : 0}%)
+              </strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Điểm trung bình:' : 'Avg Band:'}</span>
-              <strong style={{ color: '#2563eb' }}>6.8 IELTS</strong>
-            </div>
+            {lastSavedTime && (
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#94a3b8', textAlign: 'right' }}>
+                {isVi ? `Đã lưu lần cuối: ${lastSavedTime}` : `Last saved at: ${lastSavedTime}`}
+              </div>
+            )}
           </section>
         </div>
       </div>
@@ -828,11 +728,6 @@ export const TeacherEditAssignment: React.FC = () => {
         }
         rightActions={
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
-              {isVi ? `Đã lưu tự động lúc ${lastSavedTime}` : `Auto-saved at ${lastSavedTime}`}
-            </span>
-
             <button 
               type="button"
               className="btn btn-secondary bg-white btn-sm"
@@ -846,6 +741,7 @@ export const TeacherEditAssignment: React.FC = () => {
             <button 
               type="button"
               className="btn btn-secondary bg-white btn-sm"
+              disabled={isSaving}
               onClick={handleSaveDraft}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
@@ -856,17 +752,22 @@ export const TeacherEditAssignment: React.FC = () => {
             <button 
               type="button"
               className="btn btn-primary btn-sm"
+              disabled={isSaving}
               onClick={handleSaveAndPublish}
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
             >
-              <Send size={14} />
-              <span>{isVi ? 'Cập nhật & Xuất bản' : 'Save & Publish'}</span>
+              {isSaving ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Send size={14} />
+              )}
+              <span>{isSaving ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Cập nhật & Xuất bản' : 'Update & Publish')}</span>
             </button>
           </div>
         }
       />
 
-      {/* Student View Interactive Preview Modal */}
+      {/* Preview Modal */}
       {showPreviewModal && (
         <AssignmentPreviewModal 
           data={assignmentData} 

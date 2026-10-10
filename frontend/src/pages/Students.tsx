@@ -1,25 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, UserPlus, Search, 
-  FileSpreadsheet, CheckCircle2, Award
+  FileSpreadsheet, CheckCircle2, Award, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { userService } from '../api/services/user.service';
+import { reportService } from '../api/services/report.service';
+import type { UserListItem } from '../api/services/user.service';
 
 interface StudentDirectoryItem {
-  id: string;
+  id: number;
+  code: string;
   name: string;
-  avatar: string;
-  class: string;
-  entry: string;
-  target: string;
-  progress: string;
-  progressPct: number;
-  progressStatus: 'good' | 'warning';
   email: string;
-  phone: string;
-  parentPhone: string;
-  dob: string;
+  role: string;
+  status: 'ACTIVE' | 'LOCKED' | 'INACTIVE';
 }
 
 export const Students: React.FC = () => {
@@ -27,70 +23,76 @@ export const Students: React.FC = () => {
   const navigate = useNavigate();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [studentsData, setStudentsData] = useState<StudentDirectoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [levelFilter, setLevelFilter] = useState<'All' | 'IELTS' | 'TOEIC'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
+  const [totalEnrolled, setTotalEnrolled] = useState(0);
 
-  const studentsData: StudentDirectoryItem[] = [
-    {
-      id: 'HV-8801',
-      name: 'Alice Johnson',
-      avatar: 'AJ',
-      class: 'ENG-IELTS-6.5A',
-      entry: '5.5',
-      target: '7.0',
-      progress: '14/15 Bài',
-      progressPct: 93,
-      progressStatus: 'good',
-      email: 'alice.j@student.edu.vn',
-      phone: '0912 345 678',
-      parentPhone: '0988 776 655',
-      dob: '2005-08-14'
-    },
-    {
-      id: 'HV-8802',
-      name: 'David Pham',
-      avatar: 'DP',
-      class: 'ENG-IELTS-6.5A',
-      entry: '5.0',
-      target: '6.5',
-      progress: '8/15 Bài',
-      progressPct: 53,
-      progressStatus: 'warning',
-      email: 'david.p@student.edu.vn',
-      phone: '0933 111 222',
-      parentPhone: '0977 444 333',
-      dob: '2005-11-20'
-    },
-    {
-      id: 'HV-8803',
-      name: 'Lê Bảo Trâm',
-      avatar: 'BT',
-      class: 'ENG-TOEIC-750',
-      entry: '600',
-      target: '800',
-      progress: '12/12 Bài',
-      progressPct: 100,
-      progressStatus: 'good',
-      email: 'tram.lb@student.edu.vn',
-      phone: '0944 555 666',
-      parentPhone: '0911 222 333',
-      dob: '2004-03-05'
-    }
-  ];
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [usersRes, reportRes] = await Promise.allSettled([
+          userService.listUsers({ role: 'STUDENT', limit: 100 }),
+          reportService.getOverview()
+        ]);
+
+        if (!isMounted) return;
+
+        const rawList: UserListItem[] = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
+        if (reportRes.status === 'fulfilled') {
+          // overview stats if available
+        }
+
+        const items: StudentDirectoryItem[] = rawList.map(st => ({
+          id: st.id,
+          code: `HV-${String(st.id).padStart(4, '0')}`,
+          name: st.fullName,
+          email: st.email,
+          role: st.role,
+          status: st.status
+        }));
+
+        setStudentsData(items);
+        setTotalEnrolled(items.length);
+      } catch (err: unknown) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách học viên.' : 'Failed to load students.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchStudents();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi]);
 
   const filtered = studentsData.filter(st => {
-    if (levelFilter === 'IELTS' && !st.class.includes('IELTS')) return false;
-    if (levelFilter === 'TOEIC' && !st.class.includes('TOEIC')) return false;
+    if (statusFilter !== 'All' && st.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
         st.name.toLowerCase().includes(q) ||
-        st.id.toLowerCase().includes(q) ||
-        st.class.toLowerCase().includes(q)
+        st.code.toLowerCase().includes(q) ||
+        st.email.toLowerCase().includes(q)
       );
     }
     return true;
   });
+
+  const activeCount = studentsData.filter(s => s.status === 'ACTIVE').length;
 
   return (
     <div className="adm-container">
@@ -129,53 +131,73 @@ export const Students: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* KPI Stats Strip */}
       <div className="adm-kpi-grid">
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'TỔNG SỐ HỌC VIÊN' : 'TOTAL COHORT'}</div>
-              <div className="adm-kpi-value">1,248</div>
+              <div className="adm-kpi-value">{totalEnrolled}</div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
               <Users size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">+12%</span>
-            <span className="text-on-surface-variant">{isVi ? 'tăng trưởng tháng này' : 'growth this month'}</span>
+            <span className="text-on-surface-variant">
+              {activeCount} {isVi ? 'tài khoản đang hoạt động' : 'active accounts'}
+            </span>
           </div>
         </div>
 
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <div>
-              <div className="adm-kpi-label">{isVi ? 'TỶ LỆ NỘP ĐỦ BÀI TẬP' : 'HOMEWORK COMPLIANCE'}</div>
-              <div className="adm-kpi-value">94.2%</div>
+              <div className="adm-kpi-label">{isVi ? 'TRẠNG THÁI HỆ THỐNG' : 'ACCOUNT STATUS'}</div>
+              <div className="adm-kpi-value" style={{ color: '#16a34a' }}>
+                {totalEnrolled > 0 ? `${Math.round((activeCount / totalEnrolled) * 100)}%` : '100%'}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
               <CheckCircle2 size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">92.6%</span>
-            <span className="text-on-surface-variant">{isVi ? 'nộp đúng hạn SLA' : 'on-time submissions'}</span>
+            <span className="adm-kpi-delta pos">{isVi ? 'Tỷ lệ kích hoạt' : 'Activation rate'}</span>
           </div>
         </div>
 
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <div>
-              <div className="adm-kpi-label">{isVi ? 'TỶ LỆ ĐẠT TARGET' : 'TARGET ATTAINMENT'}</div>
-              <div className="adm-kpi-value">84.2%</div>
+              <div className="adm-kpi-label">{isVi ? 'TÀI KHOẢN TẠM KHÓA' : 'LOCKED USERS'}</div>
+              <div className="adm-kpi-value">
+                {studentsData.filter(s => s.status === 'LOCKED').length}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
               <Award size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">+5.1%</span>
-            <span className="text-on-surface-variant">{isVi ? 'vượt chuẩn đầu ra' : 'above baseline'}</span>
+            <span className="text-on-surface-variant">{isVi ? 'Cần hỗ trợ học vụ' : 'Needs attention'}</span>
           </div>
         </div>
       </div>
@@ -183,13 +205,13 @@ export const Students: React.FC = () => {
       {/* Filter Bar */}
       <div className="adm-filter-bar">
         <div className="adm-pills">
-          {(['All', 'IELTS', 'TOEIC'] as const).map(lvl => (
+          {(['All', 'ACTIVE', 'LOCKED'] as const).map(st => (
             <button
-              key={lvl}
-              onClick={() => setLevelFilter(lvl)}
-              className={`adm-pill ${levelFilter === lvl ? 'active' : ''}`}
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={`adm-pill ${statusFilter === st ? 'active' : ''}`}
             >
-              <span>{lvl === 'All' ? t('students.filterAllLevels') : lvl}</span>
+              <span>{st === 'All' ? (isVi ? 'Tất cả trạng thái' : 'All') : st === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}</span>
             </button>
           ))}
         </div>
@@ -208,54 +230,73 @@ export const Students: React.FC = () => {
 
       {/* Modern Student Directory Table */}
       <div className="adm-table-card">
-        <table className="adm-table">
-          <thead>
-            <tr>
-              <th>{t('students.colId')}</th>
-              <th>{t('students.colName')}</th>
-              <th>{t('students.colClass')}</th>
-              <th>{t('students.colTarget')}</th>
-              <th>{t('students.colProgress')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(st => (
-              <tr 
-                key={st.id} 
-                className="adm-table-row-clickable"
-                onClick={() => navigate(`/admin/students/${st.id}`)}
-              >
-                <td className="font-mono font-semibold text-primary">{st.id}</td>
-                <td>
-                  <div className="adm-avatar-info">
-                    <div className="adm-avatar-name">{st.name}</div>
-                    <div className="adm-avatar-meta">{st.email}</div>
-                  </div>
-                </td>
-                <td className="font-mono text-on-surface-variant">{st.class}</td>
-                <td>
-                  <span className="text-on-surface-variant">{st.entry}</span>
-                  <span className="adm-score-arrow">&rarr;</span>
-                  <strong className="text-primary font-bold">{st.target}</strong>
-                </td>
-                <td>
-                  <div className="adm-progress-cell">
-                    <div className="adm-progress-text-row">
-                      <span className="font-semibold">{st.progress}</span>
-                      <span className="text-on-surface-variant">{st.progressPct}%</span>
-                    </div>
-                    <div className="adm-progress-track">
-                      <div 
-                        className={st.progressStatus === 'good' ? 'adm-progress-fill-good' : 'adm-progress-fill-warning'}
-                        style={{ width: `${st.progressPct}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </td>
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+            <div>{isVi ? 'Đang tải danh sách học viên...' : 'Loading students...'}</div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '56px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+            <Users size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
+              {isVi ? 'Không tìm thấy học viên nào' : 'No students found'}
+            </h3>
+            <p style={{ margin: 0, fontSize: '13.5px' }}>
+              {searchQuery 
+                ? (isVi ? 'Thử tìm với từ khóa khác.' : 'Try adjusting your search criteria.')
+                : (isVi ? 'Chưa có tài khoản học viên nào trong hệ thống.' : 'No student accounts exist yet.')}
+            </p>
+            <div style={{ marginTop: '18px' }}>
+              <button onClick={() => navigate('/admin/students/create')} className="btn btn-primary btn-sm">
+                <UserPlus size={14} style={{ marginRight: '6px' }} />
+                <span>{t('students.addStudent')}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>{t('students.colId')}</th>
+                <th>{t('students.colName')}</th>
+                <th>Email</th>
+                <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filtered.map(st => (
+                <tr 
+                  key={st.id} 
+                  className="adm-table-row-clickable"
+                  onClick={() => navigate(`/admin/students/${st.id}`)}
+                >
+                  <td className="font-mono font-semibold text-primary">{st.code}</td>
+                  <td>
+                    <div className="font-semibold text-on-surface">{st.name}</div>
+                  </td>
+                  <td className="font-mono text-on-surface-variant">{st.email}</td>
+                  <td>
+                    <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
+                      {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/students/${st.id}`);
+                      }}
+                    >
+                      {isVi ? 'Chi tiết' : 'Profile'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
