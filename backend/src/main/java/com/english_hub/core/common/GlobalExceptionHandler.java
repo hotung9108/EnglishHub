@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -49,6 +50,17 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<ApiError> handleTypeMismatch() {
 		return ResponseEntity.badRequest().body(new ApiError("Dữ liệu không hợp lệ."));
+	}
+
+	/**
+	 * A missing or unsupported {@code Content-Type} header makes Spring reject the request body
+	 * before it reaches the controller. Without this handler the catch-all {@code Exception}
+	 * handler would report it as a 500, so map it to the correct 415 response instead.
+	 */
+	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+	public ResponseEntity<ApiError> handleUnsupportedMediaType() {
+		return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+				.body(new ApiError("Định dạng nội dung không được hỗ trợ."));
 	}
 
 	/**
