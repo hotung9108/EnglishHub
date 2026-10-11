@@ -1,18 +1,35 @@
-﻿import { Builder, Browser } from 'selenium-webdriver';
+import { Builder } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
-import { getSeleniumConfig } from './env-helper.js';
+import edge from 'selenium-webdriver/edge.js';
+import path from 'node:path';
+import { root } from '../config/env.js';
 
-export async function createDriver() {
-  const cfg = getSeleniumConfig();
-  const options = new chrome.Options();
-  if (cfg.headless) {
-    options.addArguments('--headless=new');
-    options.addArguments('--disable-gpu');
-    options.addArguments('--window-size=1920,1080');
+export async function createDriver(config) {
+  // Keep driver downloads inside this workspace, independent of the user's cache.
+  process.env.SE_CACHE_PATH ||= path.join(root, '.cache', 'selenium');
+  const module = config.browser === 'edge' ? edge : chrome;
+  const options = new module.Options();
+  options.addArguments('--window-size=1440,1000');
+  if (config.headless) options.addArguments('--headless=new');
+  if (config.binary) {
+    if (config.browser === 'edge') options.setEdgeChromiumBinaryPath(config.binary);
+    else options.setChromeBinaryPath(config.binary);
   }
-  const driver = await new Builder()
-    .forBrowser(Browser.CHROME)
-    .setChromeOptions(options)
-    .build();
-  return driver;
+  const builder = new Builder().forBrowser(config.browser);
+  if (config.browser === 'edge') builder.setEdgeOptions(options);
+  else builder.setChromeOptions(options);
+  if (config.gridUrl) builder.usingServer(config.gridUrl);
+  else if (config.driverPath) {
+    const service = new module.ServiceBuilder(config.driverPath);
+    if (config.browser === 'edge') builder.setEdgeService(service);
+    else builder.setChromeService(service);
+  }
+  const driver = await builder.build();
+  try {
+    await driver.manage().setTimeouts({ implicit: 0, pageLoad: config.timeout, script: config.timeout });
+    return driver;
+  } catch (error) {
+    await driver.quit();
+    throw error;
+  }
 }
