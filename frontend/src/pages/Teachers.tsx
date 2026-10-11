@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   GraduationCap, UserPlus, Search, 
-  Award, BookOpen, Clock, 
-  ArrowRight
+  BookOpen, Clock, 
+  ArrowRight, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { userService } from '../api/services/user.service';
+import { classService } from '../api/services/class.service';
+import type { UserListItem } from '../api/services/user.service';
 
 interface TeacherItem {
-  id: string;
+  id: number;
   code: string;
   name: string;
   avatar: string;
   email: string;
-  phone: string;
   certs: string;
   activeClasses: number;
-  pendingGradings: number;
-  avgTurnaround: number; // in hours
-  status: 'Active' | 'OnLeave';
+  status: 'Active' | 'Blocked';
 }
 
 export const Teachers: React.FC = () => {
@@ -26,63 +26,74 @@ export const Teachers: React.FC = () => {
   const navigate = useNavigate();
   const isVi = language === 'vi';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterExpertise, setFilterExpertise] = useState<'All' | 'IELTS' | 'TOEIC' | 'Grammar'>('All');
+  const [totalClassesCount, setTotalClassesCount] = useState(0);
 
-  const teachers: TeacherItem[] = [
-    {
-      id: '1',
-      code: 'GV-088',
-      name: 'Cô Trần Thị Mai Lan',
-      avatar: 'TL',
-      email: 'teacher.lan@center.edu.vn',
-      phone: '0987 654 321',
-      certs: 'IELTS 8.5 • TESOL Certified',
-      activeClasses: 4,
-      pendingGradings: 2,
-      avgTurnaround: 14.5,
-      status: 'Active'
-    },
-    {
-      id: '2',
-      code: 'GV-042',
-      name: 'Thầy Nguyễn Văn Nam',
-      avatar: 'VN',
-      email: 'nam.nv@center.edu.vn',
-      phone: '0912 888 999',
-      certs: 'IELTS 8.0 • MA Applied Linguistics',
-      activeClasses: 3,
-      pendingGradings: 0,
-      avgTurnaround: 18.2,
-      status: 'Active'
-    },
-    {
-      id: '3',
-      code: 'GV-019',
-      name: 'Thầy David Miller',
-      avatar: 'DM',
-      email: 'david.miller@center.edu.vn',
-      phone: '0933 777 666',
-      certs: 'Native Speaker • CELTA Certified',
-      activeClasses: 2,
-      pendingGradings: 1,
-      avgTurnaround: 12.0,
-      status: 'Active'
-    },
-    {
-      id: '4',
-      code: 'GV-033',
-      name: 'Cô Nguyễn Thu Trang',
-      avatar: 'TT',
-      email: 'trang.nt@center.edu.vn',
-      phone: '0944 333 222',
-      certs: 'TOEIC 990/990 • 6 năm luyện thi',
-      activeClasses: 3,
-      pendingGradings: 3,
-      avgTurnaround: 20.4,
-      status: 'Active'
-    }
-  ];
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchTeachersData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [teachersRes, classesRes] = await Promise.allSettled([
+          userService.listUsers({ role: 'TEACHER', limit: 100 }),
+          classService.list({ page: 1, limit: 100 })
+        ]);
+
+        if (!isMounted) return;
+
+        const teacherList: UserListItem[] = teachersRes.status === 'fulfilled' ? teachersRes.value.data : [];
+        const classes = classesRes.status === 'fulfilled' ? classesRes.value.data : [];
+        setTotalClassesCount(classes.length);
+
+        // Count classes per teacher
+        const classCountByTeacher = new Map<number, number>();
+        classes.forEach(c => {
+          if (c.teacherId) {
+            classCountByTeacher.set(c.teacherId, (classCountByTeacher.get(c.teacherId) || 0) + 1);
+          }
+        });
+
+        const mapped: TeacherItem[] = teacherList.map(tc => {
+          const initials = tc.fullName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
+          const assignedCount = classCountByTeacher.get(tc.id) || 0;
+
+          return {
+            id: tc.id,
+            code: `GV-${String(tc.id).padStart(3, '0')}`,
+            name: tc.fullName,
+            avatar: initials || 'GV',
+            email: tc.email,
+            certs: 'TESOL / IELTS Standard',
+            activeClasses: assignedCount,
+            status: tc.status === 'LOCKED' ? 'Blocked' : 'Active'
+          };
+        });
+
+        setTeachers(mapped);
+      } catch (err: unknown) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách giảng viên.' : 'Failed to load teachers.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTeachersData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi]);
 
   const filtered = teachers.filter(tc => {
     if (filterExpertise !== 'All' && !tc.certs.toLowerCase().includes(filterExpertise.toLowerCase())) return false;
@@ -96,6 +107,8 @@ export const Teachers: React.FC = () => {
     }
     return true;
   });
+
+  const activeTeachersCount = teachers.filter(t => t.status === 'Active').length;
 
   return (
     <div className="adm-container">
@@ -124,20 +137,37 @@ export const Teachers: React.FC = () => {
         </button>
       </div>
 
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
       {/* KPI Stats Strip */}
       <div className="adm-kpi-grid">
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'TỔNG ĐỘI NGŨ GIẢNG VIÊN' : 'TOTAL FACULTY'}</div>
-              <div className="adm-kpi-value">45</div>
+              <div className="adm-kpi-value">{teachers.length}</div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
               <GraduationCap size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer text-on-surface-variant">
-            <span>100% đạt chuẩn TESOL / CELTA</span>
+            <span>{activeTeachersCount} {isVi ? 'đang hoạt động' : 'active instructors'}</span>
           </div>
         </div>
 
@@ -145,29 +175,31 @@ export const Teachers: React.FC = () => {
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'LỚP ĐANG GIẢNG DẠY' : 'ASSIGNED CLASSES'}</div>
-              <div className="adm-kpi-value">32</div>
+              <div className="adm-kpi-value">{totalClassesCount}</div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
               <BookOpen size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">TB 2.4 lớp/GV</span>
+            <span className="adm-kpi-delta pos">
+              {teachers.length > 0 ? (totalClassesCount / teachers.length).toFixed(1) : '0'} {isVi ? 'lớp/GV' : 'classes/teacher'}
+            </span>
           </div>
         </div>
 
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <div>
-              <div className="adm-kpi-label">{isVi ? 'TỐC ĐỘ TRẢ BÀI TB' : 'AVG TURNAROUND'}</div>
-              <div className="adm-kpi-value">15.8 <span style={{ fontSize: '16px', fontWeight: 500 }}>giờ</span></div>
+              <div className="adm-kpi-label">{isVi ? 'QUY CHUẨN ĐÀO TẠO' : 'ACADEMIC STANDARDS'}</div>
+              <div className="adm-kpi-value" style={{ fontSize: '20px', fontWeight: 700 }}>100%</div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
               <Clock size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">Đạt chuẩn SLA &lt; 24h</span>
+            <span className="adm-kpi-delta pos">{isVi ? 'Đạt chuẩn kiểm định SLA' : 'SLA Compliant'}</span>
           </div>
         </div>
       </div>
@@ -191,7 +223,7 @@ export const Teachers: React.FC = () => {
           <input 
             type="text" 
             className="adm-search-input"
-            placeholder={isVi ? 'Tìm tên giáo viên, mã GV, chứng chỉ...' : 'Search teachers...'}
+            placeholder={isVi ? 'Tìm tên giáo viên, mã GV, email...' : 'Search teachers...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -199,69 +231,91 @@ export const Teachers: React.FC = () => {
       </div>
 
       {/* Modern Teacher Bento Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '22px' }}>
-        {filtered.map(tc => (
-          <div 
-            key={tc.id} 
-            className="card"
-            style={{ 
-              padding: '24px', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              justifyContent: 'space-between', 
-              gap: '16px',
-              border: '1px solid var(--outline-variant)'
-            }}
-          >
-            <div>
-              {/* Header with Avatar and Status */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#2563eb' }}>
-                    {tc.avatar}
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 2px 0' }}>{tc.name}</h3>
-                    <span className="font-mono text-primary font-semibold" style={{ fontSize: '12px' }}>{tc.code}</span>
-                  </div>
-                </div>
-
-                <span className="badge badge-active">{tc.status}</span>
-              </div>
-
-              {/* Certs Pill */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: 'var(--radius-full)', background: 'var(--surface-container-high)', fontSize: '12px', fontWeight: 600, color: 'var(--on-surface)', marginBottom: '16px' }}>
-                <Award size={14} color="var(--primary)" />
-                <span>{tc.certs}</span>
-              </div>
-
-              {/* Workload Stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', fontSize: '12.5px' }}>
-                <div>
-                  <span className="text-on-surface-variant">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
-                  <strong>{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
-                </div>
-                <div>
-                  <span className="text-on-surface-variant">{isVi ? 'Tốc độ chấm: ' : 'SLA Speed: '}</span>
-                  <strong className="text-primary">{tc.avgTurnaround}h</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Action */}
-            <div style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: '14px', display: 'flex', gap: '10px' }}>
-              <button 
-                onClick={() => navigate(`/admin/teachers/${tc.id}`)}
-                className="btn btn-secondary flex-1"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
-              >
-                <span>{t('teachers.viewProfile')}</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
+      {loading ? (
+        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <div>{isVi ? 'Đang tải danh sách giảng viên...' : 'Loading teachers...'}</div>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card" style={{ padding: '56px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+          <GraduationCap size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
+          <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
+            {isVi ? 'Không tìm thấy giảng viên nào' : 'No teachers found'}
+          </h3>
+          <p style={{ margin: 0, fontSize: '13.5px' }}>
+            {searchQuery 
+              ? (isVi ? 'Thử tìm với từ khóa khác.' : 'Try adjusting your search criteria.')
+              : (isVi ? 'Chưa có giảng viên nào trong cơ sở dữ liệu.' : 'No faculty accounts created yet.')}
+          </p>
+          <div style={{ marginTop: '18px' }}>
+            <button onClick={() => navigate('/admin/teachers/create')} className="btn btn-primary btn-sm">
+              <UserPlus size={14} style={{ marginRight: '6px' }} />
+              <span>{t('teachers.addTeacher')}</span>
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '22px' }}>
+          {filtered.map(tc => (
+            <div 
+              key={tc.id} 
+              className="card"
+              style={{ 
+                padding: '24px', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                justifyContent: 'space-between', 
+                gap: '16px',
+                border: '1px solid var(--outline-variant)'
+              }}
+            >
+              <div>
+                {/* Header with Avatar and Status */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#2563eb' }}>
+                      {tc.avatar}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 2px 0' }}>{tc.name}</h3>
+                      <span className="font-mono text-primary font-semibold" style={{ fontSize: '12px' }}>{tc.code}</span>
+                    </div>
+                  </div>
+
+                  <span className={`badge ${tc.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
+                    {tc.status}
+                  </span>
+                </div>
+
+                {/* Email */}
+                <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '12px' }}>
+                  {tc.email}
+                </div>
+
+                {/* Workload Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', fontSize: '12.5px' }}>
+                  <div>
+                    <span className="text-on-surface-variant">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
+                    <strong>{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Action */}
+              <div style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: '14px', display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => navigate(`/admin/teachers/${tc.id}`)}
+                  className="btn btn-secondary flex-1"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
+                >
+                  <span>{t('teachers.viewProfile')}</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

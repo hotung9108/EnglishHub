@@ -6,7 +6,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AiWritingAnalysisResponse(
 		long submissionModuleId,
-		double overallScore,
+		Double overallScore,
 		String aiFeedback,
 		WritingCriteriaScoresDto criteriaScores,
 		TextMetricsDto textMetrics,
@@ -16,7 +16,7 @@ public record AiWritingAnalysisResponse(
 ) {
 	public AiWritingAnalysisResponse(
 			long submissionModuleId,
-			double overallScore,
+			Double overallScore,
 			String aiFeedback,
 			WritingCriteriaScoresDto criteriaScores,
 			TextMetricsDto textMetrics,

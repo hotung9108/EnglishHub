@@ -74,14 +74,14 @@ public record Grading(
 				aiInstructionSnapshot);
 	}
 
-	public Grading withAiGrade(
-			BigDecimal score,
+	public Grading withAiSuggestion(
+			BigDecimal suggestedScore,
 			String feedback,
-			Object transcript,
-			OffsetDateTime gradedAt) {
-		if (score != null && maxScoreSnapshot != null
-				&& (score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(maxScoreSnapshot) > 0)) {
-			throw new IllegalArgumentException("AI score must be between zero and maxScoreSnapshot.");
+			Object transcript) {
+		if (suggestedScore != null && maxScoreSnapshot != null
+				&& (suggestedScore.compareTo(BigDecimal.ZERO) < 0
+						|| suggestedScore.compareTo(maxScoreSnapshot) > 0)) {
+			throw new IllegalArgumentException("AI suggested score must be between zero and maxScoreSnapshot.");
 		}
 		return new Grading(
 				id,
@@ -89,11 +89,11 @@ public record Grading(
 				GradingMethod.AUTO,
 				GradingStatus.AI_GRADED,
 				feedback,
-				score,
-				feedback,
+				finalScore,
+				finalFeedback,
 				maxScoreSnapshot,
-				null,
-				null,
+				reviewedBy,
+				reviewedAt,
 				gradedAt,
 				transcript,
 				aiInstructionSnapshot);

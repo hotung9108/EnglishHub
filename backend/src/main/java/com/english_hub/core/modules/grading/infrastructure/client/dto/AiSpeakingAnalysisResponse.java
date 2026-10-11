@@ -7,7 +7,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AiSpeakingAnalysisResponse(
 		long submissionModuleId,
-		double overallScore,
+		Double overallScore,
 		String aiFeedback,
 		JsonNode aiTranscript,
 		FluencyMetricsDto fluencyMetrics,
@@ -18,7 +18,7 @@ public record AiSpeakingAnalysisResponse(
 ) {
 	public AiSpeakingAnalysisResponse(
 			long submissionModuleId,
-			double overallScore,
+			Double overallScore,
 			String aiFeedback,
 			JsonNode aiTranscript,
 			FluencyMetricsDto fluencyMetrics,

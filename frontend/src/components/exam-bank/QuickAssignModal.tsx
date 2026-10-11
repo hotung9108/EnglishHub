@@ -1,36 +1,103 @@
-import React, { useState } from 'react';
-import { X, Send, Bell, GraduationCap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Send, Bell, GraduationCap, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import type { ExamTemplateItem, QuickAssignForm } from '../../types/exam-bank.types';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { classService, type ClassSummary } from '../../api/services/class.service';
 
 interface QuickAssignModalProps {
   exam: ExamTemplateItem;
   onClose: () => void;
-  onConfirmAssign: (form: QuickAssignForm) => void;
+  onConfirmAssign: (form: QuickAssignForm) => Promise<void> | void;
 }
 
 export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClose, onConfirmAssign }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [form, setForm] = useState<QuickAssignForm>(() => {
     const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
     const defaultStartDate = new Date().toISOString().slice(0, 16);
     return {
       templateId: exam.id,
-      className: 'ENG-IELTS-6.5A',
+      classId: '',
+      className: '',
       assignmentTitle: `${exam.title}`,
       assignmentCode: `HW-${exam.code.replace('EB-', '')}`,
       startDate: defaultStartDate,
       dueDate: defaultDueDate,
       allowLate: true,
-      notifyStudents: true
+      notifyStudents: true,
     };
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const handleRetry = () => {
+    setIsLoadingClasses(true);
+    setLoadError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchClasses = async () => {
+      try {
+        const res = await classService.list({ limit: 100 });
+        const classList = res.data ?? [];
+        if (!isMounted) return;
+        setClasses(classList);
+
+        if (classList.length > 0) {
+          setForm(prev => ({
+            ...prev,
+            classId: prev.classId || String(classList[0].id),
+            className: prev.className || classList[0].name,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load classrooms for quick assign:', err);
+        if (isMounted) {
+          setLoadError(isVi ? 'Không thể tải danh sách lớp học.' : 'Failed to load classrooms.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingClasses(false);
+        }
+      }
+    };
+
+    fetchClasses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVi, reloadKey]);
+
+  const handleClassChange = (selectedId: string) => {
+    const target = classes.find(c => String(c.id) === selectedId);
+    setForm(prev => ({
+      ...prev,
+      classId: selectedId,
+      className: target ? target.name : '',
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onConfirmAssign(form);
+    if (!form.classId) return;
+
+    try {
+      setIsSubmitting(true);
+      await onConfirmAssign(form);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -64,6 +131,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
           <button 
             type="button" 
             onClick={onClose}
+            disabled={isSubmitting}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 4 }}
           >
             <X size={20} />
@@ -74,17 +142,50 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
         <form onSubmit={handleSubmit}>
           <div className="exam-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label className="edit-form-label">{isVi ? 'Chọn lớp học nhận bài' : 'Target Classroom'}</label>
-              <select 
-                className="edit-form-select"
-                value={form.className}
-                onChange={(e) => setForm({ ...form, className: e.target.value })}
-                style={{ fontWeight: 600 }}
-              >
-                <option value="ENG-IELTS-6.5A">Lớp: ENG-IELTS-6.5A (Intensive - 24 học viên)</option>
-                <option value="ENG-GRAM-ADV">Lớp: ENG-GRAM-ADV (Ngữ pháp nâng cao - 20 học viên)</option>
-                <option value="ENG-TOEIC-750">Lớp: ENG-TOEIC-750 (Cấp tốc - 18 học viên)</option>
-              </select>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label className="edit-form-label" style={{ margin: 0 }}>
+                  {isVi ? 'Chọn lớp học nhận bài' : 'Target Classroom'} <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                {loadError && (
+                  <button 
+                    type="button" 
+                    onClick={handleRetry} 
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <RefreshCw size={11} /> {isVi ? 'Thử lại' : 'Retry'}
+                  </button>
+                )}
+              </div>
+
+              {isLoadingClasses ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', color: '#64748b', fontSize: 13 }}>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{isVi ? 'Đang tải danh sách lớp học...' : 'Loading classes...'}</span>
+                </div>
+              ) : loadError ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca', color: '#b91c1c', fontSize: 13 }}>
+                  <AlertCircle size={16} />
+                  <span>{loadError}</span>
+                </div>
+              ) : classes.length === 0 ? (
+                <div style={{ padding: '10px 12px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fef3c7', color: '#b45309', fontSize: 13 }}>
+                  {isVi ? 'Chưa có lớp học nào khả dụng. Vui lòng tạo lớp trước khi giao bài.' : 'No classroom available. Please create a class first.'}
+                </div>
+              ) : (
+                <select 
+                  className="edit-form-select"
+                  value={String(form.classId)}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  style={{ fontWeight: 600 }}
+                  required
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name} {c.status ? `(${c.status})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
@@ -106,6 +207,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
                   className="edit-form-input" 
                   value={form.assignmentTitle}
                   onChange={(e) => setForm({ ...form, assignmentTitle: e.target.value })}
+                  required
                 />
               </div>
             </div>
@@ -131,6 +233,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
                   value={form.dueDate}
                   onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
                   style={{ fontWeight: 600 }}
+                  required
                 />
               </div>
             </div>
@@ -169,6 +272,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
               type="button" 
               className="btn btn-secondary bg-white btn-sm"
               onClick={onClose}
+              disabled={isSubmitting}
             >
               {isVi ? 'Hủy bỏ' : 'Cancel'}
             </button>
@@ -176,10 +280,20 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
             <button 
               type="submit" 
               className="btn btn-primary btn-sm"
+              disabled={isSubmitting || isLoadingClasses || !form.classId}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 24px' }}
             >
-              <Send size={14} />
-              <span>{isVi ? 'Xác nhận giao bài' : 'Confirm & Deploy'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>{isVi ? 'Đang giao bài...' : 'Deploying...'}</span>
+                </>
+              ) : (
+                <>
+                  <Send size={14} />
+                  <span>{isVi ? 'Xác nhận giao bài' : 'Confirm & Deploy'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

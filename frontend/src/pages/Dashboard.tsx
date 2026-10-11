@@ -1,67 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, GraduationCap, BookOpen, Sparkles, 
-  ArrowUpRight, Plus, ShieldCheck, 
-  BarChart3, CheckCircle2, Clock, 
-  ChevronRight, Zap, FileSpreadsheet, History
+  Plus, ShieldCheck, 
+  BarChart3, 
+  Zap, FileSpreadsheet, History, Loader2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService } from '../api/services/class.service';
+import { userService } from '../api/services/user.service';
+import { reportService } from '../api/services/report.service';
+
+interface DashboardStats {
+  totalStudents: number;
+  totalTeachers: number;
+  totalClasses: number;
+  totalAssignments: number;
+  pendingGradings: number;
+}
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
-  const [activityFilter, setActivityFilter] = useState<'all' | 'enrollment' | 'grading' | 'alert'>('all');
-
-  const activities = [
-    {
-      id: 'act-1',
-      type: 'enrollment',
-      title: isVi ? 'Cô Trần Thị Mai Lan đã thêm 2 học viên mới' : 'Trần Thị Mai Lan enrolled 2 new students',
-      target: 'ENG-IELTS-6.5A',
-      time: isVi ? '8 phút trước' : '8 mins ago',
-      icon: Users,
-      iconBg: '#eff6ff',
-      iconColor: '#2563eb'
-    },
-    {
-      id: 'act-2',
-      type: 'grading',
-      title: isVi ? 'AI Engine hoàn thành chấm 24 bài Writing Task 2' : 'AI Engine graded 24 Writing Task 2 essays',
-      target: 'ENG-IELTS-6.5A',
-      time: isVi ? '25 phút trước' : '25 mins ago',
-      icon: Sparkles,
-      iconBg: '#faf5ff',
-      iconColor: '#7e22ce'
-    },
-    {
-      id: 'act-3',
-      type: 'alert',
-      title: isVi ? 'Cảnh báo: Học viên David Pham vắng 2 buổi liên tiếp' : 'Alert: David Pham missed 2 consecutive sessions',
-      target: 'ENG-TOEIC-750',
-      time: isVi ? '1 giờ trước' : '1 hour ago',
-      icon: Clock,
-      iconBg: '#fef2f2',
-      iconColor: '#dc2626'
-    },
-    {
-      id: 'act-4',
-      type: 'grading',
-      title: isVi ? 'Thầy Nguyễn Văn Nam đã duyệt và trả bài chấm nói' : 'Nguyễn Văn Nam finalized Speaking reviews',
-      target: 'ENG-GRAM-PREP',
-      time: isVi ? '3 giờ trước' : '3 hours ago',
-      icon: CheckCircle2,
-      iconBg: '#f0fdf4',
-      iconColor: '#16a34a'
-    }
-  ];
-
-  const filteredActivities = activities.filter(act => {
-    if (activityFilter === 'all') return true;
-    return act.type === activityFilter;
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
+    totalAssignments: 0,
+    pendingGradings: 0,
   });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchDashboardTelemetry = async () => {
+      try {
+        setLoading(true);
+
+        const [studentsRes, teachersRes, classesRes, overviewRes] = await Promise.allSettled([
+          userService.listUsers({ role: 'STUDENT', limit: 1 }),
+          userService.listUsers({ role: 'TEACHER', limit: 1 }),
+          classService.list({ limit: 1 }),
+          reportService.getOverview()
+        ]);
+
+        if (!isMounted) return;
+
+        const totalStudents = studentsRes.status === 'fulfilled' ? studentsRes.value.pagination.total : 0;
+        const totalTeachers = teachersRes.status === 'fulfilled' ? teachersRes.value.pagination.total : 0;
+        const totalClasses = classesRes.status === 'fulfilled' ? classesRes.value.pagination.total : 0;
+
+        let totalAssignments = 0;
+        let pendingGradings = 0;
+        if (overviewRes.status === 'fulfilled') {
+          totalAssignments = overviewRes.value.assignedAssignmentCount || 0;
+          pendingGradings = overviewRes.value.pendingGradingCount || 0;
+        }
+
+        setStats({
+          totalStudents,
+          totalTeachers,
+          totalClasses,
+          totalAssignments,
+          pendingGradings
+        });
+      } catch {
+        // fail gracefully
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchDashboardTelemetry();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="adm-container">
@@ -71,7 +91,7 @@ export const Dashboard: React.FC = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <span className="adm-title-badge" style={{ background: 'rgba(255, 255, 255, 0.15)', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                {isVi ? 'Học kỳ Q1-2026 • Executive Portal' : 'Term Q1-2026 • Executive Portal'}
+                {isVi ? 'Executive Portal' : 'Executive Portal'}
               </span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#86efac' }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }}></span>
@@ -116,17 +136,16 @@ export const Dashboard: React.FC = () => {
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'TỔNG HỌC VIÊN' : 'TOTAL STUDENTS'}</div>
-              <div className="adm-kpi-value">1,248</div>
+              <div className="adm-kpi-value">
+                {loading ? <Loader2 size={20} className="animate-spin" /> : stats.totalStudents}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
               <Users size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">
-              <ArrowUpRight size={13} /> +12.4%
-            </span>
-            <span className="text-on-surface-variant">{isVi ? 'so với tháng trước' : 'vs last month'}</span>
+            <span className="text-on-surface-variant">{isVi ? 'Hồ sơ đã kích hoạt' : 'Registered accounts'}</span>
           </div>
         </div>
 
@@ -135,7 +154,9 @@ export const Dashboard: React.FC = () => {
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'GIẢNG VIÊN HOẠT ĐỘNG' : 'ACTIVE TEACHERS'}</div>
-              <div className="adm-kpi-value">45</div>
+              <div className="adm-kpi-value">
+                {loading ? <Loader2 size={20} className="animate-spin" /> : stats.totalTeachers}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
               <GraduationCap size={22} />
@@ -143,7 +164,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="adm-kpi-footer">
             <span className="adm-kpi-delta pos">100%</span>
-            <span className="text-on-surface-variant">{isVi ? 'đạt chuẩn SLA chấm bài' : 'compliant with SLA'}</span>
+            <span className="text-on-surface-variant">{isVi ? 'đạt chuẩn SLA giảng dạy' : 'compliant with SLA'}</span>
           </div>
         </div>
 
@@ -152,15 +173,16 @@ export const Dashboard: React.FC = () => {
           <div className="adm-kpi-header">
             <div>
               <div className="adm-kpi-label">{isVi ? 'LỚP HỌC ĐANG MỞ' : 'ACTIVE CLASSES'}</div>
-              <div className="adm-kpi-value">32</div>
+              <div className="adm-kpi-value">
+                {loading ? <Loader2 size={20} className="animate-spin" /> : stats.totalClasses}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
               <BookOpen size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">94.2%</span>
-            <span className="text-on-surface-variant">{isVi ? 'tỷ lệ lấp đầy sĩ số' : 'capacity utilization'}</span>
+            <span className="text-on-surface-variant">{isVi ? 'Theo dõi sĩ số và tiến độ' : 'Class cohorts'}</span>
           </div>
         </div>
 
@@ -168,16 +190,19 @@ export const Dashboard: React.FC = () => {
         <div className="adm-kpi-card" onClick={() => navigate('/admin/reports')} style={{ cursor: 'pointer' }}>
           <div className="adm-kpi-header">
             <div>
-              <div className="adm-kpi-label">{isVi ? 'LƯỢT CHẤM AI (Q1)' : 'AI GRADINGS (Q1)'}</div>
-              <div className="adm-kpi-value">2,640</div>
+              <div className="adm-kpi-label">{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}</div>
+              <div className="adm-kpi-value">
+                {loading ? <Loader2 size={20} className="animate-spin" /> : stats.totalAssignments}
+              </div>
             </div>
             <div className="adm-kpi-icon" style={{ backgroundColor: '#faf5ff', color: '#7e22ce' }}>
               <Sparkles size={22} />
             </div>
           </div>
           <div className="adm-kpi-footer">
-            <span className="adm-kpi-delta pos">+880h</span>
-            <span className="text-on-surface-variant">{isVi ? 'tiết kiệm cho giáo viên' : 'faculty hours saved'}</span>
+            <span className="text-on-surface-variant">
+              {stats.pendingGradings > 0 ? `${stats.pendingGradings} ${isVi ? 'chờ chấm' : 'pending'}` : (isVi ? 'Đã hoàn tất xử lý' : 'All graded')}
+            </span>
           </div>
         </div>
       </div>
@@ -197,82 +222,25 @@ export const Dashboard: React.FC = () => {
                   {isVi ? 'Cập nhật thời gian thực từ các lớp học và hệ thống chấm điểm' : 'Real-time telemetry across academic courses and grading pipelines'}
                 </p>
               </div>
-
-              {/* Segmented Filter Pills */}
-              <div className="adm-pills">
-                {(
-                  [
-                    { key: 'all', label: isVi ? 'Tất cả' : 'All' },
-                    { key: 'enrollment', label: isVi ? 'Ghi danh' : 'Enrollments' },
-                    { key: 'grading', label: isVi ? 'Chấm bài' : 'Grading' },
-                    { key: 'alert', label: isVi ? 'Cảnh báo' : 'Alerts' },
-                  ] as const
-                ).map((p) => (
-                  <button
-                    key={p.key}
-                    onClick={() => setActivityFilter(p.key)}
-                    className={`adm-pill ${activityFilter === p.key ? 'active' : ''}`}
-                    style={{ padding: '4px 10px', fontSize: '12px' }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {filteredActivities.map((act) => {
-                const Icon = act.icon;
-                return (
-                  <div 
-                    key={act.id} 
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '14px',
-                      padding: '12px 14px',
-                      borderRadius: 'var(--radius-md, 10px)',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--outline-variant)',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '10px',
-                      backgroundColor: act.iconBg,
-                      color: act.iconColor,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <Icon size={18} />
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--on-surface)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        {act.title}
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                        <span className="font-semibold text-primary">{act.target}</span>
-                        <span>•</span>
-                        <span>{act.time}</span>
-                      </div>
-                    </div>
-
-                    <ChevronRight size={16} className="text-on-surface-variant" />
-                  </div>
-                );
-              })}
+            <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--on-surface-variant)', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--outline-variant)' }}>
+              <ShieldCheck size={32} style={{ margin: '0 auto 10px', color: '#16a34a' }} />
+              <div style={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--on-surface)' }}>
+                {isVi ? 'Hệ thống vận hành ổn định' : 'System running smoothly'}
+              </div>
+              <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                {isVi 
+                  ? `${stats.totalClasses} lớp học và ${stats.totalStudents} học viên đang đồng bộ theo thời gian thực.` 
+                  : `${stats.totalClasses} classes and ${stats.totalStudents} students synced in real-time.`}
+              </div>
             </div>
           </div>
 
           {/* Right Column: AI Engine Status & Quick Launch */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
-            {/* Quick Action Commands (Linear Launcher Style) */}
+            {/* Quick Action Commands */}
             <div className="card" style={{ padding: '24px' }}>
               <h3 className="headline-md" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Zap size={18} color="var(--primary)" />
@@ -323,7 +291,7 @@ export const Dashboard: React.FC = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <FileSpreadsheet size={16} color="#7e22ce" />
-                    <span className="font-semibold" style={{ fontSize: '13.5px' }}>{isVi ? 'Xuất báo cáo chất lượng' : 'Export Reports'}</span>
+                    <span className="font-semibold" style={{ fontSize: '13.5px' }}>{isVi ? 'Báo cáo quản trị' : 'Export Reports'}</span>
                   </div>
                   <span className="adm-search-shortcut">⌘R</span>
                 </button>
@@ -337,21 +305,21 @@ export const Dashboard: React.FC = () => {
                   <ShieldCheck size={16} color="#16a34a" />
                   {isVi ? 'Trạng Thái Hạ Tầng & Dịch Vụ' : 'Core Infrastructure Health'}
                 </h4>
-                <span className="badge badge-active">{isVi ? 'Tất cả Online' : 'All Healthy'}</span>
+                <span className="badge badge-active">{isVi ? 'Đang hoạt động' : 'Operational'}</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--outline-variant)' }}>
-                  <span className="text-on-surface-variant">AI Evaluation Engine (Gemini 1.5 Pro)</span>
-                  <span className="font-semibold" style={{ color: '#16a34a' }}>99.98% • 1.2s avg</span>
+                  <span className="text-on-surface-variant">AI Evaluation Pipeline</span>
+                  <span className="font-semibold" style={{ color: '#16a34a' }}>Connected</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid var(--outline-variant)' }}>
-                  <span className="text-on-surface-variant">Audio STT & Phonetics (Whisper v3)</span>
-                  <span className="font-semibold" style={{ color: '#16a34a' }}>100% Operational</span>
+                  <span className="text-on-surface-variant">Speech Recognition & Audio Service</span>
+                  <span className="font-semibold" style={{ color: '#16a34a' }}>Connected</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span className="text-on-surface-variant">Database (PostgreSQL V2 + V4 jsonb)</span>
-                  <span className="font-semibold" style={{ color: '#16a34a' }}>Connected (24ms)</span>
+                  <span className="text-on-surface-variant">Application Database</span>
+                  <span className="font-semibold" style={{ color: '#16a34a' }}>Connected</span>
                 </div>
               </div>
             </div>

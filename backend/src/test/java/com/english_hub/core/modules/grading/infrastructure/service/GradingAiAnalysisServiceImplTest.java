@@ -17,7 +17,8 @@ import com.english_hub.core.modules.grading.domain.model.GradingContext;
 import com.english_hub.core.modules.grading.domain.model.GradingMethod;
 import com.english_hub.core.modules.grading.domain.model.GradingStatus;
 import com.english_hub.core.modules.grading.domain.model.ReviewStatus;
-import com.english_hub.core.modules.grading.domain.repository.AnswerAnnotationRepository;
+import com.english_hub.core.modules.grading.application.port.AiAnalysisInFlightRegistry;
+import com.english_hub.core.modules.grading.application.service.GradingAiResultPersistenceService;
 import com.english_hub.core.modules.grading.domain.repository.GradingContextRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingRepository;
 import com.english_hub.core.modules.grading.infrastructure.client.AiServiceClient;
@@ -32,6 +33,7 @@ import com.english_hub.core.modules.grading.infrastructure.client.dto.TextMetric
 import com.english_hub.core.modules.grading.infrastructure.client.dto.WritingCriteriaScoresDto;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import org.springframework.core.io.Resource;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataAnswerRepository;
 import tools.jackson.databind.json.JsonMapper;
@@ -59,7 +61,10 @@ class GradingAiAnalysisServiceImplTest {
 	private SpringDataAnswerRepository answerRepository;
 
 	@Mock
-	private AnswerAnnotationRepository answerAnnotationRepository;
+	private GradingAiResultPersistenceService gradingAiResultPersistenceService;
+
+	@Mock
+	private AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry;
 
 	@Mock
 	private StorageService storageService;
@@ -76,7 +81,8 @@ class GradingAiAnalysisServiceImplTest {
 				gradingRepository,
 				gradingContextRepository,
 				answerRepository,
-				answerAnnotationRepository,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
 				storageService,
 				aiServiceClient);
 	}
@@ -125,6 +131,7 @@ class GradingAiAnalysisServiceImplTest {
 				null,
 				null,
 				null);
+		ReflectionTestUtils.setField(answer, "id", 1101L);
 
 		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
 		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
@@ -146,10 +153,11 @@ class GradingAiAnalysisServiceImplTest {
 				mockTranscript,
 				new FluencyMetricsDto(135.0, 3, 44.5, 0.78),
 				new CriteriaScoresDto(7.0, 7.0, 7.0, 7.0, 7.0),
-				List.of(new AiAnnotationDto(10, 16, "pronunciation", "Mispronounced habit", "habits"))
+				List.of(new AiAnnotationDto(0, 5, "pronunciation", "Mispronounced habit", "habits"))
 		);
 
 		when(aiServiceClient.analyzeSpeaking(any(AiSpeakingAnalysisRequest.class))).thenReturn(aiResponse);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
 
 		service.analyzeSubmittedModule(submissionModuleId);
 
@@ -160,23 +168,64 @@ class GradingAiAnalysisServiceImplTest {
 		assertThat(capturedRequest.aiInstructionSnapshot()).isEqualTo("Assess candidate with IELTS Speaking rubric");
 
 		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
-		verify(gradingRepository).saveAiGrade(gradingCaptor.capture());
+		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingAiResultPersistenceService).persistAiResult(gradingCaptor.capture(), annotationsCaptor.capture());
 		Grading saved = gradingCaptor.getValue();
 
 		assertThat(saved.status()).isEqualTo(GradingStatus.AI_GRADED);
 		assertThat(saved.method()).isEqualTo(GradingMethod.AUTO);
-		assertThat(saved.finalScore()).isEqualByComparingTo(BigDecimal.valueOf(7.0));
+		assertThat(saved.finalScore()).isNull();
+		assertThat(saved.finalFeedback()).isNull();
+		assertThat(saved.aiTranscript().toString()).contains("\"overallScore\":7.0");
 		assertThat(saved.aiFeedback()).contains("Overall good coherence");
 		assertThat(saved.aiTranscript()).isNotNull();
 
-		ArgumentCaptor<AnswerAnnotation> annotationCaptor = ArgumentCaptor.forClass(AnswerAnnotation.class);
-		verify(answerAnnotationRepository).save(annotationCaptor.capture());
-		AnswerAnnotation ann = annotationCaptor.getValue();
+		assertThat(annotationsCaptor.getValue()).hasSize(1);
+		AnswerAnnotation ann = (AnswerAnnotation) annotationsCaptor.getValue().getFirst();
 		assertThat(ann.source()).isEqualTo(AnnotationSource.AI);
 		assertThat(ann.reviewStatus()).isEqualTo(ReviewStatus.PENDING);
 		assertThat(ann.errorType()).isEqualTo("pronunciation");
-		assertThat(ann.startOffset()).isEqualTo(10);
-		assertThat(ann.endOffset()).isEqualTo(16);
+		assertThat(ann.startOffset()).isZero();
+		assertThat(ann.endOffset()).isEqualTo(5);
+	}
+
+	@Test
+	void speakingTranscriptAnnotations_useCodePointLengthAndSkipOutOfRangeItems() {
+		long submissionModuleId = 104L;
+		Grading grading = new Grading(
+				4L, submissionModuleId, GradingMethod.AUTO, GradingStatus.PENDING, null, null, null,
+				BigDecimal.valueOf(9.0), null, null, null, null, null);
+		GradingContext context = new GradingContext(
+				submissionModuleId, null, 200L, 10L, 5L, 2L, 15L, ModuleSkill.SPEAKING, true, null);
+		Answer answer = new Answer(
+				submissionModuleId, null, null, "speaking-104.wav", 10, 1000L, "audio/wav",
+				UploadStatus.READY, null, null, null, null);
+		ReflectionTestUtils.setField(answer, "id", 1104L);
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		when(storageService.generatePresignedGetUrl("speaking-104.wav")).thenReturn("https://storage.example/audio");
+
+		ArrayNode transcript = objectMapper.createArrayNode();
+		transcript.addObject().put("word", "😀");
+		AiSpeakingAnalysisResponse response = new AiSpeakingAnalysisResponse(
+				submissionModuleId, 6.0, "Feedback", transcript,
+				new FluencyMetricsDto(100.0, 0, 1.0, 0.8),
+				new CriteriaScoresDto(6.0, 6.0, 6.0, 6.0, 6.0),
+				List.of(
+						new AiAnnotationDto(0, 1, "pronunciation", "Valid code point range", null),
+						new AiAnnotationDto(1, 2, "pronunciation", "Past transcript end", null)));
+		when(aiServiceClient.analyzeSpeaking(any(AiSpeakingAnalysisRequest.class))).thenReturn(response);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
+
+		service.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingAiResultPersistenceService).persistAiResult(any(), annotationsCaptor.capture());
+		assertThat(annotationsCaptor.getValue()).hasSize(1);
+		AnswerAnnotation saved = (AnswerAnnotation) annotationsCaptor.getValue().getFirst();
+		assertThat(saved.startOffset()).isZero();
+		assertThat(saved.endOffset()).isEqualTo(1);
 	}
 
 	@Test
@@ -235,9 +284,8 @@ class GradingAiAnalysisServiceImplTest {
 		service.analyzeSubmittedModule(submissionModuleId);
 
 		// Verified that failure is isolated, and status is updated to FAILED so teachers can manually grade
-		verify(gradingRepository).updateStatus(2L, GradingStatus.FAILED);
-		verify(gradingRepository, never()).saveAiGrade(any());
-		verifyNoInteractions(answerAnnotationRepository);
+		verify(gradingAiResultPersistenceService).markFailedIfStillPending(submissionModuleId);
+		verify(gradingAiResultPersistenceService, never()).persistAiResult(any(), any());
 	}
 
 	@Test
@@ -290,7 +338,7 @@ class GradingAiAnalysisServiceImplTest {
 
 		service.analyzeSubmittedModule(submissionModuleId);
 
-		verify(gradingRepository).updateStatus(3L, GradingStatus.FAILED);
+		verify(gradingAiResultPersistenceService).markFailedIfStillPending(submissionModuleId);
 		verifyNoInteractions(aiServiceClient);
 	}
 
@@ -301,7 +349,8 @@ class GradingAiAnalysisServiceImplTest {
 				gradingRepository,
 				gradingContextRepository,
 				answerRepository,
-				answerAnnotationRepository,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
 				storageService,
 				aiServiceClient,
 				"anthropic/claude-3.5-sonnet",
@@ -352,7 +401,6 @@ class GradingAiAnalysisServiceImplTest {
 				null,
 				null
 		);
-
 		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
 		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
 		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
@@ -430,6 +478,7 @@ class GradingAiAnalysisServiceImplTest {
 				null,
 				null
 		);
+		ReflectionTestUtils.setField(answer, "id", 1201L);
 
 		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
 		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
@@ -437,16 +486,19 @@ class GradingAiAnalysisServiceImplTest {
 
 		AiWritingAnalysisResponse aiResponse = new AiWritingAnalysisResponse(
 				submissionModuleId,
-				6.5,
+				8.0,
 				"Clear task response and well-structured arguments.",
 				new WritingCriteriaScoresDto(7.0, 6.5, 6.0, 6.5, 6.5),
 				new TextMetricsDto(180, 8, 22.5, 0.65, 11.2),
-				List.of(new AiAnnotationDto(20, 35, "educators argue", "VOCABULARY", "Good collocation", null)),
+				List.of(
+						new AiAnnotationDto(20, 35, "educators argue", "VOCABULARY", "Good collocation", null),
+						new AiAnnotationDto(500, 501, "outside text", "GRAMMAR", "Invalid range", null)),
 				"google/gemini-2.5-flash",
 				"openrouter"
 		);
 
 		when(aiServiceClient.analyzeWriting(any(AiWritingAnalysisRequest.class))).thenReturn(aiResponse);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
 
 		service.analyzeSubmittedModule(submissionModuleId);
 
@@ -459,15 +511,50 @@ class GradingAiAnalysisServiceImplTest {
 		assertThat(captured.aiInstructionSnapshot()).isEqualTo("Strict IELTS Writing task 2 rubric");
 
 		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
-		verify(gradingRepository).saveAiGrade(gradingCaptor.capture());
+		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingAiResultPersistenceService).persistAiResult(gradingCaptor.capture(), annotationsCaptor.capture());
 		Grading saved = gradingCaptor.getValue();
 		assertThat(saved.status()).isEqualTo(GradingStatus.AI_GRADED);
 		assertThat(saved.method()).isEqualTo(GradingMethod.AUTO);
-		assertThat(saved.finalScore()).isEqualByComparingTo(BigDecimal.valueOf(6.5));
+		assertThat(saved.finalScore()).isNull();
+		assertThat(saved.finalFeedback()).isNull();
+		assertThat(saved.aiTranscript().toString()).contains("\"overallScore\":6.5");
 		assertThat(saved.aiFeedback()).contains("Clear task response");
 		assertThat(saved.aiTranscript()).isNotNull();
 
-		verify(answerAnnotationRepository).save(any(AnswerAnnotation.class));
+		assertThat(annotationsCaptor.getValue()).hasSize(1);
+		AnswerAnnotation annotation = (AnswerAnnotation) annotationsCaptor.getValue().getFirst();
+		assertThat(annotation.startOffset()).isEqualTo(20);
+		assertThat(annotation.endOffset()).isEqualTo(35);
+	}
+
+	@Test
+	void writingTextAnnotations_useCodePointLengthAndSkipOutOfRangeItems() {
+		long submissionModuleId = 204L;
+		Grading grading = new Grading(
+				14L, submissionModuleId, GradingMethod.AUTO, GradingStatus.PENDING, null, null, null,
+				BigDecimal.valueOf(9.0), null, null, null, null, null);
+		GradingContext context = new GradingContext(
+				submissionModuleId, null, 200L, 10L, 5L, 2L, 15L, ModuleSkill.WRITING, true, null);
+		Answer answer = new Answer(
+				submissionModuleId, null, "😀", null, null, null, null, null, null, null, null, null);
+		ReflectionTestUtils.setField(answer, "id", 1204L);
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		AiWritingAnalysisResponse response = new AiWritingAnalysisResponse(
+				submissionModuleId, 6.0, "Feedback",
+				new WritingCriteriaScoresDto(6.0, 6.0, 6.0, 6.0, 6.0),
+				new TextMetricsDto(1, 1, 1.0, 1.0, 1.0),
+				List.of(new AiAnnotationDto(1, 2, "word", "GRAMMAR", "Out of code point range", null)));
+		when(aiServiceClient.analyzeWriting(any(AiWritingAnalysisRequest.class))).thenReturn(response);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
+
+		service.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingAiResultPersistenceService).persistAiResult(any(), annotationsCaptor.capture());
+		assertThat(annotationsCaptor.getValue()).isEmpty();
 	}
 
 	@Test
@@ -518,6 +605,7 @@ class GradingAiAnalysisServiceImplTest {
 				25000L,
 				UploadStatus.READY
 		);
+		ReflectionTestUtils.setField(answer, "id", 1202L);
 
 		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
 		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
@@ -530,7 +618,7 @@ class GradingAiAnalysisServiceImplTest {
 				"Strong essay submitted via document.",
 				new WritingCriteriaScoresDto(7.5, 7.0, 7.0, 6.5, 7.0),
 				new TextMetricsDto(250, 12, 20.8, 0.70, 12.0),
-				List.of(),
+				List.of(new AiAnnotationDto(30000, 40000, "document text", "GRAMMAR", "Upload range", null)),
 				"google/gemini-2.5-flash",
 				"openrouter"
 		);
@@ -549,10 +637,41 @@ class GradingAiAnalysisServiceImplTest {
 		service.analyzeSubmittedModule(submissionModuleId);
 
 		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
-		verify(gradingRepository).saveAiGrade(gradingCaptor.capture());
+		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingAiResultPersistenceService).persistAiResult(gradingCaptor.capture(), annotationsCaptor.capture());
 		Grading saved = gradingCaptor.getValue();
 		assertThat(saved.status()).isEqualTo(GradingStatus.AI_GRADED);
-		assertThat(saved.finalScore()).isEqualByComparingTo(BigDecimal.valueOf(7.0));
+		assertThat(saved.finalScore()).isNull();
+		assertThat(saved.finalFeedback()).isNull();
+		assertThat(saved.aiTranscript().toString()).contains("\"overallScore\":7.0");
+		assertThat(annotationsCaptor.getValue()).hasSize(1);
+		assertThat(((AnswerAnnotation) annotationsCaptor.getValue().getFirst()).endOffset()).isEqualTo(40000);
+	}
+
+	@Test
+	void analyzeSubmittedModule_missingCriteriaOverallScore_marksPendingGradingFailed() {
+		long submissionModuleId = 205L;
+		Grading grading = new Grading(
+				15L, submissionModuleId, GradingMethod.AUTO, GradingStatus.PENDING, null, null, null,
+				BigDecimal.valueOf(9.0), null, null, null, null, null);
+		GradingContext context = new GradingContext(
+				submissionModuleId, null, 200L, 10L, 5L, 2L, 15L, ModuleSkill.WRITING, true, null);
+		Answer answer = new Answer(
+				submissionModuleId, null, "A text response", null, null, null, null, null, null, null, null, null);
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		when(aiServiceClient.analyzeWriting(any(AiWritingAnalysisRequest.class))).thenReturn(
+				new AiWritingAnalysisResponse(
+						submissionModuleId, 7.0, "Feedback",
+						new WritingCriteriaScoresDto(7.0, 7.0, 7.0, 7.0, null),
+						new TextMetricsDto(3, 1, 3.0, 1.0, 1.0),
+						List.of()));
+
+		service.analyzeSubmittedModule(submissionModuleId);
+
+		verify(gradingAiResultPersistenceService).markFailedIfStillPending(submissionModuleId);
+		verify(gradingAiResultPersistenceService, never()).persistAiResult(any(), any());
 	}
 
 	@Test
@@ -612,8 +731,8 @@ class GradingAiAnalysisServiceImplTest {
 
 		service.analyzeSubmittedModule(submissionModuleId);
 
-		verify(gradingRepository).updateStatus(12L, GradingStatus.FAILED);
-		verify(gradingRepository, never()).saveAiGrade(any());
+		verify(gradingAiResultPersistenceService).markFailedIfStillPending(submissionModuleId);
+		verify(gradingAiResultPersistenceService, never()).persistAiResult(any(), any());
 	}
 }
 

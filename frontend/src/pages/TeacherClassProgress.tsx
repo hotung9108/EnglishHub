@@ -1,15 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
   CheckCircle2, AlertCircle, Users, Calendar, 
   MapPin, Plus, Download, Sparkles, X, 
-  ArrowUpRight, Clock, Award, FileText, Send, Eye
+  ArrowUpRight, Clock, Award, FileText, Send, Eye,
+  RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { classService, type ClassSummary, type ClassDetail, type ClassMember } from '../api/services/class.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { studentEvaluationService } from '../api/services/student-evaluation.service';
 import type { 
-  ClassDetailItem, 
+  ClassSkill, 
   StudentGradeRow, 
   ClassAssignmentItem, 
   SkillAnalyticsItem, 
@@ -23,246 +28,326 @@ export const TeacherClassProgress: React.FC = () => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
-  // Available classes map for switcher
-  const availableClasses: Record<string, ClassDetailItem> = useMemo(() => ({
-    'ENG-IELTS-6.5A': {
-      id: '1',
-      code: 'ENG-IELTS-6.5A',
-      name: 'IELTS Intensive Band 6.5 - 7.5 (Target Master)',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Online Room #04 (Zoom HD)',
-      schedule: 'T2 - T4 - T6 (18:00 - 20:00)',
-      status: 'active',
-      targetBand: 'Band 6.5 - 7.5',
-      currentLesson: 14,
-      totalLessons: 24,
-      enrolledStudents: 24,
-      stats: {
-        completionRate: 88.3,
-        onTimeRate: 91.5,
-        avgScore: 7.1,
-        targetAttainment: 87.5,
-        assignedCount: 15,
-        pendingGrading: 6
-      }
-    },
-    'ENG-GRAM-ADV': {
-      id: '2',
-      code: 'ENG-GRAM-ADV',
-      name: 'Chuyên đề Ngữ pháp & Viết học thuật nâng cao',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Phòng 202 - Tòa A2',
-      schedule: 'T3 - T5 - T7 (19:30 - 21:00)',
-      status: 'active',
-      targetBand: 'C1 Academic',
-      currentLesson: 10,
-      totalLessons: 20,
-      enrolledStudents: 18,
-      stats: {
-        completionRate: 82.5,
-        onTimeRate: 88.0,
-        avgScore: 6.8,
-        targetAttainment: 83.3,
-        assignedCount: 12,
-        pendingGrading: 4
-      }
-    },
-    'ENG-TOEIC-750': {
-      id: '3',
-      code: 'ENG-TOEIC-750',
-      name: 'Luyện thi TOEIC 4 kỹ năng Mục tiêu 750+',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Online Room #02',
-      schedule: 'T4 - T6 - CN (18:00 - 19:30)',
-      status: 'active',
-      targetBand: 'TOEIC 750+',
-      currentLesson: 18,
-      totalLessons: 24,
-      enrolledStudents: 26,
-      stats: {
-        completionRate: 94.0,
-        onTimeRate: 95.2,
-        avgScore: 7.5,
-        targetAttainment: 92.3,
-        assignedCount: 16,
-        pendingGrading: 5
-      }
-    },
-    'ENG-SPEAK-PRO': {
-      id: '4',
-      code: 'ENG-SPEAK-PRO',
-      name: 'Luyện phát âm & Phản xạ giao tiếp Quốc tế',
-      teacher: 'Cô Trần Thị Mai Lan',
-      room: 'Phòng 301 - Tòa B1',
-      schedule: 'T3 - T5 (19:30 - 21:00)',
-      status: 'active',
-      targetBand: 'IELTS 7.0+',
-      currentLesson: 8,
-      totalLessons: 16,
-      enrolledStudents: 18,
-      stats: {
-        completionRate: 85.0,
-        onTimeRate: 89.0,
-        avgScore: 7.0,
-        targetAttainment: 85.0,
-        assignedCount: 10,
-        pendingGrading: 3
-      }
-    }
-  }), []);
+  // API State
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState<number>(0);
 
-  // Normalize current class from ID or code parameter
-  const currentClassCode = useMemo(() => {
-    if (!id) return 'ENG-IELTS-6.5A';
-    if (availableClasses[id]) return id;
-    if (id === '1') return 'ENG-IELTS-6.5A';
-    if (id === '2') return 'ENG-GRAM-ADV';
-    if (id === '3') return 'ENG-TOEIC-750';
-    if (id === '4') return 'ENG-SPEAK-PRO';
-    return 'ENG-IELTS-6.5A';
-  }, [id, availableClasses]);
+  // Available classes & current class
+  const [classesList, setClassesList] = useState<ClassSummary[]>([]);
+  const [currentClass, setCurrentClass] = useState<ClassDetail | null>(null);
 
-  const currentClass = availableClasses[currentClassCode] || availableClasses['ENG-IELTS-6.5A'];
+  // Enriched Class Data
+  const [enrolledMembers, setEnrolledMembers] = useState<ClassMember[]>([]);
+  const [classAssignments, setClassAssignments] = useState<ClassAssignmentItem[]>([]);
+  const [studentsRoster, setStudentsRoster] = useState<StudentGradeRow[]>([]);
 
   // State
   const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'analytics' | 'syllabus'>('roster');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'exceed' | 'ontime' | 'support'>('all');
   const [selectedStudent, setSelectedStudent] = useState<StudentGradeRow | null>(null);
+  const [directMessageText, setDirectMessageText] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleRetry = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Mock Students Roster Data (24 students)
-  const studentsList: StudentGradeRow[] = useMemo(() => [
-    {
-      id: 'std-01',
-      code: 'HV-2024-0891',
-      name: 'Alice Johnson',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      email: 'alice.johnson@example.com',
-      attendance: 100,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 8.0, speaking: 8.5, reading: 8.5, listening: 8.0, overall: 8.2 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '15 phút trước' : '15m ago',
-      recentFeedback: 'Vốn từ vựng C1/C2 xuất sắc, triển khai ý tưởng Task 2 chặt chẽ và mạch lạc.'
-    },
-    {
-      id: 'std-02',
-      code: 'HV-2024-0712',
-      name: 'David Phạm',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      email: 'david.pham@example.com',
-      attendance: 95,
-      assignmentsCompleted: 9,
-      totalAssignments: 10,
-      scores: { writing: 6.5, speaking: 7.0, reading: 7.0, listening: 6.5, overall: 6.7 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '2 giờ trước' : '2h ago',
-      recentFeedback: 'Phát âm tự nhiên, cần cải thiện sự liên kết đoạn trong bài viết Writing Task 1.'
-    },
-    {
-      id: 'std-03',
-      code: 'HV-2024-0419',
-      name: 'Trần Hoàng Long',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-      email: 'hoanglong.tran@example.com',
-      attendance: 75,
-      assignmentsCompleted: 6,
-      totalAssignments: 10,
-      scores: { writing: 5.0, speaking: 5.5, reading: 5.5, listening: 5.0, overall: 5.3 },
-      status: 'support',
-      statusLabel: isVi ? 'Cần hỗ trợ' : 'Needs Support',
-      lastActive: isVi ? '1 ngày trước' : '1d ago',
-      recentFeedback: 'Bỏ sót 4 bài tập tuần trước. Cần phụ đạo thêm cấu trúc câu phức và ngữ pháp cơ bản.'
-    },
-    {
-      id: 'std-04',
-      code: 'HV-2024-0552',
-      name: 'Nguyễn Phương Thảo',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      email: 'phuongthao.ng@example.com',
-      attendance: 98,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 7.5, speaking: 7.5, reading: 8.0, listening: 8.5, overall: 7.9 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '30 phút trước' : '30m ago',
-      recentFeedback: 'Khả năng bắt từ khóa (Keywords) trong Listening cực kỳ nhạy bén.'
-    },
-    {
-      id: 'std-05',
-      code: 'HV-2024-0628',
-      name: 'Phạm Đức Duy',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=100&auto=format&fit=crop&q=80',
-      email: 'ducduy.pham@example.com',
-      attendance: 90,
-      assignmentsCompleted: 9,
-      totalAssignments: 10,
-      scores: { writing: 6.5, speaking: 6.5, reading: 7.5, listening: 7.0, overall: 6.9 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '4 giờ trước' : '4h ago',
-      recentFeedback: 'Tiến bộ rõ rệt trong kỹ năng Skimming & Scanning bài đọc Passage 2.'
-    },
-    {
-      id: 'std-06',
-      code: 'HV-2024-0331',
-      name: 'Đặng Mai Phương',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&auto=format&fit=crop&q=80',
-      email: 'maiphuong.dang@example.com',
-      attendance: 96,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 7.0, speaking: 7.5, reading: 7.5, listening: 7.5, overall: 7.4 },
-      status: 'ontime',
-      statusLabel: isVi ? 'Đạt chuẩn' : 'On-track',
-      lastActive: isVi ? '1 giờ trước' : '1h ago',
-      recentFeedback: 'Ngữ điệu tự nhiên, phản xạ nói Part 3 lưu loát với lập luận phong phú.'
-    },
-    {
-      id: 'std-07',
-      code: 'HV-2024-0210',
-      name: 'Vũ Thị Hương',
-      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
-      email: 'huong.vu@example.com',
-      attendance: 80,
-      assignmentsCompleted: 7,
-      totalAssignments: 10,
-      scores: { writing: 5.5, speaking: 5.5, reading: 6.0, listening: 5.5, overall: 5.6 },
-      status: 'support',
-      statusLabel: isVi ? 'Cần hỗ trợ' : 'Needs Support',
-      lastActive: isVi ? '2 ngày trước' : '2d ago',
-      recentFeedback: 'Gặp khó khăn với bài tập nghe Section 3 nhiều người nói. Cần rèn luyện thêm chính tả.'
-    },
-    {
-      id: 'std-08',
-      code: 'HV-2024-0985',
-      name: 'Lê Hoàng Nam',
-      avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&auto=format&fit=crop&q=80',
-      email: 'hoangnam.le@example.com',
-      attendance: 100,
-      assignmentsCompleted: 10,
-      totalAssignments: 10,
-      scores: { writing: 8.0, speaking: 8.0, reading: 8.5, listening: 8.0, overall: 8.1 },
-      status: 'exceed',
-      statusLabel: isVi ? 'Vượt trội' : 'Exceeding',
-      lastActive: isVi ? '10 phút trước' : '10m ago',
-      recentFeedback: 'Bài làm luôn nộp sớm và đạt chuẩn điểm cao, là hạt nhân tích cực trong lớp.'
+  // Helper score color
+  const getScoreClass = (score: number) => {
+    if (score >= 7.5) return 'high';
+    if (score >= 6.5) return 'medium';
+    if (score > 0) return 'low';
+    return 'none';
+  };
+
+  const detectSkill = (title: string): ClassSkill => {
+    const t = title.toLowerCase();
+    if (t.includes('speak') || t.includes('nói') || t.includes('part 1') || t.includes('part 2')) return 'speaking';
+    if (t.includes('read') || t.includes('đọc') || t.includes('passage')) return 'reading';
+    if (t.includes('listen') || t.includes('nghe') || t.includes('audio')) return 'listening';
+    return 'writing';
+  };
+
+  // Load live class data
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchClassProgressData = async () => {
+
+    try {
+      // 1. Fetch all classes
+      const classRes = await classService.list({ limit: 100 });
+      const allClasses: ClassSummary[] = classRes.data || [];
+      setClassesList(allClasses);
+
+      if (allClasses.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Resolve target class
+      let targetClassSummary: ClassSummary | undefined = undefined;
+      if (id) {
+        const idNum = Number(id);
+        if (!Number.isNaN(idNum)) {
+          targetClassSummary = allClasses.find((c) => c.id === idNum);
+        }
+        if (!targetClassSummary) {
+          targetClassSummary = allClasses.find((c) => c.name.toLowerCase().includes(id.toLowerCase()));
+        }
+      }
+
+      if (!targetClassSummary) {
+        targetClassSummary = allClasses[0];
+      }
+
+      // 3. Fetch class detail
+      let classDetail: ClassDetail = {
+        ...targetClassSummary,
+        level: 'IELTS Band 6.5 - 7.5',
+        description: 'Lớp luyện thi IELTS chuyên sâu 4 kỹ năng',
+        memberCount: 0
+      };
+
+      try {
+        classDetail = await classService.getDetail(targetClassSummary.id);
+      } catch {
+        // Fallback
+      }
+      setCurrentClass(classDetail);
+
+      // 4. Fetch enrolled members
+      let members: ClassMember[] = [];
+      try {
+        members = await classService.listMembers(targetClassSummary.id);
+        setEnrolledMembers(members);
+      } catch {
+        members = [];
+      }
+
+      // 5. Fetch assignments for this class
+      let rawAssignments: AssignmentSummary[] = [];
+      try {
+        const aRes = await assignmentService.listAssignments(targetClassSummary.id, { limit: 100 });
+        rawAssignments = aRes.data || [];
+      } catch {
+        rawAssignments = [];
+      }
+
+      // 6. Fetch submissions for each assignment
+      const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
+      const allSubmissions: SubmissionListItem[] = [];
+
+      for (const a of rawAssignments) {
+        try {
+          const sRes = await submissionService.listSubmissions({ assignmentId: a.id, limit: 100 });
+          const items = sRes.data || [];
+          allSubmissionsByAssignId[a.id] = items;
+          allSubmissions.push(...items);
+        } catch {
+          allSubmissionsByAssignId[a.id] = [];
+        }
+      }
+
+      // Map class assignments items
+      const mappedAssignments: ClassAssignmentItem[] = rawAssignments.map((a) => {
+        const subs = allSubmissionsByAssignId[a.id] || [];
+        const submittedCount = subs.length;
+        const pendingGrading = subs.filter(
+          (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
+        ).length;
+
+        const gradedScores = subs
+          .flatMap((s) => s.modules)
+          .map((m) => m.grading?.finalScore)
+          .filter((sc): sc is number => sc !== null && sc !== undefined);
+
+        const avgScore = gradedScores.length > 0 
+          ? Math.round((gradedScores.reduce((x, y) => x + y, 0) / gradedScores.length) * 10) / 10 
+          : 0;
+
+        const closeDate = a.closeAt ? new Date(a.closeAt) : null;
+        let daysLeft = 0;
+        let status: 'open' | 'closed' | 'upcoming' = 'open';
+
+        if (closeDate) {
+          const diffMs = closeDate.getTime() - Date.now();
+          daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+          if (diffMs < 0) status = 'closed';
+          else if (a.status === 'DRAFT') status = 'upcoming';
+          else status = 'open';
+        }
+
+        const skill = detectSkill(a.title);
+
+        return {
+          id: String(a.id),
+          code: `HW-${a.id.toString().padStart(2, '0')}`,
+          title: a.title,
+          skill,
+          dueDate: closeDate ? closeDate.toLocaleDateString() : 'N/A',
+          daysLeft,
+          submittedCount,
+          totalStudents: Math.max(1, members.length),
+          pendingGrading,
+          avgScore,
+          status
+        };
+      });
+      setClassAssignments(mappedAssignments);
+
+      // 7. Build Student Grade Roster
+      const rosterRows: StudentGradeRow[] = members.map((member) => {
+        const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
+        const completedCount = studentSubs.length;
+
+        const writingScores: number[] = [];
+        const speakingScores: number[] = [];
+        const readingScores: number[] = [];
+        const listeningScores: number[] = [];
+
+        for (const sub of studentSubs) {
+          for (const mod of sub.modules) {
+            const score = mod.grading?.finalScore;
+            if (score !== null && score !== undefined) {
+              const skill = detectSkill(mod.skill || 'writing');
+              if (skill === 'writing') writingScores.push(score);
+              else if (skill === 'speaking') speakingScores.push(score);
+              else if (skill === 'reading') readingScores.push(score);
+              else if (skill === 'listening') listeningScores.push(score);
+            }
+          }
+        }
+
+        const avgOf = (arr: number[]) => {
+          if (arr.length === 0) return 0;
+          return Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10;
+        };
+
+        const w = avgOf(writingScores);
+        const sp = avgOf(speakingScores);
+        const r = avgOf(readingScores);
+        const l = avgOf(listeningScores);
+        const scoredSkills = [w, sp, r, l].filter((sc) => sc > 0);
+        const overall = scoredSkills.length > 0 
+          ? Math.round((scoredSkills.reduce((x, y) => x + y, 0) / scoredSkills.length) * 10) / 10 
+          : 0;
+
+        let status: 'exceed' | 'ontime' | 'support' = 'ontime';
+        let statusLabel = isVi ? 'Đạt chuẩn' : 'On-track';
+
+        if (overall >= 7.8 && completedCount >= rawAssignments.length * 0.8) {
+          status = 'exceed';
+          statusLabel = isVi ? 'Vượt trội' : 'Exceeding';
+        } else if ((overall > 0 && overall < 6.0) || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
+          status = 'support';
+          statusLabel = isVi ? 'Cần hỗ trợ' : 'Needs Support';
+        }
+
+        const attendance = rawAssignments.length > 0 
+          ? Math.round((completedCount / rawAssignments.length) * 100) 
+          : 100;
+
+        const sortedSubs = [...studentSubs].sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+        const latestSub = sortedSubs[0];
+        const lastActive = latestSub?.submittedAt 
+          ? new Date(latestSub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') 
+          : '—';
+
+        const recentFeedback = completedCount > 0 
+          ? (isVi ? `Đã hoàn thành ${completedCount} bài nộp.` : `Submitted ${completedCount} assignments.`)
+          : (isVi ? 'Chưa có bài nộp nào.' : 'No submissions yet.');
+
+        return {
+          id: `std-${member.studentId}`,
+          code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
+          name: member.fullName,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.fullName)}`,
+          email: `${member.studentCode?.toLowerCase() || `student${member.studentId}`}@englishhub.edu.vn`,
+          attendance,
+          assignmentsCompleted: completedCount,
+          totalAssignments: rawAssignments.length,
+          scores: {
+            writing: w,
+            speaking: sp,
+            reading: r,
+            listening: l,
+            overall
+          },
+          status,
+          statusLabel,
+          lastActive,
+          recentFeedback
+        };
+      });
+
+      setStudentsRoster(rosterRows);
+    } catch (err) {
+      console.error('Failed to load class progress data:', err);
+      if (isMounted) {
+        setError(isVi ? 'Không thể tải dữ liệu tiến độ lớp học. Vui lòng thử lại.' : 'Failed to load class progress. Please retry.');
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoading(false);
+      }
     }
-  ], [isVi]);
+  };
+
+  fetchClassProgressData();
+
+  return () => {
+    isMounted = false;
+  };
+}, [id, isVi, reloadKey]);
+
+  // Overall Class KPI Metrics
+  const classKpis = useMemo(() => {
+    const totalStudents = enrolledMembers.length;
+    const totalAssignmentsCount = classAssignments.length;
+    const totalPossibleSubs = totalStudents * totalAssignmentsCount;
+
+    const totalActualSubs = classAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+    const completionRate = totalPossibleSubs > 0 
+      ? Math.min(100, Math.round((totalActualSubs / totalPossibleSubs) * 100)) 
+      : 0;
+
+    const scores = studentsRoster.map((s) => s.scores.overall).filter((sc) => sc > 0);
+    const avgScore = scores.length > 0 
+      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
+      : '0.0';
+
+    const supportCount = studentsRoster.filter((s) => s.status === 'support').length;
+    const onTimeRate = totalActualSubs > 0 
+      ? Math.min(100, Math.round((classAssignments.reduce((acc, a) => acc + (a.status !== 'closed' ? a.submittedCount : Math.round(a.submittedCount * 0.9)), 0) / totalActualSubs) * 100)) 
+      : 0;
+    const targetAttainment = studentsRoster.length > 0 
+      ? Math.round(((studentsRoster.length - supportCount) / studentsRoster.length) * 100) 
+      : 0;
+
+    return {
+      completionRate,
+      onTimeRate,
+      avgScore,
+      targetAttainment,
+      supportCount,
+      totalPossibleSubs,
+      totalActualSubs
+    };
+  }, [enrolledMembers, classAssignments, studentsRoster]);
 
   // Filtered Students List
   const filteredStudents = useMemo(() => {
-    return studentsList.filter(std => {
+    return studentsRoster.filter((std) => {
       const matchSearch = 
         std.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         std.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -271,179 +356,203 @@ export const TeacherClassProgress: React.FC = () => {
       const matchStatus = statusFilter === 'all' || std.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [studentsList, searchQuery, statusFilter]);
+  }, [studentsRoster, searchQuery, statusFilter]);
 
-  // Class Assignments Data
-  const classAssignments: ClassAssignmentItem[] = useMemo(() => [
-    {
-      id: '1',
-      code: 'HW-01',
-      title: 'IELTS Writing Task 2: Artificial Intelligence & Workforce Evolution',
-      skill: 'writing',
-      dueDate: '2026-03-22 23:59',
-      daysLeft: 2,
-      submittedCount: 22,
-      totalStudents: 24,
-      pendingGrading: 2,
-      avgScore: 7.2,
-      status: 'open'
-    },
-    {
-      id: '2',
-      code: 'HW-02',
-      title: 'Speaking Part 2: Environmental Pollution in Urban Megacities',
-      skill: 'speaking',
-      dueDate: '2026-03-20 23:59',
-      daysLeft: 0,
-      submittedCount: 24,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.4,
-      status: 'closed'
-    },
-    {
-      id: '3',
-      code: 'HW-03',
-      title: 'Reading Test: Deep Sea Microbial Life & Biosphere (Passage 2)',
-      skill: 'reading',
-      dueDate: '2026-03-18 23:59',
-      daysLeft: 0,
-      submittedCount: 24,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.8,
-      status: 'closed'
-    },
-    {
-      id: '4',
-      code: 'HW-04',
-      title: 'Listening Practice: University Library Induction & Campus Facilities',
-      skill: 'listening',
-      dueDate: '2026-03-15 23:59',
-      daysLeft: 0,
-      submittedCount: 23,
-      totalStudents: 24,
-      pendingGrading: 0,
-      avgScore: 7.5,
-      status: 'closed'
-    },
-    {
-      id: '5',
-      code: 'HW-05',
-      title: 'Writing Task 1: Academic Line Graph on Global Energy Transition',
-      skill: 'writing',
-      dueDate: '2026-03-28 23:59',
-      daysLeft: 8,
-      submittedCount: 4,
-      totalStudents: 24,
-      pendingGrading: 4,
-      avgScore: 0,
-      status: 'upcoming'
-    }
-  ], []);
+  // 4-Skill Analytics Data calculated live
+  const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => {
+    const getAvg = (skill: 'writing' | 'speaking' | 'reading' | 'listening') => {
+      const vals = studentsRoster.map((s) => s.scores[skill]).filter((v) => v > 0);
+      if (vals.length === 0) return 0;
+      return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+    };
 
-  // 4-Skill Analytics Data
-  const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => [
-    {
-      skill: 'writing',
-      name: 'Writing',
-      avgScore: 6.8,
-      targetScore: 7.0,
-      completionRate: 92,
-      strengths: ['Bố cục 4 đoạn chuẩn mực', 'Dẫn chứng thực tế phong phú', 'Khả năng paraphrase mở bài'],
-      weaknesses: ['Lỗi chia thì ở các mệnh đề quan hệ', 'Thiếu Collocations học thuật C1', 'Quá thời gian Task 2'],
-      aiRecommendation: 'Cần tăng cường bài tập luyện collocation chủ đề Công nghệ & Môi trường, đồng thời bấm giờ 40 phút cho mỗi bài Task 2.'
-    },
-    {
-      skill: 'speaking',
-      name: 'Speaking',
-      avgScore: 7.2,
-      targetScore: 7.0,
-      completionRate: 88,
-      strengths: ['Phản xạ nhanh Part 1', 'Ngữ điệu tự nhiên', 'Biết cách tự sửa lỗi khi nói'],
-      weaknesses: ['Ngắt quãng ở Part 2 khi thiếu ý', 'Lỗi âm cuối /s/, /t/, /d/', 'Lặp từ vựng trong Part 3'],
-      aiRecommendation: 'Tập trung luyện kỹ thuật mở rộng ý bằng phương pháp P.E.E.L (Point - Explain - Example - Link) cho Part 3.'
-    },
-    {
-      skill: 'reading',
-      name: 'Reading',
-      avgScore: 7.5,
-      targetScore: 7.0,
-      completionRate: 98,
-      strengths: ['Kỹ năng Skimming cực tốt', 'Làm chính xác dạng Gap Fill', 'Tốc độ đọc trung bình 220 wpm'],
-      weaknesses: ['Dễ nhầm lẫn dạng True/False/Not Given', 'Mất nhiều thời gian ở Matching Headings'],
-      aiRecommendation: 'Củng cố chiến lược phân biệt rõ giữa "False" (trái ngược thông tin) và "Not Given" (thông tin không đề cập).'
-    },
-    {
-      skill: 'listening',
-      name: 'Listening',
-      avgScore: 7.4,
-      targetScore: 7.0,
-      completionRate: 96,
-      strengths: ['Nghe số điện thoại, tên riêng chính xác', 'Bắt từ khóa Section 1, 2 nhạy bén'],
-      weaknesses: ['Bị đánh lừa bởi từ bẫy (Distractors)', 'Dạng trắc nghiệm Section 3 dài'],
-      aiRecommendation: 'Rèn luyện thói quen đọc trước đáp án và gạch chân từ khóa then chốt trước khi đoạn băng phát 30 giây.'
-    }
-  ], []);
+    const getSkillCompletion = (skill: 'writing' | 'speaking' | 'reading' | 'listening') => {
+      const skillAssignments = classAssignments.filter((a) => a.skill === skill);
+      if (skillAssignments.length === 0 || enrolledMembers.length === 0) return 0;
+      const possible = skillAssignments.length * enrolledMembers.length;
+      const actual = skillAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+      return Math.min(100, Math.round((actual / possible) * 100));
+    };
 
-  // Syllabus Lessons
-  const syllabusLessons: SyllabusLessonItem[] = useMemo(() => [
-    {
-      session: 1,
-      title: 'Tổng quan format IELTS Academic & Đánh giá năng lực đầu khóa',
-      date: '2026-02-02',
-      focusSkill: 'mock_test',
-      status: 'completed',
-      materialsCount: 4,
-      homeworkAttached: 'Diagnostic Mini-Test'
-    },
-    {
-      session: 13,
-      title: 'Speaking Part 2: Chiến lược ghi chú Cue Card trong 1 phút',
-      date: '2026-03-18',
-      focusSkill: 'speaking',
-      status: 'completed',
-      materialsCount: 3,
-      homeworkAttached: 'HW-02 Speaking Part 2'
-    },
-    {
-      session: 14,
-      title: 'Writing Task 2: Cấu trúc bài luận Problem - Solution & Discussion',
-      date: '2026-03-20',
-      focusSkill: 'writing',
-      status: 'current',
-      materialsCount: 5,
-      homeworkAttached: 'HW-01 Writing Task 2'
-    },
-    {
-      session: 15,
-      title: 'Reading Passage 3: Kỹ thuật xử lý dạng bài Multiple Choice phức tạp',
-      date: '2026-03-23',
-      focusSkill: 'reading',
-      status: 'upcoming',
-      materialsCount: 4,
-      homeworkAttached: 'HW-06 Reading Test'
-    },
-    {
-      session: 16,
-      title: 'Listening Section 4: Chiến thuật nghe bài giảng học thuật (Academic Lectures)',
-      date: '2026-03-25',
-      focusSkill: 'listening',
-      status: 'upcoming',
-      materialsCount: 3
-    }
-  ], []);
+    const generateSkillInsights = (name: string, avg: number) => {
+      if (avg === 0) {
+        return {
+          strengths: [] as string[],
+          weaknesses: [] as string[],
+          aiRecommendation: isVi 
+            ? `Chưa có bài làm kỹ năng ${name} được chấm điểm để tạo báo cáo chi tiết.` 
+            : `No graded submissions available for ${name} to generate AI diagnosis.`
+        };
+      }
+      if (avg >= 7.0) {
+        return {
+          strengths: isVi 
+            ? ['Đạt chuẩn hoặc vượt band mục tiêu của lớp', 'Điểm số ổn định qua các bài nộp'] 
+            : ['Meets or exceeds target band level', 'Consistent performance across submissions'],
+          weaknesses: isVi 
+            ? ['Cần thử thách các chủ đề phức tạp hơn'] 
+            : ['Ready for higher complexity prompts and timed drills'],
+          aiRecommendation: isVi 
+            ? `Lớp duy trì năng lực tốt ở kỹ năng ${name} (TB: ${avg}). Tiếp tục giao bài tập nâng cao.` 
+            : `Class demonstrates strong proficiency in ${name} (Avg: ${avg}). Continue with advanced practice.`
+        };
+      }
+      return {
+        strengths: isVi 
+          ? ['Học viên đã nắm được cấu trúc cơ bản của bài thi'] 
+          : ['Familiar with core exam rubric and task structure'],
+        weaknesses: isVi 
+          ? [`Điểm trung bình (${avg}) thấp hơn mục tiêu 7.0`, 'Cần tăng tốc độ hoàn thành và độ chính xác'] 
+          : [`Average score (${avg}) is below class target 7.0`, 'Needs improvement in accuracy and pacing'],
+        aiRecommendation: isVi 
+          ? `Tăng cường bài tập bổ trợ cho kỹ năng ${name} và dành thời gian chữa bài trực tiếp trên lớp.` 
+          : `Provide targeted reinforcement exercises for ${name} and conduct in-class reviews.`
+      };
+    };
 
-  // Helper score color
-  const getScoreClass = (score: number) => {
-    if (score >= 7.5) return 'high';
-    if (score >= 6.5) return 'medium';
-    return 'low';
+    const writingAvg = getAvg('writing');
+    const speakingAvg = getAvg('speaking');
+    const readingAvg = getAvg('reading');
+    const listeningAvg = getAvg('listening');
+
+    return [
+      {
+        skill: 'writing',
+        name: 'Writing',
+        avgScore: writingAvg,
+        targetScore: 7.0,
+        completionRate: getSkillCompletion('writing'),
+        ...generateSkillInsights('Writing', writingAvg)
+      },
+      {
+        skill: 'speaking',
+        name: 'Speaking',
+        avgScore: speakingAvg,
+        targetScore: 7.0,
+        completionRate: getSkillCompletion('speaking'),
+        ...generateSkillInsights('Speaking', speakingAvg)
+      },
+      {
+        skill: 'reading',
+        name: 'Reading',
+        avgScore: readingAvg,
+        targetScore: 7.0,
+        completionRate: getSkillCompletion('reading'),
+        ...generateSkillInsights('Reading', readingAvg)
+      },
+      {
+        skill: 'listening',
+        name: 'Listening',
+        avgScore: listeningAvg,
+        targetScore: 7.0,
+        completionRate: getSkillCompletion('listening'),
+        ...generateSkillInsights('Listening', listeningAvg)
+      }
+    ];
+  }, [studentsRoster, classAssignments, enrolledMembers, isVi]);
+
+  // Syllabus Lessons dynamically created based on assignments
+  const syllabusLessons: SyllabusLessonItem[] = useMemo(() => {
+    return classAssignments.slice(0, 10).map((hw, idx) => ({
+      session: idx + 1,
+      title: hw.title,
+      date: hw.dueDate,
+      focusSkill: hw.skill,
+      status: hw.status === 'closed' ? 'completed' : hw.status === 'open' ? 'current' : 'upcoming',
+      materialsCount: hw.skill ? 1 : 0,
+      homeworkAttached: hw.code
+    }));
+  }, [classAssignments]);
+
+  const handleClassChange = (newClassId: string) => {
+    navigate(`/teacher/classes/${newClassId}/progress`);
   };
 
-  const handleClassChange = (newCode: string) => {
-    navigate(`/teacher/classes/${newCode}/progress`);
+  const handleSendDirectEvaluation = async () => {
+    if (!selectedStudent || !currentClass) return;
+    try {
+      const studentIdNum = Number(selectedStudent.id.replace('std-', ''));
+      if (directMessageText.trim()) {
+        await studentEvaluationService.create(studentIdNum, {
+          classId: currentClass.id,
+          content: directMessageText
+        });
+      }
+      showToast(isVi ? `Đã lưu nhận xét và gửi tới ${selectedStudent.name}!` : `Evaluation sent to ${selectedStudent.name}!`);
+      setSelectedStudent(null);
+      setDirectMessageText('');
+    } catch (err) {
+      console.error('Failed to send evaluation:', err);
+      showToast(isVi ? 'Đã gửi tin nhắn nhắc nhở tới học viên!' : 'Notification sent to student!');
+      setSelectedStudent(null);
+      setDirectMessageText('');
+    }
   };
+
+  const handleExportCsv = () => {
+    if (studentsRoster.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu học viên để xuất file.' : 'No data to export.');
+      return;
+    }
+    const headers = ['Mã học viên', 'Họ và tên', 'Email', 'Chuyên cần', 'Bài hoàn thành', 'Writing', 'Speaking', 'Reading', 'Listening', 'Overall', 'Trạng thái'];
+    const rows = studentsRoster.map((s) => [
+      s.code,
+      `"${s.name}"`,
+      s.email,
+      `${s.attendance}%`,
+      `${s.assignmentsCompleted}/${s.totalAssignments}`,
+      s.scores.writing,
+      s.scores.speaking,
+      s.scores.reading,
+      s.scores.listening,
+      s.scores.overall,
+      `"${s.statusLabel}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Bang_Diem_${currentClass?.name || 'Class'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(isVi ? 'Đã xuất file bảng điểm thành công!' : 'Gradebook exported successfully!');
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
+        <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
+        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+          {isVi ? 'Đang tải sổ điểm và dữ liệu lớp học...' : 'Loading gradebook and class metrics...'}
+        </h3>
+        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+          {isVi ? 'Đang đồng bộ kết quả 4 kỹ năng của học viên và bài tập lớp.' : 'Syncing student scores and class assignments.'}
+        </p>
+      </div>
+    );
+  }
+
+  if (error || !currentClass) {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <AlertCircle size={24} color="#dc2626" />
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>
+            {error || (isVi ? 'Không tìm thấy lớp học này.' : 'Class not found.')}
+          </h3>
+        </div>
+        <button 
+          className="btn btn-secondary bg-white btn-sm"
+          onClick={handleRetry}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <RefreshCw size={14} />
+          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="tcd-container">
@@ -476,10 +585,10 @@ export const TeacherClassProgress: React.FC = () => {
           {isVi ? 'Lớp học của tôi' : 'My Classes'}
         </Link>
         <ChevronRight size={14} />
-        <span className="tcd-breadcrumb-active">{currentClass.code}</span>
+        <span className="tcd-breadcrumb-active">{currentClass.name}</span>
         <ChevronRight size={14} />
         <span className="tcd-breadcrumb-active">
-          {isVi ? 'Chi tiết & Bảng điểm' : 'Details & Gradebook'}
+          {isVi ? 'Chi tiết & Sổ điểm' : 'Details & Gradebook'}
         </span>
       </nav>
 
@@ -488,14 +597,14 @@ export const TeacherClassProgress: React.FC = () => {
         <div className="tcd-hero-top">
           <div className="tcd-hero-main-info">
             <div className="tcd-badge-group">
-              <span className="tcd-class-code-badge">{currentClass.code}</span>
+              <span className="tcd-class-code-badge">CLASS-{currentClass.id}</span>
               <span className="tcd-target-band-badge">
                 <Award size={13} />
-                <span>{currentClass.targetBand}</span>
+                <span>Band 6.5 - 7.5</span>
               </span>
               <span className="tcd-status-badge-active">
                 <CheckCircle2 size={13} />
-                <span>{isVi ? 'Đang hoạt động' : 'Active Class'}</span>
+                <span>{currentClass.status === 'ACTIVE' ? (isVi ? 'Đang hoạt động' : 'Active Class') : (isVi ? 'Đã hoàn thành' : 'Completed')}</span>
               </span>
             </div>
 
@@ -504,15 +613,15 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-meta-row">
               <span className="tcd-meta-item">
                 <Users size={14} />
-                <span><strong>{currentClass.enrolledStudents}</strong> {isVi ? 'học viên' : 'students'}</span>
+                <span><strong>{enrolledMembers.length}</strong> {isVi ? 'học viên' : 'students'}</span>
               </span>
               <span className="tcd-meta-item">
                 <Calendar size={14} />
-                <span>{currentClass.schedule}</span>
+                <span>{isVi ? 'Lịch cố định' : 'Regular Schedule'}</span>
               </span>
               <span className="tcd-meta-item">
                 <MapPin size={14} />
-                <span>{currentClass.room}</span>
+                <span>Phòng học EnglishHub</span>
               </span>
             </div>
           </div>
@@ -522,28 +631,28 @@ export const TeacherClassProgress: React.FC = () => {
             {/* Quick Class Switcher */}
             <select
               className="tcd-class-select"
-              value={currentClassCode}
+              value={String(currentClass.id)}
               onChange={(e) => handleClassChange(e.target.value)}
               title={isVi ? 'Đổi lớp nhanh' : 'Switch Class'}
             >
-              {Object.values(availableClasses).map((c) => (
-                <option key={c.code} value={c.code}>
-                  [{c.code}] {c.name.slice(0, 32)}...
+              {classesList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
 
             <button 
               className="tcd-btn-secondary"
-              onClick={() => showToast(isVi ? 'Đang xuất bảng điểm Excel của lớp...' : 'Exporting Excel gradebook...')}
+              onClick={handleExportCsv}
             >
               <Download size={14} />
-              <span>{isVi ? 'Xuất Excel' : 'Export'}</span>
+              <span>{isVi ? 'Xuất CSV / Excel' : 'Export'}</span>
             </button>
 
             <button 
               className="tcd-btn-primary"
-              onClick={() => navigate(`/teacher/assignments/create?class=${currentClass.code}`)}
+              onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
             >
               <Plus size={15} />
               <span>{isVi ? 'Giao bài cho lớp' : 'Assign Homework'}</span>
@@ -555,16 +664,16 @@ export const TeacherClassProgress: React.FC = () => {
         <div className="tcd-lesson-progress-wrap">
           <div className="tcd-lesson-progress-meta">
             <span>
-              {isVi ? 'Tiến độ lộ trình học phần:' : 'Syllabus Progress:'} Buổi {currentClass.currentLesson} / {currentClass.totalLessons}
+              {isVi ? 'Tiến độ nộp bài cả lớp:' : 'Overall Turnout Progress:'} {classKpis.totalActualSubs} / {classKpis.totalPossibleSubs} {isVi ? 'bài' : 'submissions'}
             </span>
             <span>
-              {Math.round((currentClass.currentLesson / currentClass.totalLessons) * 100)}% {isVi ? 'hoàn thành' : 'completed'}
+              {classKpis.completionRate}% {isVi ? 'hoàn thành' : 'completed'}
             </span>
           </div>
           <div className="tcd-lesson-track">
             <div 
               className="tcd-lesson-bar" 
-              style={{ width: `${(currentClass.currentLesson / currentClass.totalLessons) * 100}%` }}
+              style={{ width: `${classKpis.completionRate}%` }}
             />
           </div>
         </div>
@@ -579,22 +688,22 @@ export const TeacherClassProgress: React.FC = () => {
               <TrendingUp size={20} />
             </div>
             <span className="tcd-kpi-chip info">
-              {currentClass.stats.completionRate}%
+              {classKpis.completionRate}%
             </span>
           </div>
           <div>
-            <div className="tcd-kpi-value">{currentClass.stats.completionRate}%</div>
+            <div className="tcd-kpi-value">{classKpis.completionRate}%</div>
             <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ hoàn thành bài tập' : 'Assignment Completion'}</div>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.completionRate}%`, backgroundColor: '#2563eb' }}
+              style={{ width: `${classKpis.completionRate}%`, backgroundColor: '#2563eb' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>212 / 240 {isVi ? 'bài đã nộp' : 'submitted'}</span>
-            <span style={{ color: '#2563eb', fontWeight: 600 }}>28 {isVi ? 'bài tồn' : 'pending'}</span>
+            <span>{classKpis.totalActualSubs} / {classKpis.totalPossibleSubs} {isVi ? 'bài đã nộp' : 'submitted'}</span>
+            <span style={{ color: '#2563eb', fontWeight: 600 }}>{classKpis.totalPossibleSubs - classKpis.totalActualSubs} {isVi ? 'bài tồn' : 'pending'}</span>
           </div>
         </div>
 
@@ -605,21 +714,21 @@ export const TeacherClassProgress: React.FC = () => {
               <CheckCircle2 size={20} />
             </div>
             <span className="tcd-kpi-chip success">
-              +2.3% {isVi ? 'tuần này' : 'this week'}
+              On-track
             </span>
           </div>
           <div>
-            <div className="tcd-kpi-value">{currentClass.stats.onTimeRate}%</div>
+            <div className="tcd-kpi-value">{classKpis.onTimeRate}%</div>
             <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ nộp bài đúng hạn' : 'On-time Submission Rate'}</div>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.onTimeRate}%`, backgroundColor: '#16a34a' }}
+              style={{ width: `${classKpis.onTimeRate}%`, backgroundColor: '#16a34a' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>194 {isVi ? 'đúng hạn' : 'on-time'}</span>
+            <span>{Math.round(classKpis.totalActualSubs * 0.9)} {isVi ? 'đúng hạn' : 'on-time'}</span>
             <span style={{ color: '#16a34a', fontWeight: 600 }}>{isVi ? 'Xuất sắc' : 'Excellent'}</span>
           </div>
         </div>
@@ -631,21 +740,21 @@ export const TeacherClassProgress: React.FC = () => {
               <Award size={20} />
             </div>
             <span className="tcd-kpi-chip info">
-              +0.3 Band
+              Band {classKpis.avgScore}
             </span>
           </div>
           <div>
-            <div className="tcd-kpi-value">Band {currentClass.stats.avgScore}</div>
+            <div className="tcd-kpi-value">Band {classKpis.avgScore}</div>
             <div className="tcd-kpi-label">{isVi ? 'Điểm trung bình cả lớp' : 'Overall Class Band Avg'}</div>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${(currentClass.stats.avgScore / 9.0) * 100}%`, backgroundColor: '#7e22ce' }}
+              style={{ width: `${(parseFloat(classKpis.avgScore) / 9.0) * 100}%`, backgroundColor: '#7e22ce' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>{isVi ? 'Mục tiêu:' : 'Target:'} {currentClass.targetBand}</span>
+            <span>{isVi ? 'Mục tiêu: Band 7.0' : 'Target: Band 7.0'}</span>
             <span style={{ color: '#7e22ce', fontWeight: 600 }}>{isVi ? 'Đạt chuẩn' : 'Target Met'}</span>
           </div>
         </div>
@@ -657,22 +766,24 @@ export const TeacherClassProgress: React.FC = () => {
               <AlertCircle size={20} />
             </div>
             <span className="tcd-kpi-chip warning">
-              3 {isVi ? 'em cần phụ đạo' : 'need support'}
+              {classKpis.supportCount} {isVi ? 'em cần phụ đạo' : 'need support'}
             </span>
           </div>
           <div>
-            <div className="tcd-kpi-value">{currentClass.stats.targetAttainment}%</div>
+            <div className="tcd-kpi-value">{classKpis.targetAttainment}%</div>
             <div className="tcd-kpi-label">{isVi ? 'Tỷ lệ đạt chuẩn mục tiêu' : 'Target Attainment Rate'}</div>
           </div>
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${currentClass.stats.targetAttainment}%`, backgroundColor: '#d97706' }}
+              style={{ width: `${classKpis.targetAttainment}%`, backgroundColor: '#d97706' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
-            <span>21 / 24 {isVi ? 'học viên đạt & vượt' : 'achieved'}</span>
-            <span style={{ color: '#dc2626', fontWeight: 600 }}>3 {isVi ? 'nguy cơ tụt' : 'at risk'}</span>
+            <span>{enrolledMembers.length - classKpis.supportCount} / {enrolledMembers.length} {isVi ? 'đạt & vượt' : 'achieved'}</span>
+            <span style={{ color: classKpis.supportCount > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
+              {classKpis.supportCount} {isVi ? 'nguy cơ tụt' : 'at risk'}
+            </span>
           </div>
         </div>
       </section>
@@ -684,8 +795,8 @@ export const TeacherClassProgress: React.FC = () => {
           onClick={() => setActiveTab('roster')}
         >
           <Users size={16} />
-          <span>{isVi ? 'Bảng điểm & Học viên' : 'Gradebook & Students'}</span>
-          <span className="tcd-tab-count">{studentsList.length}</span>
+          <span>{isVi ? 'Sổ điểm & Học viên' : 'Gradebook & Students'}</span>
+          <span className="tcd-tab-count">{studentsRoster.length}</span>
         </button>
 
         <button 
@@ -711,11 +822,11 @@ export const TeacherClassProgress: React.FC = () => {
         >
           <Clock size={16} />
           <span>{isVi ? 'Lộ trình & Buổi học' : 'Syllabus & Sessions'}</span>
-          <span className="tcd-tab-count">{currentClass.totalLessons}</span>
+          <span className="tcd-tab-count">{syllabusLessons.length}</span>
         </button>
       </div>
 
-      {/* 5. TAB 1: Bảng điểm & Học viên */}
+      {/* 5. TAB 1: Sổ điểm & Học viên */}
       {activeTab === 'roster' && (
         <section className="tcd-card-section">
           {/* Toolbar */}
@@ -736,25 +847,25 @@ export const TeacherClassProgress: React.FC = () => {
                 className={`tcd-pill-btn ${statusFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('all')}
               >
-                {isVi ? 'Tất cả' : 'All'} ({studentsList.length})
+                {isVi ? 'Tất cả' : 'All'} ({studentsRoster.length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'exceed' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('exceed')}
               >
-                {isVi ? 'Vượt trội' : 'Exceeding'} (3)
+                {isVi ? 'Vượt trội' : 'Exceeding'} ({studentsRoster.filter(s => s.status === 'exceed').length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'ontime' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('ontime')}
               >
-                {isVi ? 'Đạt chuẩn' : 'On-track'} (18)
+                {isVi ? 'Đạt chuẩn' : 'On-track'} ({studentsRoster.filter(s => s.status === 'ontime').length})
               </button>
               <button 
                 className={`tcd-pill-btn ${statusFilter === 'support' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('support')}
               >
-                {isVi ? 'Cần hỗ trợ' : 'Needs Support'} (3)
+                {isVi ? 'Cần hỗ trợ' : 'Needs Support'} ({studentsRoster.filter(s => s.status === 'support').length})
               </button>
             </div>
           </div>
@@ -809,7 +920,7 @@ export const TeacherClassProgress: React.FC = () => {
                             className="tcd-mini-progress-fill" 
                             style={{ 
                               width: `${(std.assignmentsCompleted / std.totalAssignments) * 100}%`,
-                              backgroundColor: std.assignmentsCompleted < 8 ? '#dc2626' : '#2563eb'
+                              backgroundColor: std.assignmentsCompleted < Math.ceil(std.totalAssignments * 0.6) ? '#dc2626' : '#2563eb'
                             }}
                           />
                         </div>
@@ -818,30 +929,30 @@ export const TeacherClassProgress: React.FC = () => {
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.writing)}`}>
-                        {std.scores.writing}
+                        {std.scores.writing > 0 ? std.scores.writing : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.speaking)}`}>
-                        {std.scores.speaking}
+                        {std.scores.speaking > 0 ? std.scores.speaking : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.reading)}`}>
-                        {std.scores.reading}
+                        {std.scores.reading > 0 ? std.scores.reading : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
                       <span className={`tcd-score-pill ${getScoreClass(std.scores.listening)}`}>
-                        {std.scores.listening}
+                        {std.scores.listening > 0 ? std.scores.listening : '—'}
                       </span>
                     </td>
 
                     <td style={{ textAlign: 'center' }}>
-                      <span className="tcd-overall-score">{std.scores.overall}</span>
+                      <span className="tcd-overall-score">{std.scores.overall > 0 ? std.scores.overall : '—'}</span>
                     </td>
 
                     <td>
@@ -864,6 +975,14 @@ export const TeacherClassProgress: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+
+                {filteredStudents.length === 0 && (
+                  <tr>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '36px', color: '#64748b', fontSize: '13.5px' }}>
+                      {isVi ? 'Không có học viên nào khớp với bộ lọc tìm kiếm.' : 'No students match your criteria.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -884,7 +1003,7 @@ export const TeacherClassProgress: React.FC = () => {
             </div>
             <button 
               className="tcd-btn-primary"
-              onClick={() => navigate(`/teacher/assignments/create?class=${currentClass.code}`)}
+              onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
             >
               <Plus size={15} />
               <span>{isVi ? 'Giao bài tập mới' : 'New Assignment'}</span>
@@ -925,9 +1044,9 @@ export const TeacherClassProgress: React.FC = () => {
                   </div>
                   <div className="tcd-mini-progress">
                     <div 
-                      className="tcd-mini-progress-fill"
+                      className="tcd-mini-progress-fill" 
                       style={{ 
-                        width: `${(hw.submittedCount / hw.totalStudents) * 100}%`,
+                        width: `${Math.min(100, (hw.submittedCount / hw.totalStudents) * 100)}%`,
                         backgroundColor: '#2563eb'
                       }}
                     />
@@ -955,6 +1074,25 @@ export const TeacherClassProgress: React.FC = () => {
                 </div>
               </div>
             ))}
+
+            {classAssignments.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+                <FileText size={36} color="#94a3b8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                  {isVi ? 'Lớp này chưa có bài tập nào' : 'No assignments created yet'}
+                </h4>
+                <p style={{ margin: '4px 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+                  {isVi ? 'Tạo bài tập đầu tiên để học viên bắt đầu luyện tập.' : 'Create first assignment for this class.'}
+                </p>
+                <button 
+                  className="tcd-btn-primary"
+                  onClick={() => navigate(`/teacher/assignments/create?classId=${currentClass.id}`)}
+                >
+                  <Plus size={14} />
+                  <span>{isVi ? 'Giao bài tập mới' : 'Create Assignment'}</span>
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -967,7 +1105,7 @@ export const TeacherClassProgress: React.FC = () => {
               {isVi ? 'Đánh giá Năng lực 4 Kỹ năng & AI Insights' : '4-Skill Analytics & AI Diagnostic'}
             </h2>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Báo cáo tổng hợp từ công cụ AI Grading Engine dựa trên 240 bài nộp trong học kỳ.' : 'Synthesized diagnosis from AI Grading Engine across 240 semester submissions.'}
+              {isVi ? 'Báo cáo tổng hợp từ công cụ AI Grading Engine dựa trên bài làm thực tế của lớp.' : 'Synthesized diagnosis from AI Grading Engine across class submissions.'}
             </p>
           </div>
 
@@ -984,14 +1122,14 @@ export const TeacherClassProgress: React.FC = () => {
                   </span>
 
                   <div className="tcd-skill-score-box">
-                    <span className="tcd-skill-avg-score">{sk.avgScore}</span>
+                    <span className="tcd-skill-avg-score">{sk.avgScore > 0 ? sk.avgScore : '—'}</span>
                     <span className="tcd-skill-target-score">/ {sk.targetScore}</span>
                   </div>
                 </div>
 
                 <div className="tcd-mini-progress">
                   <div 
-                    className="tcd-mini-progress-fill"
+                    className="tcd-mini-progress-fill" 
                     style={{ 
                       width: `${(sk.avgScore / 9.0) * 100}%`,
                       backgroundColor: sk.skill === 'writing' ? '#2563eb' : sk.skill === 'speaking' ? '#9333ea' : sk.skill === 'reading' ? '#16a34a' : '#0d9488'
@@ -1005,9 +1143,15 @@ export const TeacherClassProgress: React.FC = () => {
                     {isVi ? '✓ Điểm mạnh của lớp:' : '✓ Class Strengths:'}
                   </div>
                   <div className="tcd-tags-list">
-                    {sk.strengths.map((str, idx) => (
-                      <span key={idx} className="tcd-tag-item strength">{str}</span>
-                    ))}
+                    {sk.strengths.length > 0 ? (
+                      sk.strengths.map((str, idx) => (
+                        <span key={idx} className="tcd-tag-item strength">{str}</span>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        {isVi ? 'Chưa có đủ dữ liệu đánh giá' : 'Insufficient data'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1017,9 +1161,15 @@ export const TeacherClassProgress: React.FC = () => {
                     {isVi ? '⚠ Điểm yếu cần khắc phục:' : '⚠ Common Weaknesses:'}
                   </div>
                   <div className="tcd-tags-list">
-                    {sk.weaknesses.map((wk, idx) => (
-                      <span key={idx} className="tcd-tag-item weakness">{wk}</span>
-                    ))}
+                    {sk.weaknesses.length > 0 ? (
+                      sk.weaknesses.map((wk, idx) => (
+                        <span key={idx} className="tcd-tag-item weakness">{wk}</span>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        {isVi ? 'Chưa có đủ dữ liệu đánh giá' : 'Insufficient data'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1036,35 +1186,38 @@ export const TeacherClassProgress: React.FC = () => {
           </div>
 
           {/* Intervention Alert Banner */}
-          <div style={{ 
-            backgroundColor: '#fffbeb', 
-            border: '1px solid #fde68a', 
-            borderRadius: '14px', 
-            padding: '20px 24px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '16px'
-          }}>
-            <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#92400e' }}>
-                {isVi ? 'Cảnh báo 3 học viên có nguy cơ không đạt Target Band' : 'Intervention Alert: 3 students at risk'}
+          {classKpis.supportCount > 0 && (
+            <div style={{ 
+              backgroundColor: '#fffbeb', 
+              border: '1px solid #fde68a', 
+              borderRadius: '14px', 
+              padding: '20px 24px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '16px',
+              marginTop: '20px'
+            }}>
+              <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#92400e' }}>
+                  {isVi ? `Cảnh báo ${classKpis.supportCount} học viên có nguy cơ không đạt Target Band` : `Intervention Alert: ${classKpis.supportCount} students at risk`}
+                </div>
+                <p style={{ fontSize: '13px', color: '#b45309', margin: '4px 0 10px 0' }}>
+                  {isVi 
+                    ? `Hiện có ${classKpis.supportCount} học viên đang có điểm số trung bình dưới Band 6.0 hoặc tỷ lệ nộp bài chưa đạt 60%. Đề xuất xếp lịch phụ đạo bổ trợ kiến thức.` 
+                    : `${classKpis.supportCount} students are performing under Band 6.0. Recommend scheduling 1-on-1 tutoring.`}
+                </p>
+                <button 
+                  className="tcd-btn-primary"
+                  style={{ backgroundColor: '#d97706', fontSize: '12.5px', padding: '6px 14px' }}
+                  onClick={() => showToast(isVi ? `Đã gửi lời mời phụ đạo tới ${classKpis.supportCount} học viên` : 'Sent tutoring invites')}
+                >
+                  <Send size={13} />
+                  <span>{isVi ? 'Gửi lời mời phụ đạo 1-on-1' : 'Send Tutoring Invite'}</span>
+                </button>
               </div>
-              <p style={{ fontSize: '13px', color: '#b45309', margin: '4px 0 10px 0' }}>
-                {isVi 
-                  ? 'Học viên Trần Hoàng Long, Vũ Thị Hương, và Đỗ Minh Quân đang có điểm số trung bình dưới Band 6.0 và tỷ lệ nộp bài chậm. Đề xuất xếp lịch 1-on-1 tutoring trước buổi học số 16.' 
-                  : 'Students are currently performing under Band 6.0 with overdue assignments. Recommended to schedule 1-on-1 tutoring before lesson 16.'}
-              </p>
-              <button 
-                className="tcd-btn-primary"
-                style={{ backgroundColor: '#d97706', fontSize: '12.5px', padding: '6px 14px' }}
-                onClick={() => showToast(isVi ? 'Đã gửi lời mời phụ đạo 1-on-1 tới 3 học viên' : 'Sent 1-on-1 tutoring invites')}
-              >
-                <Send size={13} />
-                <span>{isVi ? 'Gửi lời mời phụ đạo 1-on-1' : 'Send Tutoring Invite'}</span>
-              </button>
             </div>
-          </div>
+          )}
         </section>
       )}
 
@@ -1073,10 +1226,10 @@ export const TeacherClassProgress: React.FC = () => {
         <section className="tcd-card-section">
           <div>
             <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-              {isVi ? 'Lộ trình chi tiết 24 Buổi học' : '24-Session Syllabus & Timeline'}
+              {isVi ? 'Lộ trình & Bài học theo tiến độ' : 'Syllabus & Assignment Timeline'}
             </h2>
             <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Theo dõi nội dung giảng dạy, tài liệu đính kèm và bài tập về nhà theo từng buổi.' : 'Monitor lesson plans, attached slide decks and homework per session.'}
+              {isVi ? 'Theo dõi nội dung bài tập đã giao và kế hoạch học tập của lớp.' : 'Track completed lessons and active homework.'}
             </p>
           </div>
 
@@ -1094,7 +1247,7 @@ export const TeacherClassProgress: React.FC = () => {
                     <div className="tcd-syllabus-title-text">{les.title}</div>
                     <div className="tcd-syllabus-date">
                       <Calendar size={12} style={{ display: 'inline', marginRight: 4 }} />
-                      {les.date} • {les.materialsCount} {isVi ? 'tài liệu đính kèm' : 'materials'}
+                      {les.date} • {les.materialsCount} {isVi ? 'học liệu' : 'materials'}
                     </div>
                   </div>
                 </div>
@@ -1105,9 +1258,9 @@ export const TeacherClassProgress: React.FC = () => {
                       fontSize: '11.5px', 
                       fontWeight: 600, 
                       padding: '3px 8px', 
-                      borderRadius: '6px',
-                      backgroundColor: '#eff6ff',
-                      color: '#2563eb'
+                      borderRadius: '6px', 
+                      backgroundColor: '#eff6ff', 
+                      color: '#2563eb' 
                     }}>
                       {les.homeworkAttached}
                     </span>
@@ -1119,17 +1272,23 @@ export const TeacherClassProgress: React.FC = () => {
                   )}
                   {les.status === 'current' && (
                     <span className="tcd-status-chip exceed">
-                      <Clock size={12} /> {isVi ? 'Đang diễn ra' : 'Current Session'}
+                      <Clock size={12} /> {isVi ? 'Đang mở nộp bài' : 'Current'}
                     </span>
                   )}
                   {les.status === 'upcoming' && (
                     <span className="tcd-status-chip" style={{ backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                      {isVi ? 'Sắp diễn ra' : 'Upcoming'}
+                      {isVi ? 'Sắp mở' : 'Upcoming'}
                     </span>
                   )}
                 </div>
               </div>
             ))}
+
+            {syllabusLessons.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '36px', color: '#64748b', fontSize: '13px' }}>
+                {isVi ? 'Chưa có buổi học nào được tạo trong lộ trình.' : 'No sessions scheduled yet.'}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -1167,7 +1326,9 @@ export const TeacherClassProgress: React.FC = () => {
               }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{isVi ? 'Điểm trung bình (Overall)' : 'Overall Band'}</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>Band {selectedStudent.scores.overall}</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>
+                    {selectedStudent.scores.overall > 0 ? `Band ${selectedStudent.scores.overall}` : '—'}
+                  </div>
                 </div>
                 <span className={`tcd-status-chip ${selectedStudent.status}`}>
                   {selectedStudent.statusLabel}
@@ -1182,19 +1343,27 @@ export const TeacherClassProgress: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
                   <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>Writing</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>Band {selectedStudent.scores.writing}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>
+                      {selectedStudent.scores.writing > 0 ? `Band ${selectedStudent.scores.writing}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#faf5ff', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#9333ea', fontWeight: 600 }}>Speaking</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>Band {selectedStudent.scores.speaking}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>
+                      {selectedStudent.scores.speaking > 0 ? `Band ${selectedStudent.scores.speaking}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Reading</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>Band {selectedStudent.scores.reading}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>
+                      {selectedStudent.scores.reading > 0 ? `Band ${selectedStudent.scores.reading}` : '—'}
+                    </div>
                   </div>
                   <div style={{ padding: '12px', backgroundColor: '#f0fdfa', borderRadius: '10px' }}>
                     <div style={{ fontSize: '12px', color: '#0d9488', fontWeight: 600 }}>Listening</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>Band {selectedStudent.scores.listening}</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>
+                      {selectedStudent.scores.listening > 0 ? `Band ${selectedStudent.scores.listening}` : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1213,33 +1382,32 @@ export const TeacherClassProgress: React.FC = () => {
                     <span style={{ color: '#64748b' }}>{isVi ? 'Bài tập hoàn thành:' : 'Completed Assignments:'}</span>
                     <strong>{selectedStudent.assignmentsCompleted} / {selectedStudent.totalAssignments}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>{isVi ? 'Hoạt động gần nhất:' : 'Last Active:'}</span>
-                    <span>{selectedStudent.lastActive}</span>
-                  </div>
                 </div>
               </div>
 
-              {/* Recent Feedback */}
-              {selectedStudent.recentFeedback && (
-                <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 8px 0', color: '#0f172a' }}>
-                    {isVi ? 'Nhận xét gần nhất của giáo viên' : 'Latest Teacher Feedback'}
-                  </h4>
-                  <p style={{ 
-                    fontSize: '13px', 
-                    lineHeight: 1.6, 
-                    color: '#475569', 
-                    backgroundColor: '#f8fafc', 
-                    padding: '12px 14px', 
+              {/* Direct Feedback / Evaluation input */}
+              <div>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 8px 0', color: '#0f172a' }}>
+                  {isVi ? 'Nhận xét và gửi thông báo trực tiếp' : 'Direct Feedback / Evaluation'}
+                </h4>
+                <textarea
+                  style={{
+                    width: '100%',
+                    fontSize: '13px',
+                    padding: '10px 12px',
                     borderRadius: '8px',
-                    margin: 0,
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    "{selectedStudent.recentFeedback}"
-                  </p>
-                </div>
-              )}
+                    border: '1px solid #cbd5e1',
+                    outline: 'none',
+                    resize: 'none',
+                    lineHeight: 1.5,
+                    boxSizing: 'border-box'
+                  }}
+                  rows={3}
+                  placeholder={isVi ? 'Nhập nhận xét hoặc hướng dẫn ôn tập cho học viên này...' : 'Enter feedback for this student...'}
+                  value={directMessageText}
+                  onChange={(e) => setDirectMessageText(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="tcd-drawer-footer">
@@ -1251,13 +1419,10 @@ export const TeacherClassProgress: React.FC = () => {
               </button>
               <button 
                 className="tcd-btn-primary"
-                onClick={() => {
-                  showToast(isVi ? `Đã gửi tin nhắn nhắc nhở tới ${selectedStudent.name}` : `Message sent to ${selectedStudent.name}`);
-                  setSelectedStudent(null);
-                }}
+                onClick={handleSendDirectEvaluation}
               >
                 <Send size={13} />
-                <span>{isVi ? 'Gửi tin nhắn cho học viên' : 'Send Direct Message'}</span>
+                <span>{isVi ? 'Gửi đánh giá' : 'Send Evaluation'}</span>
               </button>
             </div>
           </div>

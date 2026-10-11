@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.grading.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.english_hub.core.modules.grading.infrastructure.client.dto.AiAnnotationDto;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.AiSpeakingAnalysisRequest;
@@ -14,7 +15,14 @@ import com.english_hub.core.modules.grading.infrastructure.client.dto.WritingCri
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageConversionException;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
 class AiServiceClientTest {
 
@@ -221,6 +229,90 @@ class AiServiceClientTest {
 		assertThat(response.annotations().getFirst().errorType()).isEqualTo("GRAMMAR");
 		assertThat(response.modelUsed()).isEqualTo("google/gemini-2.5-flash");
 		assertThat(response.providerUsed()).isEqualTo("openrouter");
+	}
+
+	@Test
+	void deserializeMissingCriteriaOverallScoreAsNull() throws Exception {
+		String jsonResponse = """
+				{
+				  "submissionModuleId": 205,
+				  "overallScore": 7.0,
+				  "aiFeedback": "Feedback",
+				  "criteriaScores": {
+				    "taskResponse": 7.0,
+				    "coherenceAndCohesion": 7.0,
+				    "lexicalResource": 7.0,
+				    "grammaticalRangeAndAccuracy": 7.0
+				  }
+				}
+				""";
+
+		AiWritingAnalysisResponse response = objectMapper.readValue(jsonResponse, AiWritingAnalysisResponse.class);
+
+		assertThat(response.criteriaScores()).isNotNull();
+		assertThat(response.criteriaScores().overallScore()).isNull();
+	}
+
+	@Test
+	void retriesTimeoutThreeAttemptsWithOneAndTwoSecondBackoff() {
+		List<Long> backoffs = new ArrayList<>();
+		AtomicInteger attempts = new AtomicInteger();
+		ResourceAccessException timeout = new ResourceAccessException("read timed out");
+		AiServiceClientImpl client = client(backoffs);
+
+		assertThatThrownBy(() -> client.executeWithRetry("timeout-test", () -> {
+			attempts.incrementAndGet();
+			throw timeout;
+		})).isSameAs(timeout);
+
+		assertThat(attempts).hasValue(3);
+		assertThat(backoffs).containsExactly(1000L, 2000L);
+	}
+
+	@Test
+	void retriesServerErrorsAndReturnsSuccessfulResponse() {
+		List<Long> backoffs = new ArrayList<>();
+		AtomicInteger attempts = new AtomicInteger();
+		HttpServerErrorException serverError = new HttpServerErrorException(HttpStatus.BAD_GATEWAY);
+		AiServiceClientImpl client = client(backoffs);
+
+		String result = client.executeWithRetry("server-error-test", () -> {
+			if (attempts.incrementAndGet() < 3) {
+				throw serverError;
+			}
+			return "ok";
+		});
+
+		assertThat(result).isEqualTo("ok");
+		assertThat(attempts).hasValue(3);
+		assertThat(backoffs).containsExactly(1000L, 2000L);
+	}
+
+	@Test
+	void doesNotRetryClientErrorsOrResponseDeserializationErrors() {
+		List<Long> backoffs = new ArrayList<>();
+		AtomicInteger clientErrorAttempts = new AtomicInteger();
+		AtomicInteger conversionErrorAttempts = new AtomicInteger();
+		HttpClientErrorException clientError = new HttpClientErrorException(HttpStatus.UNPROCESSABLE_ENTITY);
+		HttpMessageConversionException conversionError = new HttpMessageConversionException("invalid response");
+		AiServiceClientImpl client = client(backoffs);
+
+		assertThatThrownBy(() -> client.executeWithRetry("client-error-test", () -> {
+			clientErrorAttempts.incrementAndGet();
+			throw clientError;
+		})).isSameAs(clientError);
+		assertThatThrownBy(() -> client.executeWithRetry("conversion-error-test", () -> {
+			conversionErrorAttempts.incrementAndGet();
+			throw conversionError;
+		})).isSameAs(conversionError);
+
+		assertThat(clientErrorAttempts).hasValue(1);
+		assertThat(conversionErrorAttempts).hasValue(1);
+		assertThat(backoffs).isEmpty();
+	}
+
+	private AiServiceClientImpl client(List<Long> backoffs) {
+		return new AiServiceClientImpl("http://localhost:8001", 1, 1, backoffs::add);
 	}
 }
 

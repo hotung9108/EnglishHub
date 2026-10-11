@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, ArrowRight, Check
+  ArrowLeft, ArrowRight, Check, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateFullName } from '../utils/nameValidation';
+import { userService } from '../api/services/user.service';
+import { classService } from '../api/services/class.service';
+import type { ClassSummary } from '../api/services/class.service';
 
 export const AddStudent: React.FC = () => {
   const navigate = useNavigate();
@@ -12,18 +15,41 @@ export const AddStudent: React.FC = () => {
   const isVi = language === 'vi';
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
-    name: 'Nguyễn Minh Quân',
-    code: 'HV-8805',
-    email: 'quan.nm@student.edu.vn',
-    phone: '0912 999 888',
-    parentPhone: '0988 333 222',
-    dob: '2005-09-12',
+    name: '',
+    code: '',
+    email: '',
+    phone: '',
+    password: '',
+    parentPhone: '',
+    dob: '',
     entryBand: '5.5 IELTS',
     targetBand: '7.0 IELTS',
-    assignedClass: 'ENG-IELTS-6.5A'
+    assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchClasses = async () => {
+      try {
+        const res = await classService.list({ page: 1, limit: 50 });
+        if (isMounted) {
+          setClasses(res.data);
+        }
+      } catch {
+        // fail gracefully
+      }
+    };
+    fetchClasses();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const steps = [
     { num: 1 as const, title: isVi ? 'Thông tin cá nhân' : 'Personal Info' },
@@ -31,7 +57,7 @@ export const AddStudent: React.FC = () => {
     { num: 3 as const, title: isVi ? 'Ghi danh lớp học' : 'Class Enrollment' },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -40,8 +66,40 @@ export const AddStudent: React.FC = () => {
       return;
     }
     setNameError('');
-    alert(isVi ? `Ghi danh học viên ${valResult.normalized} (${formData.code}) thành công!` : `Enrolled student ${valResult.normalized}!`);
-    navigate('/admin/students');
+
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+
+      const created = await userService.createUser({
+        role: 'STUDENT',
+        fullName: valResult.normalized,
+        email: formData.email.trim(),
+        password: formData.password || 'Student123!',
+        studentCode: formData.code || undefined,
+        dateOfBirth: formData.dob || undefined,
+        parentPhone: formData.parentPhone || undefined
+      });
+
+      if (formData.assignedClassId && created?.user?.id) {
+        try {
+          await classService.addMember(Number(formData.assignedClassId), created.user.id);
+        } catch {
+          // ignore enrollment failure if already added
+        }
+      }
+
+      navigate('/admin/students');
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể ghi danh học viên mới.' : 'Failed to register student.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    if (!name.trim()) return 'HV';
+    return name.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
   };
 
   return (
@@ -64,6 +122,23 @@ export const AddStudent: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {submitError && (
+        <div style={{
+          padding: '12px 16px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          color: '#b91c1c',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          <AlertCircle size={18} />
+          <span>{submitError}</span>
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="adm-stepper">
@@ -93,6 +168,7 @@ export const AddStudent: React.FC = () => {
                   <input 
                     type="text" 
                     className="input"
+                    placeholder="Nguyễn Văn A..."
                     value={formData.name}
                     onChange={(e) => {
                       setFormData({ ...formData, name: e.target.value });
@@ -122,13 +198,13 @@ export const AddStudent: React.FC = () => {
 
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mã định danh (HV Code)' : 'Student ID'} *</label>
+                    <label className="adm-form-label">{isVi ? 'Mã định danh (HV Code)' : 'Student ID'}</label>
                     <input 
                       type="text" 
                       className="input font-mono"
+                      placeholder={isVi ? 'Tự sinh nếu để trống' : 'Auto-generated'}
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      required
                     />
                   </div>
 
@@ -149,6 +225,7 @@ export const AddStudent: React.FC = () => {
                     <input 
                       type="email" 
                       className="input"
+                      placeholder="student@center.edu.vn"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
@@ -156,31 +233,46 @@ export const AddStudent: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'SĐT Học viên' : 'Student Phone'}</label>
+                    <label className="adm-form-label">{isVi ? 'Mật khẩu' : 'Password'}</label>
                     <input 
-                      type="text" 
+                      type="password" 
                       className="input"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder={isVi ? 'Mặc định: Student123!' : 'Default: Student123!'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     />
                   </div>
                 </div>
 
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Số điện thoại Phụ huynh' : 'Parent Phone'} *</label>
-                  <input 
-                    type="text" 
-                    className="input"
-                    value={formData.parentPhone}
-                    onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
-                    required
-                  />
+                <div className="adm-form-grid">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'SĐT Học viên' : 'Student Phone'}</label>
+                    <input 
+                      type="text" 
+                      className="input"
+                      placeholder="0912-345-678"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Số điện thoại Phụ huynh' : 'Parent Phone'}</label>
+                    <input 
+                      type="text" 
+                      className="input"
+                      placeholder="0988-776-655"
+                      value={formData.parentPhone}
+                      onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
                   <button 
                     type="button" 
                     className="btn btn-primary"
+                    disabled={!formData.name.trim() || !formData.email.trim()}
                     onClick={() => {
                       const res = validateFullName(formData.name, isVi);
                       if (!res.isValid) {
@@ -205,7 +297,7 @@ export const AddStudent: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Trình độ đầu vào' : 'Entry Level'} *</label>
+                    <label className="adm-form-label">{isVi ? 'Trình độ đầu vào' : 'Entry Level'}</label>
                     <select 
                       className="input"
                       value={formData.entryBand}
@@ -219,15 +311,15 @@ export const AddStudent: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mục tiêu chứng chỉ' : 'Target Band'} *</label>
+                    <label className="adm-form-label">{isVi ? 'Mục tiêu chứng chỉ' : 'Target Band'}</label>
                     <select 
                       className="input"
                       value={formData.targetBand}
                       onChange={(e) => setFormData({ ...formData, targetBand: e.target.value })}
                     >
-                      <option value="6.5 IELTS">6.5 IELTS (Target)</option>
-                      <option value="7.0 IELTS">7.0 IELTS (Target Master)</option>
-                      <option value="7.5 IELTS">7.5 IELTS (High Score)</option>
+                      <option value="6.5 IELTS">6.5 IELTS</option>
+                      <option value="7.0 IELTS">7.0 IELTS</option>
+                      <option value="7.5 IELTS">7.5 IELTS</option>
                       <option value="800+ TOEIC">800+ TOEIC</option>
                     </select>
                   </div>
@@ -258,16 +350,25 @@ export const AddStudent: React.FC = () => {
             {currentStep === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Đăng ký vào lớp học' : 'Select Cohort'} *</label>
-                  <select 
-                    className="input"
-                    value={formData.assignedClass}
-                    onChange={(e) => setFormData({ ...formData, assignedClass: e.target.value })}
-                  >
-                    <option value="ENG-IELTS-6.5A">ENG-IELTS-6.5A (Cô Trần Thị Mai Lan)</option>
-                    <option value="ENG-TOEIC-750">ENG-TOEIC-750 (Cô Nguyễn Thu Trang)</option>
-                    <option value="ENG-COMM-B2">ENG-COMM-B2 (Thầy Mark Reynolds)</option>
-                  </select>
+                  <label className="adm-form-label">{isVi ? 'Đăng ký vào lớp học' : 'Select Cohort'}</label>
+                  {classes.length === 0 ? (
+                    <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+                      {isVi ? 'Chưa có lớp học nào trên hệ thống.' : 'No classes available.'}
+                    </div>
+                  ) : (
+                    <select 
+                      className="input"
+                      value={formData.assignedClassId}
+                      onChange={(e) => setFormData({ ...formData, assignedClassId: e.target.value })}
+                    >
+                      <option value="">{isVi ? '-- Chưa ghi danh vào lớp cụ thể --' : '-- No class assigned --'}</option>
+                      {classes.map(c => (
+                        <option key={c.id} value={c.id}>
+                          ENG-{c.id}: {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
@@ -275,15 +376,17 @@ export const AddStudent: React.FC = () => {
                     type="button" 
                     className="btn btn-secondary"
                     onClick={() => setCurrentStep(2)}
+                    disabled={submitting}
                   >
                     {isVi ? 'Quay lại' : 'Back'}
                   </button>
                   <button 
                     type="submit" 
                     className="btn btn-primary"
+                    disabled={submitting || !formData.name.trim() || !formData.email.trim()}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <Check size={16} />
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                     <span>{t('addStudent.btnFinish')}</span>
                   </button>
                 </div>
@@ -301,26 +404,28 @@ export const AddStudent: React.FC = () => {
           <div className="card" style={{ padding: '24px', border: '2px solid var(--primary-fixed-dim, #bfdbfe)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
               <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#059669' }}>
-                {formData.name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase()}
+                {getInitials(formData.name)}
               </div>
               <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 2px 0' }}>{formData.name}</h3>
-                <span className="font-mono text-primary font-semibold" style={{ fontSize: '12.5px' }}>{formData.code}</span>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 2px 0' }}>
+                  {formData.name || (isVi ? 'Họ và tên học viên' : 'Student Full Name')}
+                </h3>
+                <span className="font-mono text-primary font-semibold" style={{ fontSize: '12.5px' }}>
+                  {formData.code || 'HV-NEW'}
+                </span>
               </div>
             </div>
 
             <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
-                <span>Đầu vào: <strong>{formData.entryBand}</strong></span>
+                <span>{isVi ? 'Đầu vào: ' : 'Entry: '}<strong>{formData.entryBand}</strong></span>
                 <span className="text-primary font-bold">{formData.targetBand}</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-              <div><strong>Email:</strong> {formData.email}</div>
-              <div><strong>SĐT Học viên:</strong> {formData.phone}</div>
-              <div><strong>SĐT Phụ huynh:</strong> {formData.parentPhone}</div>
-              <div><strong>Lớp đăng ký:</strong> <span className="font-mono text-primary">{formData.assignedClass}</span></div>
+              <div><strong>Email:</strong> {formData.email || '—'}</div>
+              <div><strong>{isVi ? 'SĐT Học viên:' : 'Phone:'}</strong> {formData.phone || '—'}</div>
             </div>
           </div>
         </div>

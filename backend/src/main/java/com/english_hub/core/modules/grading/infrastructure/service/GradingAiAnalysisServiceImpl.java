@@ -2,11 +2,12 @@ package com.english_hub.core.modules.grading.infrastructure.service;
 
 import com.english_hub.core.infrastructure.persistence.entity.Answer;
 import com.english_hub.core.modules.grading.application.service.GradingAiAnalysisService;
+import com.english_hub.core.modules.grading.application.port.AiAnalysisInFlightRegistry;
+import com.english_hub.core.modules.grading.application.service.GradingAiResultPersistenceService;
 import com.english_hub.core.modules.grading.domain.model.AnswerAnnotation;
 import com.english_hub.core.modules.grading.domain.model.Grading;
 import com.english_hub.core.modules.grading.domain.model.GradingContext;
 import com.english_hub.core.modules.grading.domain.model.GradingStatus;
-import com.english_hub.core.modules.grading.domain.repository.AnswerAnnotationRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingContextRepository;
 import com.english_hub.core.modules.grading.domain.repository.GradingRepository;
 import com.english_hub.core.modules.grading.infrastructure.client.AiServiceClient;
@@ -21,8 +22,7 @@ import com.english_hub.core.modules.submission.infrastructure.persistence.reposi
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -43,7 +43,8 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 	private final GradingRepository gradingRepository;
 	private final GradingContextRepository gradingContextRepository;
 	private final SpringDataAnswerRepository answerRepository;
-	private final AnswerAnnotationRepository answerAnnotationRepository;
+	private final GradingAiResultPersistenceService gradingAiResultPersistenceService;
+	private final AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry;
 	private final StorageService storageService;
 	private final AiServiceClient aiServiceClient;
 	private final String configuredModel;
@@ -54,7 +55,8 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			GradingRepository gradingRepository,
 			GradingContextRepository gradingContextRepository,
 			SpringDataAnswerRepository answerRepository,
-			AnswerAnnotationRepository answerAnnotationRepository,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry,
 			StorageService storageService,
 			AiServiceClient aiServiceClient,
 			@Value("${app.ai-service.model:}") String configuredModel,
@@ -62,7 +64,8 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 		this.gradingRepository = gradingRepository;
 		this.gradingContextRepository = gradingContextRepository;
 		this.answerRepository = answerRepository;
-		this.answerAnnotationRepository = answerAnnotationRepository;
+		this.gradingAiResultPersistenceService = gradingAiResultPersistenceService;
+		this.aiAnalysisInFlightRegistry = aiAnalysisInFlightRegistry;
 		this.storageService = storageService;
 		this.aiServiceClient = aiServiceClient;
 		this.configuredModel = configuredModel;
@@ -73,24 +76,33 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			GradingRepository gradingRepository,
 			GradingContextRepository gradingContextRepository,
 			SpringDataAnswerRepository answerRepository,
-			AnswerAnnotationRepository answerAnnotationRepository,
+			GradingAiResultPersistenceService gradingAiResultPersistenceService,
+			AiAnalysisInFlightRegistry aiAnalysisInFlightRegistry,
 			StorageService storageService,
 			AiServiceClient aiServiceClient) {
-		this(gradingRepository, gradingContextRepository, answerRepository, answerAnnotationRepository, storageService, aiServiceClient, null, null);
+		this(
+				gradingRepository,
+				gradingContextRepository,
+				answerRepository,
+				gradingAiResultPersistenceService,
+				aiAnalysisInFlightRegistry,
+				storageService,
+				aiServiceClient,
+				null,
+				null);
 	}
 
 	@Override
 	@Async("gradingAiExecutor")
 	public void analyzeSubmittedModule(long submissionModuleId) {
 		LOGGER.info("AI analysis started for submission module {}", submissionModuleId);
-		Optional<Grading> gradingOpt = gradingRepository.findBySubmissionModuleId(submissionModuleId);
-		if (gradingOpt.isEmpty()) {
-			LOGGER.warn("Grading record not found for submission module {}", submissionModuleId);
-			return;
-		}
-		Grading grading = gradingOpt.get();
-
 		try {
+			Optional<Grading> gradingOpt = gradingRepository.findBySubmissionModuleId(submissionModuleId);
+			if (gradingOpt.isEmpty()) {
+				LOGGER.warn("Grading record not found for submission module {}", submissionModuleId);
+				return;
+			}
+			Grading grading = gradingOpt.get();
 			Optional<GradingContext> contextOpt = gradingContextRepository.findBySubmissionModuleId(submissionModuleId);
 			if (contextOpt.isEmpty()) {
 				throw new IllegalStateException("GradingContext not found for submission module " + submissionModuleId);
@@ -105,9 +117,18 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 				LOGGER.info("Skill {} AI analysis not supported yet; keeping status as PENDING.", context.moduleSkill());
 			}
 		} catch (Exception e) {
-			LOGGER.error("AI analysis failed for submission module {}. Falling back to FAILED status (PP 6.5.2): {}",
-					submissionModuleId, e.getMessage(), e);
-			gradingRepository.updateStatus(grading.id(), GradingStatus.FAILED);
+			LOGGER.error("AI analysis failed for submission module {}. Marking pending grading as failed: {}",
+					submissionModuleId, e.getClass().getSimpleName());
+			try {
+				gradingAiResultPersistenceService.markFailedIfStillPending(submissionModuleId);
+			} catch (RuntimeException failure) {
+				LOGGER.error(
+						"Could not mark AI analysis as failed for submission module {}: {}",
+						submissionModuleId,
+						failure.getClass().getSimpleName());
+			}
+		} finally {
+			aiAnalysisInFlightRegistry.release(submissionModuleId);
 		}
 	}
 
@@ -162,35 +183,31 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			throw new IllegalStateException("Received null response from AI Service");
 		}
 
-		LOGGER.info("AI Speaking Analysis completed for submissionModuleId {} (score: {}, modelUsed: {}, providerUsed: {})",
-				submissionModuleId, response.overallScore(), response.modelUsed(), response.providerUsed());
+		double suggestedScore = suggestedScore(
+				response.criteriaScores() == null ? null : response.criteriaScores().overallScore(),
+				response.overallScore(),
+				submissionModuleId,
+				"speaking");
+		LOGGER.info("AI Speaking Analysis completed for submissionModuleId {} (suggested score: {}, modelUsed: {}, providerUsed: {})",
+				submissionModuleId, suggestedScore, response.modelUsed(), response.providerUsed());
 
-		BigDecimal finalScore = BigDecimal.valueOf(response.overallScore());
+		BigDecimal aiSuggestedScore = BigDecimal.valueOf(suggestedScore);
 		String aiFeedback = response.aiFeedback();
-		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
 		ObjectNode aiAnalysisDetails = formatSpeakingAnalysisDetails(response);
 
-		Grading updatedGrading = grading.withAiGrade(finalScore, aiFeedback, aiAnalysisDetails, now);
-		gradingRepository.saveAiGrade(updatedGrading);
-
-		if (response.annotations() != null && !response.annotations().isEmpty()) {
-			for (AiAnnotationDto ann : response.annotations()) {
-				AnswerAnnotation annotation = AnswerAnnotation.ai(
-						answer.getId(),
-						ann.startOffset(),
-						ann.endOffset(),
-						null,
-						ann.errorType(),
-						ann.comment(),
-						ann.suggestedFix()
-				);
-				answerAnnotationRepository.save(annotation);
-			}
+		Grading updatedGrading = grading.withAiSuggestion(aiSuggestedScore, aiFeedback, aiAnalysisDetails);
+		List<AnswerAnnotation> annotations = validAnnotations(
+				submissionModuleId,
+				answer.getId(),
+				response.annotations(),
+				transcriptCodePointLength(response.aiTranscript()));
+		if (!gradingAiResultPersistenceService.persistAiResult(updatedGrading, annotations)) {
+			return;
 		}
 
-		LOGGER.info("AI speaking analysis completed successfully for submission module {} with score {}",
-				submissionModuleId, finalScore);
+		LOGGER.info("AI speaking analysis completed successfully for submission module {} with suggested score {}",
+				submissionModuleId, aiSuggestedScore);
 	}
 
 	private void handleWritingAnalysis(Grading grading, long submissionModuleId, String moduleInstructions) {
@@ -207,8 +224,9 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 		String targetProvider = (configuredProvider != null && !configuredProvider.isBlank()) ? configuredProvider.trim() : null;
 
 		AiWritingAnalysisResponse response;
+		boolean textSubmission = content != null && !content.trim().isBlank();
 
-		if (content != null && !content.trim().isBlank()) {
+		if (textSubmission) {
 			AiWritingAnalysisRequest request = new AiWritingAnalysisRequest(
 					submissionModuleId,
 					content,
@@ -251,35 +269,32 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			throw new IllegalStateException("Received null response from AI Service for writing analysis");
 		}
 
-		LOGGER.info("AI Writing Analysis completed for submissionModuleId {} (score: {}, modelUsed: {}, providerUsed: {})",
-				submissionModuleId, response.overallScore(), response.modelUsed(), response.providerUsed());
+		double suggestedScore = suggestedScore(
+				response.criteriaScores() == null ? null : response.criteriaScores().overallScore(),
+				response.overallScore(),
+				submissionModuleId,
+				"writing");
+		LOGGER.info("AI Writing Analysis completed for submissionModuleId {} (suggested score: {}, modelUsed: {}, providerUsed: {})",
+				submissionModuleId, suggestedScore, response.modelUsed(), response.providerUsed());
 
-		BigDecimal finalScore = BigDecimal.valueOf(response.overallScore());
+		BigDecimal aiSuggestedScore = BigDecimal.valueOf(suggestedScore);
 		String aiFeedback = response.aiFeedback();
-		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
 		Object aiAnalysisDetails = formatWritingAnalysisDetails(response);
 
-		Grading updatedGrading = grading.withAiGrade(finalScore, aiFeedback, aiAnalysisDetails, now);
-		gradingRepository.saveAiGrade(updatedGrading);
-
-		if (response.annotations() != null && !response.annotations().isEmpty()) {
-			for (AiAnnotationDto ann : response.annotations()) {
-				AnswerAnnotation annotation = AnswerAnnotation.ai(
-						answer.getId(),
-						ann.startOffset(),
-						ann.endOffset(),
-						null,
-						ann.errorType(),
-						ann.comment(),
-						ann.suggestedFix()
-				);
-				answerAnnotationRepository.save(annotation);
-			}
+		Grading updatedGrading = grading.withAiSuggestion(aiSuggestedScore, aiFeedback, aiAnalysisDetails);
+		Integer contentLength = textSubmission ? content.codePointCount(0, content.length()) : null;
+		List<AnswerAnnotation> annotations = validAnnotations(
+				submissionModuleId,
+				answer.getId(),
+				response.annotations(),
+				contentLength);
+		if (!gradingAiResultPersistenceService.persistAiResult(updatedGrading, annotations)) {
+			return;
 		}
 
-		LOGGER.info("AI writing analysis completed successfully for submission module {} with score {}",
-				submissionModuleId, finalScore);
+		LOGGER.info("AI writing analysis completed successfully for submission module {} with suggested score {}",
+				submissionModuleId, aiSuggestedScore);
 	}
 
 	private ObjectNode formatWritingAnalysisDetails(AiWritingAnalysisResponse response) {
@@ -315,7 +330,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			try {
 				root.set("transcript", OBJECT_MAPPER.readTree(response.aiTranscript().toString()));
 			} catch (Exception e) {
-				LOGGER.warn("Failed to parse aiTranscript into json tree: {}", e.getMessage());
+				LOGGER.warn("Failed to parse AI transcript JSON: {}", e.getClass().getSimpleName());
 			}
 		}
 		if (response.criteriaScores() != null) {
@@ -340,5 +355,78 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			root.put("providerUsed", response.providerUsed());
 		}
 		return root;
+	}
+
+	private double suggestedScore(Double criteriaScore, Double topLevelScore, long submissionModuleId, String pipeline) {
+		if (criteriaScore == null || !Double.isFinite(criteriaScore)) {
+			throw new IllegalStateException("AI response is missing a valid criteriaScores.overallScore.");
+		}
+		if (topLevelScore != null
+				&& Double.isFinite(topLevelScore)
+				&& BigDecimal.valueOf(criteriaScore).compareTo(BigDecimal.valueOf(topLevelScore)) != 0) {
+			LOGGER.warn(
+					"AI {} score fields differ for submissionModuleId {}: criteriaScores.overallScore={}, overallScore={}",
+					pipeline,
+					submissionModuleId,
+					criteriaScore,
+					topLevelScore);
+		}
+		return criteriaScore;
+	}
+
+	private List<AnswerAnnotation> validAnnotations(
+			long submissionModuleId,
+			long answerId,
+			List<AiAnnotationDto> source,
+			Integer contentLength) {
+		if (source == null || source.isEmpty()) {
+			return List.of();
+		}
+		List<AnswerAnnotation> valid = new ArrayList<>();
+		for (AiAnnotationDto annotation : source) {
+			try {
+				valid.add(AnswerAnnotation.ai(
+						answerId,
+						annotation.startOffset(),
+						annotation.endOffset(),
+						contentLength,
+						annotation.errorType(),
+						annotation.comment(),
+						annotation.suggestedFix()));
+			} catch (IllegalArgumentException exception) {
+				LOGGER.warn(
+						"Skipping invalid AI annotation for submissionModuleId {} with range {}-{}",
+						submissionModuleId,
+						annotation.startOffset(),
+						annotation.endOffset());
+			}
+		}
+		return List.copyOf(valid);
+	}
+
+	private int transcriptCodePointLength(Object transcript) {
+		if (transcript == null) {
+			return 0;
+		}
+		try {
+			com.fasterxml.jackson.databind.JsonNode words = OBJECT_MAPPER.readTree(transcript.toString());
+			if (!words.isArray()) {
+				return 0;
+			}
+			StringBuilder transcriptText = new StringBuilder();
+			for (com.fasterxml.jackson.databind.JsonNode entry : words) {
+				com.fasterxml.jackson.databind.JsonNode word = entry.get("word");
+				if (word == null || word.isNull() || word.asText().isEmpty()) {
+					continue;
+				}
+				if (!transcriptText.isEmpty()) {
+					transcriptText.append(' ');
+				}
+				transcriptText.append(word.asText());
+			}
+			return transcriptText.codePointCount(0, transcriptText.length());
+		} catch (Exception exception) {
+			return 0;
+		}
 	}
 }

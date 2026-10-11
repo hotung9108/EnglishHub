@@ -14,7 +14,10 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository("gradingApiJpaAdapter")
 public class GradingJpaAdapter implements GradingRepository {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(GradingJpaAdapter.class);
 
 	private final com.english_hub.core.infrastructure.persistence.repository.GradingRepository jpaRepository;
 	private final GradingPersistenceMapper mapper;
@@ -49,7 +54,7 @@ public class GradingJpaAdapter implements GradingRepository {
 	}
 
 	@Override
-	@Transactional(readOnly = true)
+	@Transactional
 	public Optional<Grading> findBySubmissionModuleIdForUpdate(Long submissionModuleId) {
 		return jpaRepository.findBySubmissionModuleIdForUpdate(submissionModuleId).map(mapper::toDomain);
 	}
@@ -89,14 +94,23 @@ public class GradingJpaAdapter implements GradingRepository {
 	@Override
 	@Transactional
 	public Grading saveAiGrade(Grading source) {
-		com.english_hub.core.infrastructure.persistence.entity.Grading target =
-				jpaRepository.findById(source.id()).orElseThrow();
+		com.english_hub.core.infrastructure.persistence.entity.Grading target = jpaRepository
+				.findBySubmissionModuleIdForUpdate(source.submissionModuleId())
+				.orElseThrow();
+		if (target.getStatus() == com.english_hub.core.infrastructure.persistence.entity.GradingStatus.COMPLETED) {
+			LOGGER.warn(
+					"Ignoring AI grade for completed grading: submissionModuleId={}, gradingId={}, status={}",
+					target.getSubmissionModuleId(),
+					target.getId(),
+					target.getStatus());
+			return mapper.toDomain(target);
+		}
+		if (!Objects.equals(target.getId(), source.id())) {
+			throw new IllegalStateException("AI result grading does not match the locked grading row.");
+		}
 		target.setMethod(com.english_hub.core.infrastructure.persistence.entity.GradingMethod.AUTO);
 		target.setStatus(com.english_hub.core.infrastructure.persistence.entity.GradingStatus.AI_GRADED);
 		target.setAiFeedback(source.aiFeedback());
-		target.setFinalScore(source.finalScore());
-		target.setFinalFeedback(source.finalFeedback());
-		target.setGradedAt(source.gradedAt());
 		if (source.aiTranscript() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode) {
 			target.setAiTranscript(jsonNode);
 		} else if (source.aiTranscript() != null) {

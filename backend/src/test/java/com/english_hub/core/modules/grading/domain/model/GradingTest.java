@@ -32,6 +32,18 @@ class GradingTest {
 		assertThat(zero.status()).isEqualTo(GradingStatus.COMPLETED);
 	}
 
+	@Test
+	void aiSuggestionDoesNotSetFinalGradeFields() {
+		Grading suggestion = grading().withAiSuggestion(
+				new BigDecimal("7.00"), "AI feedback", "{\"criteriaScores\":{\"overallScore\":7.0}}");
+
+		assertThat(suggestion.finalScore()).isNull();
+		assertThat(suggestion.finalFeedback()).isNull();
+		assertThat(suggestion.aiFeedback()).isEqualTo("AI feedback");
+		assertThat(suggestion.aiTranscript().toString()).contains("\"overallScore\":7.0");
+		assertThat(suggestion.status()).isEqualTo(GradingStatus.AI_GRADED);
+	}
+
 	private Grading grading() {
 		return new Grading(
 				1L,

@@ -1,0 +1,18 @@
+id: BE-TASK-24
+title: "Harden Unified AI Grading API (BE-24, UC25)"
+assignee: "@be-primary"
+status: "Done"
+priority: "High"
+description: >-
+  Address the seven BE-24 grading issues: prevent AI from overwriting teacher
+  grades; persist grade and annotations atomically; prevent duplicate triggers
+  and schedule after commit; retry only transient AI-service failures; validate
+  text/transcript annotation offsets by code point; and cover race, atomicity,
+  retry, and timeout behavior. AI may return a suggested score for teacher
+  reference, persisted with AI analysis details and exposed as suggestedScore;
+  only the teacher's grading flow writes gradings.final_score and
+  gradings.final_feedback. AI feedback, annotations, transcript, and suggestion
+  remain separate from the teacher's final grade. Verification: ./gradlew test
+  succeeded (712 tests, 0 failures, 0 errors, 0 skipped). PUT lock timeout maps
+  to HTTP 400 with message: "Không thể khóa bản chấm để cập nhật. Vui lòng thử
+  lại." Include this exact message in the PR description.
