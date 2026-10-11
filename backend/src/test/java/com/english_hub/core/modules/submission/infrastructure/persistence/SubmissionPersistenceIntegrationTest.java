@@ -229,8 +229,8 @@ class SubmissionPersistenceIntegrationTest {
 				submissionModuleRepository.bulkCreate(submissionId, List.of(seed.module1Id(), seed.module2Id()));
 
 		List<GradingDraft> drafts = List.of(
-				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO),
-				new GradingDraft(modules.get(1).getId(), GradingMethod.TEACHER_MANUAL));
+				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO, BigDecimal.TEN),
+				new GradingDraft(modules.get(1).getId(), GradingMethod.TEACHER_MANUAL, BigDecimal.TEN));
 
 		List<Grading> gradings = gradingRepository.bulkCreate(drafts);
 
@@ -246,6 +246,9 @@ class SubmissionPersistenceIntegrationTest {
 		Grading first = gradingRepository.findBySubmissionModuleId(modules.get(0).getId()).get(0);
 		assertThat(first.getMethod()).isEqualTo(GradingMethod.AUTO);
 		assertThat(first.getStatus()).isEqualTo(GradingStatus.PENDING);
+		assertThat(first.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
+		Grading second = gradingRepository.findBySubmissionModuleId(modules.get(1).getId()).get(0);
+		assertThat(second.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
 	}
 
 	@Test
@@ -255,7 +258,7 @@ class SubmissionPersistenceIntegrationTest {
 		List<SubmissionModule> modules =
 				submissionModuleRepository.bulkCreate(submissionId, List.of(seed.module1Id(), seed.module2Id()));
 		List<GradingDraft> drafts = modules.stream()
-				.map(m -> new GradingDraft(m.getId(), GradingMethod.AUTO))
+				.map(m -> new GradingDraft(m.getId(), GradingMethod.AUTO, BigDecimal.TEN))
 				.toList();
 		gradingRepository.bulkCreate(drafts);
 

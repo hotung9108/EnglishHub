@@ -156,8 +156,8 @@ class SubmissionServiceTest {
 		when(submissionRepository.create(5L, 41L, 1)).thenReturn(submission);
 
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
-				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1),
-				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2)));
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1, BigDecimal.TEN),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2, BigDecimal.TEN)));
 
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -187,6 +187,8 @@ class SubmissionServiceTest {
 		assertThat(drafts).extracting(GradingDraft::submissionModuleId).containsExactly(100L, 101L);
 		assertThat(drafts).extracting(GradingDraft::method)
 				.containsExactly(GradingMethod.AUTO, GradingMethod.TEACHER_MANUAL);
+		assertThat(drafts).extracting(GradingDraft::maxScoreSnapshot)
+				.containsExactly(BigDecimal.TEN, BigDecimal.TEN);
 	}
 
 	@Test
@@ -200,7 +202,7 @@ class SubmissionServiceTest {
 		submission.setId(11L);
 		when(submissionRepository.create(5L, 41L, 2)).thenReturn(submission);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
-				.thenReturn(List.of(new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1)));
+				.thenReturn(List.of(new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1, BigDecimal.TEN)));
 		SubmissionModule firstModule = module(9L);
 		firstModule.setId(102L);
 		when(submissionModuleRepository.bulkCreate(11L, List.of(9L)))
@@ -210,6 +212,40 @@ class SubmissionServiceTest {
 
 		assertThat(result.attemptNumber()).isEqualTo(2);
 		verify(submissionRepository).create(5L, 41L, 2);
+	}
+
+	@Test
+	void startAttemptLeavesSnapshotNullForNullOrNonPositiveModuleMaxScore() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
+		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(0L);
+
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(12L);
+		when(submissionRepository.create(5L, 41L, 1)).thenReturn(submission);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1, null),
+				new ModuleInfo(10L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 2, BigDecimal.ZERO),
+				new ModuleInfo(11L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 3, new BigDecimal("-1.00"))));
+
+		SubmissionModule first = module(9L);
+		first.setId(120L);
+		SubmissionModule second = module(10L);
+		second.setId(121L);
+		SubmissionModule third = module(11L);
+		third.setId(122L);
+		when(submissionModuleRepository.bulkCreate(12L, List.of(9L, 10L, 11L)))
+				.thenReturn(List.of(first, second, third));
+
+		SubmissionStartResult result = submissionService.startAttempt(5L);
+
+		assertThat(result.modules()).hasSize(3);
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<GradingDraft>> draftsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingRepository).bulkCreate(draftsCaptor.capture());
+		assertThat(draftsCaptor.getValue()).extracting(GradingDraft::maxScoreSnapshot)
+				.containsExactly(null, null, null);
 	}
 
 	@Test
@@ -342,8 +378,8 @@ class SubmissionServiceTest {
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L)))
 				.thenReturn(List.of(essayModule, quizModule));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
-				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 2),
-				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1)));
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 2, BigDecimal.TEN),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1, BigDecimal.TEN)));
 		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.PENDING);
 		quizGrading.setId(77L);
 		when(gradingRepository.findBySubmissionModuleIds(List.of(151L, 150L)))
@@ -447,8 +483,8 @@ class SubmissionServiceTest {
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L)))
 				.thenReturn(List.of(quizModule, essayModule));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
-				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1),
-				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2)));
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1, BigDecimal.TEN),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2, BigDecimal.TEN)));
 		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.COMPLETED);
 		quizGrading.setFinalScore(BigDecimal.valueOf(8));
 		quizGrading.setMaxScoreSnapshot(BigDecimal.TEN);
@@ -1667,7 +1703,7 @@ class SubmissionServiceTest {
 	}
 
 	private ModuleInfo moduleInfo(Long moduleId, ModuleSkill skill, ModuleTaskType taskType) {
-		return new ModuleInfo(moduleId, 5L, skill, taskType, 1);
+		return new ModuleInfo(moduleId, 5L, skill, taskType, 1, BigDecimal.TEN);
 	}
 
 	private AnswerPayload multipleChoice(Long questionId, int optionId) {

@@ -78,7 +78,11 @@ public class GradingJpaAdapter implements GradingRepository {
 		com.english_hub.core.infrastructure.persistence.entity.Grading target =
 				jpaRepository.findById(source.id()).orElseThrow();
 		target.updateTeacherGrade(
-				source.finalScore(), source.finalFeedback(), source.reviewedBy(), source.reviewedAt());
+				source.finalScore(),
+				source.finalFeedback(),
+				source.reviewedBy(),
+				source.reviewedAt(),
+				source.maxScoreSnapshot());
 		return mapper.toDomain(jpaRepository.save(target));
 	}
 

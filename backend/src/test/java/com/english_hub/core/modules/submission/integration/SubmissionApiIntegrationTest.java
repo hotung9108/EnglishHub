@@ -232,6 +232,8 @@ class SubmissionApiIntegrationTest {
 		assertThat(gradings).hasSize(2);
 		assertThat(gradings).extracting(Grading::getMethod)
 				.containsExactlyInAnyOrder(GradingMethod.AUTO, GradingMethod.TEACHER_MANUAL);
+		assertThat(gradings).extracting(Grading::getMaxScoreSnapshot)
+				.allSatisfy(snapshot -> assertThat(snapshot).isEqualByComparingTo(BigDecimal.TEN));
 	}
 
 	@Test
@@ -1163,10 +1165,18 @@ class SubmissionApiIntegrationTest {
 	}
 
 	private void assertAttemptNumber(int expected) throws Exception {
-		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
+		String response = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", publishedAssignmentId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.attemptNumber").value(expected));
+				.andExpect(jsonPath("$.attemptNumber").value(expected))
+				.andReturn().getResponse().getContentAsString();
+		long submissionId = jsonLong(response, "id");
+		List<SubmissionModule> modules = submissionModuleRepository.findBySubmissionId(submissionId);
+		List<Grading> gradings = gradingRepository.findBySubmissionModuleIds(
+				modules.stream().map(SubmissionModule::getId).toList());
+		assertThat(gradings).hasSize(2);
+		assertThat(gradings).extracting(Grading::getMaxScoreSnapshot)
+				.allSatisfy(snapshot -> assertThat(snapshot).isEqualByComparingTo(BigDecimal.TEN));
 	}
 
 	private long assignment(long classId, AssignmentStatus status, OffsetDateTime openAt, OffsetDateTime closeAt,

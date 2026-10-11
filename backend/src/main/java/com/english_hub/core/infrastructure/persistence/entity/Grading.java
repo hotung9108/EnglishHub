@@ -117,7 +117,13 @@ public class Grading {
 			BigDecimal finalScore,
 			String finalFeedback,
 			Long reviewedBy,
-			OffsetDateTime reviewedAt) {
+			OffsetDateTime reviewedAt,
+			BigDecimal maxScoreSnapshot) {
+		if (this.maxScoreSnapshot == null
+				&& maxScoreSnapshot != null
+				&& maxScoreSnapshot.compareTo(BigDecimal.ZERO) > 0) {
+			this.maxScoreSnapshot = maxScoreSnapshot;
+		}
 		this.method = GradingMethod.TEACHER_MANUAL;
 		this.status = GradingStatus.COMPLETED;
 		this.finalScore = finalScore;
