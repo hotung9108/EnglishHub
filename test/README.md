@@ -4,6 +4,8 @@
 Centralized test suite covering black-box, white-box, API, E2E, Selenium UI, and performance. Supports TEST_ENV=dev|staging.
 
 ## Quick start
+
+Selenium UI framework dùng chung: [selenium/README.md](selenium/README.md). Cài dependency trong `test/selenium/`, điền `.env`, rồi chạy `npm.cmd run test:login` tại đó hoặc mở `scripts/run-selenium-login.bat`. Test theo luồng ở `selenium/tests/`, Page Object ở `selenium/pages/`.
 - npm run test:env:check
 - TEST_ENV=dev npm run selenium:dev (or scripts/run-selenium-dev.bat)
 - TEST_ENV=staging npm run selenium:staging

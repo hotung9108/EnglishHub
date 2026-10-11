@@ -1,3 +1,6 @@
 @echo off
-set TEST_ENV=staging
-node selenium\suites\staging\run-staging.js
+setlocal
+cd /d "%~dp0..\selenium"
+set "TEST_ENV=staging"
+call npm.cmd test
+exit /b %ERRORLEVEL%
