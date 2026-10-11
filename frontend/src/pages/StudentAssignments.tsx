@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { 
   PenTool, 
@@ -106,13 +106,32 @@ const StudentAssignments: React.FC = () => {
                   }
                 }
 
-                // Determine skill type from title or modules
-                const lowerTitle = a.title.toLowerCase();
+                // Fetch assignment details to determine exact skill module
+                let detail: AssignmentDetail | null = null;
+                try {
+                  detail = await assignmentService.getAssignment(a.id);
+                } catch {
+                  // Fallback to title
+                }
+
+                // Determine skill type from module or title fallback
                 let skillType = 'General Task';
-                if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
-                else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
-                else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
-                else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+                const modSkill = detail?.modules?.[0]?.skill?.toUpperCase();
+                if (modSkill === 'SPEAKING') {
+                  skillType = 'Speaking';
+                } else if (modSkill === 'WRITING') {
+                  skillType = 'Writing';
+                } else if (modSkill === 'READING') {
+                  skillType = 'Reading';
+                } else if (modSkill === 'LISTENING') {
+                  skillType = 'Listening';
+                } else {
+                  const lowerTitle = a.title.toLowerCase();
+                  if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
+                  else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
+                  else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
+                  else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+                }
 
                 // Calculate days left
                 let daysLeft = 3;
@@ -174,7 +193,10 @@ const StudentAssignments: React.FC = () => {
     if (typeLower.includes('listening')) {
       return `/student/assignments/listening/${assignment.id}`;
     }
-    return `/student/assignments/${assignment.id}`;
+    if (typeLower.includes('writing')) {
+      return `/student/assignments/${assignment.id}`;
+    }
+    return `/student/assignments/${assignment.id}/overview`;
   };
 
   // Filtered by class & search query & status filter

@@ -7,11 +7,19 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentDetail, type AssignmentStatus } from '../api/services/assignment.service';
+import { assignmentService, type AssignmentDetail, type AssignmentStatus, type AssignmentSkill as ApiSkill } from '../api/services/assignment.service';
 import { moduleService, type ModuleSummary } from '../api/services/module.service';
 import { submissionService } from '../api/services/submission.service';
+import { 
+  questionService, 
+  buildMcqPayload, 
+  buildShortAnswerPayload, 
+  extractMcqOptions, 
+  extractShortAnswerText,
+  type QuestionResponse 
+} from '../api/services/question.service';
 import type { 
-  AssignmentEditorData, AssignmentSkill 
+  AssignmentEditorData, AssignmentSkill, ReadingQuestionItem, ListeningQuestionItem 
 } from '../types/assignment-editor.types';
 import { 
   SkillWritingEditor, 
@@ -118,6 +126,8 @@ export const TeacherEditAssignment: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
+  const [currentDbStatus, setCurrentDbStatus] = useState<AssignmentStatus>('DRAFT');
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -133,6 +143,9 @@ export const TeacherEditAssignment: React.FC = () => {
 
       // 1. Fetch assignment details
       const detail: AssignmentDetail = await assignmentService.getAssignment(assignmentIdNum);
+      if (isMounted) {
+        setCurrentDbStatus(detail.status);
+      }
       
       // 2. Fetch classes
       const classRes = await classService.list({ limit: 100 });
@@ -171,13 +184,27 @@ export const TeacherEditAssignment: React.FC = () => {
       let modules: ModuleSummary[] = [];
       try {
         const modRes = await moduleService.listModules(assignmentIdNum);
-        modules = modRes.modules || [];
+        modules = modRes.modules || modRes.data || [];
       } catch {
         modules = [];
       }
 
+      if (modules.length === 0 && detail.modules && detail.modules.length > 0) {
+        modules = detail.modules.map(m => ({
+          id: m.id,
+          skill: m.skill,
+          taskType: 'QUIZ',
+          orderIndex: 1,
+          maxScore: 10,
+          hasAudio: false,
+        }));
+      }
+
       let detectedSkill: AssignmentSkill = 'writing';
       let instructionsText = '';
+
+      let loadedReadingQuestions: ReadingQuestionItem[] | null = null;
+      let loadedListeningQuestions: ListeningQuestionItem[] | null = null;
 
       if (modules.length > 0) {
         const firstMod = modules[0];
@@ -193,6 +220,50 @@ export const TeacherEditAssignment: React.FC = () => {
           instructionsText = modDetail.instructions || '';
         } catch {
           instructionsText = '';
+        }
+
+        // Fetch questions for Reading / Listening
+        if (detectedSkill === 'reading' || detectedSkill === 'listening') {
+          try {
+            const qRes = await questionService.listQuestions(firstMod.id);
+            const fetchedQuestions = qRes.questions || [];
+
+            if (detectedSkill === 'reading' && fetchedQuestions.length > 0) {
+              loadedReadingQuestions = fetchedQuestions.map((q, idx) => {
+                const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+                const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+                const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+                return {
+                  id: String(q.id),
+                  order: q.orderIndex || idx + 1,
+                  type: isMcq ? 'multiple_choice' : 'gap_fill',
+                  prompt: q.content,
+                  options: mcq ? mcq.options : undefined,
+                  correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
+                  paragraphRef: 'A',
+                  points: Number(q.score) || 1,
+                };
+              });
+            } else if (detectedSkill === 'listening' && fetchedQuestions.length > 0) {
+              loadedListeningQuestions = fetchedQuestions.map((q, idx) => {
+                const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+                const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+                const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+                return {
+                  id: String(q.id),
+                  order: q.orderIndex || idx + 1,
+                  section: 'section1',
+                  type: isMcq ? 'multiple_choice' : 'short_answer',
+                  prompt: q.content,
+                  options: mcq ? mcq.options : undefined,
+                  correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
+                  points: Number(q.score) || 1,
+                };
+              });
+            }
+          } catch (qErr) {
+            console.warn('Failed to load questions for module:', qErr);
+          }
         }
       }
 
@@ -220,11 +291,13 @@ export const TeacherEditAssignment: React.FC = () => {
         },
         reading: {
           ...prev.reading,
-          passageTitle: instructionsText ? instructionsText.slice(0, 80) : prev.reading.passageTitle
+          passageTitle: instructionsText ? instructionsText.slice(0, 80) : prev.reading.passageTitle,
+          questions: loadedReadingQuestions || prev.reading.questions
         },
         listening: {
           ...prev.listening,
-          transcript: instructionsText || prev.listening.transcript
+          transcript: instructionsText || prev.listening.transcript,
+          questions: loadedListeningQuestions || prev.listening.questions
         }
       }));
     } catch (err) {
@@ -248,6 +321,34 @@ export const TeacherEditAssignment: React.FC = () => {
 
   const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
     if (!id) return;
+
+    // Validation for Reading/Listening questions
+    if (assignmentData.skill === 'reading') {
+      const qList = assignmentData.reading.questions;
+      if (qList.length === 0) {
+        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
+        return;
+      }
+      for (let i = 0; i < qList.length; i++) {
+        if (!qList[i].prompt.trim()) {
+          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+          return;
+        }
+      }
+    } else if (assignmentData.skill === 'listening') {
+      const qList = assignmentData.listening.questions;
+      if (qList.length === 0) {
+        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
+        return;
+      }
+      for (let i = 0; i < qList.length; i++) {
+        if (!qList[i].prompt.trim()) {
+          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+          return;
+        }
+      }
+    }
+
     setIsSaving(true);
     try {
       const assignmentIdNum = Number(id);
@@ -274,20 +375,148 @@ export const TeacherEditAssignment: React.FC = () => {
         maxSubmissions: assignmentData.maxSubmissions || 3
       });
 
-      // 2. Update status if specified
-      if (publishStatus) {
-        await assignmentService.updateAssignmentStatus(assignmentIdNum, publishStatus);
+      // 2. Update status only if changed and the transition is permitted by backend
+      if (publishStatus && publishStatus !== currentDbStatus) {
+        const isValidTransition =
+          (currentDbStatus === 'DRAFT' && publishStatus === 'PUBLISHED') ||
+          (currentDbStatus === 'PUBLISHED' && publishStatus === 'CLOSED');
+
+        if (isValidTransition) {
+          try {
+            await assignmentService.updateAssignmentStatus(assignmentIdNum, publishStatus);
+            setCurrentDbStatus(publishStatus);
+          } catch (statusErr) {
+            console.warn('Status transition failed:', statusErr);
+          }
+        } else if (currentDbStatus === 'PUBLISHED' && publishStatus === 'DRAFT') {
+          showToast(isVi ? 'Bài tập đã xuất bản không thể chuyển về bản nháp!' : 'Published assignment cannot be reverted to draft!');
+        }
       }
 
-      // 3. Update module if exists
-      if (activeModuleId) {
+      // 3. Ensure module exists and is updated
+      let targetModuleId = activeModuleId;
+      if (targetModuleId) {
         try {
-          await moduleService.updateModule(activeModuleId, {
+          await moduleService.updateModule(targetModuleId, {
             instructions,
             aiInstruction: assignmentData.writing.aiInstruction || undefined
           });
         } catch {
           // ignore
+        }
+      } else {
+        try {
+          const apiSkillMap: Record<AssignmentSkill, ApiSkill> = {
+            writing: 'WRITING', speaking: 'SPEAKING', reading: 'READING', listening: 'LISTENING'
+          };
+          const taskTypeMap: Record<AssignmentSkill, 'ESSAY' | 'RECORDING' | 'QUIZ'> = {
+            writing: 'ESSAY', speaking: 'RECORDING', reading: 'QUIZ', listening: 'QUIZ'
+          };
+          const newMod = await moduleService.createModule(assignmentIdNum, {
+            skill: apiSkillMap[assignmentData.skill],
+            taskType: taskTypeMap[assignmentData.skill],
+            orderIndex: 1,
+            instructions,
+            aiInstruction: assignmentData.writing.aiInstruction || undefined,
+            maxScore: 10
+          });
+          targetModuleId = newMod.id;
+          setActiveModuleId(newMod.id);
+        } catch (modErr) {
+          console.warn('Fallback module creation:', modErr);
+        }
+      }
+
+      // 4. Synchronize questions sequentially for Reading / Listening to prevent 409 Lock Contention
+      if (targetModuleId && (assignmentData.skill === 'reading' || assignmentData.skill === 'listening')) {
+        let existingDbQuestions: QuestionResponse[] = [];
+        try {
+          const dbRes = await questionService.listQuestions(targetModuleId);
+          existingDbQuestions = dbRes.questions || [];
+        } catch (dbErr) {
+          console.warn('Could not fetch existing DB questions:', dbErr);
+        }
+
+        const uiQuestions = assignmentData.skill === 'reading'
+          ? assignmentData.reading.questions
+          : assignmentData.listening.questions;
+
+        // A. Delete questions removed in UI
+        const uiNumericIds = new Set(
+          uiQuestions
+            .map((q) => Number(q.id))
+            .filter((num) => Number.isInteger(num) && num > 0)
+        );
+
+        for (const dbQ of existingDbQuestions) {
+          if (!uiNumericIds.has(dbQ.id)) {
+            try {
+              await questionService.deleteQuestion(dbQ.id);
+            } catch (delErr: unknown) {
+              console.warn(`Could not delete question ${dbQ.id}:`, delErr);
+            }
+          }
+        }
+
+        // B. Sequentially update existing or create new questions
+        const updatedQuestionIds: Record<number, string> = {};
+        for (let i = 0; i < uiQuestions.length; i++) {
+          const q = uiQuestions[i];
+          const isExisting = Number.isInteger(Number(q.id)) && Number(q.id) > 0 && existingDbQuestions.some((dbQ) => dbQ.id === Number(q.id));
+          const payload = q.type === 'multiple_choice'
+            ? buildMcqPayload({
+                content: q.prompt,
+                options: q.options,
+                correctOptionIndexOrText: q.correctAnswer,
+                score: q.points,
+                orderIndex: i + 1,
+              })
+            : buildShortAnswerPayload({
+                content: q.prompt,
+                answerText: q.correctAnswer,
+                score: q.points,
+                orderIndex: i + 1,
+              });
+
+          if (isExisting) {
+            await questionService.updateQuestion(Number(q.id), {
+              content: payload.content,
+              correctAnswer: payload.correctAnswer,
+              score: payload.score,
+              orderIndex: payload.orderIndex,
+            });
+          } else {
+            const created = await questionService.createQuestion(targetModuleId, payload);
+            updatedQuestionIds[i] = String(created.id);
+          }
+        }
+
+        if (Object.keys(updatedQuestionIds).length > 0) {
+          setAssignmentData((prev) => {
+            if (prev.skill === 'reading') {
+              return {
+                ...prev,
+                reading: {
+                  ...prev.reading,
+                  questions: prev.reading.questions.map((item, idx) =>
+                    updatedQuestionIds[idx] ? { ...item, id: updatedQuestionIds[idx] } : item
+                  ),
+                },
+              };
+            }
+            if (prev.skill === 'listening') {
+              return {
+                ...prev,
+                listening: {
+                  ...prev.listening,
+                  questions: prev.listening.questions.map((item, idx) =>
+                    updatedQuestionIds[idx] ? { ...item, id: updatedQuestionIds[idx] } : item
+                  ),
+                },
+              };
+            }
+            return prev;
+          });
         }
       }
 
@@ -296,23 +525,28 @@ export const TeacherEditAssignment: React.FC = () => {
       setLastSavedTime(timeStr);
 
       showToast(isVi ? 'Cập nhật bài tập thành công!' : 'Assignment updated successfully!');
-      if (publishStatus === 'PUBLISHED') {
+      if (publishStatus !== 'DRAFT') {
         setTimeout(() => navigate('/teacher/assignments'), 1000);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to update assignment:', err);
-      showToast(isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please retry!');
+      const msg = err instanceof Error ? err.message : '';
+      showToast(msg ? `Lỗi: ${msg}` : (isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please retry!'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSaveDraft = () => {
+    if (currentDbStatus === 'PUBLISHED') {
+      showToast(isVi ? 'Bài tập này đã xuất bản, không thể chuyển về bản nháp.' : 'This assignment is already published.');
+      return;
+    }
     saveAssignmentChanges('DRAFT');
   };
 
   const handleSaveAndPublish = () => {
-    saveAssignmentChanges('PUBLISHED');
+    saveAssignmentChanges(currentDbStatus === 'PUBLISHED' ? undefined : 'PUBLISHED');
   };
 
   const handleSkillChange = (newSkill: AssignmentSkill) => {
@@ -620,17 +854,26 @@ export const TeacherEditAssignment: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  disabled={currentDbStatus === 'PUBLISHED'}
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
                     border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
+                    backgroundColor: currentDbStatus === 'PUBLISHED' ? '#f8fafc' : assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
+                    color: currentDbStatus === 'PUBLISHED' ? '#94a3b8' : assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
                     fontSize: '12.5px',
                     fontWeight: 700,
-                    cursor: 'pointer'
+                    cursor: currentDbStatus === 'PUBLISHED' ? 'not-allowed' : 'pointer',
+                    opacity: currentDbStatus === 'PUBLISHED' ? 0.6 : 1
                   }}
-                  onClick={() => setAssignmentData({ ...assignmentData, status: 'draft' })}
+                  onClick={() => {
+                    if (currentDbStatus === 'PUBLISHED') {
+                      showToast(isVi ? 'Bài tập đã xuất bản không thể chuyển về bản nháp.' : 'Published assignment cannot be reverted to draft.');
+                      return;
+                    }
+                    setAssignmentData({ ...assignmentData, status: 'draft' });
+                  }}
+                  title={currentDbStatus === 'PUBLISHED' ? (isVi ? 'Bài tập đã xuất bản không thể chuyển về bản nháp' : 'Published assignment cannot be reverted to draft') : undefined}
                 >
                   {isVi ? 'Bản nháp' : 'Draft'}
                 </button>
@@ -738,16 +981,18 @@ export const TeacherEditAssignment: React.FC = () => {
               <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
             </button>
 
-            <button 
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              disabled={isSaving}
-              onClick={handleSaveDraft}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Save size={14} />
-              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
-            </button>
+            {currentDbStatus !== 'PUBLISHED' && (
+              <button 
+                type="button"
+                className="btn btn-secondary bg-white btn-sm"
+                disabled={isSaving}
+                onClick={handleSaveDraft}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Save size={14} />
+                <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
+              </button>
+            )}
 
             <button 
               type="button"
@@ -761,7 +1006,13 @@ export const TeacherEditAssignment: React.FC = () => {
               ) : (
                 <Send size={14} />
               )}
-              <span>{isSaving ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Cập nhật & Xuất bản' : 'Update & Publish')}</span>
+              <span>
+                {isSaving 
+                  ? (isVi ? 'Đang lưu...' : 'Saving...') 
+                  : currentDbStatus === 'PUBLISHED' 
+                    ? (isVi ? 'Lưu thay đổi' : 'Save Changes') 
+                    : (isVi ? 'Cập nhật & Xuất bản' : 'Update & Publish')}
+              </span>
             </button>
           </div>
         }

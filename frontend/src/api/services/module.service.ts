@@ -29,7 +29,8 @@ export interface ModuleDetailResponse {
 }
 
 export interface ModuleListResponse {
-  modules: ModuleSummary[];
+  modules?: ModuleSummary[];
+  data?: ModuleSummary[];
 }
 
 export interface CreateModulePayload {
@@ -58,8 +59,25 @@ export class ModuleService {
     this.http = http;
   }
 
-  listModules(assignmentId: number, options?: ApiRequestOptions): Promise<ModuleListResponse> {
-    return this.http.get<ModuleListResponse>(`/assignments/${assignmentId}/modules`, options);
+  async listModules(assignmentId: number, options?: ApiRequestOptions): Promise<ModuleListResponse> {
+    const res = await this.http.get<ModuleListResponse | ModuleSummary[] | { data?: ModuleSummary[]; modules?: ModuleSummary[] }>(
+      `/assignments/${assignmentId}/modules`,
+      options
+    );
+    let items: ModuleSummary[] = [];
+    if (Array.isArray(res)) {
+      items = res;
+    } else if (res && typeof res === 'object') {
+      if (Array.isArray(res.data)) {
+        items = res.data;
+      } else if (Array.isArray(res.modules)) {
+        items = res.modules;
+      }
+    }
+    return {
+      modules: items,
+      data: items,
+    };
   }
 
   getModule(moduleId: number, options?: ApiRequestOptions): Promise<ModuleDetailResponse> {
