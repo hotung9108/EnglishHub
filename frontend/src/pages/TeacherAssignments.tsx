@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
+import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { 
   Plus, Mic, BookOpen, Headphones, PenTool, Clock, Calendar, 
@@ -167,7 +167,18 @@ export const TeacherAssignments: React.FC = () => {
                 })
               : (isVi ? 'Không thời hạn' : 'No deadline');
 
-            const skill = detectSkill(raw.title);
+            let detail: AssignmentDetail | null = null;
+            try {
+              detail = await assignmentService.getAssignment(raw.id);
+            } catch {
+              // ignore
+            }
+
+            let skill: 'writing' | 'speaking' | 'reading' | 'listening' = detectSkill(raw.title);
+            const modSkill = detail?.modules?.[0]?.skill?.toLowerCase();
+            if (modSkill === 'speaking' || modSkill === 'reading' || modSkill === 'listening' || modSkill === 'writing') {
+              skill = modSkill;
+            }
 
             loadedItems.push({
               id: String(raw.id),

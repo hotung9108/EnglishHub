@@ -8,6 +8,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSkill as ApiSkill } from '../api/services/assignment.service';
 import { moduleService } from '../api/services/module.service';
+import { 
+  questionService, 
+  buildMcqPayload, 
+  buildShortAnswerPayload 
+} from '../api/services/question.service';
 import type { 
   AssignmentEditorData, AssignmentSkill 
 } from '../types/assignment-editor.types';
@@ -217,6 +222,33 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
+    // Validation for Reading/Listening questions
+    if (assignmentData.skill === 'reading') {
+      const qList = assignmentData.reading.questions;
+      if (qList.length === 0) {
+        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
+        return;
+      }
+      for (let i = 0; i < qList.length; i++) {
+        if (!qList[i].prompt.trim()) {
+          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+          return;
+        }
+      }
+    } else if (assignmentData.skill === 'listening') {
+      const qList = assignmentData.listening.questions;
+      if (qList.length === 0) {
+        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
+        return;
+      }
+      for (let i = 0; i < qList.length; i++) {
+        if (!qList[i].prompt.trim()) {
+          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const openDate = assignmentData.startDate 
@@ -252,8 +284,9 @@ export const TeacherCreateAssignment: React.FC = () => {
         listening: 'QUIZ'
       };
 
+      let createdModuleId: number | null = null;
       try {
-        await moduleService.createModule(newAssignmentId, {
+        const modRes = await moduleService.createModule(newAssignmentId, {
           skill: apiSkillMap[assignmentData.skill],
           taskType: taskTypeMap[assignmentData.skill],
           orderIndex: 1,
@@ -261,8 +294,54 @@ export const TeacherCreateAssignment: React.FC = () => {
           aiInstruction: assignmentData.writing.aiInstruction || undefined,
           maxScore: 10
         });
+        createdModuleId = modRes.id;
       } catch (modErr) {
         console.warn('Module creation fallback:', modErr);
+      }
+
+      // 3. Sequentially create questions in DB to prevent 409 Lock Contention
+      if (createdModuleId) {
+        if (assignmentData.skill === 'reading') {
+          const readingQuestions = assignmentData.reading.questions;
+          for (let i = 0; i < readingQuestions.length; i++) {
+            const q = readingQuestions[i];
+            const payload = q.type === 'multiple_choice'
+              ? buildMcqPayload({
+                  content: q.prompt,
+                  options: q.options,
+                  correctOptionIndexOrText: q.correctAnswer,
+                  score: q.points,
+                  orderIndex: i + 1,
+                })
+              : buildShortAnswerPayload({
+                  content: q.prompt,
+                  answerText: q.correctAnswer,
+                  score: q.points,
+                  orderIndex: i + 1,
+                });
+            await questionService.createQuestion(createdModuleId, payload);
+          }
+        } else if (assignmentData.skill === 'listening') {
+          const listeningQuestions = assignmentData.listening.questions;
+          for (let i = 0; i < listeningQuestions.length; i++) {
+            const q = listeningQuestions[i];
+            const payload = q.type === 'multiple_choice'
+              ? buildMcqPayload({
+                  content: q.prompt,
+                  options: q.options,
+                  correctOptionIndexOrText: q.correctAnswer,
+                  score: q.points,
+                  orderIndex: i + 1,
+                })
+              : buildShortAnswerPayload({
+                  content: q.prompt,
+                  answerText: q.correctAnswer,
+                  score: q.points,
+                  orderIndex: i + 1,
+                });
+            await questionService.createQuestion(createdModuleId, payload);
+          }
+        }
       }
 
       // If status is PUBLISHED and backend requires explicit publish

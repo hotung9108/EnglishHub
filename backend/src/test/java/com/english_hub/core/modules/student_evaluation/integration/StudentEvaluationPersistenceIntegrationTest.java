@@ -101,12 +101,16 @@ class StudentEvaluationPersistenceIntegrationTest {
 		entityManager.flush();
 		entityManager.clear();
 
-		var firstPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null), 1, 1);
-		var secondPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null), 2, 1);
+		var firstPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null, null), 1, 1);
+		var secondPage = studentEvaluationRepository.findPage(new StudentEvaluationFilter(studentId, null, null, null, null), 2, 1);
 		var classFiltered = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId, classOneId, null, null), 1, 20);
+				new StudentEvaluationFilter(studentId, classOneId, null, null, null), 1, 20);
 		var otherStudent = studentEvaluationRepository.findPage(
-				new StudentEvaluationFilter(studentId + 999, null, null, null), 1, 20);
+				new StudentEvaluationFilter(studentId + 999, null, null, null, null), 1, 20);
+		var teacherScoped = studentEvaluationRepository.findPage(
+				new StudentEvaluationFilter(studentId, null, teacherId, null, null), 1, 20);
+		var otherTeacherScoped = studentEvaluationRepository.findPage(
+				new StudentEvaluationFilter(studentId, null, teacherId + 999, null, null), 1, 20);
 
 		assertThat(firstPage.getTotalElements()).isEqualTo(3);
 		assertThat(firstPage.getContent()).extracting(com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluation::id)
@@ -117,6 +121,8 @@ class StudentEvaluationPersistenceIntegrationTest {
 		assertThat(classFiltered.getContent()).extracting(com.english_hub.core.modules.student_evaluation.domain.model.StudentEvaluation::id)
 				.containsExactly(newestId, oldestId);
 		assertThat(otherStudent.getTotalElements()).isZero();
+		assertThat(teacherScoped.getTotalElements()).isEqualTo(3);
+		assertThat(otherTeacherScoped.getTotalElements()).isZero();
 		assertThat(firstPage.getContent().getFirst().createdAt()).isEqualTo(Instant.parse("2026-09-22T10:00:00Z"));
 	}
 
