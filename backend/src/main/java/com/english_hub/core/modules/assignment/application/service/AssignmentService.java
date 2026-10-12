@@ -99,7 +99,9 @@ public class AssignmentService {
 	}
 
 	@Transactional
-	public void updateAssignment(long assignmentId, UpdateAssignmentCommand command) {
+	public AssignmentUpdateResult updateAssignment(
+			long assignmentId,
+			UpdateAssignmentCommand command) {
 		User caller = requireTeacher();
 		Assignment assignment = findAssignmentOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
@@ -123,7 +125,8 @@ public class AssignmentService {
 		validateTimeAndSubmissions(openAt, closeAt, maxSubmissions);
 
 		assignment.updateDetails(title, description, openAt, closeAt, maxSubmissions);
-		assignmentRepository.save(assignment);
+		Assignment savedAssignment = assignmentRepository.save(assignment);
+		return new AssignmentUpdateResult(savedAssignment.maxSubmissions());
 	}
 
 	@Transactional
@@ -266,5 +269,8 @@ public class AssignmentService {
 	public record AssignmentDetailResult(
 			Assignment assignment,
 			List<AssignmentModuleSummary> modules) {
+	}
+
+	public record AssignmentUpdateResult(Integer maxSubmissions) {
 	}
 }

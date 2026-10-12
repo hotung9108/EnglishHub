@@ -269,7 +269,7 @@ Update assignment information.
 
 **Request Body:** `UpdateAssignmentRequest`
 
-**Response:** `MessageResponse`
+**Response:** `UpdateAssignmentResponse`
 
 ---
 
@@ -1125,7 +1125,16 @@ Delete an evaluation.
 | `id` | int64 | Assignment ID |
 | `title` | string | Title |
 | `status` | string | Status |
+| `maxSubmissions` | integer (nullable) | Maximum number of submissions |
 | `modules` | `AssignmentModuleSummaryResponse[]` | List of modules |
+
+---
+
+#### `UpdateAssignmentResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Result message |
+| `maxSubmissions` | integer (nullable) | Maximum number of submissions |
 
 ---
 

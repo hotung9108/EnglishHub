@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.assignment.integration;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -25,6 +26,8 @@ import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 import com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -65,6 +68,9 @@ class AssignmentApiIntegrationTest {
 
 	@Autowired
 	private JwtTokenService jwtTokenService;
+
+	@PersistenceContext
+	private EntityManager entityManager;
 
 	private Long adminId;
 	private Long teacherId;
@@ -269,6 +275,76 @@ class AssignmentApiIntegrationTest {
 					.content("{\"title\":\"Should fail\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Không thể sửa bài tập đã đóng."));
+	}
+
+	@Test
+	void getAndUpdateResponsesIncludeMaxSubmissions() throws Exception {
+		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.maxSubmissions").value(2));
+
+		mockMvc.perform(put("/api/v1/assignments/{id}", assignmentId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"maxSubmissions\":3}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.message").value("Cập nhật bài tập thành công."))
+			.andExpect(jsonPath("$.maxSubmissions").value(3));
+
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.maxSubmissions").value(3));
+	}
+
+	@Test
+	void updateWithoutMaxSubmissionsReturnsAndKeepsStoredValue() throws Exception {
+		mockMvc.perform(put("/api/v1/assignments/{id}", assignmentId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"title\":\"Updated title without max submissions\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.maxSubmissions").value(2));
+
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.maxSubmissions").value(2));
+	}
+
+	@Test
+	void getAndUpdateResponsesKeepNullMaxSubmissions() throws Exception {
+		Assignment assignmentWithoutMaxSubmissions = assignmentRepository.save(new Assignment(
+				classId,
+				"Assignment without max submissions",
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				null,
+				false,
+				AssignmentStatus.DRAFT));
+
+		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentWithoutMaxSubmissions.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.maxSubmissions").hasJsonPath())
+			.andExpect(jsonPath("$.maxSubmissions").value(nullValue()));
+
+		mockMvc.perform(put("/api/v1/assignments/{id}", assignmentWithoutMaxSubmissions.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"title\":\"Updated assignment without max submissions\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.message").value("Cập nhật bài tập thành công."))
+			.andExpect(jsonPath("$.maxSubmissions").hasJsonPath())
+			.andExpect(jsonPath("$.maxSubmissions").value(nullValue()));
 	}
 
 	@Test
