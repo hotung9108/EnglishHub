@@ -1,0 +1,10 @@
+id: BE-TASK-32
+title: "Fix grading maxScoreSnapshot creation and legacy teacher grading updates"
+assignee: "@be-primary"
+status: "In Progress"
+priority: "High"
+description: >-
+  Capture a positive module max score when an attempt creates grading rows and
+  self-heal legacy null snapshots during a valid teacher grade update without
+  overwriting existing snapshots. Targeted unit, persistence, API, AI-path, and
+  Testcontainers regression tests pass. Manual QA verification remains pending.

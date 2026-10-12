@@ -1,0 +1,24 @@
+id: QA-28
+title: "Thiết lập Selenium Framework cho test giao diện Web"
+assignee: "@tester"
+status: "Done"
+review_status: "Pending PM review"
+updated_at: "2026-10-11"
+branch: "feature/qa-28-selenium-framework"
+description: "Framework Selenium JavaScript dùng chung theo POM, cấu hình staging và test login mẫu."
+completed_scope:
+  - "WebDriver Chrome/Edge/Grid; URL/timeout/tài khoản ngoài source."
+  - "Page Object và test theo Auth/Teacher/Student/Admin; tách case login khỏi runner."
+  - "Run người dùng trên staging: 2/2 smoke/login Teacher Passed."
+  - "README và launcher Windows; HTML/JSON/screenshot."
+validation:
+  staging_evidence: "run-2026-10-11T11-19-45-366Z; user executed; PASSED"
+  integration: "Static syntax/import/package inspection; no automated tests/browser rerun per user request."
+  coverage: "Not measured; no claim of >80 percent coverage."
+artifacts:
+  - "test/selenium/README.md"
+  - "test/selenium/tests/auth/login.test.js"
+  - "test/scripts/run-selenium-login.bat"
+  - "production_artifacts/test_reports/QA-28/README.md"
+  - "production_artifacts/test_reports/QA-28/report.html"
+  - "production_artifacts/test_reports/QA-28/summary.json"

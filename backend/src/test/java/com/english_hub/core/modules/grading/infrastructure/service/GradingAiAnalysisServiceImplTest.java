@@ -88,6 +88,20 @@ class GradingAiAnalysisServiceImplTest {
 	}
 
 	@Test
+	void speakingAnalysisPassesPositiveSnapshotToAiClient() {
+		AiSpeakingAnalysisRequest request = captureSpeakingRequest(BigDecimal.TEN);
+
+		assertThat(request.maxScore()).isEqualTo(10.0);
+	}
+
+	@Test
+	void speakingAnalysisUsesNinePointFallbackForLegacyNullSnapshot() {
+		AiSpeakingAnalysisRequest request = captureSpeakingRequest(null);
+
+		assertThat(request.maxScore()).isEqualTo(9.0);
+	}
+
+	@Test
 	void successfulSpeakingAnalysis_updatesGradingAndSavesAnnotations() {
 		long submissionModuleId = 101L;
 		Grading grading = new Grading(
@@ -733,6 +747,72 @@ class GradingAiAnalysisServiceImplTest {
 
 		verify(gradingAiResultPersistenceService).markFailedIfStillPending(submissionModuleId);
 		verify(gradingAiResultPersistenceService, never()).persistAiResult(any(), any());
+	}
+
+	private AiSpeakingAnalysisRequest captureSpeakingRequest(BigDecimal maxScoreSnapshot) {
+		long submissionModuleId = 910L;
+		Grading grading = new Grading(
+				1L,
+				submissionModuleId,
+				GradingMethod.AUTO,
+				GradingStatus.PENDING,
+				null,
+				null,
+				null,
+				maxScoreSnapshot,
+				null,
+				null,
+				null,
+				null,
+				null);
+		GradingContext context = new GradingContext(
+				submissionModuleId,
+				null,
+				200L,
+				10L,
+				5L,
+				2L,
+				15L,
+				ModuleSkill.SPEAKING,
+				true,
+				null,
+				"Speaking instructions");
+		Answer answer = new Answer(
+				submissionModuleId,
+				null,
+				null,
+				"speaking-910.wav",
+				45,
+				720000L,
+				"audio/wav",
+				UploadStatus.READY,
+				null,
+				null,
+				null,
+				null);
+		ReflectionTestUtils.setField(answer, "id", 1910L);
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		when(storageService.generatePresignedGetUrl("speaking-910.wav"))
+				.thenReturn("https://storage.example.com/speaking-910.wav");
+		AiSpeakingAnalysisResponse response = new AiSpeakingAnalysisResponse(
+				submissionModuleId,
+				7.0,
+				"AI feedback",
+				objectMapper.createArrayNode(),
+				new FluencyMetricsDto(120.0, 2, 40.0, 0.8),
+				new CriteriaScoresDto(7.0, 7.0, 7.0, 7.0, 7.0),
+				List.of());
+		when(aiServiceClient.analyzeSpeaking(any(AiSpeakingAnalysisRequest.class))).thenReturn(response);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
+
+		service.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<AiSpeakingAnalysisRequest> requestCaptor =
+				ArgumentCaptor.forClass(AiSpeakingAnalysisRequest.class);
+		verify(aiServiceClient).analyzeSpeaking(requestCaptor.capture());
+		return requestCaptor.getValue();
 	}
 }
 

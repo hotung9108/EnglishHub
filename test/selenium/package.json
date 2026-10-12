@@ -1,0 +1,19 @@
+{
+  "name": "englishhub-selenium",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "test": "node run.js",
+    "test:login": "node run.js --role=teacher",
+    "test:roles": "node run.js --roles",
+    "test:self": "node run.js --self-test",
+    "check": "node --test tests/framework/*.test.js"
+  },
+  "dependencies": {
+    "selenium-webdriver": "4.35.0"
+  }
+}
