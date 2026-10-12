@@ -154,9 +154,17 @@ public class SubmissionService {
 				submission.getId(),
 				modules.stream().map(ModuleInfo::moduleId).toList());
 		gradingRepository.bulkCreate(submissionModules.stream()
-				.map(submissionModule -> new GradingDraft(
-						submissionModule.getId(),
-						gradingMethodOf(moduleById.get(submissionModule.getModuleId()))))
+				.map(submissionModule -> {
+					ModuleInfo moduleInfo = moduleById.get(submissionModule.getModuleId());
+					BigDecimal maxScoreSnapshot = moduleInfo.maxScore() != null
+							&& moduleInfo.maxScore().compareTo(BigDecimal.ZERO) > 0
+							? moduleInfo.maxScore()
+							: null;
+					return new GradingDraft(
+							submissionModule.getId(),
+							gradingMethodOf(moduleInfo),
+							maxScoreSnapshot);
+				})
 				.toList());
 
 		List<ModuleEntry> entries = submissionModules.stream()

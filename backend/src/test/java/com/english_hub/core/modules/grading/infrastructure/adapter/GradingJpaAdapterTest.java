@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.grading.infrastructure.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.core.infrastructure.persistence.entity.GradingStatus;
@@ -72,5 +73,69 @@ class GradingJpaAdapterTest {
 		assertThat(target.getStatus()).isEqualTo(GradingStatus.AI_GRADED);
 		assertThat(target.getAiFeedback()).isEqualTo("AI feedback");
 		assertThat(target.getAiTranscript()).contains("\"overallScore\":7.0");
+	}
+
+	@Test
+	void saveTeacherGradeFillsNullSnapshotFromValidatedDomainValue() {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target = entity(null);
+		com.english_hub.core.modules.grading.domain.model.Grading source = domainGrading(new BigDecimal("10.00"));
+		when(jpaRepository.findById(9L)).thenReturn(Optional.of(target));
+		when(jpaRepository.save(target)).thenReturn(target);
+
+		com.english_hub.core.modules.grading.domain.model.Grading saved = adapter.saveTeacherGrade(source);
+
+		assertThat(target.getMaxScoreSnapshot()).isEqualByComparingTo("10.00");
+		assertThat(saved.maxScoreSnapshot()).isEqualByComparingTo("10.00");
+		verify(jpaRepository).save(target);
+	}
+
+	@Test
+	void saveTeacherGradeDoesNotOverwriteExistingSnapshot() {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target = entity(new BigDecimal("10.00"));
+		com.english_hub.core.modules.grading.domain.model.Grading source = domainGrading(new BigDecimal("12.00"));
+		when(jpaRepository.findById(9L)).thenReturn(Optional.of(target));
+		when(jpaRepository.save(target)).thenReturn(target);
+
+		com.english_hub.core.modules.grading.domain.model.Grading saved = adapter.saveTeacherGrade(source);
+
+		assertThat(target.getMaxScoreSnapshot()).isEqualByComparingTo("10.00");
+		assertThat(saved.maxScoreSnapshot()).isEqualByComparingTo("10.00");
+		verify(jpaRepository).save(target);
+	}
+
+	private com.english_hub.core.infrastructure.persistence.entity.Grading entity(BigDecimal maxScoreSnapshot) {
+		com.english_hub.core.infrastructure.persistence.entity.Grading target =
+				new com.english_hub.core.infrastructure.persistence.entity.Grading(
+						71L,
+						com.english_hub.core.infrastructure.persistence.entity.GradingMethod.TEACHER_MANUAL,
+						GradingStatus.PENDING,
+						null,
+						null,
+						null,
+						maxScoreSnapshot,
+						null,
+						null,
+						null,
+						null,
+						null);
+		ReflectionTestUtils.setField(target, "id", 9L);
+		return target;
+	}
+
+	private com.english_hub.core.modules.grading.domain.model.Grading domainGrading(BigDecimal maxScoreSnapshot) {
+		return new com.english_hub.core.modules.grading.domain.model.Grading(
+				9L,
+				71L,
+				GradingMethod.TEACHER_MANUAL,
+				com.english_hub.core.modules.grading.domain.model.GradingStatus.COMPLETED,
+				null,
+				new BigDecimal("6.00"),
+				"Teacher feedback",
+				maxScoreSnapshot,
+				20L,
+				java.time.OffsetDateTime.parse("2026-10-11T10:00:00Z"),
+				java.time.OffsetDateTime.parse("2026-10-11T10:00:00Z"),
+				null,
+				null);
 	}
 }

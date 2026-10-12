@@ -23,11 +23,13 @@ public record Grading(
 			BigDecimal score,
 			String feedback,
 			Long teacherId,
-			OffsetDateTime gradedAt) {
+			OffsetDateTime gradedAt,
+			BigDecimal effectiveMaxScoreSnapshot) {
 		if (score == null
-				|| maxScoreSnapshot == null
+				|| effectiveMaxScoreSnapshot == null
+				|| effectiveMaxScoreSnapshot.compareTo(BigDecimal.ZERO) <= 0
 				|| score.compareTo(BigDecimal.ZERO) < 0
-				|| score.compareTo(maxScoreSnapshot) > 0) {
+				|| score.compareTo(effectiveMaxScoreSnapshot) > 0) {
 			throw new IllegalArgumentException("Final score must be between zero and maxScoreSnapshot.");
 		}
 		return new Grading(
@@ -38,7 +40,7 @@ public record Grading(
 				aiFeedback,
 				score,
 				feedback,
-				maxScoreSnapshot,
+				effectiveMaxScoreSnapshot,
 				teacherId,
 				gradedAt,
 				gradedAt,

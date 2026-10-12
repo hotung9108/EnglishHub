@@ -11,25 +11,41 @@ class GradingTest {
 	@Test
 	void rejectsNegativeFinalScore() {
 		assertThatThrownBy(() -> grading().withTeacherGrade(
-				new BigDecimal("-0.01"), "Feedback", 10L, null))
+				new BigDecimal("-0.01"), "Feedback", 10L, null, new BigDecimal("10.00")))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void rejectsFinalScoreAboveSnapshot() {
 		assertThatThrownBy(() -> grading().withTeacherGrade(
-				new BigDecimal("10.01"), "Feedback", 10L, null))
+				new BigDecimal("10.01"), "Feedback", 10L, null, new BigDecimal("10.00")))
 				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test
 	void acceptsFinalScoreAtBothBounds() {
-		Grading zero = grading().withTeacherGrade(new BigDecimal("0.00"), "Feedback", 10L, null);
-		Grading maximum = grading().withTeacherGrade(new BigDecimal("10.00"), "Feedback", 10L, null);
+		Grading zero = grading().withTeacherGrade(
+				new BigDecimal("0.00"), "Feedback", 10L, null, new BigDecimal("10.00"));
+		Grading maximum = grading().withTeacherGrade(
+				new BigDecimal("10.00"), "Feedback", 10L, null, new BigDecimal("10.00"));
 
 		assertThat(zero.finalScore()).isEqualByComparingTo("0.00");
 		assertThat(maximum.finalScore()).isEqualByComparingTo("10.00");
+		assertThat(zero.maxScoreSnapshot()).isEqualByComparingTo("10.00");
+		assertThat(maximum.maxScoreSnapshot()).isEqualByComparingTo("10.00");
 		assertThat(zero.status()).isEqualTo(GradingStatus.COMPLETED);
+	}
+
+	@Test
+	void rejectsNullOrNonPositiveEffectiveSnapshot() {
+		assertThatThrownBy(() -> grading().withTeacherGrade(BigDecimal.ONE, "Feedback", 10L, null, null))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> grading().withTeacherGrade(
+					BigDecimal.ONE, "Feedback", 10L, null, BigDecimal.ZERO))
+				.isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> grading().withTeacherGrade(
+					BigDecimal.ONE, "Feedback", 10L, null, new BigDecimal("-1.00")))
+				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test

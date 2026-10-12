@@ -283,13 +283,17 @@ public class GradingService {
 		if (!Objects.equals(current.id(), gradingId)) {
 			throw ApiException.notFound(GRADING_NOT_FOUND_MESSAGE);
 		}
-		if (!isValidScore(finalScore, current.maxScoreSnapshot())) {
+		BigDecimal effectiveMaxScore = current.maxScoreSnapshot() != null
+				? current.maxScoreSnapshot()
+				: context.moduleMaxScore();
+		if (!isValidScore(finalScore, effectiveMaxScore)) {
 			throw ApiException.badRequest(INVALID_SCORE_MESSAGE);
 		}
 
 		OffsetDateTime changedAt = OffsetDateTime.now(ZoneOffset.UTC);
 		boolean scoreChanged = !sameScore(current.finalScore(), finalScore);
-		Grading updated = current.withTeacherGrade(finalScore, finalFeedback, teacher.id(), changedAt);
+		Grading updated = current.withTeacherGrade(
+				finalScore, finalFeedback, teacher.id(), changedAt, effectiveMaxScore);
 		gradingRepository.saveTeacherGrade(updated);
 		if (scoreChanged) {
 			gradingChangeLogRepository.save(new GradingChangeLog(
@@ -512,6 +516,7 @@ public class GradingService {
 	private boolean isValidScore(BigDecimal score, BigDecimal maxScore) {
 		return score != null
 				&& maxScore != null
+				&& maxScore.compareTo(BigDecimal.ZERO) > 0
 				&& score.compareTo(BigDecimal.ZERO) >= 0
 				&& score.compareTo(maxScore) <= 0;
 	}

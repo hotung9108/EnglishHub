@@ -165,6 +165,103 @@ class GradingServiceTest {
 	}
 
 	@Test
+	void legacyNullSnapshotUsesModuleMaxScoreAndPersistsSnapshotWithTeacherGrade() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, bd("10.00"))));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, null, null, GradingStatus.PENDING)));
+		when(gradingRepository.saveTeacherGrade(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+		gradingService.updateFinalGrade(5L, bd("6.00"), "Legacy grading", null);
+
+		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
+		verify(gradingRepository).saveTeacherGrade(gradingCaptor.capture());
+		assertThat(gradingCaptor.getValue().finalScore()).isEqualByComparingTo("6.00");
+		assertThat(gradingCaptor.getValue().maxScoreSnapshot()).isEqualByComparingTo("10.00");
+		verify(gradingChangeLogRepository).save(any());
+	}
+
+	@Test
+	void rejectsLegacyScoreAboveModuleMaxWithoutSavingSnapshotOrChangeLog() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, bd("10.00"))));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, null, null, GradingStatus.PENDING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("11.00"), "Feedback", null))
+				.satisfies(exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(exception.getMessage())
+							.contains("Điểm số không hợp lệ so với thang điểm tối đa.");
+				});
+		verify(gradingRepository, never()).saveTeacherGrade(any());
+		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
+	void rejectsLegacyNegativeScoreWithoutSavingSnapshotOrChangeLog() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, bd("10.00"))));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, null, null, GradingStatus.PENDING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("-0.01"), "Feedback", null))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(gradingRepository, never()).saveTeacherGrade(any());
+		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
+	void rejectsLegacyFallbackWhenModuleMaxScoreIsNotPositive() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, BigDecimal.ZERO)));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, null, null, GradingStatus.PENDING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("0.00"), "Feedback", null))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(gradingRepository, never()).saveTeacherGrade(any());
+		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
+	void existingSnapshotTakesPrecedenceOverChangedModuleMaxScore() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, bd("12.00"))));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, bd("10.00"), null, GradingStatus.PENDING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("11.00"), "Feedback", null))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(gradingRepository, never()).saveTeacherGrade(any());
+		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
+	void nonPositiveExistingSnapshotDoesNotFallbackToModuleMaxScore() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByGradingId(5L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING, bd("12.00"))));
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L))
+				.thenReturn(Optional.of(grading(5L, BigDecimal.ZERO, null, GradingStatus.PENDING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.updateFinalGrade(5L, bd("6.00"), "Feedback", null))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(gradingRepository, never()).saveTeacherGrade(any());
+		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
 	void numericallyEqualScoreDoesNotAppendChangeLog() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
 		when(gradingRepository.findBySubmissionModuleIdForUpdate(14L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("7.00"),
@@ -610,7 +707,13 @@ class GradingServiceTest {
 	}
 
 	private GradingContext context(Long teacherId, ModuleSkill skill) {
-		return new GradingContext(14L, 6L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64, ModuleTaskType.ESSAY, null);
+		return context(teacherId, skill, null);
+	}
+
+	private GradingContext context(Long teacherId, ModuleSkill skill, BigDecimal moduleMaxScore) {
+		return new GradingContext(
+				14L, 6L, 8L, 7L, 3L, 2L, teacherId, 41L, skill, true, 64,
+				ModuleTaskType.ESSAY, moduleMaxScore, null);
 	}
 
 	private User user(Long id, UserRole role) {
