@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   PenTool, CheckCircle, Sparkles, UploadCloud, 
-  Bold, Italic, Underline, List, FileText, Trash2, Eye, ShieldAlert
+  Bold, Italic, Underline, List, FileText, Trash2, Eye
 } from 'lucide-react';
 import type { WritingConfig } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -17,16 +17,6 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
 
   const updateField = <K extends keyof WritingConfig>(key: K, value: WritingConfig[K]) => {
     onChange({ ...config, [key]: value });
-  };
-
-  const updateRubric = (key: keyof WritingConfig['rubrics'], val: number) => {
-    onChange({
-      ...config,
-      rubrics: {
-        ...config.rubrics,
-        [key]: val
-      }
-    });
   };
 
   const promptWordCount = config.promptText.trim() ? config.promptText.trim().split(/\s+/).length : 0;
@@ -57,7 +47,7 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
             backgroundColor: '#eff6ff', 
             color: '#2563eb' 
           }}>
-            IELTS Academic
+            Writing
           </span>
         </div>
 
@@ -75,9 +65,9 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
                   if (val === 'task2') updateField('minWords', 250);
                 }}
               >
-                <option value="task2">IELTS Writing Task 2 (Discursive Essay - 250+ words)</option>
-                <option value="task1">IELTS Writing Task 1 (Report/Chart/Graph - 150+ words)</option>
-                <option value="custom">{isVi ? 'Tự luận / Tự do (Custom Assignment)' : 'Custom Essay Format'}</option>
+                <option value="task2">{isVi ? 'Bài luận (Essay - 250+ từ)' : 'Essay (250+ words)'}</option>
+                <option value="task1">{isVi ? 'Đoạn văn ngắn (Paragraph - 150+ từ)' : 'Short Paragraph (150+ words)'}</option>
+                <option value="custom">{isVi ? 'Tự luận tự do (Custom)' : 'Custom Format'}</option>
               </select>
             </div>
 
@@ -92,7 +82,7 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
                   style={{ maxWidth: '120px' }}
                 />
                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                  {config.taskType === 'task2' ? '(Chuẩn Task 2: 250 từ)' : '(Chuẩn Task 1: 150 từ)'}
+                  {config.taskType === 'task2' ? (isVi ? '(Tối thiểu: 250 từ)' : '(Min: 250 words)') : (isVi ? '(Tối thiểu: 150 từ)' : '(Min: 150 words)')}
                 </span>
               </div>
             </div>
@@ -173,7 +163,7 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
         </div>
       </section>
 
-      {/* SECTION 2: AI Assistance & IELTS Rubric Weights */}
+      {/* SECTION 2: AI Assistance */}
       <section className="edit-card">
         <div className="edit-card-header">
           <div className="edit-card-header-left">
@@ -182,10 +172,10 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Trợ Lý AI Chấm Điểm & Trọng Số Rubric' : 'AI Grading Assistant & IELTS Rubrics'}
+                {isVi ? 'Trợ Lý AI Chấm Bài' : 'AI Grading Assistant'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Cân chỉnh 4 tiêu chí chấm chuẩn hội đồng khảo thí và hướng dẫn riêng cho AI.' : 'Calibrate 4 IELTS descriptor weights and AI inspection focus.'}
+                {isVi ? 'Bật AI hỗ trợ nhận xét và chấm điểm bài viết.' : 'Enable AI assisted essay grading and feedback.'}
               </p>
             </div>
           </div>
@@ -203,111 +193,22 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
         </div>
 
         {config.enableAi && (
-          <div className="ai-calibration-card">
-            <div className="ai-header-row">
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle size={16} color="#2563eb" />
-                {isVi ? 'Phân bổ trọng số 4 tiêu chí chấm Writing (Tổng phải = 100%)' : '4 Criteria Weights (Total = 100%)'}
-              </span>
-              <span style={{ 
-                fontSize: '12px', 
-                fontWeight: 800, 
-                color: (config.rubrics.tr + config.rubrics.cc + config.rubrics.lr + config.rubrics.gra === 100) ? '#16a34a' : '#dc2626' 
-              }}>
-                Tổng: {config.rubrics.tr + config.rubrics.cc + config.rubrics.lr + config.rubrics.gra}%
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Task Response (TR)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.tr}
-                    onChange={(e) => updateRubric('tr', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Coherence (CC)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.cc}
-                    onChange={(e) => updateRubric('cc', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Lexical (LR)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.lr}
-                    onChange={(e) => updateRubric('lr', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Grammar (GRA)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.gra}
-                    onChange={(e) => updateRubric('gra', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-            </div>
-
+          <div className="ai-calibration-card" style={{ marginBottom: '16px' }}>
             <div className="edit-form-group" style={{ marginBottom: 0 }}>
               <label className="edit-form-label">
-                {isVi ? 'Chỉ thị riêng cho AI chấm (Custom AI Prompt Instruction)' : 'Prompt Instruction for AI Grader'}
+                {isVi ? 'Hướng dẫn riêng cho AI chấm bài' : 'Prompt Instruction for AI Grader'}
               </label>
               <textarea 
                 className="edit-form-textarea"
                 rows={3}
                 value={config.aiInstruction}
                 onChange={(e) => updateField('aiInstruction', e.target.value)}
-                placeholder={isVi ? 'Ví dụ: Khắt khe với lỗi lặp từ vựng và mạo từ; gạch chân các cấu trúc ngữ pháp Band 7.5+...' : 'Custom grading focus...'}
+                placeholder={isVi ? 'Ví dụ: Chú ý kiểm tra ngữ pháp, tính mạch lạc và từ vựng...' : 'Custom grading focus...'}
                 style={{ backgroundColor: '#ffffff' }}
               />
             </div>
           </div>
         )}
-
-        {/* Plagiarism check */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '8px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldAlert size={18} color="#d97706" />
-            <div>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', display: 'block' }}>
-                {isVi ? 'Phát hiện đạo văn & văn bản AI (Plagiarism Detection)' : 'Plagiarism & AI Copy Detection'}
-              </span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
-                {isVi ? 'So sánh bài nộp giữa các học viên và phát hiện văn bản do ChatGPT tạo ra.' : 'Cross-check submission against peer database & AI models.'}
-              </span>
-            </div>
-          </div>
-          <input 
-            type="checkbox" 
-            checked={config.enablePlagiarismCheck}
-            onChange={(e) => updateField('enablePlagiarismCheck', e.target.checked)}
-            style={{ width: '18px', height: '18px', accentColor: '#2563eb' }}
-          />
-        </div>
       </section>
 
       {/* SECTION 3: Model Answer & Reference Materials */}
@@ -319,10 +220,10 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Bài Mẫu & Tài Liệu Đối Chiếu (Band 8.0+ Model Answer)' : 'Model Essay & References'}
+                {isVi ? 'Bài Mẫu Tham Khảo (Model Answer)' : 'Model Essay & References'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Bài mẫu đối chiếu để AI tham khảo và học viên xem sau khi bài làm đã được chấm.' : 'Benchmark essay for AI grading reference and student review.'}
+                {isVi ? 'Bài mẫu đối chiếu để AI tham khảo và học viên xem sau khi hoàn thành.' : 'Model essay for AI reference and student review after completion.'}
               </p>
             </div>
           </div>

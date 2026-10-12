@@ -18,20 +18,11 @@ interface SkillScore {
   target: number;
   max: number;
   status: 'strong' | 'average' | 'needs_work';
-  percentile: number;
   testsCompleted: number;
-  subCriteria: { name: string; score: number }[];
 }
 
-function convertScoreToBand(score: number): number {
-  if (score >= 92) return 8.5;
-  if (score >= 84) return 8.0;
-  if (score >= 76) return 7.5;
-  if (score >= 68) return 7.0;
-  if (score >= 60) return 6.5;
-  if (score >= 50) return 6.0;
-  if (score >= 40) return 5.5;
-  return 5.0;
+function convertScoreTo10(score: number): number {
+  return parseFloat((score / 10).toFixed(1));
 }
 
 export const StudentAnalytics: React.FC = () => {
@@ -101,19 +92,17 @@ export const StudentAnalytics: React.FC = () => {
     return skillList.map(skill => {
       const apiScore = skillMap.get(skill.toUpperCase());
       const hasSkill = apiScore !== undefined;
-      const band = hasSkill ? convertScoreToBand(apiScore) : 0;
-      const status: 'strong' | 'average' | 'needs_work' = band >= 7.5 ? 'strong' : band >= 6.5 ? 'average' : 'needs_work';
+      const score10 = hasSkill ? convertScoreTo10(apiScore) : 0;
+      const status: 'strong' | 'average' | 'needs_work' = score10 >= 8.0 ? 'strong' : score10 >= 6.5 ? 'average' : 'needs_work';
       const testsCompleted = submissions.filter(s => s.status === 'GRADED').length;
 
       return {
         skill,
-        current: band,
-        target: 8.0,
-        max: 9.0,
+        current: score10,
+        target: 8.5,
+        max: 10.0,
         status,
-        percentile: band > 0 ? Math.min(98, Math.round(band * 11)) : 0,
         testsCompleted: hasSkill ? Math.max(1, testsCompleted) : 0,
-        subCriteria: []
       };
     });
   }, [progressData, submissions]);
@@ -121,7 +110,7 @@ export const StudentAnalytics: React.FC = () => {
   const currentOverallBand = useMemo(() => {
     if (progressData?.skillAverages && progressData.skillAverages.length > 0) {
       const avgPercent = progressData.skillAverages.reduce((acc, curr) => acc + curr.averageScorePercent, 0) / progressData.skillAverages.length;
-      return convertScoreToBand(avgPercent);
+      return convertScoreTo10(avgPercent);
     }
     const gradedSkills = skillsData.filter(s => s.current > 0);
     if (gradedSkills.length > 0) {
@@ -196,8 +185,8 @@ export const StudentAnalytics: React.FC = () => {
           </h1>
           <p className="std-eco-subtitle">
             {isVi 
-              ? 'Chẩn đoán đa chiều 4 kỹ năng chuẩn IELTS, phát hiện lỗ hổng kiến thức và đề xuất bài tập cá nhân hóa.' 
-              : 'Holistic 4-skill diagnostic, rubric component analysis, and adaptive remediation plan.'}
+              ? 'Chẩn đoán đa chiều 4 kỹ năng (Writing, Reading, Listening, Speaking), phát hiện lỗ hổng kiến thức và đề xuất bài tập cá nhân hóa.' 
+              : 'Holistic 4-skill diagnostic, component analysis, and adaptive remediation plan.'}
           </p>
         </div>
 
@@ -241,24 +230,24 @@ export const StudentAnalytics: React.FC = () => {
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.18)', padding: '5px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, marginBottom: '12px' }}>
               <Target size={15} />
-              <span>{isVi ? 'Mục tiêu chứng chỉ: IELTS Academic 7.5 - 8.0' : 'Target Goal: IELTS Academic 7.5 - 8.0'}</span>
+              <span>{isVi ? 'Mục tiêu học tập: 8.5 / 10' : 'Target Goal: 8.5 / 10'}</span>
             </div>
             <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.01em' }}>
               {currentOverallBand !== null ? (
                 isVi 
-                  ? `Bạn đã đạt ${Math.min(100, Math.round((currentOverallBand / 8.0) * 100))}% chặng đường đến Band 8.0 🎉` 
-                  : `You have completed ${Math.min(100, Math.round((currentOverallBand / 8.0) * 100))}% of your target milestone 🎉`
+                  ? `Bạn đã đạt ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% chặng đường đến mục tiêu 8.5 điểm 🎉` 
+                  : `You have completed ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% of your target milestone 🎉`
               ) : (
                 isVi
-                  ? 'Bắt đầu làm bài tập để theo dõi tiến độ đến Band 8.0 🎯'
-                  : 'Start completing assignments to track progress toward Band 8.0 🎯'
+                  ? 'Bắt đầu làm bài tập để theo dõi tiến độ điểm số 🎯'
+                  : 'Start completing assignments to track progress toward your goal 🎯'
               )}
             </h2>
             <p style={{ fontSize: '14px', opacity: 0.88, margin: 0, maxWidth: '640px', lineHeight: 1.5 }}>
               {currentOverallBand !== null ? (
                 isVi 
-                  ? `Kỹ năng ${highestSkill.skill} của bạn đang ở phong độ tốt (Band ${highestSkill.current.toFixed(1)}). Tập trung rèn luyện thêm ${lowestSkill.skill} để bứt phá điểm tổng!`
-                  : `Your ${highestSkill.skill} skill is performing well (Band ${highestSkill.current.toFixed(1)}). Channel focused practice into ${lowestSkill.skill} to elevate your overall band!`
+                  ? `Kỹ năng ${highestSkill.skill} của bạn đang ở phong độ tốt (${highestSkill.current.toFixed(1)} / 10). Tập trung rèn luyện thêm ${lowestSkill.skill} để bứt phá điểm tổng!`
+                  : `Your ${highestSkill.skill} skill is performing well (${highestSkill.current.toFixed(1)} / 10). Channel focused practice into ${lowestSkill.skill} to elevate your overall score!`
               ) : (
                 isVi
                   ? 'Khi hoàn thành các bài tập và được chấm điểm, bảng phân tích năng lực chi tiết cho từng kỹ năng sẽ hiển thị tại đây.'
@@ -273,23 +262,23 @@ export const StudentAnalytics: React.FC = () => {
                 {currentOverallBand !== null ? currentOverallBand.toFixed(1) : '--'}
               </div>
               <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
-                {isVi ? 'Overall Hiện Tại' : 'Current Band'}
+                {isVi ? 'Điểm TB Hiện Tại' : 'Current Score'}
               </div>
             </div>
             <div style={{ width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' }}></div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: '#fde047', lineHeight: 1 }}>8.0</div>
+              <div style={{ fontSize: '32px', fontWeight: 800, color: '#fde047', lineHeight: 1 }}>8.5</div>
               <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
-                {isVi ? 'Mục Tiêu' : 'Target Band'}
+                {isVi ? 'Mục Tiêu' : 'Target'}
               </div>
             </div>
             <div style={{ width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' }}></div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: '#86efac', lineHeight: 1 }}>
-                {currentOverallBand !== null ? `Top ${Math.max(5, Math.round((1 - currentOverallBand / 9.0) * 100))}%` : '--'}
+              <div style={{ fontSize: '32px', fontWeight: 800, color: '#86efac', lineHeight: 1 }}>
+                {submissions.filter(s => s.status === 'GRADED').length}
               </div>
               <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
-                {isVi ? 'Thứ hạng ước tính' : 'Percentile'}
+                {isVi ? 'Bài Đã Chấm' : 'Graded Tests'}
               </div>
             </div>
           </div>
@@ -344,25 +333,6 @@ export const StudentAnalytics: React.FC = () => {
                 }}
               ></div>
             </div>
-
-            {/* Sub criteria */}
-            {item.subCriteria.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--outline-variant)', paddingTop: '12px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--on-surface-variant)', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.03em' }}>
-                  {isVi ? 'Tiêu chí đánh giá chi tiết' : 'Sub-skill Breakdown'}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {item.subCriteria.map((sub, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px' }}>
-                      <span style={{ color: 'var(--on-surface)' }}>{sub.name}</span>
-                      <span style={{ fontWeight: 700, color: sub.score >= 8.0 ? '#16a34a' : sub.score >= 7.0 ? '#2563eb' : '#d97706' }}>
-                        Band {sub.score.toFixed(1)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ))}
       </div>
@@ -387,7 +357,7 @@ export const StudentAnalytics: React.FC = () => {
                 <CheckCircle2 size={20} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }} />
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: '3px' }}>
-                    {isVi ? `Điểm mạnh nổi bật: ${highestSkill.skill} (Band ${highestSkill.current.toFixed(1)})` : `Key Strength: ${highestSkill.skill} (Band ${highestSkill.current.toFixed(1)})`}
+                    {isVi ? `Điểm mạnh nổi bật: ${highestSkill.skill} (${highestSkill.current.toFixed(1)} / 10)` : `Key Strength: ${highestSkill.skill} (${highestSkill.current.toFixed(1)} / 10)`}
                   </div>
                   <div style={{ opacity: 0.9 }}>
                     {isVi 
@@ -402,12 +372,12 @@ export const StudentAnalytics: React.FC = () => {
                 <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: '3px' }}>
-                    {isVi ? `Trọng tâm cần bồi dưỡng: ${lowestSkill.skill} (Band ${lowestSkill.current.toFixed(1)})` : `Focus Area: ${lowestSkill.skill} (Band ${lowestSkill.current.toFixed(1)})`}
+                    {isVi ? `Trọng tâm cần bồi dưỡng: ${lowestSkill.skill} (${lowestSkill.current.toFixed(1)} / 10)` : `Focus Area: ${lowestSkill.skill} (${lowestSkill.current.toFixed(1)} / 10)`}
                   </div>
                   <div style={{ opacity: 0.9 }}>
                     {isVi 
-                      ? `Điểm trung bình kỹ năng ${lowestSkill.skill} đang ở mức Band ${lowestSkill.current.toFixed(1)}. Bổ sung thêm các bài tập rèn luyện sẽ giúp nâng điểm nhanh chóng.`
-                      : `Average score in ${lowestSkill.skill} currently stands at Band ${lowestSkill.current.toFixed(1)}. Completing targeted drills will bring noticeable progress.`}
+                      ? `Điểm trung bình kỹ năng ${lowestSkill.skill} đang ở mức ${lowestSkill.current.toFixed(1)} / 10. Bổ sung thêm các bài tập rèn luyện sẽ giúp nâng điểm nhanh chóng.`
+                      : `Average score in ${lowestSkill.skill} currently stands at ${lowestSkill.current.toFixed(1)} / 10. Completing targeted drills will bring noticeable progress.`}
                   </div>
                 </div>
               </div>

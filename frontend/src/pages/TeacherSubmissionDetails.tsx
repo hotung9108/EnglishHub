@@ -389,14 +389,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-            {assignment?.title || 'BÀI TẬP TIẾNG ANH'}
+            {assignment?.title || (isVi ? 'BÀI TẬP TIẾNG ANH' : 'ENGLISH ASSIGNMENT')}
           </h1>
-          <span style={{ fontSize: '12px', fontWeight: 600, padding: '2px 10px', borderRadius: '9999px', backgroundColor: '#DBEAFE', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
-            IELTS Standard
-          </span>
         </div>
         <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-          {isVi ? 'Bài nộp lần' : 'Attempt'} #{submission.attemptNumber} • {t('submissionDetails.targetBandPrefix')} <span style={{ fontWeight: 600, color: '#334155' }}>6.5 - 7.5</span>
+          {isVi ? 'Bài nộp lần' : 'Attempt'} #{submission.attemptNumber}
         </p>
       </div>
 
@@ -469,14 +466,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {/* Score Card */}
         <MetricCard 
-          title={isVi ? 'Điểm số đề xuất (Band Score)' : 'Band Score'}
+          title={isVi ? 'Điểm số đề xuất' : 'Suggested Score'}
           value={finalScoreInput || '7.0'}
-          suffix="/ 9.0"
+          suffix="/ 10"
           icon={<Star size={16} />}
           footerText={
             <span style={{ color: 'var(--success)', fontWeight: 500 }}>
               <Star size={14} style={{ display: 'inline', verticalAlign: 'middle' }}/> 
-              {aiSuggestion?.suggestedScore ? `AI Pre-score: Band ${aiSuggestion.suggestedScore}` : 'AI Calibrated'}
+              {aiSuggestion?.suggestedScore ? `${isVi ? 'AI đề xuất:' : 'AI Suggestion:'} ${aiSuggestion.suggestedScore}` : (isVi ? 'Đã hiệu chuẩn AI' : 'AI Calibrated')}
             </span>
           }
         />
@@ -489,7 +486,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           icon={<Clock size={16} />}
           iconBgColor="var(--surface-container)"
           iconColor="var(--on-surface-variant)"
-          footerText={wordCount >= 250 ? (isVi ? 'Đạt tiêu chuẩn Task 2 (>= 250 từ)' : 'Meets standard') : (isVi ? 'Cần bổ sung thêm từ vựng' : 'Below target')}
+          footerText={wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu (>= 250 từ)' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target')}
         />
       </div>
 
@@ -559,7 +556,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
             <div style={{ padding: '24px', fontFamily: 'serif', color: '#1E293B', lineHeight: 1.8, fontSize: '15px', maxHeight: '580px', overflowY: 'auto' }}>
               <div style={{ fontFamily: 'sans-serif', fontWeight: 600, fontSize: '13px', color: '#94A3B8', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9', letterSpacing: '0.025em', textTransform: 'uppercase', marginBottom: '16px' }}>
-                {assignment?.title || 'IELTS TASK PROMPT'}
+                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
               <p style={{ margin: 0, whiteSpace: 'pre-line' }}>
                 {studentAnswerText}
@@ -588,15 +585,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
               <p style={{ color: '#334155', lineHeight: 1.6, fontSize: '12px', margin: 0 }}>
                 {aiSuggestion?.aiFeedback || (isVi 
-                  ? 'AI Engine đã sẵn sàng phân tích cấu trúc ngữ pháp, vốn từ vựng và tiêu chí IELTS.' 
-                  : 'AI Engine is ready to diagnose grammar and criteria.')}
+                  ? 'AI Engine đã sẵn sàng phân tích cấu trúc ngữ pháp và vốn từ vựng.' 
+                  : 'AI Engine is ready to diagnose grammar and vocabulary.')}
               </p>
             </div>
 
             {/* Teacher Score Input */}
             <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
-                {isVi ? 'Điểm Chấm Chính Thức (Band Score / Thang 10)' : 'Official Final Score'}
+                {isVi ? 'Điểm Chấm Chính Thức (Thang 10)' : 'Official Final Score (Scale 10)'}
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <input 
@@ -619,7 +616,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   }}
                 />
                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                  {isVi ? 'Thang điểm Band 0.0 - 9.0' : 'Score Scale 0.0 - 9.0'}
+                  {isVi ? 'Thang điểm 0 - 10' : 'Score Scale 0 - 10'}
                 </span>
               </div>
             </div>

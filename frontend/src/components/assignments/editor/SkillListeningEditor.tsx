@@ -82,7 +82,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             backgroundColor: '#f0fdfa', 
             color: '#0d9488' 
           }}>
-            IELTS Academic Listening
+            Listening
           </span>
         </div>
 
@@ -100,7 +100,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               </button>
               <div>
                 <span style={{ fontSize: '14px', fontWeight: 700, display: 'block' }}>
-                  {config.audioTitle || 'Cambridge_15_Test1_Listening.mp3'}
+                  {config.audioTitle || 'listening_audio.mp3'}
                 </span>
                 <span style={{ fontSize: '11px', color: '#94a3b8' }}>
                   {isPlayingAudio ? 'Playing track • 04:12 / 30:00' : 'Audio file ready • 30:00 duration (320kbps MP3)'}
@@ -133,7 +133,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               className="edit-form-input" 
               value={config.audioTitle}
               onChange={(e) => updateField('audioTitle', e.target.value)}
-              placeholder="Cambridge IELTS 15 - Test 1 Listening Audio"
+              placeholder="listening_track_01.mp3"
             />
           </div>
 
@@ -144,21 +144,8 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               className="edit-form-input" 
               value={config.audioUrl}
               onChange={(e) => updateField('audioUrl', e.target.value)}
-              placeholder="https://cdn.englishhub.edu.vn/audio/listening/cam15-test1.mp3"
+              placeholder="https://cdn.englishhub.edu.vn/audio/listening/track-01.mp3"
             />
-          </div>
-
-          <div>
-            <label className="edit-form-label">{isVi ? 'Giới hạn số lần nghe' : 'Playback Limit'}</label>
-            <select 
-              className="edit-form-select"
-              value={config.playbackLimit}
-              onChange={(e) => updateField('playbackLimit', e.target.value as ListeningConfig['playbackLimit'])}
-            >
-              <option value="single">{isVi ? '1 lần duy nhất (Chuẩn phòng thi IELTS)' : 'Single Play (Real Exam)'}</option>
-              <option value="double">{isVi ? '2 lần (Chế độ luyện tập có gợi ý)' : '2 Plays (Practice Mode)'}</option>
-              <option value="unlimited">{isVi ? 'Không giới hạn (Tự do tua)' : 'Unlimited Playback'}</option>
-            </select>
           </div>
         </div>
       </section>
@@ -226,10 +213,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Bộ Câu Hỏi Theo Section (Section Questions Builder)' : 'Section Questions Builder'}
+                {isVi ? 'Danh Sách Câu Hỏi Bài Nghe' : 'Listening Questions'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Phân loại câu hỏi theo 4 Section chuẩn IELTS và gán mốc thời gian gợi ý.' : 'Organize questions across 4 IELTS listening sections.'}
+                {isVi ? 'Thiết lập các câu hỏi kiểm tra nội dung bài nghe.' : 'Create questions for the listening track.'}
               </p>
             </div>
           </div>

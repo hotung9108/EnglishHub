@@ -150,17 +150,17 @@ const StudentDashboard: React.FC = () => {
       .slice(0, 4);
   }, [assignments]);
 
-  // Average score derivation
-  const averageBand = useMemo(() => {
+  // Average score derivation (Scale 10)
+  const averageScore10 = useMemo(() => {
     if (progress?.skillAverages && progress.skillAverages.length > 0) {
       const sumPercent = progress.skillAverages.reduce((acc, curr) => acc + (Number(curr.averageScorePercent) || 0), 0);
       const avgPercent = sumPercent / progress.skillAverages.length;
-      return (avgPercent / 100 * 9).toFixed(1);
+      return (avgPercent / 10).toFixed(1);
     }
     const scores = assignments.map((a) => a.score).filter((s): s is number => s !== null && s !== undefined);
     if (scores.length > 0) {
       const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      return (avg / 100 * 9).toFixed(1);
+      return (avg > 10 ? avg / 10 : avg).toFixed(1);
     }
     return '--';
   }, [progress, assignments]);
@@ -168,10 +168,10 @@ const StudentDashboard: React.FC = () => {
   // Skill scores for 4 skills
   const skillScores = useMemo(() => {
     const defaultSkills = [
-      { skill: 'LISTENING', name: 'Listening', band: '--', percent: 0, icon: Headphones, color: '#3b82f6', cls: 'listening' },
-      { skill: 'READING', name: 'Reading', band: '--', percent: 0, icon: BookOpen, color: '#10b981', cls: 'reading' },
-      { skill: 'WRITING', name: 'Writing', band: '--', percent: 0, icon: PenTool, color: '#f59e0b', cls: 'writing' },
-      { skill: 'SPEAKING', name: 'Speaking', band: '--', percent: 0, icon: Mic, color: '#8b5cf6', cls: 'speaking' },
+      { skill: 'LISTENING', name: 'Listening', score10: '--', percent: 0, icon: Headphones, color: '#3b82f6', cls: 'listening' },
+      { skill: 'READING', name: 'Reading', score10: '--', percent: 0, icon: BookOpen, color: '#10b981', cls: 'reading' },
+      { skill: 'WRITING', name: 'Writing', score10: '--', percent: 0, icon: PenTool, color: '#f59e0b', cls: 'writing' },
+      { skill: 'SPEAKING', name: 'Speaking', score10: '--', percent: 0, icon: Mic, color: '#8b5cf6', cls: 'speaking' },
     ];
 
     if (!progress?.skillAverages || progress.skillAverages.length === 0) {
@@ -182,8 +182,8 @@ const StudentDashboard: React.FC = () => {
       const found = progress.skillAverages.find((item) => String(item.skill).toUpperCase() === def.skill);
       if (found) {
         const percent = Math.min(100, Math.max(0, Math.round(Number(found.averageScorePercent) || 0)));
-        const band = (percent / 100 * 9).toFixed(1);
-        return { ...def, percent, band };
+        const score10 = (percent / 10).toFixed(1);
+        return { ...def, percent, score10 };
       }
       return def;
     });
@@ -236,13 +236,13 @@ const StudentDashboard: React.FC = () => {
 
           <div className="std-dash-target-pill">
             <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.8 }}>Mục tiêu chứng chỉ</div>
-              <div style={{ fontSize: '14px', fontWeight: 700 }}>IELTS Academic</div>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.8 }}>Mục tiêu học tập</div>
+              <div style={{ fontSize: '14px', fontWeight: 700 }}>Tiếng Anh Tổng Quát</div>
             </div>
             <div style={{ width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
             <div>
-              <div className="std-dash-target-val">7.5</div>
-              <div style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>Target Band</div>
+              <div className="std-dash-target-val">8.5</div>
+              <div style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>Thang 10</div>
             </div>
           </div>
         </div>
@@ -285,7 +285,7 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div>
             <div className="std-dash-stat-num">
-              {isLoading ? '...' : `Band ${averageBand}`}
+              {isLoading ? '...' : (averageScore10 !== '--' ? `${averageScore10} / 10` : '--')}
             </div>
             <div className="std-dash-stat-label">Điểm TB 4 Kỹ năng</div>
           </div>
@@ -459,7 +459,7 @@ const StudentDashboard: React.FC = () => {
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <IconComponent size={15} color={item.color} /> {item.name}
                       </span>
-                      <span>Band {item.band}</span>
+                      <span>{item.score10 !== '--' ? `${item.score10} / 10` : '--'}</span>
                     </div>
                     <div className="skill-bar-track">
                       <div className={`skill-bar-fill ${item.cls}`} style={{ width: `${item.percent}%` }}></div>
@@ -486,7 +486,7 @@ const StudentDashboard: React.FC = () => {
                     Luyện tập Phát âm &amp; Ngữ điệu Speaking
                   </div>
                   <div style={{ fontSize: '11px', color: '#15803d', lineHeight: 1.4 }}>
-                    Dựa trên đánh giá âm phổ gần nhất, cải thiện nối âm (linking sounds) và trọng âm từ sẽ giúp đẩy band Speaking lên 7.5+.
+                    Dựa trên đánh giá phát âm gần nhất, cải thiện nối âm (linking sounds) và trọng âm từ sẽ giúp nâng cao sự lưu loát và điểm số bài nói.
                   </div>
                   <button 
                     type="button"
@@ -501,10 +501,10 @@ const StudentDashboard: React.FC = () => {
               <div className="ai-recommend-box" style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', borderColor: '#bfdbfe' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', marginBottom: 2 }}>
-                    Cấu trúc câu phức &amp; Mạo từ Writing
+                    Cấu trúc câu &amp; Ngữ pháp Writing
                   </div>
                   <div style={{ fontSize: '11px', color: '#1d4ed8', lineHeight: 1.4 }}>
-                    Luyện tập mệnh đề quan hệ rút gọn và câu điều kiện hỗn hợp để nâng cao chỉ số Grammatical Range.
+                    Luyện tập mệnh đề quan hệ rút gọn và câu điều kiện để câu văn mạch lạc và đạt độ chính xác ngữ pháp cao hơn.
                   </div>
                   <button 
                     type="button"

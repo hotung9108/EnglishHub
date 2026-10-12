@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { 
-  User, Shield, Laptop, 
+  User, Shield, 
   Check, Eye, EyeOff, 
   CheckCircle2, Copy, AlertCircle, Loader2,
   Calendar, Phone, BookOpen, Building
@@ -22,16 +22,15 @@ const PRESET_AVATARS = [
 export const Profile: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-  const { user, updateUser, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, updateUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const tabParam = searchParams.get('tab') as 'general' | 'security' | 'sessions' | null;
-  const activeTab = tabParam && ['general', 'security', 'sessions'].includes(tabParam) 
+  const tabParam = searchParams.get('tab') as 'general' | 'security' | null;
+  const activeTab = tabParam && ['general', 'security'].includes(tabParam) 
     ? tabParam 
     : 'general';
 
-  const setActiveTab = (tab: 'general' | 'security' | 'sessions') => {
+  const setActiveTab = (tab: 'general' | 'security') => {
     setSearchParams({ tab });
   };
 
@@ -63,8 +62,6 @@ export const Profile: React.FC = () => {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
-  // 2FA state
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -202,11 +199,6 @@ export const Profile: React.FC = () => {
     setAvatarUrl(url);
   };
 
-  const handleLogoutCurrentSession = async () => {
-    await logout();
-    navigate('/login');
-  };
-
   const getInitials = (name?: string) => {
     if (!name) return 'U';
     const cleanName = name.replace(/\(.*?\)/g, '').trim();
@@ -214,24 +206,6 @@ export const Profile: React.FC = () => {
     if (parts.length === 0) return 'U';
     if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  // Detect current client device info
-  const getDeviceName = () => {
-    const ua = navigator.userAgent;
-    let browser = 'Web Browser';
-    if (ua.includes('Chrome')) browser = 'Google Chrome';
-    else if (ua.includes('Firefox')) browser = 'Mozilla Firefox';
-    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Apple Safari';
-    else if (ua.includes('Edg')) browser = 'Microsoft Edge';
-
-    let os = 'Desktop';
-    if (ua.includes('Windows')) os = 'Windows 11 / 10';
-    else if (ua.includes('Macintosh')) os = 'macOS';
-    else if (ua.includes('iPhone')) os = 'iOS';
-    else if (ua.includes('Android')) os = 'Android';
-
-    return `${browser} • ${os} (${isVi ? 'Thiết bị này' : 'This device'})`;
   };
 
   const getRoleBadge = () => {
@@ -315,7 +289,6 @@ export const Profile: React.FC = () => {
             [
               { key: 'general', label: isVi ? 'Thông tin cá nhân' : 'General Profile', icon: User },
               { key: 'security', label: isVi ? 'Bảo mật & Mật khẩu' : 'Security & Password', icon: Shield },
-              { key: 'sessions', label: isVi ? 'Phiên & Thiết bị' : 'Active Sessions', icon: Laptop },
             ] as const
           ).map((tab) => {
             const Icon = tab.icon;
@@ -697,62 +670,6 @@ export const Profile: React.FC = () => {
                 </form>
               </div>
 
-              {/* 2FA Toggle */}
-              <div className="card" style={{ padding: '24px' }}>
-                <h3 className="headline-md" style={{ marginBottom: '6px' }}>{isVi ? 'Xác Thực Hai Yếu Tố (2FA)' : 'Two-Factor Authentication'}</h3>
-                <p className="body-sm text-on-surface-variant" style={{ marginBottom: '20px' }}>
-                  {isVi ? 'Tăng cường bảo mật với mã OTP qua ứng dụng Google Authenticator.' : 'Secure account with an Authenticator OTP challenge.'}
-                </p>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--surface-container-low)', marginBottom: '16px' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px' }}>{isVi ? 'Bật mã xác thực 2FA' : 'Enable 2FA OTP'}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                      {twoFactorEnabled ? (isVi ? 'Đang bảo vệ tài khoản' : 'Account is protected') : (isVi ? 'Đang tắt' : 'Disabled')}
-                    </div>
-                  </div>
-                  <label className="adm-switch">
-                    <input 
-                      type="checkbox" 
-                      checked={twoFactorEnabled} 
-                      onChange={() => setTwoFactorEnabled(!twoFactorEnabled)} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Tab 3: Active Sessions */}
-          {activeTab === 'sessions' && (
-            <div className="card" style={{ padding: '24px' }}>
-              <h3 className="headline-md" style={{ marginBottom: '6px' }}>{isVi ? 'Các Thiết Bị Đang Đăng Nhập (Active Sessions)' : 'Active Login Sessions'}</h3>
-              <p className="body-sm text-on-surface-variant" style={{ marginBottom: '20px' }}>
-                {isVi ? 'Được đồng bộ trực tiếp với token bảo mật của hệ thống EnglishHub.' : 'Synchronized with system authentication credentials.'}
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', border: '1px solid var(--outline-variant)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <Laptop size={22} color="var(--primary)" />
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '14px' }}>{getDeviceName()}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
-                        {email} • {isVi ? 'Phiên làm việc hiện tại' : 'Current active session'}
-                      </div>
-                    </div>
-                  </div>
-                  <button 
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleLogoutCurrentSession}
-                    style={{ color: 'var(--error)' }}
-                  >
-                    {isVi ? 'Đăng xuất' : 'Logout'}
-                  </button>
-                </div>
-              </div>
             </div>
           )}
         </>

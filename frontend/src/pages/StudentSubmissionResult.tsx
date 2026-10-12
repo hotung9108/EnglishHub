@@ -99,7 +99,8 @@ export const StudentSubmissionResult: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { user } = useAuth();
 
   // State
@@ -368,9 +369,10 @@ export const StudentSubmissionResult: React.FC = () => {
     return 100;
   }, [gradingDetail, activeSubModule, moduleDetail, aiSuggestion]);
 
-  const bandScore = useMemo<string>(() => {
+  const standardScore10 = useMemo<string>(() => {
     if (rawScore == null) return '--';
-    const computed = (rawScore / maxScore) * 9;
+    if (maxScore === 10) return rawScore.toFixed(1);
+    const computed = (rawScore / maxScore) * 10;
     return computed.toFixed(1);
   }, [rawScore, maxScore]);
 
@@ -797,16 +799,16 @@ export const StudentSubmissionResult: React.FC = () => {
           <div className="result-hero-score-box">
             <div className="result-score-main">
               <span className="result-score-number">
-                {isLoading ? '...' : bandScore}
+                {isLoading ? '...' : standardScore10}
               </span>
-              <span className="result-score-label">{t('studentResult.bandScore')}</span>
+              <span className="result-score-label">{isVi ? 'Thang 10' : 'Scale 10'}</span>
             </div>
             <div className="result-score-divider" />
             <div className="result-score-sub">
               <span className="result-score-100">
                 {isLoading ? '...' : rawScore != null ? `${rawScore} / ${maxScore}` : `-- / ${maxScore}`}
               </span>
-              <span className="result-score-sub-label">{t('studentResult.score100')}</span>
+              <span className="result-score-sub-label">{isVi ? 'Điểm thô' : 'Raw Score'}</span>
               <span className="result-score-status-pill">
                 {rawScore != null && (maxScore > 0 ? (rawScore / maxScore) >= 0.5 : rawScore >= 50) ? (
                   <>
@@ -1122,7 +1124,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     {criteriaList.map((crit) => (
                       <div key={crit.key} className="flex-between">
                         <span className="text-on-surface-variant">{crit.title}:</span>
-                        <strong className="text-primary">{crit.score} / 9.0</strong>
+                        <strong className="text-primary">{crit.score} / 10</strong>
                       </div>
                     ))}
                   </div>
@@ -1226,14 +1228,14 @@ export const StudentSubmissionResult: React.FC = () => {
               <div className="flex-col gap-20">
                 <div className="result-card p-20">
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: 'var(--on-surface)' }}>
-                    Tiêu chí IELTS Speaking:
+                    {isVi ? 'Tiêu chí đánh giá Speaking:' : 'Speaking Criteria:'}
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px' }}>
                     {criteriaList.map((crit) => (
                       <div key={crit.key}>
                         <div className="flex-between" style={{ marginBottom: 4 }}>
                           <span className="text-on-surface-variant">{crit.title}:</span>
-                          <strong className="text-primary">{crit.score} / 9.0</strong>
+                          <strong className="text-primary">{crit.score} / 10</strong>
                         </div>
                         <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--on-surface-variant)' }}>{crit.desc}</p>
                       </div>
@@ -1416,14 +1418,14 @@ export const StudentSubmissionResult: React.FC = () => {
                   <div className="result-rubric-header">
                     <h3 className="result-rubric-title">{crit.title}</h3>
                     <span className="result-rubric-score" style={{ color }}>
-                      {hasScore ? `${crit.score} / 9.0` : '-- / 9.0'}
+                      {hasScore ? `${crit.score} / 10` : '-- / 10'}
                     </span>
                   </div>
                   <div className="result-rubric-bar-track">
                     <div 
                       className="result-rubric-bar-fill" 
                       style={{ 
-                        width: hasScore ? `${(numScore / 9) * 100}%` : '0%', 
+                        width: hasScore ? `${(numScore / 10) * 100}%` : '0%', 
                         backgroundColor: color 
                       }} 
                     />

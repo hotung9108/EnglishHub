@@ -113,8 +113,8 @@ export const TeacherClassProgress: React.FC = () => {
       // 3. Fetch class detail
       let classDetail: ClassDetail = {
         ...targetClassSummary,
-        level: 'IELTS Band 6.5 - 7.5',
-        description: 'Lớp luyện thi IELTS chuyên sâu 4 kỹ năng',
+        level: 'Tiếng Anh Tổng Quát - B2',
+        description: 'Lớp luyện tập Tiếng Anh chuyên sâu 4 kỹ năng',
         memberCount: 0
       };
 

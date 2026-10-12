@@ -188,7 +188,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                 style={{ width: '100px' }}
               />
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                {isVi ? 'phút (Chuẩn 1 passage: 20m)' : 'minutes (IELTS 1 passage: 20m)'}
+                {isVi ? 'phút' : 'minutes'}
               </span>
             </div>
           </div>

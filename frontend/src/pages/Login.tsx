@@ -67,7 +67,7 @@ const LoginForm: React.FC = () => {
               </div>
               <div>
                 <div className="login-brand-name">EnglishHub</div>
-                <div className="login-brand-tag">IELTS & Academic Platform</div>
+                <div className="login-brand-tag">English Learning Platform</div>
               </div>
             </div>
 
@@ -100,7 +100,7 @@ const LoginForm: React.FC = () => {
                     {isVi ? 'AI Chấm Điểm 4 Kỹ Năng' : 'AI Multi-Skill Evaluation'}
                   </h2>
                   <p className="login-feature-text-sub">
-                    {isVi ? 'Đánh giá tự động theo chuẩn tiêu chí Band Descriptors của British Council & IDP.' : 'Automated grading calibrated with official IELTS descriptors.'}
+                    {isVi ? 'Đánh giá tự động theo chuẩn 4 kỹ năng Writing, Reading, Listening, Speaking.' : 'Automated grading calibrated for the 4 core English skills.'}
                   </p>
                 </div>
               </div>
@@ -147,11 +147,11 @@ const LoginForm: React.FC = () => {
             </div>
             <p className="login-testimonial-quote">
               {isVi 
-                ? '"Hệ thống gợi ý sửa lỗi phát âm và bài viết IELTS giúp em tăng từ Band 6.5 lên 7.5 chỉ sau 2 tháng luyện tập!"' 
-                : '"The AI sentence annotation and teacher feedback helped me advance from Band 6.5 to 7.5 in 2 months!"'}
+                ? '"Hệ thống gợi ý sửa lỗi phát âm và bài viết giúp em tăng điểm đáng kể chỉ sau 2 tháng luyện tập!"' 
+                : '"The AI sentence annotation and teacher feedback helped me advance my skills noticeably in 2 months!"'}
             </p>
             <div className="login-testimonial-author">
-              — Alice Johnson (IELTS 8.0 Candidate)
+              — Alice Johnson (Học viên xuất sắc)
             </div>
           </div>
         </div>

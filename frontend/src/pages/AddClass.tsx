@@ -23,7 +23,7 @@ export const AddClass: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    level: 'IELTS 6.5+',
+    level: 'Trung cấp (B1-B2)',
     room: '',
     startDate: new Date().toISOString().slice(0, 10),
     endDate: '',
@@ -178,7 +178,7 @@ export const AddClass: React.FC = () => {
                   <input 
                     type="text"
                     className="input"
-                    placeholder={isVi ? 'Ví dụ: IELTS Intensive Band 6.5 - 7.5' : 'e.g., IELTS Intensive Band 6.5 - 7.5'}
+                    placeholder={isVi ? 'Ví dụ: Tiếng Anh Tổng Quát 4 Kỹ Năng K24' : 'e.g., General English 4 Skills K24'}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
@@ -204,11 +204,10 @@ export const AddClass: React.FC = () => {
                       value={formData.level}
                       onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                     >
-                      <option value="IELTS 5.5+">IELTS Pre-Int (5.5+)</option>
-                      <option value="IELTS 6.5+">IELTS Intensive (6.5+)</option>
-                      <option value="IELTS 7.0+">IELTS Master (7.0+)</option>
-                      <option value="TOEIC 750+">TOEIC Cấp tốc 750+</option>
-                      <option value="CEFR B2">Tiếng Anh Giao tiếp B2</option>
+                      <option value="Sơ cấp (A2-B1)">Sơ cấp (A2 - B1)</option>
+                      <option value="Trung cấp (B1-B2)">Trung cấp (B1 - B2)</option>
+                      <option value="Cao cấp (C1)">Cao cấp (C1)</option>
+                      <option value="Giao tiếp 4 kỹ năng">Giao tiếp 4 kỹ năng</option>
                     </select>
                   </div>
                 </div>

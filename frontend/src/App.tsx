@@ -5,7 +5,6 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
-import Roles from './pages/Roles';
 import Classes from './pages/Classes';
 import AddClass from './pages/AddClass';
 import ClassDetails from './pages/ClassDetails';
@@ -27,7 +26,6 @@ import StudentAssignmentSpeaking from './pages/StudentAssignmentSpeaking';
 import StudentSubmissionResult from './pages/StudentSubmissionResult';
 import StudentAssignmentOverview from './pages/StudentAssignmentOverview';
 import StudentDashboard from './pages/StudentDashboard';
-import StudentWorkspace from './pages/StudentWorkspace';
 import StudentFeedback from './pages/StudentFeedback';
 import StudentGrades from './pages/StudentGrades';
 import StudentAnalytics from './pages/StudentAnalytics';
@@ -35,13 +33,11 @@ import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
 import TeacherEditAssignment from './pages/TeacherEditAssignment';
-import TeacherExamBank from './pages/TeacherExamBank';
 import TeacherSubmissionDetails from './pages/TeacherSubmissionDetails';
 import TeacherClassProgress from './pages/TeacherClassProgress';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDetails from './pages/StudentDetails';
 import AdminReports from './pages/AdminReports';
-import AdminSettings from './pages/AdminSettings';
 import AdminGradingAuditLogs from './pages/AdminGradingAuditLogs';
 import AdminClassArchive from './pages/AdminClassArchive';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -86,7 +82,7 @@ function App() {
             <Route path="accounts" element={<Accounts />} />
             <Route path="accounts/profile" element={<Profile />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="roles" element={<Roles />} />
+            <Route path="roles" element={<Navigate to="/admin/accounts" replace />} />
             <Route path="classes" element={<Classes />} />
             <Route path="classes/create" element={<AddClass />} />
             <Route path="classes/archive" element={<AdminClassArchive />} />
@@ -99,7 +95,7 @@ function App() {
             <Route path="students/:id" element={<StudentDetails />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="audit/gradings" element={<AdminGradingAuditLogs />} />
-            <Route path="settings" element={<AdminSettings />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         </Route>
 
@@ -121,8 +117,8 @@ function App() {
             <Route path="assignments/:id/edit" element={<TeacherEditAssignment />} />
             <Route path="assignments/edit/:id" element={<TeacherEditAssignment />} />
             <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
-            <Route path="exam-bank" element={<TeacherExamBank />} />
-            <Route path="assignments/templates" element={<Navigate to="/teacher/exam-bank" replace />} />
+            <Route path="exam-bank" element={<Navigate to="/teacher/assignments" replace />} />
+            <Route path="assignments/templates" element={<Navigate to="/teacher/assignments" replace />} />
             <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />
           </Route>
@@ -143,7 +139,7 @@ function App() {
             <Route path="assignments/reading/:id" element={<StudentAssignmentReading />} />
             <Route path="assignments/listening/:id" element={<StudentAssignmentListening />} />
             <Route path="assignments/speaking/:id" element={<StudentAssignmentSpeaking />} />
-            <Route path="workspace" element={<StudentWorkspace />} />
+            <Route path="workspace" element={<Navigate to="/student/assignments" replace />} />
             <Route path="feedback" element={<StudentFeedback />} />
             <Route path="grades" element={<StudentGrades />} />
             <Route path="analytics" element={<StudentAnalytics />} />

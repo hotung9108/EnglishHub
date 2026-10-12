@@ -674,8 +674,8 @@ export const TeacherAssignments: React.FC = () => {
             </div>
             <p style={{ fontSize: '13.5px', color: 'var(--on-surface-variant)', margin: '0 0 20px 0' }}>
               {isVi 
-                ? 'Hệ thống tự động tích hợp rubric chấm điểm chuẩn IELTS và bộ công cụ chẩn đoán AI cho từng kỹ năng.' 
-                : 'Automated IELTS rubrics and AI assessment engines will be calibrated for your assignment.'}
+                ? 'Chọn 1 trong 4 kỹ năng tiếng Anh để thiết lập nội dung đề bài.' 
+                : 'Select one of the 4 skills to configure assignment content.'}
             </p>
 
             <div className="skill-card-grid">

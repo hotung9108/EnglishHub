@@ -270,7 +270,7 @@ export const AdminSettings: React.FC = () => {
 
             <div className="card" style={{ padding: '24px' }}>
               <h3 className="headline-md" style={{ marginBottom: '6px' }}>
-                {isVi ? 'Prompt Hệ Thống Mặc Định (System Prompt Template)' : 'Default IELTS Grading Prompt Template'}
+                {isVi ? 'Prompt Hệ Thống Mặc Định (System Prompt Template)' : 'Default Grading Prompt Template'}
               </h3>
               <p className="body-sm text-on-surface-variant" style={{ marginBottom: '16px' }}>
                 {isVi ? 'Khung chỉ dẫn được nhúng vào snapshot ai_instruction_snapshot của bảng gradings trong CSDL.' : 'Core rubric instruction stored into gradings.ai_instruction_snapshot.'}
@@ -278,12 +278,12 @@ export const AdminSettings: React.FC = () => {
               <textarea 
                 className="input" 
                 rows={6}
-                defaultValue={`You are an official senior IELTS Cambridge Examiner.
-Assess the candidate's essay strictly against official IELTS Band Descriptors (9.0 scale):
-1. Task Achievement / Task Response (Weight 25%)
-2. Coherence and Cohesion (Weight 25%)
-3. Lexical Resource & Collocations (Weight 25%)
-4. Grammatical Range and Accuracy (Weight 25%)
+                defaultValue={`You are an expert English language evaluator.
+Assess the candidate's submission on a standard 10-point scale:
+1. Task Completion & Relevance (Content)
+2. Coherence and Organization (Structure)
+3. Lexical Resource & Vocabulary (Vocabulary)
+4. Grammatical Accuracy (Grammar)
 Return JSON output with detailed annotations, error start/end offsets, and constructive recommendations.`}
                 style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.5 }}
               />

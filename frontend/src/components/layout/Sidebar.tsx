@@ -12,9 +12,7 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  Layout,
-  History,
-  Library
+  History
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -61,15 +59,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {
         title: t('sectionManagement'),
         items: [
-          { 
-            path: '/admin/accounts', 
-            label: t('menuAccounts'),
-            icon: Users,
-            children: [
-              { path: '/admin/accounts/profile', label: t('menuProfile') },
-              { path: '/admin/roles', label: t('menuRoles') }
-            ]
-          },
+          { path: '/admin/accounts', label: t('menuAccounts'), icon: Users },
           { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
           { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
           { path: '/admin/students', label: t('menuStudents'), icon: Users },
@@ -95,7 +85,6 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
-          { path: '/teacher/exam-bank', label: t('menuExamBank'), icon: Library },
         ]
       },
       {
@@ -117,7 +106,6 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList, badge: '7' },
-          { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
         ]
       },
       {

@@ -130,7 +130,7 @@ export const StudentFeedback: React.FC = () => {
 
           const isAi = idx % 2 === 0;
           const scoreVal = sub.modules?.[0]?.grading?.finalScore;
-          const bandVal = scoreVal !== undefined && scoreVal !== null ? (scoreVal / 10).toFixed(1) : '--';
+          const score10Val = scoreVal !== undefined && scoreVal !== null ? (scoreVal <= 10 ? scoreVal.toFixed(1) : (scoreVal / 10).toFixed(1)) : '--';
 
           dynamicList.push({
             id: `sub-fb-${sub.id}`,
@@ -140,13 +140,13 @@ export const StudentFeedback: React.FC = () => {
             skill: detectedSkill,
             reviewerType: isAi ? 'ai' : 'teacher',
             reviewerName: isAi ? 'EnglishHub AI Diagnostic Engine' : (isVi ? 'Giáo viên phụ trách' : 'Instructor'),
-            reviewerRole: isAi ? 'Automated Rubric & Acoustic Model' : (isVi ? 'Giảng viên Chuyên môn' : 'Instructor'),
+            reviewerRole: isAi ? 'AI Evaluation' : (isVi ? 'Giảng viên Chuyên môn' : 'Instructor'),
             date: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '',
-            score: bandVal !== '--' ? `Band ${bandVal}` : '--',
-            badgeType: bandVal !== '--' ? `Band ${bandVal}` : (isVi ? 'Đã chấm' : 'Graded'),
+            score: score10Val !== '--' ? `${score10Val} / 10` : '--',
+            badgeType: score10Val !== '--' ? `${score10Val} / 10` : (isVi ? 'Đã chấm' : 'Graded'),
             summaryComment: isAi 
-              ? 'Hệ thống AI đã phân tích chi tiết câu trả lời của bạn theo chuẩn khung năng lực IELTS. Độ chính xác từ vựng và ngữ pháp đạt mức tốt.'
-              : 'Bài làm tốt, bố cục chặt chẽ. Cần chú ý hoàn thiện thêm các liên từ học thuật và đa dạng hóa cấu trúc câu phức.',
+              ? 'Hệ thống AI đã phân tích chi tiết câu trả lời của bạn. Độ chính xác từ vựng và ngữ pháp đạt mức tốt.'
+              : 'Bài làm tốt, bố cục chặt chẽ. Cần chú ý hoàn thiện thêm các liên từ và đa dạng hóa cấu trúc câu.',
             keyStrengths: [
               'Bám sát yêu cầu đề bài và phân bổ thời gian hợp lý',
               'Sử dụng linh hoạt các liên từ chuyển tiếp'

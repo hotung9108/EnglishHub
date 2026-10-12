@@ -215,39 +215,39 @@ export const StudentWorkspace: React.FC = () => {
   const resources: StudyResource[] = [
     {
       id: 'res-1',
-      title: 'IELTS Academic Writing Task 2 Official Band Descriptors',
+      title: 'Hướng Dẫn Làm Bài & Tiêu Chí Đánh Giá Writing (Thang 10)',
       category: 'Writing Guide',
       format: 'PDF',
       size: '2.4 MB',
       downloads: 1420,
-      description: isVi ? 'Chi tiết 4 tiêu chí chấm điểm: Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range.' : 'Official 4-criteria assessment rubric published by British Council / IDP.'
+      description: isVi ? 'Chi tiết các tiêu chí đánh giá kỹ năng Viết: Bố cục, Ngữ pháp, Từ vựng, Sự mạch lạc.' : 'Detailed assessment criteria for Writing: Structure, Grammar, Vocabulary, and Coherence.'
     },
     {
       id: 'res-2',
-      title: 'Speaking Part 2 & 3 High-Band Idiomatic Phrases & Fillers',
+      title: 'Tổng Hợp Từ Vựng & Cụm Từ Giao Tiếp Speaking Thông Dụng',
       category: 'Speaking Materials',
       format: 'PDF',
       size: '1.8 MB',
       downloads: 980,
-      description: isVi ? 'Tổng hợp 100+ thành ngữ học thuật, cụm collocations tự nhiên và từ nối tư duy phản biện.' : '100+ natural academic idioms, discourse markers, and thinking fillers.'
+      description: isVi ? 'Tổng hợp 100+ từ vựng, thành ngữ giao tiếp tự nhiên và các cấu trúc câu phản xạ nhanh.' : '100+ natural idioms, discourse markers, and thinking fillers.'
     },
     {
       id: 'res-3',
-      title: 'Cambridge IELTS 19 Academic Listening Practice Audio Test 1-4',
+      title: 'Luyện Nghe Tiếng Anh Tổng Quát & Audio File 1-4',
       category: 'Listening Practice',
       format: 'Audio MP3',
       size: '64 MB',
       downloads: 2150,
-      description: isVi ? 'Trọn bộ audio chuẩn giọng Anh - Úc - Mỹ kèm bảng script phân tích bẫy nghe.' : 'Complete audio tracks with scripts and distractor analysis.'
+      description: isVi ? 'Trọn bộ audio chuẩn giọng đọc kèm bảng script và giải thích chi tiết.' : 'Complete audio tracks with scripts and explanations.'
     },
     {
       id: 'res-4',
-      title: 'Model Essays Band 8.5+ with Teacher Annotations',
+      title: 'Tuyển Tập Bài Luận Mẫu Điểm Cao (Thang 10) Có Nhận Xét',
       category: 'Writing Samples',
       format: 'PDF',
       size: '3.1 MB',
       downloads: 1890,
-      description: isVi ? 'Tuyển tập 25 bài luận mẫu điểm cao phân tích cấu trúc lập luận và ngữ pháp phức hợp.' : 'Collection of 25 band 8.5+ essays with thorough analytical breakdown.'
+      description: isVi ? 'Tuyển tập 25 bài luận mẫu xuất sắc phân tích cấu trúc lập luận và cách dùng từ.' : 'Collection of 25 top essays with thorough analytical breakdown.'
     }
   ];
 
@@ -670,10 +670,10 @@ export const StudentWorkspace: React.FC = () => {
         <div>
           <div className="mb-24">
             <h3 className="m-0 font-bold text-on-surface" style={{ fontSize: '16px' }}>
-              {isVi ? 'Thư Viện Tài Liệu & Đề Thi Mẫu' : 'Official IELTS Practice Materials & Guides'}
+              {isVi ? 'Thư Viện Tài Liệu 4 Kỹ Năng' : '4-Skill Study Materials & Guides'}
             </h3>
             <p className="m-0 mt-4 text-on-surface-variant" style={{ fontSize: '13px' }}>
-              {isVi ? 'Tài liệu tiêu chuẩn do EnglishHub biên soạn và chọn lọc từ Cambridge & Hội đồng Anh.' : 'Verified academic materials, rubrics, and high-band practice audio files.'}
+              {isVi ? 'Tài liệu học tập và rèn luyện 4 kỹ năng do EnglishHub biên soạn và chọn lọc.' : 'Study materials and practice resources curated for the 4 core English skills.'}
             </p>
           </div>
 

@@ -487,7 +487,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
               {metrics.avgBand !== '0.0' ? metrics.avgBand : '—'}
             </div>
             <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: 500 }}>
-              {t('assignmentDetails.bandSuffix')}
+              / 10
             </span>
           </div>
         </div>
@@ -500,9 +500,6 @@ export const TeacherAssignmentDetails: React.FC = () => {
             <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>
               <FileText size={20} color="#2563EB" /> {t('assignmentDetails.promptTitle')}
             </h2>
-            <span style={{ border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '6px', fontSize: '13px', color: '#6B7280', backgroundColor: '#F9FAFB' }}>
-              IELTS Standard
-            </span>
           </div>
           <div style={{ color: '#374151', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
             {instructions}

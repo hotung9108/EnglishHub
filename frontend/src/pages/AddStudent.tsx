@@ -27,8 +27,8 @@ export const AddStudent: React.FC = () => {
     password: '',
     parentPhone: '',
     dob: '',
-    entryBand: '5.5 IELTS',
-    targetBand: '7.0 IELTS',
+    entryBand: 'Thang 10: 6.0',
+    targetBand: 'Thang 10: 8.0+',
     assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
@@ -303,24 +303,24 @@ export const AddStudent: React.FC = () => {
                       value={formData.entryBand}
                       onChange={(e) => setFormData({ ...formData, entryBand: e.target.value })}
                     >
-                      <option value="5.0 IELTS">5.0 IELTS</option>
-                      <option value="5.5 IELTS">5.5 IELTS</option>
-                      <option value="6.0 IELTS">6.0 IELTS</option>
-                      <option value="550 TOEIC">550 TOEIC</option>
+                      <option value="Thang 10: 5.0">Thang 10: 5.0</option>
+                      <option value="Thang 10: 6.0">Thang 10: 6.0</option>
+                      <option value="Thang 10: 7.0">Thang 10: 7.0</option>
+                      <option value="Sơ cấp (A2-B1)">Sơ cấp (A2 - B1)</option>
                     </select>
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mục tiêu chứng chỉ' : 'Target Band'}</label>
+                    <label className="adm-form-label">{isVi ? 'Mục tiêu học tập' : 'Target Goal'}</label>
                     <select 
                       className="input"
                       value={formData.targetBand}
                       onChange={(e) => setFormData({ ...formData, targetBand: e.target.value })}
                     >
-                      <option value="6.5 IELTS">6.5 IELTS</option>
-                      <option value="7.0 IELTS">7.0 IELTS</option>
-                      <option value="7.5 IELTS">7.5 IELTS</option>
-                      <option value="800+ TOEIC">800+ TOEIC</option>
+                      <option value="Thang 10: 7.0+">Thang 10: 7.0+</option>
+                      <option value="Thang 10: 8.0+">Thang 10: 8.0+</option>
+                      <option value="Thang 10: 8.5+">Thang 10: 8.5+</option>
+                      <option value="Thang 10: 9.0+">Thang 10: 9.0+</option>
                     </select>
                   </div>
                 </div>

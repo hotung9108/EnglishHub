@@ -30,7 +30,7 @@ export const Teachers: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterExpertise, setFilterExpertise] = useState<'All' | 'IELTS' | 'TOEIC' | 'Grammar'>('All');
+  const [filterExpertise, setFilterExpertise] = useState<'All' | 'TESOL' | 'Writing' | 'Speaking'>('All');
   const [totalClassesCount, setTotalClassesCount] = useState(0);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export const Teachers: React.FC = () => {
             name: tc.fullName,
             avatar: initials || 'GV',
             email: tc.email,
-            certs: 'TESOL / IELTS Standard',
+            certs: 'TESOL / Chuẩn Sư Phạm',
             activeClasses: assignedCount,
             status: tc.status === 'LOCKED' ? 'Blocked' : 'Active'
           };
@@ -207,7 +207,7 @@ export const Teachers: React.FC = () => {
       {/* Filter Bar */}
       <div className="adm-filter-bar">
         <div className="adm-pills">
-          {(['All', 'IELTS', 'TOEIC', 'Grammar'] as const).map(exp => (
+          {(['All', 'TESOL', 'Writing', 'Speaking'] as const).map(exp => (
             <button
               key={exp}
               onClick={() => setFilterExpertise(exp)}

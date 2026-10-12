@@ -477,7 +477,7 @@ export const TeacherExamBank: React.FC = () => {
           taskType: taskType,
           orderIndex: 0,
           instructions: instructions,
-          aiInstruction: assigningExam.details?.rubricsSummary || 'Chấm điểm chi tiết theo tiêu chuẩn Cambridge IELTS',
+          aiInstruction: assigningExam.details?.rubricsSummary || 'Chấm điểm chi tiết theo thang điểm 10',
           maxScore: 10,
         });
       }
@@ -540,8 +540,8 @@ export const TeacherExamBank: React.FC = () => {
             </h1>
             <p className="exam-hero-subtitle">
               {isVi
-                ? 'Thư viện đề thi chuẩn Cambridge IELTS, TOEIC và học liệu 4 kỹ năng được hiệu chuẩn sẵn rubric chấm điểm và AI diagnostics. Giao bài nhanh cho lớp chỉ với 1 cú click.'
-                : 'Curated repository of official Cambridge IELTS, TOEIC, and 4-skill exam modules with calibrated rubrics and AI assessment presets.'}
+                ? 'Thư viện đề thi và học liệu 4 kỹ năng (Writing, Reading, Listening, Speaking) tích hợp sẵn rubric chấm điểm và AI hỗ trợ. Giao bài nhanh cho lớp chỉ với 1 cú click.'
+                : 'Curated repository of 4-skill exam modules with calibrated rubrics and AI assessment presets.'}
             </p>
           </div>
 
@@ -559,10 +559,10 @@ export const TeacherExamBank: React.FC = () => {
               type="button" 
               className="btn btn-primary btn-sm"
               style={{ backgroundColor: '#2563eb', borderColor: '#3b82f6', fontWeight: 700 }}
-              onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi Cambridge 20...' : 'Syncing Cambridge 20 Exam Bank...')}
+              onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi mẫu mới...' : 'Syncing Exam Bank...')}
             >
               <Sparkles size={16} />
-              <span>{isVi ? 'Đồng bộ Cambridge' : 'Sync Cambridge'}</span>
+              <span>{isVi ? 'Đồng bộ đề thi' : 'Sync Bank'}</span>
             </button>
           </div>
         </div>
@@ -586,7 +586,7 @@ export const TeacherExamBank: React.FC = () => {
           </div>
           <div>
             <div className="exam-stat-num">100% {isVi ? 'Rubric Chuẩn' : 'Calibrated'}</div>
-            <div className="exam-stat-label">{isVi ? 'Tích hợp sẵn thang điểm AI' : 'Official IELTS Band Descriptors'}</div>
+            <div className="exam-stat-label">{isVi ? 'Tích hợp sẵn thang điểm 10' : 'Calibrated 10-Scale Rubrics'}</div>
           </div>
         </div>
 

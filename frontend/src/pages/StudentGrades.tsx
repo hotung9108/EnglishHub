@@ -27,16 +27,9 @@ interface GradeRow {
   status: 'graded' | 'pending';
 }
 
-function convertScoreToBand(score: number): number {
-  if (score >= 95) return 9.0;
-  if (score >= 90) return 8.5;
-  if (score >= 82) return 8.0;
-  if (score >= 75) return 7.5;
-  if (score >= 68) return 7.0;
-  if (score >= 60) return 6.5;
-  if (score >= 50) return 6.0;
-  if (score >= 40) return 5.5;
-  return 5.0;
+function convertTo10Scale(rawScore: number): number {
+  if (rawScore <= 10) return rawScore;
+  return parseFloat((rawScore / 10).toFixed(1));
 }
 
 export const StudentGrades: React.FC = () => {
@@ -48,7 +41,7 @@ export const StudentGrades: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [grades, setGrades] = useState<GradeRow[]>([]);
-  const [overallBand, setOverallBand] = useState<number | null>(null);
+  const [overallAvg, setOverallAvg] = useState<number | null>(null);
   const [progressDelta, setProgressDelta] = useState<number>(0);
 
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -100,7 +93,7 @@ export const StudentGrades: React.FC = () => {
       const rows: GradeRow[] = submissions.map((sub, idx) => {
         const assignmentIdStr = String(sub.assignmentId || sub.id);
         const assignment = assignmentMap.get(assignmentIdStr);
-        const classTitle = classes.length > 0 ? (classes[0].name) : 'IELTS Intensive 6.5 - 7.5';
+        const classTitle = classes.length > 0 ? (classes[0].name) : (isVi ? 'Lớp Tiếng Anh Tổng Quát' : 'General English Class');
         
         let detectedSkill: 'Writing' | 'Speaking' | 'Reading' | 'Listening' = 'Writing';
         const titleLower = (assignment?.title || '').toLowerCase();
@@ -110,7 +103,7 @@ export const StudentGrades: React.FC = () => {
 
         const isGraded = sub.status === 'GRADED';
         const rawScoreVal = sub.modules?.[0]?.grading?.finalScore ?? null;
-        const bandScore = rawScoreVal !== null ? convertScoreToBand(rawScoreVal) : 7.0;
+        const score10 = rawScoreVal !== null ? convertTo10Scale(rawScoreVal) : 7.0;
 
         return {
           id: sub.id ? `grade-${sub.id}` : `grade-${idx}`,
@@ -122,7 +115,7 @@ export const StudentGrades: React.FC = () => {
           submittedDate: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '2026-03-20',
           weight: '15%',
           rawScore: rawScoreVal !== null ? `${rawScoreVal}/100` : '--',
-          scaledGrade: isGraded ? `${bandScore.toFixed(1)} / 9.0` : (isVi ? 'Đang chấm' : 'Evaluating'),
+          scaledGrade: isGraded ? `${score10.toFixed(1)} / 10` : (isVi ? 'Đang chấm' : 'Evaluating'),
           status: isGraded ? 'graded' : 'pending'
         };
       });
@@ -131,24 +124,24 @@ export const StudentGrades: React.FC = () => {
         setGrades(rows);
         const gradedRows = rows.filter(r => r.status === 'graded');
         if (gradedRows.length > 0) {
-          const totalBands = gradedRows.reduce((acc, curr) => {
+          const totalScores = gradedRows.reduce((acc, curr) => {
             const b = parseFloat(curr.scaledGrade.split('/')[0].trim());
             return acc + (isNaN(b) ? 0 : b);
           }, 0);
-          setOverallBand(parseFloat((totalBands / gradedRows.length).toFixed(1)));
+          setOverallAvg(parseFloat((totalScores / gradedRows.length).toFixed(1)));
         } else {
-          setOverallBand(null);
+          setOverallAvg(null);
         }
       } else {
         setGrades([]);
-        setOverallBand(null);
+        setOverallAvg(null);
       }
 
       if (progressRes.status === 'fulfilled' && progressRes.value) {
         const sk = progressRes.value.skillAverages;
         if (sk && sk.length > 0) {
           const avg = sk.reduce((acc, curr) => acc + curr.averageScorePercent, 0) / sk.length;
-          setOverallBand(convertScoreToBand(avg));
+          setOverallAvg(convertTo10Scale(avg));
           setProgressDelta(0.5);
         } else {
           setProgressDelta(0);
@@ -162,7 +155,7 @@ export const StudentGrades: React.FC = () => {
       console.error('Failed to load student grade book', err);
       setError(isVi ? 'Không thể tải bảng điểm từ máy chủ.' : 'Failed to fetch student grade book from server.');
       setGrades([]);
-      setOverallBand(null);
+      setOverallAvg(null);
     } finally {
       if (isMounted) {
         setLoading(false);
@@ -239,8 +232,8 @@ export const StudentGrades: React.FC = () => {
           </h1>
           <p className="m-0 text-on-surface-variant" style={{ fontSize: '15px' }}>
             {isVi 
-              ? 'Theo dõi chi tiết điểm số từng bài nộp, trọng số học phần và kết quả quy đổi theo chuẩn IELTS.' 
-              : 'Track assignment grades, weighted GPA, and standardized IELTS band scale equivalents.'}
+              ? 'Theo dõi chi tiết điểm số từng bài nộp theo 4 kỹ năng: Writing, Reading, Listening và Speaking.' 
+              : 'Track assignment grades across Writing, Reading, Listening, and Speaking skills.'}
           </p>
         </div>
 
@@ -277,9 +270,9 @@ export const StudentGrades: React.FC = () => {
           </div>
           <div>
             <div className="font-bold text-on-surface mb-4" style={{ fontSize: '20px' }}>
-              {overallBand !== null && overallBand > 0 ? `Band ${overallBand.toFixed(1)}` : '--'}
+              {overallAvg !== null && overallAvg > 0 ? `${overallAvg.toFixed(1)} / 10` : '--'}
             </div>
-            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Điểm TB Tích lũy (Overall Band)' : 'Cumulative Band Score'}</div>
+            <div className="text-on-surface-variant" style={{ fontSize: '13px' }}>{isVi ? 'Điểm TB Tích lũy (Thang 10)' : 'Cumulative Grade (Scale 10)'}</div>
           </div>
         </div>
 
@@ -381,7 +374,7 @@ export const StudentGrades: React.FC = () => {
                 <th className="p-16-24 font-bold border-b">{isVi ? 'Ngày nộp' : 'Submitted Date'}</th>
                 <th className="p-16-24 font-bold border-b">{isVi ? 'Trọng số' : 'Weight'}</th>
                 <th className="p-16-24 font-bold border-b">{isVi ? 'Điểm thô' : 'Raw Score'}</th>
-                <th className="p-16-24 font-bold border-b">{isVi ? 'Quy đổi IELTS' : 'Equivalent Band'}</th>
+                <th className="p-16-24 font-bold border-b">{isVi ? 'Điểm số (Thang 10)' : 'Score (Scale 10)'}</th>
                 <th className="p-16-24 font-bold border-b">{isVi ? 'Trạng thái' : 'Status'}</th>
                 <th className="p-16-24 font-bold border-b text-right">{isVi ? 'Hành động' : 'Action'}</th>
               </tr>

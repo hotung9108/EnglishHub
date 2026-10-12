@@ -263,7 +263,7 @@ export const AddTeacher: React.FC = () => {
                   <input 
                     type="text"
                     className="input"
-                    placeholder={isVi ? 'Ví dụ: IELTS 8.5 • TESOL Certified' : 'e.g. IELTS 8.5 • TESOL Certified'}
+                    placeholder={isVi ? 'Ví dụ: TESOL Certified • 4 Kỹ năng Tiếng Anh' : 'e.g. TESOL Certified • 4 English Skills'}
                     value={formData.certs}
                     onChange={(e) => setFormData({ ...formData, certs: e.target.value })}
                   />

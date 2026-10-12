@@ -77,7 +77,7 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                  {data.writing.taskType === 'task2' ? 'IELTS Writing Task 2' : 'IELTS Writing Task 1'}
+                  {data.writing.taskType === 'task2' ? (isVi ? 'Bài Luận (Essay)' : 'Essay Task') : (isVi ? 'Đoạn Văn (Paragraph)' : 'Paragraph Task')}
                 </h4>
                 <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6, color: '#334155' }}>
                   {data.writing.promptText}
@@ -125,7 +125,7 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
               <div className="cue-card-container">
                 <div className="cue-card-header">
                   <Mic size={18} />
-                  <span>{isVi ? 'ĐỀ BÀI IELTS SPEAKING' : 'IELTS SPEAKING PROMPT'}</span>
+                  <span>{isVi ? 'ĐỀ BÀI SPEAKING' : 'SPEAKING PROMPT'}</span>
                 </div>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>
                   {data.speaking.cueCardTopic}

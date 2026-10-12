@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Users, Bell,
+  Calendar, Eye, Save, Send, CheckCircle2, Users,
   RefreshCw, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -73,7 +73,7 @@ export const TeacherEditAssignment: React.FC = () => {
       taskType: 'task2',
       promptText: '',
       minWords: 250,
-      scale: '9.0',
+      scale: '10',
       rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
       enableAi: true,
       aiInstruction: '',
@@ -785,37 +785,17 @@ export const TeacherEditAssignment: React.FC = () => {
               />
             </div>
 
-            <div className="edit-form-group">
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={assignmentData.allowLate}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, allowLate: e.target.checked })}
-                  style={{ marginTop: '3px', accentColor: '#2563eb' }}
-                />
-                <span style={{ fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
-                  <strong style={{ display: 'block', color: '#0f172a' }}>{isVi ? 'Cho phép nộp muộn' : 'Allow late submissions'}</strong>
-                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    {isVi ? 'Tối đa trễ 24 giờ sau deadline (tự động gắn cờ Nộp muộn).' : 'Max 24h grace period.'}
-                  </span>
-                </span>
-              </label>
-            </div>
-
             <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <label className="edit-form-label">{isVi ? 'Thời lượng làm bài có bấm giờ' : 'Duration Limit'}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="number" 
-                  className="edit-form-input" 
-                  value={assignmentData.durationMinutes || 60}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, durationMinutes: parseInt(e.target.value) || 0 })}
-                  style={{ width: '90px' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                  {isVi ? 'phút' : 'minutes'}
-                </span>
-              </div>
+              <label className="edit-form-label">{isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}</label>
+              <input 
+                type="number" 
+                min={1}
+                max={10}
+                className="edit-form-input" 
+                value={assignmentData.maxSubmissions || 3}
+                onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: parseInt(e.target.value) || 1 })}
+                style={{ width: '90px' }}
+              />
             </div>
           </section>
 
@@ -827,14 +807,13 @@ export const TeacherEditAssignment: React.FC = () => {
                   <Eye size={18} />
                 </div>
                 <div>
-                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái & Đối Tượng' : 'Publish & Audience'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Quyền truy cập của học viên' : 'Student access'}</p>
+                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái Bài Tập' : 'Publish Status'}</h3>
+                  <p className="edit-card-desc">{isVi ? 'Công khai hoặc lưu bản nháp' : 'Publish or save as draft'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Trạng thái phát hành' : 'Publish Status'}</label>
+            <div className="edit-form-group" style={{ marginBottom: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <button
                   type="button"
@@ -878,47 +857,6 @@ export const TeacherEditAssignment: React.FC = () => {
                   {isVi ? 'Bản nháp' : 'Draft'}
                 </button>
               </div>
-            </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Phạm vi giao bài' : 'Audience Target'}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'all'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? `Toàn bộ học viên trong lớp (${turnoutStats.total} học viên)` : `All class students (${turnoutStats.total})`}
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'specific'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'specific' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? 'Chỉ định nhóm học viên cần luyện thêm' : 'Specific student group'}
-                </label>
-              </div>
-            </div>
-
-            <div style={{ paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={assignmentData.notifyStudents}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, notifyStudents: e.target.checked })}
-                  style={{ accentColor: '#2563eb' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 600 }}>
-                  <Bell size={13} style={{ display: 'inline', marginRight: 4 }} />
-                  {isVi ? 'Gửi thông báo & email đến học sinh' : 'Send app & email alerts'}
-                </span>
-              </label>
             </div>
           </section>
 

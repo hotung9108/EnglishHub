@@ -25,7 +25,7 @@ interface AttemptRecord {
   submittedAt: string;
   score: number | null;
   maxScore: number;
-  bandScore: string;
+  score10: string;
   status: 'graded' | 'pending' | 'in_progress';
   isBest: boolean;
 }
@@ -96,14 +96,14 @@ const StudentAssignmentOverview: React.FC = () => {
             const records: AttemptRecord[] = list.map((item) => {
               const rawScore = item.modules?.[0]?.grading?.finalScore ?? null;
               const isGraded = item.status === 'GRADED';
-              const band = rawScore !== null ? (rawScore / 100 * 9).toFixed(1) : '--';
+              const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
               return {
                 id: item.id,
                 attemptNumber: item.attemptNumber,
                 submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
                 score: rawScore,
-                maxScore: 100,
-                bandScore: band,
+                maxScore: 10,
+                score10: s10,
                 status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
                 isBest: rawScore !== null && rawScore === maxVal && maxVal > 0,
               };
@@ -230,7 +230,7 @@ const StudentAssignmentOverview: React.FC = () => {
           <div>
             <div className="overview-badge-row" style={{ marginBottom: '8px' }}>
               <span className={`overview-skill-badge ${assignment?.modules?.[0]?.skill?.toLowerCase() || 'writing'}`}>
-                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'IELTS Skill Practice'}
+                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'Skill Practice'}
               </span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>
                 ● {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}
@@ -247,7 +247,7 @@ const StudentAssignmentOverview: React.FC = () => {
           <div style={{ textAlign: 'right' }}>
             <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>Điểm cao nhất hiện tại</span>
             <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary)' }}>
-              {bestAttempt ? `Band ${bestAttempt.bandScore}` : 'Chưa có điểm'}
+              {bestAttempt ? `${bestAttempt.score10} / 10` : 'Chưa có điểm'}
             </div>
           </div>
         </div>
@@ -324,8 +324,7 @@ const StudentAssignmentOverview: React.FC = () => {
                 <tr>
                   <th>Lần nộp</th>
                   <th>Thời gian nộp</th>
-                  <th>Điểm số (Hệ 100)</th>
-                  <th>IELTS Band</th>
+                  <th>Điểm số (Thang 10)</th>
                   <th>Trạng thái</th>
                   <th style={{ textAlign: 'right' }}>Thao tác</th>
                 </tr>
@@ -333,13 +332,13 @@ const StudentAssignmentOverview: React.FC = () => {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
                       Đang tải lịch sử các lần nộp bài...
                     </td>
                   </tr>
                 ) : attempts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
                       Chưa có lần nộp bài nào. Nhấn &quot;Bắt đầu làm bài&quot; bên dưới để làm lần đầu tiên.
                     </td>
                   </tr>
@@ -355,10 +354,9 @@ const StudentAssignmentOverview: React.FC = () => {
                         )}
                       </td>
                       <td style={{ color: 'var(--on-surface-variant)' }}>{att.submittedAt}</td>
-                      <td style={{ fontWeight: 600 }}>{att.score !== null ? `${att.score} / ${att.maxScore}` : '--'}</td>
                       <td>
                         <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>
-                          Band {att.bandScore}
+                          {att.score10 !== '--' ? `${att.score10} / 10` : '--'}
                         </span>
                       </td>
                       <td>

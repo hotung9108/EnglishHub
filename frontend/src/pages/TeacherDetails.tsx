@@ -238,7 +238,7 @@ export const TeacherDetails: React.FC = () => {
                     <Mail size={15} /> {teacherEmail}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Award size={15} color="var(--primary)" /> {isVi ? 'TESOL / IELTS Standard' : 'TESOL / IELTS Certified'}
+                    <Award size={15} color="var(--primary)" /> {isVi ? 'TESOL / Chuẩn Sư Phạm' : 'TESOL Certified'}
                   </span>
                 </div>
               </div>

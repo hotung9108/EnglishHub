@@ -224,7 +224,7 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const instructionsText = moduleDetail?.instructions || 
-    'Yêu cầu: Hoàn thành bài viết Writing Task (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và tuân thủ cấu trúc học thuật. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo 4 tiêu chí chuẩn IELTS.';
+    'Yêu cầu: Hoàn thành bài viết Writing (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và bố cục mạch lạc. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo thang điểm 10.';
 
   return (
     <div style={{ padding: '0 24px 40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -296,9 +296,9 @@ const StudentAssignmentWriting: React.FC = () => {
                     <FileText size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>writing-rubrics-guide.docx</h4>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>writing-instructions.docx</h4>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
-                      <span>Hướng dẫn tiêu chí chấm 4 tiêu chuẩn IELTS</span>
+                      <span>Hướng dẫn làm bài và tiêu chí đánh giá Writing</span>
                     </div>
                   </div>
                 </div>
