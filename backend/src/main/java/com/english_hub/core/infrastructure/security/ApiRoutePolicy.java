@@ -172,12 +172,15 @@ public final class ApiRoutePolicy {
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/students/{id}/evaluations",
-					List.of("TEACHER", "STUDENT")),
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/students/{id}/evaluations",
 					List.of("TEACHER")),
-			new RouteRule(HttpMethod.GET, "/api/v1/evaluations/{id}", List.of("TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/evaluations/{id}",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.PUT, "/api/v1/evaluations/{id}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/evaluations/{id}", List.of("TEACHER")));
 
