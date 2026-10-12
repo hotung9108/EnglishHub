@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { questionService, type QuestionResponse } from '../api/services/question.service';
+import { questionService, extractMcqOptions, type QuestionResponse } from '../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -88,11 +88,8 @@ const StudentAssignmentListening: React.FC = () => {
           try {
             const qRes = await questionService.listQuestions(moduleId);
             if (isMounted) {
-              if (qRes.questions && qRes.questions.length > 0) {
-                setQuestions(qRes.questions);
-              } else {
-                setQuestions([]);
-              }
+              const qList = qRes.questions || qRes.data || [];
+              setQuestions(qList);
             }
           } catch {
             if (isMounted) setQuestions([]);
@@ -173,23 +170,41 @@ const StudentAssignmentListening: React.FC = () => {
       const subModuleId = submission?.modules?.[0]?.id;
 
       if (subModuleId) {
-        const answersPayload = Object.entries(selectedAnswers).map(([qId, ans]) => ({
-          questionId: Number(qId),
-          content: { selectedOptionIds: [ans] }
-        }));
+        const optionKeyToId: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
+        const answersPayload = questions
+          .map((q, idx) => {
+            const qIndex = idx + 1;
+            const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
+            if (!chosenVal) return null;
 
-        try {
+            let optId: number;
+            if (typeof chosenVal === 'number') {
+              optId = chosenVal;
+            } else {
+              const upper = String(chosenVal).trim().toUpperCase();
+              optId = optionKeyToId[upper] ?? parseInt(upper, 10);
+              if (isNaN(optId) || optId < 1 || optId > 4) {
+                optId = 1;
+              }
+            }
+
+            return {
+              questionId: q.id,
+              content: { selectedOptionIds: [optId] },
+            };
+          })
+          .filter((item): item is { questionId: number; content: { selectedOptionIds: number[] } } => item !== null);
+
+        if (answersPayload.length > 0) {
           await submissionService.submitModule(subModuleId, { answers: answersPayload });
-        } catch {
-          // Continue
         }
       }
 
       if (subId) {
         try {
           await submissionService.submitSubmission(subId);
-        } catch {
-          // Continue
+        } catch (subErr) {
+          console.warn('submitSubmission warning:', subErr);
         }
       }
 
@@ -450,15 +465,16 @@ const StudentAssignmentListening: React.FC = () => {
 
                 {/* Options */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {['A', 'B', 'C', 'D'].map((optKey) => {
+                  {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
                     const isSelected = selectedAnswers[activeQuestion] === optKey;
+                    const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
                     const questionWithOptions = currentQuestionItem as QuestionResponse & {
-                      options?: Array<{ id?: string; key?: string; text?: string; content?: string }>;
+                      options?: Array<{ id?: string | number; key?: string; text?: string; content?: string }>;
                     };
                     const matchedOption = questionWithOptions.options?.find(
-                      (o) => o.id === optKey || o.key === optKey
+                      (o) => o.id === optKey || o.key === optKey || o.id === optIdx + 1
                     );
-                    const optText = matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
+                    const optText = (extracted && extracted.options[optIdx]) || matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
                     return (
                       <label 
                         key={optKey}

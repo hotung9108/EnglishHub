@@ -38,6 +38,7 @@ import {
   type SubmittedAnswerItem
 } from '../api/services/submission.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { gradingService, type AiGradingSuggestionResponse, type GradingDetailResponse } from '../api/services/grading.service';
 import '../styles/student-result.css';
 
@@ -148,10 +149,22 @@ export const StudentSubmissionResult: React.FC = () => {
       ]);
 
       if (modRes.status === 'fulfilled') {
-        setModuleDetail(modRes.value);
-        if (modRes.value.grading?.id) {
+        const modValue = modRes.value;
+        if ((!modValue.questions || modValue.questions.length === 0) && modValue.moduleId) {
           try {
-            const gd = await gradingService.getById(modRes.value.grading.id);
+            const qRes = await questionService.listQuestions(modValue.moduleId);
+            const qList = qRes.questions || qRes.data || [];
+            if (qList.length > 0) {
+              modValue.questions = qList;
+            }
+          } catch {
+            // Non-critical
+          }
+        }
+        setModuleDetail(modValue);
+        if (modValue.grading?.id) {
+          try {
+            const gd = await gradingService.getById(modValue.grading.id);
             setGradingDetail(gd);
           } catch {
             // Non-critical
@@ -346,9 +359,14 @@ export const StudentSubmissionResult: React.FC = () => {
   const maxScore = useMemo<number>(() => {
     if (gradingDetail?.maxScoreSnapshot != null) return gradingDetail.maxScoreSnapshot;
     if (activeSubModule?.grading?.maxScoreSnapshot != null) return activeSubModule.grading.maxScoreSnapshot;
+    if (moduleDetail?.grading?.maxScoreSnapshot != null) return moduleDetail.grading.maxScoreSnapshot;
     if (aiSuggestion?.maxScore != null) return aiSuggestion.maxScore;
+    if (moduleDetail?.questions && moduleDetail.questions.length > 0) {
+      const sum = moduleDetail.questions.reduce((acc, q) => acc + (q.score || 1), 0);
+      if (sum > 0) return sum;
+    }
     return 100;
-  }, [gradingDetail, activeSubModule, aiSuggestion]);
+  }, [gradingDetail, activeSubModule, moduleDetail, aiSuggestion]);
 
   const bandScore = useMemo<string>(() => {
     if (rawScore == null) return '--';
@@ -358,10 +376,14 @@ export const StudentSubmissionResult: React.FC = () => {
 
   const isGraded = useMemo<boolean>(() => {
     if (submission?.status === 'GRADED') return true;
+    if (activeSubModule?.status === 'GRADED') return true;
+    if (moduleDetail?.status === 'GRADED') return true;
     if (gradingDetail?.status === 'COMPLETED' || gradingDetail?.status === 'AI_GRADED') return true;
-    if (activeSubModule?.grading?.status === 'AI_GRADED') return true;
+    if (activeSubModule?.grading?.status === 'AI_GRADED' || activeSubModule?.grading?.status === 'COMPLETED') return true;
+    if (moduleDetail?.grading?.status === 'AI_GRADED' || moduleDetail?.grading?.status === 'COMPLETED') return true;
+    if (rawScore != null) return true;
     return false;
-  }, [submission, gradingDetail, activeSubModule]);
+  }, [submission, activeSubModule, moduleDetail, gradingDetail, rawScore]);
 
   // Annotations
   const selectedAnnotation = useMemo(() => {
@@ -379,32 +401,113 @@ export const StudentSubmissionResult: React.FC = () => {
     if (!moduleDetail?.questions || moduleDetail.questions.length === 0) return [];
     return moduleDetail.questions.map((q, idx) => {
       const studentAnsItem = moduleDetail.answers?.find(a => a.questionId === q.id);
-      let sAnsText = '--';
-      if (typeof studentAnsItem?.content === 'string') {
-        sAnsText = studentAnsItem.content;
-      } else if (studentAnsItem?.content && typeof studentAnsItem.content === 'object') {
-        const obj = studentAnsItem.content as Record<string, unknown>;
-        sAnsText = typeof obj.answer === 'string' ? obj.answer : typeof obj.selectedOption === 'string' ? obj.selectedOption : JSON.stringify(obj);
+      const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+
+      // 1. Correct Answer & Options Parsing
+      let mcq = {
+        options: [] as string[],
+        correctOptionContent: '',
+        correctOptionIndex: 0,
+      };
+      let shortAns = '';
+
+      if (isMcq) {
+        mcq = extractMcqOptions(q.correctAnswer as Record<string, unknown> | null);
+      } else {
+        shortAns = extractShortAnswerText(q.correctAnswer as Record<string, unknown> | null);
       }
 
-      const cAnsText = q.correctAnswer ? String(q.correctAnswer) : '--';
-      const isCorrect = sAnsText !== '--' && cAnsText !== '--' ? sAnsText.trim().toLowerCase() === cAnsText.trim().toLowerCase() : undefined;
+      const displayOptions = isMcq
+        ? mcq.options.map((optText, optIdx) => ({
+            key: String.fromCharCode(65 + optIdx),
+            text: optText,
+          }))
+        : [];
+
+      const correctOptLetter = String.fromCharCode(65 + mcq.correctOptionIndex);
+      const cAnsText = isMcq
+        ? `${correctOptLetter}. ${mcq.correctOptionContent}`
+        : (shortAns || '--');
+
+      // 2. Student Answer & Score Parsing
+      let sAnsText = '--';
+      let studentSelectedOptId: number | null = null;
+      let isAnswerCorrect: boolean | undefined = undefined;
+
+      if (studentAnsItem) {
+        if (typeof studentAnsItem.content === 'string') {
+          sAnsText = studentAnsItem.content;
+        } else if (studentAnsItem.content && typeof studentAnsItem.content === 'object') {
+          const obj = studentAnsItem.content as Record<string, unknown>;
+
+          if (typeof obj.isCorrect === 'boolean') {
+            isAnswerCorrect = obj.isCorrect;
+          } else if (typeof obj.is_correct === 'boolean') {
+            isAnswerCorrect = obj.is_correct;
+          }
+
+          if (isMcq) {
+            const selIds = obj.selectedOptionIds;
+            if (Array.isArray(selIds) && selIds.length > 0 && typeof selIds[0] === 'number') {
+              studentSelectedOptId = selIds[0];
+            } else if (typeof obj.selectedOptionId === 'number') {
+              studentSelectedOptId = obj.selectedOptionId;
+            } else if (typeof obj.selectedOption === 'string') {
+              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.selectedOption.toUpperCase());
+              if (letterIdx !== -1) {
+                studentSelectedOptId = letterIdx + 1;
+              }
+            } else if (typeof obj.answer === 'string') {
+              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.answer.toUpperCase());
+              if (letterIdx !== -1) {
+                studentSelectedOptId = letterIdx + 1;
+              }
+            }
+
+            if (studentSelectedOptId !== null && studentSelectedOptId >= 1 && studentSelectedOptId <= mcq.options.length) {
+              const sLetter = String.fromCharCode(65 + studentSelectedOptId - 1);
+              const sText = mcq.options[studentSelectedOptId - 1] || '';
+              sAnsText = `${sLetter}. ${sText}`;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            } else if (typeof obj.selectedOption === 'string') {
+              sAnsText = obj.selectedOption;
+            }
+          } else {
+            if (typeof obj.text === 'string') {
+              sAnsText = obj.text;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            }
+          }
+        }
+      }
+
+      // Fallback for isAnswerCorrect
+      if (isAnswerCorrect === undefined) {
+        if (studentAnsItem && sAnsText !== '--') {
+          if (isMcq) {
+            if (studentSelectedOptId !== null) {
+              isAnswerCorrect = (studentSelectedOptId - 1) === mcq.correctOptionIndex;
+            }
+          } else if (shortAns) {
+            isAnswerCorrect = sAnsText.trim().toLowerCase() === shortAns.trim().toLowerCase();
+          }
+        } else {
+          isAnswerCorrect = false;
+        }
+      }
 
       return {
         id: q.id,
-        questionNumber: idx + 1,
+        questionNumber: q.orderIndex || idx + 1,
         prompt: q.content,
         questionType: q.questionType,
-        options: [
-          { key: 'A', text: 'Phương án A' },
-          { key: 'B', text: 'Phương án B' },
-          { key: 'C', text: 'Phương án C' },
-          { key: 'D', text: 'Phương án D' }
-        ],
+        options: displayOptions,
         studentAnswer: sAnsText,
         correctAnswer: cAnsText,
-        isCorrect,
-        explanation: 'Đối chiếu theo ngân hàng câu hỏi bài học.'
+        isCorrect: isAnswerCorrect,
+        explanation: 'Đối chiếu theo đáp án chuẩn của bài học.',
       };
     });
   }, [moduleDetail]);
@@ -516,10 +619,20 @@ export const StudentSubmissionResult: React.FC = () => {
 
   // Available skills in submission
   const availableSkills: SubmissionSkill[] = useMemo(() => {
-    if (!submission?.modules || submission.modules.length === 0) return ['WRITING'];
-    const skills = submission.modules.map(m => m.skill).filter((s): s is SubmissionSkill => Boolean(s));
-    return skills.length > 0 ? Array.from(new Set(skills)) : ['WRITING'];
-  }, [submission]);
+    const list: SubmissionSkill[] = [];
+    if (submission?.modules && submission.modules.length > 0) {
+      submission.modules.forEach(m => {
+        if (m.skill) list.push(m.skill);
+      });
+    }
+    if (assignment?.modules && assignment.modules.length > 0) {
+      assignment.modules.forEach(m => {
+        if (m.skill) list.push(m.skill);
+      });
+    }
+    if (list.length === 0) return [selectedSkill || 'READING'];
+    return Array.from(new Set(list));
+  }, [submission, assignment, selectedSkill]);
 
   // Empty submission state
   if (noSubmissionFound) {
@@ -695,7 +808,7 @@ export const StudentSubmissionResult: React.FC = () => {
               </span>
               <span className="result-score-sub-label">{t('studentResult.score100')}</span>
               <span className="result-score-status-pill">
-                {rawScore != null && rawScore >= 50 ? (
+                {rawScore != null && (maxScore > 0 ? (rawScore / maxScore) >= 0.5 : rawScore >= 50) ? (
                   <>
                     <CheckCircle2 size={12} style={{ display: 'inline', marginRight: 3 }} /> 
                     {t('studentResult.meetsStandard')}
@@ -1205,16 +1318,76 @@ export const StudentSubmissionResult: React.FC = () => {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '20px', fontSize: '13px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', gap: '20px', fontSize: '13px', marginTop: '8px', flexWrap: 'wrap' }}>
                           <div>
                             <span style={{ color: 'var(--on-surface-variant)' }}>{t('studentResult.yourAnswer')}: </span>
-                            <strong>{q.studentAnswer}</strong>
+                            <strong style={{ color: q.isCorrect === true ? '#16a34a' : q.isCorrect === false ? '#dc2626' : undefined }}>
+                              {q.studentAnswer}
+                            </strong>
                           </div>
                           <div>
                             <span style={{ color: 'var(--on-surface-variant)' }}>{t('studentResult.correctAnswer')}: </span>
                             <strong style={{ color: '#16a34a' }}>{q.correctAnswer}</strong>
                           </div>
                         </div>
+
+                        {q.options && q.options.length > 0 && (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px', marginTop: '12px' }}>
+                            {q.options.map((opt) => {
+                              const isStudentPick = q.studentAnswer.startsWith(opt.key);
+                              const isCorrectOption = q.correctAnswer.startsWith(opt.key);
+                              let borderColor = 'var(--outline-variant, #E2E8F0)';
+                              let bg = 'var(--surface, #FFFFFF)';
+                              if (isCorrectOption) {
+                                borderColor = '#86efac';
+                                bg = '#ecfdf5';
+                              } else if (isStudentPick && !q.isCorrect) {
+                                borderColor = '#fca5a5';
+                                bg = '#fef2f2';
+                              }
+                              return (
+                                <div
+                                  key={opt.key}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: bg,
+                                    fontSize: '13px'
+                                  }}
+                                >
+                                  <span style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    backgroundColor: isCorrectOption ? '#16a34a' : isStudentPick ? '#ef4444' : '#e2e8f0',
+                                    color: (isCorrectOption || isStudentPick) ? '#ffffff' : '#475569',
+                                    flexShrink: 0
+                                  }}>
+                                    {opt.key}
+                                  </span>
+                                  <span style={{ flex: 1, color: isCorrectOption ? '#15803d' : isStudentPick ? '#b91c1c' : 'var(--on-surface, #334155)' }}>
+                                    {opt.text}
+                                  </span>
+                                  {isCorrectOption && (
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a' }}>✓ Đáp án đúng</span>
+                                  )}
+                                  {isStudentPick && !isCorrectOption && (
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#dc2626' }}>✗ Lựa chọn của bạn</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

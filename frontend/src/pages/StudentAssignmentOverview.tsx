@@ -151,16 +151,17 @@ const StudentAssignmentOverview: React.FC = () => {
         }
       }
 
-      // Determine skill from module or id
+      // Determine skill from module or id or title
       const skill = assignment?.modules?.[0]?.skill?.toLowerCase() || '';
+      const titleLower = (assignment?.title || id || '').toLowerCase();
       const idParam = id || '1';
       const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
 
-      if (skill === 'speaking' || id?.toLowerCase().includes('spk') || id?.toLowerCase().includes('speaking')) {
+      if (skill === 'speaking' || titleLower.includes('spk') || titleLower.includes('speaking') || titleLower.includes('nói')) {
         navigate(`/student/assignments/speaking/${idParam}${queryStr}`);
-      } else if (skill === 'reading' || id?.toLowerCase().includes('rd') || id?.toLowerCase().includes('reading')) {
+      } else if (skill === 'reading' || titleLower.includes('rd') || titleLower.includes('reading') || titleLower.includes('đọc')) {
         navigate(`/student/assignments/reading/${idParam}${queryStr}`);
-      } else if (skill === 'listening' || id?.toLowerCase().includes('ls') || id?.toLowerCase().includes('listening')) {
+      } else if (skill === 'listening' || titleLower.includes('ls') || titleLower.includes('listening') || titleLower.includes('nghe')) {
         navigate(`/student/assignments/listening/${idParam}${queryStr}`);
       } else {
         navigate(`/student/assignments/${idParam}${queryStr}`);
@@ -228,8 +229,8 @@ const StudentAssignmentOverview: React.FC = () => {
         <div className="overview-header">
           <div>
             <div className="overview-badge-row" style={{ marginBottom: '8px' }}>
-              <span className="overview-skill-badge writing">
-                {assignment?.modules?.[0]?.skill || 'IELTS Skill Practice'}
+              <span className={`overview-skill-badge ${assignment?.modules?.[0]?.skill?.toLowerCase() || 'writing'}`}>
+                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'IELTS Skill Practice'}
               </span>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>
                 ● {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}

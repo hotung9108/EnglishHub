@@ -2,13 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, Download, Calendar, Shield, PenTool, 
-  Zap, FileText, Search, Bell, RefreshCw, AlertCircle, CheckCircle2
+  Zap, FileText, Search, Bell, RefreshCw, AlertCircle, CheckCircle2,
+  HelpCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
 import { moduleService } from '../api/services/module.service';
+import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
 
 interface EnrolledStudentSubmissionRow {
   studentId: number;
@@ -44,6 +46,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const [instructions, setInstructions] = useState<string>('');
   const [skillLabel, setSkillLabel] = useState<string>('Writing Task');
   const [students, setStudents] = useState<EnrolledStudentSubmissionRow[]>([]);
+  const [questions, setQuestions] = useState<QuestionResponse[]>([]);
 
   // Filter tabs
   const [activeTab, setActiveTab] = useState<'all' | 'submitted' | 'missing'>('all');
@@ -74,22 +77,41 @@ export const TeacherAssignmentDetails: React.FC = () => {
       const assignDetail = await assignmentService.getAssignment(assignmentIdNum);
       setAssignment(assignDetail);
 
-      // 2. Fetch modules for instructions & skill
+      // 2. Fetch modules for instructions, skill & questions
+      let firstModId: number | undefined = assignDetail.modules?.[0]?.id;
+      let firstModSkill: string | undefined = assignDetail.modules?.[0]?.skill;
+
       try {
         const modRes = await moduleService.listModules(assignmentIdNum);
-        const mods = modRes.modules || [];
+        const mods = modRes.modules || modRes.data || [];
         if (mods.length > 0) {
-          const firstMod = mods[0];
-          setSkillLabel(firstMod.skill ? `${firstMod.skill.charAt(0)}${firstMod.skill.slice(1).toLowerCase()} Task` : 'General Task');
-          try {
-            const modDetail = await moduleService.getModule(firstMod.id);
-            setInstructions(modDetail.instructions || '');
-          } catch {
-            // ignore
-          }
+          firstModId = mods[0].id;
+          firstModSkill = mods[0].skill;
         }
       } catch {
         // ignore
+      }
+
+      if (firstModSkill) {
+        setSkillLabel(`${firstModSkill.charAt(0)}${firstModSkill.slice(1).toLowerCase()} Task`);
+      }
+
+      if (firstModId) {
+        try {
+          const modDetail = await moduleService.getModule(firstModId);
+          if (modDetail?.instructions) {
+            setInstructions(modDetail.instructions);
+          }
+        } catch {
+          // ignore
+        }
+        try {
+          const qRes = await questionService.listQuestions(firstModId);
+          const qList = qRes.questions || qRes.data || [];
+          if (isMounted) setQuestions(qList);
+        } catch {
+          if (isMounted) setQuestions([]);
+        }
       }
 
       // 3. Find class & members
@@ -485,6 +507,184 @@ export const TeacherAssignmentDetails: React.FC = () => {
           <div style={{ color: '#374151', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
             {instructions}
           </div>
+        </div>
+      )}
+
+      {/* Assignment Questions Preview Section */}
+      {(questions.length > 0 || skillLabel.toLowerCase().includes('reading') || skillLabel.toLowerCase().includes('listening') || (assignment?.modules && assignment.modules.some(m => ['READING', 'LISTENING'].includes(m.skill)))) && (
+        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <HelpCircle size={20} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isVi ? 'Danh sách câu hỏi đề bài' : 'Assignment Questions'}
+                  <span style={{ fontSize: '12px', fontWeight: 600, padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#F1F5F9', color: '#475569' }}>
+                    {questions.length} {isVi ? 'câu' : 'questions'}
+                  </span>
+                </h2>
+                <span style={{ fontSize: '13px', color: '#6B7280' }}>
+                  {isVi ? 'Bộ câu hỏi trắc nghiệm / tự luận học sinh phải hoàn thành' : 'Configured questions students must complete'}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid #D1D5DB',
+                backgroundColor: '#FFFFFF',
+                color: '#374151',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <Edit2 size={14} />
+              <span>{isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}</span>
+            </button>
+          </div>
+
+          {questions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '36px 16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+              <AlertCircle size={32} color="#94A3B8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+              <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#334155' }}>
+                {isVi ? 'Chưa có câu hỏi nào trong bài tập này' : 'No questions created yet'}
+              </p>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                {isVi ? 'Vui lòng nhấn Chỉnh sửa để thêm câu hỏi trắc nghiệm hoặc tự luận.' : 'Please edit the assignment to add questions.'}
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {questions.map((q, idx) => {
+                const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+                const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+                const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+
+                return (
+                  <div
+                    key={q.id || idx}
+                    style={{
+                      border: '1px solid #E2E8F0',
+                      borderRadius: '10px',
+                      padding: '16px 20px',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '26px',
+                          height: '26px',
+                          borderRadius: '50%',
+                          backgroundColor: '#2563EB',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 700
+                        }}>
+                          {q.orderIndex || idx + 1}
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: isMcq ? '#EFF6FF' : '#FEF3C7',
+                          color: isMcq ? '#1D4ED8' : '#B45309'
+                        }}>
+                          {isMcq ? (isVi ? 'Trắc nghiệm' : 'Multiple Choice') : (isVi ? 'Điền từ / Tự luận' : 'Short Answer')}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                        {q.score || 1} {isVi ? 'điểm' : 'pts'}
+                      </span>
+                    </div>
+
+                    <p style={{ margin: '0 0 12px 0', fontSize: '14.5px', fontWeight: 600, color: '#1E293B', lineHeight: 1.5 }}>
+                      {q.content}
+                    </p>
+
+                    {isMcq && mcq && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px' }}>
+                        {mcq.options.map((optText, optIdx) => {
+                          const optLetter = String.fromCharCode(65 + optIdx);
+                          const isCorrect = optIdx === mcq.correctOptionIndex;
+                          return (
+                            <div
+                              key={optIdx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                border: isCorrect ? '1.5px solid #10B981' : '1px solid #E2E8F0',
+                                backgroundColor: isCorrect ? '#ECFDF5' : '#F8FAFC',
+                                fontSize: '13px',
+                                color: isCorrect ? '#065F46' : '#334155',
+                                fontWeight: isCorrect ? 600 : 400
+                              }}
+                            >
+                              <span style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: isCorrect ? '#10B981' : '#E2E8F0',
+                                color: isCorrect ? '#FFFFFF' : '#475569',
+                                flexShrink: 0
+                              }}>
+                                {optLetter}
+                              </span>
+                              <span style={{ flex: 1 }}>{optText}</span>
+                              {isCorrect && (
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                  ✓ {isVi ? 'Đáp án đúng' : 'Correct'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {!isMcq && (
+                      <div style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: '6px',
+                        border: '1px solid #E2E8F0',
+                        fontSize: '13px',
+                        color: '#334155'
+                      }}>
+                        <strong style={{ color: '#0F172A' }}>{isVi ? 'Đáp án chuẩn:' : 'Correct answer:'} </strong>
+                        <span style={{ color: '#059669', fontWeight: 600 }}>{shortAns || '(Chưa cấu hình)'}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

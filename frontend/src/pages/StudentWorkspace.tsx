@@ -128,14 +128,15 @@ export const StudentWorkspace: React.FC = () => {
         
         let type: 'writing' | 'speaking' | 'reading' | 'listening' = 'writing';
         let route = `/student/assignments/${assignmentIdStr}`;
+        const modSkill = (sub as { modules?: Array<{ skill?: string }> }).modules?.[0]?.skill?.toLowerCase();
         const titleLower = (assignment?.title || '').toLowerCase();
-        if (titleLower.includes('speak') || titleLower.includes('nói')) {
+        if (modSkill === 'speaking' || titleLower.includes('speak') || titleLower.includes('nói')) {
           type = 'speaking';
           route = `/student/assignments/speaking/${assignmentIdStr}`;
-        } else if (titleLower.includes('read') || titleLower.includes('đọc')) {
+        } else if (modSkill === 'reading' || titleLower.includes('read') || titleLower.includes('đọc')) {
           type = 'reading';
           route = `/student/assignments/reading/${assignmentIdStr}`;
-        } else if (titleLower.includes('listen') || titleLower.includes('nghe')) {
+        } else if (modSkill === 'listening' || titleLower.includes('listen') || titleLower.includes('nghe')) {
           type = 'listening';
           route = `/student/assignments/listening/${assignmentIdStr}`;
         }

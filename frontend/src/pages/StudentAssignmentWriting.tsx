@@ -54,6 +54,22 @@ const StudentAssignmentWriting: React.FC = () => {
         try {
           currentAssignment = await assignmentService.getAssignment(numericId);
           if (isMounted) setAssignment(currentAssignment);
+
+          // If this assignment is actually READING, LISTENING, or SPEAKING, redirect to appropriate skill route
+          const targetSkill = currentAssignment?.modules?.[0]?.skill?.toLowerCase();
+          const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+          if (targetSkill === 'reading') {
+            navigate(`/student/assignments/reading/${numericId}${queryStr}`, { replace: true });
+            return;
+          }
+          if (targetSkill === 'listening') {
+            navigate(`/student/assignments/listening/${numericId}${queryStr}`, { replace: true });
+            return;
+          }
+          if (targetSkill === 'speaking') {
+            navigate(`/student/assignments/speaking/${numericId}${queryStr}`, { replace: true });
+            return;
+          }
         } catch {
           currentAssignment = {
             id: numericId,
@@ -120,7 +136,7 @@ const StudentAssignmentWriting: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
