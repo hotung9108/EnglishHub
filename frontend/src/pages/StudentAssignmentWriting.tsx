@@ -136,7 +136,7 @@ const StudentAssignmentWriting: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
