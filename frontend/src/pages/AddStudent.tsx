@@ -103,71 +103,82 @@ export const AddStudent: React.FC = () => {
   };
 
   return (
-    <div className="adm-container" style={{ maxWidth: '1100px' }}>
+    <div className="adm-container adm-container-narrow">
       {/* Header */}
       <div className="adm-header">
         <div className="adm-title-group">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className="adm-header-nav-group">
             <button 
-              className="btn btn-secondary"
+              className="btn btn-secondary adm-btn-back"
               onClick={() => navigate('/admin/students')}
-              style={{ padding: '6px 10px' }}
             >
               <ArrowLeft size={16} />
             </button>
             <h1 className="adm-title">{t('addStudent.title')}</h1>
           </div>
-          <p className="adm-subtitle">
-            {isVi ? 'Nhập hồ sơ học viên mới vào cơ sở dữ liệu và ghi danh vào lớp.' : 'Register new student into database and assign to cohort.'}
-          </p>
         </div>
       </div>
 
       {submitError && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
+        <div className="adm-alert-banner">
           <AlertCircle size={18} />
           <span>{submitError}</span>
         </div>
       )}
 
-      {/* Stepper */}
-      <div className="adm-stepper">
-        {steps.map(s => (
-          <div 
-            key={s.num}
-            className={`adm-step-item ${currentStep === s.num ? 'active' : currentStep > s.num ? 'completed' : ''}`}
-            onClick={() => s.num < currentStep && setCurrentStep(s.num)}
-          >
-            <div className="adm-step-circle">
-              {currentStep > s.num ? <Check size={16} /> : s.num}
-            </div>
-            <span className="adm-step-text">{s.title}</span>
-          </div>
-        ))}
+      {/* Stepper with Circles & Connecting Lines */}
+      <div className="adm-stepper-card">
+        <div className="adm-stepper-progress">
+          {steps.map((s, idx) => {
+            const isCompleted = currentStep > s.num;
+            const isActive = currentStep === s.num;
+            const isClickable = s.num < currentStep;
+
+            return (
+              <React.Fragment key={s.num}>
+                <div 
+                  className={`adm-progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                  onClick={() => isClickable && setCurrentStep(s.num)}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isClickable) {
+                      setCurrentStep(s.num);
+                    }
+                  }}
+                >
+                  <div className="adm-progress-circle">
+                    {isCompleted ? <Check size={18} strokeWidth={2.5} /> : s.num}
+                  </div>
+                  <div className="adm-progress-label">
+                    <span className="adm-progress-sub">{isVi ? `Bước ${s.num}` : `Step ${s.num}`}</span>
+                    <span className="adm-progress-title">{s.title}</span>
+                  </div>
+                </div>
+
+                {idx < steps.length - 1 && (
+                  <div className={`adm-progress-connector ${currentStep > s.num ? 'completed' : ''}`}>
+                    <div className="adm-progress-connector-line" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       {/* Form & Preview */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '28px', alignItems: 'flex-start' }}>
-        <div className="card" style={{ padding: '28px' }}>
+      <div className="adm-multistep-layout">
+        <div className="card adm-multistep-form-card">
           <form onSubmit={handleSubmit}>
             {/* Step 1 */}
             {currentStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Họ và tên học viên' : 'Student Full Name'} *</label>
                   <input 
                     type="text" 
-                    className="input"
+                    className={`input ${nameError ? 'adm-input-error' : ''}`}
                     placeholder="Nguyễn Văn A..."
                     value={formData.name}
                     onChange={(e) => {
@@ -182,15 +193,14 @@ export const AddStudent: React.FC = () => {
                         setNameError('');
                       }
                     }}
-                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
                   {nameError ? (
-                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="adm-form-field-error">
                       {nameError}
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="adm-form-field-hint">
                       {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
                     </span>
                   )}
@@ -268,10 +278,10 @@ export const AddStudent: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px' }}>
+                <div className="adm-form-actions-end">
                   <button 
                     type="button" 
-                    className="btn btn-primary"
+                    className="btn btn-primary adm-btn-with-icon"
                     disabled={!formData.name.trim() || !formData.email.trim()}
                     onClick={() => {
                       const res = validateFullName(formData.name, isVi);
@@ -283,7 +293,6 @@ export const AddStudent: React.FC = () => {
                       setFormData(prev => ({ ...prev, name: res.normalized }));
                       setCurrentStep(2);
                     }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addStudent.btnNextStep3')}</span>
                     <ArrowRight size={16} />
@@ -294,7 +303,7 @@ export const AddStudent: React.FC = () => {
 
             {/* Step 2 */}
             {currentStep === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
                     <label className="adm-form-label">{isVi ? 'Trình độ đầu vào' : 'Entry Level'}</label>
@@ -325,7 +334,7 @@ export const AddStudent: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                <div className="adm-form-actions-between">
                   <button 
                     type="button" 
                     className="btn btn-secondary"
@@ -335,9 +344,8 @@ export const AddStudent: React.FC = () => {
                   </button>
                   <button 
                     type="button" 
-                    className="btn btn-primary"
+                    className="btn btn-primary adm-btn-with-icon"
                     onClick={() => setCurrentStep(3)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{t('addStudent.btnNextStep4')}</span>
                     <ArrowRight size={16} />
@@ -348,11 +356,11 @@ export const AddStudent: React.FC = () => {
 
             {/* Step 3 */}
             {currentStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="adm-multistep-pane">
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Đăng ký vào lớp học' : 'Select Cohort'}</label>
                   {classes.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+                    <div className="adm-form-meta-note">
                       {isVi ? 'Chưa có lớp học nào trên hệ thống.' : 'No classes available.'}
                     </div>
                   ) : (
@@ -371,7 +379,7 @@ export const AddStudent: React.FC = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>
+                <div className="adm-form-actions-between">
                   <button 
                     type="button" 
                     className="btn btn-secondary"
@@ -382,9 +390,8 @@ export const AddStudent: React.FC = () => {
                   </button>
                   <button 
                     type="submit" 
-                    className="btn btn-primary"
+                    className="btn btn-primary adm-btn-with-icon"
                     disabled={submitting || !formData.name.trim() || !formData.email.trim()}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                     <span>{t('addStudent.btnFinish')}</span>
@@ -397,33 +404,33 @@ export const AddStudent: React.FC = () => {
 
         {/* Live Preview Card */}
         <div>
-          <div style={{ fontSize: '12.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--on-surface-variant)', marginBottom: '8px' }}>
-            {isVi ? 'HỒ SƠ HỌC VIÊN XEM TRƯỚC' : 'STUDENT PROFILE PREVIEW'}
+          <div className="adm-preview-label">
+            {isVi ? 'XEM TRƯỚC HỌC VIÊN' : 'STUDENT PREVIEW'}
           </div>
 
-          <div className="card" style={{ padding: '24px', border: '2px solid var(--primary-fixed-dim, #bfdbfe)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
-              <div className="adm-avatar" style={{ width: '48px', height: '48px', fontSize: '18px', backgroundColor: '#059669' }}>
+          <div className="card adm-preview-card">
+            <div className="adm-preview-header">
+              <div className="adm-avatar adm-preview-avatar adm-preview-avatar-student">
                 {getInitials(formData.name)}
               </div>
               <div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '0 0 2px 0' }}>
+                <h3 className="adm-preview-name">
                   {formData.name || (isVi ? 'Họ và tên học viên' : 'Student Full Name')}
                 </h3>
-                <span className="font-mono text-primary font-semibold" style={{ fontSize: '12.5px' }}>
+                <span className="font-mono text-primary font-semibold adm-preview-code">
                   {formData.code || 'HV-NEW'}
                 </span>
               </div>
             </div>
 
-            <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px' }}>
+            <div className="adm-preview-cohort-box">
+              <div className="adm-preview-cohort-row">
                 <span>{isVi ? 'Đầu vào: ' : 'Entry: '}<strong>{formData.entryBand}</strong></span>
                 <span className="text-primary font-bold">{formData.targetBand}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <div className="adm-preview-details">
               <div><strong>Email:</strong> {formData.email || '—'}</div>
               <div><strong>{isVi ? 'SĐT Học viên:' : 'Phone:'}</strong> {formData.phone || '—'}</div>
             </div>

@@ -200,7 +200,7 @@ export const TeacherDetails: React.FC = () => {
       {loading ? (
         <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-          <div>{isVi ? 'Đang tải hồ sơ giảng viên...' : 'Loading teacher profile...'}</div>
+          <div>{isVi ? 'Đang tải thông tin giảng viên...' : 'Loading teacher details...'}</div>
         </div>
       ) : (
         <>
@@ -229,7 +229,7 @@ export const TeacherDetails: React.FC = () => {
                     {teacherName}
                   </h2>
                   <span className="badge badge-primary font-mono">{teacherCode}</span>
-                  <span className={`badge ${!isSuspended ? 'badge-active' : 'badge-onleave'}`}>
+                  <span className={`badge ${!isSuspended ? 'badge-active' : 'badge-blocked'}`}>
                     {!isSuspended ? (isVi ? 'Đang hoạt động' : 'Active') : (isVi ? 'Đã tạm khóa' : 'Suspended')}
                   </span>
                 </div>

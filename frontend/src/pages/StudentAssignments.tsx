@@ -15,11 +15,14 @@ import {
   Clock, 
   Search, 
   Calendar, 
-  Sparkles,
-  Layers,
-  AlertCircle,
-  RefreshCw
+  Sparkles, 
+  Layers, 
+  AlertCircle, 
+  RefreshCw,
+  ClipboardList
 } from 'lucide-react';
+import { Button, MetricCard, EmptyState, Skeleton } from '../components/common';
+import '../styles/student-ecosystem.css';
 
 type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
 
@@ -242,576 +245,314 @@ const StudentAssignments: React.FC = () => {
     if (lower.includes('writing')) {
       return {
         icon: <PenTool size={18} strokeWidth={2.2} />,
-        bg: '#F5F3FF',
-        color: '#7C3AED',
+        skillClass: 'writing',
         label: type
       };
     }
     if (lower.includes('speaking')) {
       return {
         icon: <Mic size={18} strokeWidth={2.2} />,
-        bg: '#FFF1F2',
-        color: '#E11D48',
+        skillClass: 'speaking',
         label: type
       };
     }
     if (lower.includes('reading')) {
       return {
         icon: <BookOpen size={18} strokeWidth={2.2} />,
-        bg: '#EFF6FF',
-        color: '#2563EB',
+        skillClass: 'reading',
         label: type
       };
     }
     if (lower.includes('listening')) {
       return {
         icon: <Headphones size={18} strokeWidth={2.2} />,
-        bg: '#FFFBEB',
-        color: '#D97706',
+        skillClass: 'listening',
         label: type
       };
     }
     return {
       icon: <FileText size={18} strokeWidth={2.2} />,
-      bg: '#F1F5F9',
-      color: '#475569',
+      skillClass: 'default',
       label: type
     };
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '48px' }}>
+    <div className="std-eco-container">
       {/* 1. Page Header */}
-      <div style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', color: '#0F172A', margin: 0 }}>
-            {t('studentAssignments.title')}
+      <div className="std-eco-header">
+        <div className="std-eco-header-main">
+          <div className="std-eco-breadcrumb">
+            <span>{t('studentPortal') || 'Cổng Học viên'}</span>
+            <span className="std-eco-breadcrumb-separator">/</span>
+            <span className="current">{t('studentAssignments.title')}</span>
+          </div>
+          <h1 className="std-eco-title">
+            <ClipboardList size={26} color="var(--primary)" />
+            <span>{t('studentAssignments.title')}</span>
           </h1>
-          <span style={{ 
-            fontSize: '12px', 
-            fontWeight: 600, 
-            padding: '3px 10px', 
-            borderRadius: '9999px', 
-            backgroundColor: '#EEF2FF', 
-            color: '#4F46E5' 
-          }}>
-            {classAssignments.length} {t('studentAssignments.unitAssignments')}
-          </span>
+          <p className="std-eco-subtitle">
+            {t('studentAssignments.subtitle')}
+          </p>
         </div>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-          {t('studentAssignments.subtitle')}
-        </p>
+
+        <div className="std-eco-header-badge">
+          <span className="std-eco-badge-num">{classAssignments.length}</span>
+          <span className="std-eco-badge-label">{t('studentAssignments.unitAssignments') || 'bài tập'}</span>
+        </div>
       </div>
 
       {/* Error Banner */}
       {error && (
-        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+        <div className="analytics-error-banner">
+          <div className="flex items-center gap-10">
             <AlertCircle size={20} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span>{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            icon={<RefreshCw size={14} />}
           >
-            <RefreshCw size={14} /> {t('studentAssignments.retry')}
-          </button>
+            {t('studentAssignments.retry')}
+          </Button>
         </div>
       )}
 
       {/* 2. Top Summary Stat Cards */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', 
-        gap: '16px', 
-        marginBottom: '28px' 
-      }}>
-        {/* Card 1: Not Started */}
-        <div style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '12px',
-          padding: '20px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '10px',
-            backgroundColor: '#FEF2F2',
-            color: '#DC2626',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <Clock size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
-              {isLoading ? '...' : stats.notStarted}
-            </div>
-            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-              {t('studentAssignments.statNotStarted')}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Grading in Progress */}
-        <div style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '12px',
-          padding: '20px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '10px',
-            backgroundColor: '#FFFBEB',
-            color: '#D97706',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <Sparkles size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
-              {isLoading ? '...' : stats.grading}
-            </div>
-            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-              {t('studentAssignments.statGrading')}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Graded & Feedback */}
-        <div style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '12px',
-          padding: '20px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '10px',
-            backgroundColor: '#F0FDF4',
-            color: '#16A34A',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <CheckCircle2 size={24} />
-          </div>
-          <div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
-              {isLoading ? '...' : stats.graded}
-            </div>
-            <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-              {t('studentAssignments.statGraded')}
-            </div>
-          </div>
-        </div>
+      <div className="std-asg-stats-grid">
+        <MetricCard
+          title={t('studentAssignments.statNotStarted')}
+          value={isLoading ? '...' : stats.notStarted}
+          icon={<Clock size={20} />}
+          iconBgColor="var(--surface-dim, #F4EFE6)"
+          iconColor="var(--text-secondary, #736B63)"
+        />
+        <MetricCard
+          title={t('studentAssignments.statGrading')}
+          value={isLoading ? '...' : stats.grading}
+          icon={<Sparkles size={20} />}
+          iconBgColor="var(--tertiary-container, #FBF4E6)"
+          iconColor="var(--tertiary, #8C5E14)"
+        />
+        <MetricCard
+          title={t('studentAssignments.statGraded')}
+          value={isLoading ? '...' : stats.graded}
+          icon={<CheckCircle2 size={20} />}
+          iconBgColor="var(--primary-light, #EAF0E8)"
+          iconColor="var(--accent, #1B4D3E)"
+        />
       </div>
 
-      {/* 3. Class Filter & Search Bar */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '12px',
-        marginBottom: '20px'
-      }}>
-        {/* Class Selection Dropdown */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label htmlFor="student-class-select" style={{ fontSize: '14px', fontWeight: 500, color: '#475569' }}>
-            {t('studentAssignments.filterClassLabel')}
-          </label>
-          <select
-            id="student-class-select"
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              backgroundColor: '#FFFFFF',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#0F172A',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
+      {/* 3. Filter Toolbar */}
+      <div className="std-asg-toolbar">
+        {/* Status Pills */}
+        <div className="std-eco-pills">
+          <button
+            type="button"
+            onClick={() => setActiveStatusFilter('all')}
+            className={`std-eco-pill ${activeStatusFilter === 'all' ? 'active' : ''}`}
           >
-            <option value="all">{t('studentAssignments.filterAllClasses')}</option>
-            {classes.map(c => (
-              <option key={c.id} value={String(c.id)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            {t('studentAssignments.tabAll')} <span className="std-eco-pill-badge">{classAssignments.length}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveStatusFilter('not_started')}
+            className={`std-eco-pill ${activeStatusFilter === 'not_started' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabNotStarted')} <span className="std-eco-pill-badge">{stats.notStarted}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveStatusFilter('grading')}
+            className={`std-eco-pill ${activeStatusFilter === 'grading' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabGrading')} <span className="std-eco-pill-badge">{stats.grading}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveStatusFilter('graded')}
+            className={`std-eco-pill ${activeStatusFilter === 'graded' ? 'active' : ''}`}
+          >
+            {t('studentAssignments.tabGraded')} <span className="std-eco-pill-badge">{stats.graded}</span>
+          </button>
         </div>
 
-        {/* Search input */}
-        <div style={{
-          position: 'relative',
-          width: '280px'
-        }}>
-          <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            placeholder={t('studentAssignments.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px 8px 36px',
-              borderRadius: '8px',
-              border: '1px solid #CBD5E1',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }}
-          />
+        {/* Search & Class Dropdown */}
+        <div className="std-asg-toolbar-right">
+          <div className="std-asg-select-wrap">
+            <select
+              id="student-class-select"
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="std-asg-select"
+              aria-label={t('studentAssignments.filterClassLabel')}
+            >
+              <option value="all">{t('studentAssignments.filterAllClasses')}</option>
+              {classes.map(c => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="std-eco-search-wrap">
+            <Search size={15} className="std-eco-search-icon" />
+            <input
+              type="text"
+              placeholder={t('studentAssignments.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="std-eco-search-input"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Selected Class Info Banner if filtered */}
+      {/* Selected Class Filter Pill */}
       {selectedClass && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: '8px',
-          backgroundColor: '#F8FAFC',
-          border: '1px solid #E2E8F0',
-          marginBottom: '20px',
-          fontSize: '13px',
-          color: '#475569',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <Layers size={16} color="#64748B" />
-          <span>{t('studentAssignments.viewingClassPrefix')}<strong>{selectedClass.name}</strong></span>
+        <div className="std-asg-active-class-bar">
+          <span className="std-asg-active-class-chip">
+            <Layers size={13} />
+            <span>{t('studentAssignments.viewingClassPrefix')}<strong>{selectedClass.name}</strong></span>
+            <button 
+              type="button"
+              onClick={() => setSelectedClassId('all')}
+              className="std-asg-clear-class-btn"
+              title="Xem tất cả lớp"
+              aria-label="Xóa bộ lọc lớp"
+            >
+              ×
+            </button>
+          </span>
         </div>
       )}
 
-      {/* 4. Filter Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        borderBottom: '1px solid #E2E8F0',
-        paddingBottom: '12px',
-        marginBottom: '20px'
-      }}>
-        <button
-          type="button"
-          onClick={() => setActiveStatusFilter('all')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            fontWeight: activeStatusFilter === 'all' ? 600 : 500,
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeStatusFilter === 'all' ? '#0F172A' : '#F1F5F9',
-            color: activeStatusFilter === 'all' ? '#FFFFFF' : '#475569',
-            cursor: 'pointer'
-          }}
-        >
-          {t('studentAssignments.tabAll')} ({classAssignments.length})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveStatusFilter('not_started')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            fontWeight: activeStatusFilter === 'not_started' ? 600 : 500,
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeStatusFilter === 'not_started' ? '#DC2626' : '#F1F5F9',
-            color: activeStatusFilter === 'not_started' ? '#FFFFFF' : '#475569',
-            cursor: 'pointer'
-          }}
-        >
-          {t('studentAssignments.tabNotStarted')} ({stats.notStarted})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveStatusFilter('grading')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            fontWeight: activeStatusFilter === 'grading' ? 600 : 500,
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeStatusFilter === 'grading' ? '#D97706' : '#F1F5F9',
-            color: activeStatusFilter === 'grading' ? '#FFFFFF' : '#475569',
-            cursor: 'pointer'
-          }}
-        >
-          {t('studentAssignments.tabGrading')} ({stats.grading})
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveStatusFilter('graded')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            fontWeight: activeStatusFilter === 'graded' ? 600 : 500,
-            borderRadius: '6px',
-            border: 'none',
-            backgroundColor: activeStatusFilter === 'graded' ? '#16A34A' : '#F1F5F9',
-            color: activeStatusFilter === 'graded' ? '#FFFFFF' : '#475569',
-            cursor: 'pointer'
-          }}
-        >
-          {t('studentAssignments.tabGraded')} ({stats.graded})
-        </button>
-      </div>
-
-      {/* 5. Assignments List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* 4. Assignments List */}
+      <div className="std-asg-list">
         {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
-            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
-            <div style={{ height: 80, borderRadius: 10, backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', animation: 'pulse 1.5s infinite' }} />
+          <div className="flex flex-col gap-12">
+            <Skeleton height="88px" borderRadius="12px" />
+            <Skeleton height="88px" borderRadius="12px" />
+            <Skeleton height="88px" borderRadius="12px" />
           </div>
         ) : filteredAssignments.length === 0 ? (
-          <div style={{
-            padding: '48px 24px',
-            textAlign: 'center',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '12px',
-            border: '1px solid #E2E8F0',
-            color: '#64748B'
-          }}>
-            <FileText size={40} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
-            <div style={{ fontSize: '16px', fontWeight: 600, color: '#1E293B', marginBottom: '4px' }}>
-              {t('studentAssignments.emptyTitle')}
-            </div>
-            <p style={{ fontSize: '14px', margin: 0 }}>
-              {t('studentAssignments.emptyDesc')}
-            </p>
-          </div>
+          <EmptyState
+            icon={<FileText size={40} />}
+            title={t('studentAssignments.emptyTitle')}
+            description={t('studentAssignments.emptyDesc')}
+          />
         ) : (
           filteredAssignments.map((assignment) => {
             const badge = getTypeBadge(assignment.type);
+            const handleAction = () => {
+              if (assignment.status === 'graded') {
+                navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
+              } else if (assignment.status === 'not_started') {
+                navigate(`/student/assignments/${assignment.id}/overview`);
+              } else {
+                navigate(getAssignmentRoute(assignment));
+              }
+            };
+
             return (
               <div
                 key={assignment.id}
-                onClick={() => {
-                  if (assignment.status === 'graded') {
-                    navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
-                  } else if (assignment.status === 'not_started') {
-                    navigate(`/student/assignments/${assignment.id}/overview`);
-                  } else {
-                    navigate(getAssignmentRoute(assignment));
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px 20px',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  flexWrap: 'wrap',
-                  gap: '16px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#94A3B8';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.transform = 'none';
-                }}
+                onClick={handleAction}
+                className="std-asg-card"
               >
                 {/* Left: Icon & Info */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 300px' }}>
-                  <div style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '10px',
-                    backgroundColor: badge.bg,
-                    color: badge.color,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
+                <div className="std-asg-card-left">
+                  <div className={`std-asg-icon-box ${badge.skillClass}`}>
                     {badge.icon}
                   </div>
 
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        backgroundColor: badge.bg,
-                        color: badge.color
-                      }}>
+                  <div className="std-asg-card-content">
+                    <div className="std-asg-card-header-row">
+                      <span className={`std-skill-tag ${badge.skillClass}`}>
                         {assignment.type}
                       </span>
-                      <span style={{ fontSize: '12px', color: '#64748B' }}>
-                        {assignment.className}
+                      <span className="std-asg-class-pill">
+                        <BookOpen size={11} />
+                        <span>{assignment.className}</span>
                       </span>
                     </div>
 
-                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', margin: 0 }}>
+                    <h3 className="std-asg-card-title">
                       {assignment.title}
                     </h3>
 
                     {/* Metadata & Deadlines */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#64748B', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <div className="std-asg-card-meta">
                       {assignment.submittedOn ? (
-                        <span>{t('studentAssignments.submittedOn')}{assignment.submittedOn}</span>
+                        <span className="std-asg-meta-item text-success">
+                          <CheckCircle2 size={13} />
+                          <span>{t('studentAssignments.submittedOn')}{assignment.submittedOn}</span>
+                        </span>
                       ) : (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: assignment.daysLeft && assignment.daysLeft <= 2 ? '#DC2626' : '#64748B', fontWeight: assignment.daysLeft && assignment.daysLeft <= 2 ? 600 : 400 }}>
+                        <span className={`std-asg-meta-item ${assignment.daysLeft !== undefined && assignment.daysLeft <= 2 ? 'urgent' : ''}`}>
                           <Calendar size={13} />
-                          {t('studentAssignments.deadlinePrefix')}{assignment.deadline || t('studentAssignments.noDeadline')}
+                          <span>{t('studentAssignments.deadlinePrefix')}{assignment.deadline || t('studentAssignments.noDeadline')}</span>
+                          {assignment.daysLeft !== undefined && assignment.daysLeft > 0 && assignment.daysLeft <= 3 && (
+                            <span className="std-asg-urgent-badge">
+                              {assignment.daysLeft === 1 ? 'Hôm nay' : `Còn ${assignment.daysLeft} ngày`}
+                            </span>
+                          )}
                         </span>
                       )}
 
                       {assignment.score !== undefined && (
-                        <>
-                          <span>•</span>
-                          <span style={{ color: '#059669', fontWeight: 700 }}>
-                            {t('studentAssignments.scorePrefix')}{assignment.score}/100 (Band {(assignment.score / 100 * 9).toFixed(1)})
-                          </span>
-                        </>
+                        <span className="std-asg-score-badge">
+                          <Sparkles size={11} />
+                          <span>{t('studentAssignments.scorePrefix')}{assignment.score}/100 • Band {(assignment.score / 100 * 9).toFixed(1)}</span>
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
 
                 {/* Right: Clean Status Badge & Action */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="std-asg-card-right">
                   {(assignment.status === 'pending' || assignment.status === 'ai_processing') && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#B45309', 
-                      fontSize: '12px', 
-                      fontWeight: 600, 
-                      padding: '5px 12px', 
-                      backgroundColor: '#FFFBEB', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #FDE68A' 
-                    }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F59E0B' }} />
+                    <div className="std-asg-status-badge grading">
+                      <span className="std-asg-dot" />
                       {t('studentAssignments.statusGrading')}
                     </div>
                   )}
 
                   {assignment.status === 'in_progress' && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#2563EB', 
-                      fontSize: '12px', 
-                      fontWeight: 600, 
-                      padding: '5px 12px', 
-                      backgroundColor: '#EFF6FF', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #BFDBFE' 
-                    }}>
+                    <div className="std-asg-status-badge in_progress">
                       <Clock size={12} />
                       {t('studentAssignments.statusInProgress')}
                     </div>
                   )}
 
                   {assignment.status === 'graded' && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#059669', 
-                      fontSize: '12px', 
-                      fontWeight: 600, 
-                      padding: '5px 12px', 
-                      backgroundColor: '#ECFDF5', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #A7F3D0' 
-                    }}>
+                    <div className="std-asg-status-badge graded">
                       <CheckCircle2 size={13} strokeWidth={2.2} />
                       {t('studentAssignments.tabGraded')}
                     </div>
                   )}
 
                   {assignment.status === 'not_started' && (
-                    <div style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      color: '#475569', 
-                      fontSize: '12px', 
-                      fontWeight: 600, 
-                      padding: '5px 12px', 
-                      backgroundColor: '#F1F5F9', 
-                      borderRadius: '9999px', 
-                      border: '1px solid #E2E8F0' 
-                    }}>
+                    <div className="std-asg-status-badge not_started">
                       <Clock size={13} strokeWidth={2} />
                       {t('studentAssignments.tabNotStarted')}
                     </div>
                   )}
 
-                  {/* Action CTA Button */}
-                  <button
-                    type="button"
-                    style={{
-                      padding: '7px 16px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                      border: assignment.status === 'not_started' ? 'none' : '1px solid #CBD5E1',
-                      backgroundColor: assignment.status === 'not_started' ? '#2563EB' : '#FFFFFF',
-                      color: assignment.status === 'not_started' ? '#FFFFFF' : '#334155',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
-                    }}
+                  <Button
+                    variant={assignment.status === 'not_started' ? 'primary' : 'secondary'}
+                    size="sm"
+                    className="std-asg-action-btn"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (assignment.status === 'graded') {
-                        navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
-                      } else if (assignment.status === 'not_started') {
-                        navigate(`/student/assignments/${assignment.id}/overview`);
-                      } else {
-                        navigate(getAssignmentRoute(assignment));
-                      }
+                      handleAction();
                     }}
                   >
                     {assignment.status === 'not_started'
@@ -821,7 +562,7 @@ const StudentAssignments: React.FC = () => {
                         : assignment.status === 'in_progress'
                           ? t('studentAssignments.btnContinue')
                           : t('studentAssignments.btnReview')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -829,31 +570,10 @@ const StudentAssignments: React.FC = () => {
         )}
       </div>
 
-      {/* 6. Footer / Synchronization info */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginTop: '28px',
-        paddingTop: '16px',
-        borderTop: '1px solid #F1F5F9',
-        fontSize: '13px', 
-        color: '#64748B',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-        <div>
+      {/* 5. Footer */}
+      <div className="std-asg-footer">
+        <div className="std-asg-count-text">
           {t('studentAssignments.paginationPrefix')}<strong>{filteredAssignments.length}</strong>{t('studentAssignments.paginationMid')}<strong>{classAssignments.length}</strong>{t('studentAssignments.unitAssignments')}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#059669', fontWeight: 500 }}>
-          <span style={{ 
-            width: '6px', 
-            height: '6px', 
-            borderRadius: '50%', 
-            backgroundColor: '#10B981', 
-            display: 'inline-block' 
-          }}></span>
-          {t('studentAssignments.syncStatusRealtime')}
         </div>
       </div>
     </div>

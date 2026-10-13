@@ -32,10 +32,10 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Đề Bài & Cấu Hình Kỹ Năng Viết (Writing Prompt)' : 'Writing Prompt & Task Parameters'}
+                {isVi ? 'Đề Bài & Yêu Cầu Bài Viết' : 'Writing Prompt & Instructions'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Soạn thảo đề thi, yêu cầu số lượng từ tối thiểu và tài liệu đính kèm.' : 'Draft essay questions, target word count, and reference attachments.'}
+                {isVi ? 'Đề bài và yêu cầu độ dài bài viết.' : 'Essay prompt and required length.'}
               </p>
             </div>
           </div>
@@ -220,10 +220,10 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Bài Mẫu Tham Khảo (Model Answer)' : 'Model Essay & References'}
+                {isVi ? 'Bài Mẫu Tham Khảo' : 'Model Essay'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Bài mẫu đối chiếu để AI tham khảo và học viên xem sau khi hoàn thành.' : 'Model essay for AI reference and student review after completion.'}
+                {isVi ? 'Bài viết mẫu tham khảo sau khi nộp bài.' : 'Model essay for post-submission reference.'}
               </p>
             </div>
           </div>

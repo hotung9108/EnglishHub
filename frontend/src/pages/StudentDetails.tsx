@@ -67,7 +67,7 @@ export const StudentDetails: React.FC = () => {
         }
       } catch (err: unknown) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải hồ sơ học viên.' : 'Failed to load student details.');
+          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải thông tin học viên.' : 'Failed to load student details.');
         }
       } finally {
         if (isMounted) {
@@ -180,7 +180,7 @@ export const StudentDetails: React.FC = () => {
       {loading ? (
         <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
-          <div>{isVi ? 'Đang tải hồ sơ học viên...' : 'Loading student profile...'}</div>
+          <div>{isVi ? 'Đang tải thông tin học viên...' : 'Loading student details...'}</div>
         </div>
       ) : (
         <>
@@ -209,7 +209,7 @@ export const StudentDetails: React.FC = () => {
                     {studentName}
                   </h2>
                   <span className="badge badge-primary font-mono">{studentCode}</span>
-                  <span className={`badge ${isActive ? 'badge-active' : 'badge-onleave'}`}>
+                  <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
                     {isActive ? (isVi ? 'Đang học' : 'Active') : (isVi ? 'Tạm khóa' : 'Locked')}
                   </span>
                   <button 

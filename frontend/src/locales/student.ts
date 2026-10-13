@@ -1,8 +1,8 @@
 export const studentVi = {
   studentAssignments: {
-    title: 'Xem trạng thái bài làm',
+    title: 'Bài tập của tôi',
     classPrefix: 'Lớp: ',
-    subtitle: 'Học Viên Làm Bài • Theo dõi tiến trình bài tập của mình theo từng trạng thái và nhận kết quả chấm.',
+    subtitle: 'Danh sách bài tập và tiến độ làm bài của bạn.',
     btnRefresh: 'Làm mới tiến trình',
     btnSubmitNew: 'Nộp bài tập mới',
     tableTitle: 'Bảng trạng thái bài tập của bạn',
@@ -49,7 +49,7 @@ export const studentVi = {
     tabNotStarted: 'Chưa bắt đầu',
     tabGrading: 'Đang chờ chấm',
     tabGraded: 'Đã có kết quả',
-    statusInProgress: 'Đang làm dở',
+    statusInProgress: 'Đang làm',
     btnContinue: 'Tiếp tục làm',
     btnStartNow: 'Làm bài ngay',
     emptyTitle: 'Không tìm thấy bài tập nào',
@@ -62,7 +62,7 @@ export const studentVi = {
   },
   studentClasses: {
     title: 'Lớp học của tôi',
-    subtitle: 'Không Gian Học Viên • Danh sách các khóa học và lớp bạn đang tham gia kỳ này.',
+    subtitle: 'Danh sách các lớp học bạn đang tham gia.',
     searchPlaceholder: 'Tìm theo tên lớp, giảng viên, mã lớp (ENG-...)',
     filterActive: 'Đang diễn ra',
     filterCompleted: 'Đã hoàn thành',
@@ -203,9 +203,9 @@ export const studentVi = {
 
 export const studentEn = {
   studentAssignments: {
-    title: 'View Submission Status',
+    title: 'My Assignments',
     classPrefix: 'Class: ',
-    subtitle: 'Student Dashboard • Track your assignment progress by status and receive grading results.',
+    subtitle: 'Your assignments and submission progress.',
     btnRefresh: 'Refresh Progress',
     btnSubmitNew: 'Submit New Assignment',
     tableTitle: 'Your Assignment Status Board',
@@ -265,7 +265,7 @@ export const studentEn = {
   },
   studentClasses: {
     title: 'My Classes',
-    subtitle: 'Student Portal • List of courses and classes you are enrolled in this semester.',
+    subtitle: 'Classes you are currently enrolled in.',
     searchPlaceholder: 'Search by class name, instructor, class code (ENG-...)',
     filterActive: 'In Progress',
     filterCompleted: 'Completed',

@@ -8,8 +8,9 @@ import { submissionService } from '../api/services/submission.service';
 import { 
   BookOpen, Users, Clock, Award, Search, Plus, 
   Calendar, MapPin, 
-  TrendingUp, FileText, User, RefreshCw, AlertCircle
+  RefreshCw, AlertCircle
 } from 'lucide-react';
+import { Button, EmptyState } from '../components/common';
 
 interface TeacherClassCardData {
   id: string;
@@ -188,47 +189,30 @@ export const TeacherClasses: React.FC = () => {
       <div className="teacher-header">
         <div>
           <h1 className="teacher-title">
-            <BookOpen size={28} color="var(--primary)" />
-            {isVi ? 'Quản Lý Lớp Học & Giảng Dạy' : 'Teaching & Class Management'}
-            <span style={{ 
-              fontSize: '13px', 
-              fontWeight: 700, 
-              padding: '3px 10px', 
-              borderRadius: 'var(--radius-full)', 
-              backgroundColor: 'var(--primary-fixed)', 
-              color: 'var(--primary)',
-              marginLeft: '8px'
-            }}>
-              {counts.all} {isVi ? 'lớp học' : 'classes'}
-            </span>
+            {isVi ? 'Quản lý lớp học' : 'Classes'}
           </h1>
-          <p className="teacher-subtitle">
-            {isVi
-              ? 'Theo dõi tiến độ học viên, kiểm tra bài nộp cần chấm điểm và cập nhật lộ trình khóa học.'
-              : 'Monitor student learning curves, grade pending submissions, and manage course schedules.'}
-          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button 
-            type="button" 
-            className="btn btn-primary btn-sm"
+        <div className="flex gap-2 items-center">
+          <Button 
+            variant="primary" 
+            size="sm"
+            icon={Plus}
             onClick={() => navigate('/teacher/assignments/create')}
           >
-            <Plus size={16} />
-            <span>{isVi ? 'Giao bài tập mới' : 'Create Assignment'}</span>
-          </button>
+            {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
+          </Button>
         </div>
       </div>
 
       {/* Loading state */}
       {isLoading && (
-        <div style={{ textAlign: 'center', padding: '48px 20px', backgroundColor: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--outline-variant)', marginBottom: '24px' }}>
-          <RefreshCw size={32} color="var(--primary)" className="animate-spin" style={{ margin: '0 auto 12px auto', display: 'block' }} />
-          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)' }}>
+        <div className="eh-card p-6 mb-6 text-center">
+          <RefreshCw size={28} className="text-primary animate-spin m-auto mb-3" />
+          <h3 className="m-0 text-sm font-bold text-main">
             {isVi ? 'Đang tải danh sách lớp học thực tế...' : 'Loading live classes...'}
           </h3>
-          <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+          <p className="mt-1 text-xs text-muted">
             {isVi ? 'Đang đồng bộ sĩ số, bài tập và điểm trung bình từng lớp.' : 'Syncing enrollment turnout and average class performance.'}
           </p>
         </div>
@@ -236,29 +220,19 @@ export const TeacherClasses: React.FC = () => {
 
       {/* Error state */}
       {!isLoading && error && (
-        <div style={{ 
-          padding: '16px 20px', 
-          backgroundColor: '#fef2f2', 
-          border: '1px solid #fecaca', 
-          borderRadius: '12px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          gap: '16px',
-          marginBottom: '24px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertCircle size={20} color="#dc2626" />
-            <span style={{ fontSize: '13.5px', color: '#b91c1c', fontWeight: 600 }}>{error}</span>
+        <div className="adm-alert-error mb-6">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={20} className="text-danger flex-shrink-0" />
+            <span className="text-sm font-semibold">{error}</span>
           </div>
-          <button 
-            className="btn btn-secondary bg-white btn-sm"
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
             onClick={handleRetry}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <RefreshCw size={14} />
-            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-          </button>
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
         </div>
       )}
 
@@ -270,50 +244,50 @@ export const TeacherClasses: React.FC = () => {
             className={`teacher-stat-card ${filter === 'active' ? 'active' : ''}`}
             onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
           >
-            <div className="teacher-stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+            <div className="teacher-stat-icon active">
               <BookOpen size={22} />
             </div>
             <div>
               <div className="teacher-stat-num">{counts.active} {isVi ? 'Lớp' : 'Classes'}</div>
-              <div className="teacher-stat-label">{isVi ? 'Đang trong thời gian giảng dạy' : 'Active Enrolled Classes'}</div>
+              <div className="teacher-stat-label">{isVi ? 'Lớp đang dạy' : 'Active Classes'}</div>
             </div>
           </div>
 
           {/* Total Students Card */}
           <div className="teacher-stat-card">
-            <div className="teacher-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+            <div className="teacher-stat-icon total">
               <Users size={22} />
             </div>
             <div>
               <div className="teacher-stat-num">{counts.totalStudents} {isVi ? 'Học viên' : 'Students'}</div>
-              <div className="teacher-stat-label">{isVi ? 'Tổng số học viên các lớp' : 'Total Enrolled Students'}</div>
+              <div className="teacher-stat-label">{isVi ? 'Tổng học viên' : 'Total Students'}</div>
             </div>
           </div>
 
           {/* Pending Submissions Card */}
           <div 
-            className="teacher-stat-card"
+            className={`teacher-stat-card ${counts.totalPending > 0 ? 'has-pending' : ''}`}
             onClick={() => navigate('/teacher/assignments')}
           >
-            <div className="teacher-stat-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+            <div className="teacher-stat-icon pending">
               <Clock size={22} />
             </div>
             <div>
-              <div className="teacher-stat-num" style={{ color: counts.totalPending > 0 ? '#d97706' : 'inherit' }}>
+              <div className="teacher-stat-num">
                 {counts.totalPending} {isVi ? 'Bài nộp' : 'Submissions'}
               </div>
-              <div className="teacher-stat-label">{isVi ? 'Cần giáo viên chấm điểm ngay' : 'Pending Grading'}</div>
+              <div className="teacher-stat-label">{isVi ? 'Bài chờ chấm' : 'Pending Grading'}</div>
             </div>
           </div>
 
           {/* Average Score Card */}
           <div className="teacher-stat-card">
-            <div className="teacher-stat-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }}>
+            <div className="teacher-stat-icon turnout">
               <Award size={22} />
             </div>
             <div>
               <div className="teacher-stat-num">Band {counts.overallAvg}</div>
-              <div className="teacher-stat-label">{isVi ? 'Điểm trung bình toàn khóa' : 'Overall Cohort GPA'}</div>
+              <div className="teacher-stat-label">{isVi ? 'Điểm trung bình' : 'Average Score'}</div>
             </div>
           </div>
         </div>
@@ -349,20 +323,12 @@ export const TeacherClasses: React.FC = () => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             {/* Term filter */}
             <select
               value={selectedTerm}
               onChange={(e) => setSelectedTerm(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                borderRadius: 'var(--radius-md, 8px)',
-                border: '1px solid var(--outline-variant)',
-                backgroundColor: 'var(--surface)',
-                color: 'var(--on-surface)',
-                outline: 'none'
-              }}
+              className="select-input"
             >
               <option value="current">{isVi ? 'Học kỳ hiện tại' : 'Current Term'}</option>
               <option value="previous">{isVi ? 'Học kỳ trước' : 'Previous Term'}</option>
@@ -391,43 +357,16 @@ export const TeacherClasses: React.FC = () => {
               <div>
                 {/* Header Badge */}
                 <div className="teacher-class-header">
-                  <span style={{ 
-                    backgroundColor: '#0f172a', 
-                    color: '#ffffff', 
-                    fontWeight: 700, 
-                    fontSize: '11.5px', 
-                    padding: '4px 10px', 
-                    borderRadius: '6px',
-                    letterSpacing: '0.04em'
-                  }}>
+                  <span className="teacher-assignment-code-badge">
                     {cls.code}
                   </span>
 
                   {cls.status === 'active' ? (
-                    <span style={{ 
-                      display: 'inline-flex', 
-                      alignItems: 'center', 
-                      gap: '6px', 
-                      backgroundColor: '#ecfdf5', 
-                      color: '#059669', 
-                      padding: '3px 10px', 
-                      borderRadius: '20px', 
-                      fontSize: '12px', 
-                      fontWeight: 700,
-                      border: '1px solid #a7f3d0'
-                    }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
+                    <span className="teacher-class-status-active">
                       {isVi ? 'Đang diễn ra' : 'In Progress'}
                     </span>
                   ) : (
-                    <span style={{ 
-                      backgroundColor: 'var(--surface-container-high)', 
-                      color: 'var(--on-surface-variant)', 
-                      padding: '3px 10px', 
-                      borderRadius: '20px', 
-                      fontSize: '12px', 
-                      fontWeight: 600 
-                    }}>
+                    <span className="teacher-class-status-completed">
                       {isVi ? 'Đã kết thúc' : 'Archived'}
                     </span>
                   )}
@@ -441,20 +380,16 @@ export const TeacherClasses: React.FC = () => {
                 {/* Meta information */}
                 <div className="teacher-class-meta">
                   <div className="teacher-class-meta-item">
-                    <User size={14} color="var(--primary)" />
-                    <span>{cls.teacher}</span>
-                  </div>
-                  <div className="teacher-class-meta-item">
-                    <MapPin size={14} color="var(--on-surface-variant)" />
+                    <MapPin size={14} className="text-muted" />
                     <span>{cls.room}</span>
                   </div>
                   <div className="teacher-class-meta-item">
-                    <Calendar size={14} color="var(--on-surface-variant)" />
+                    <Calendar size={14} className="text-muted" />
                     <span>{cls.schedule}</span>
                   </div>
                   <div className="teacher-class-meta-item">
-                    <Users size={14} color="var(--on-surface-variant)" />
-                    <span><strong>{cls.enrolledStudents}</strong> {isVi ? 'học viên đang tham gia' : 'students enrolled'}</span>
+                    <Users size={14} className="text-muted" />
+                    <span><strong>{cls.enrolledStudents}</strong> {isVi ? 'học viên' : 'students'}</span>
                   </div>
                 </div>
 
@@ -466,13 +401,13 @@ export const TeacherClasses: React.FC = () => {
                   </div>
                   <div className="teacher-mini-kpi-item">
                     <span className="teacher-mini-kpi-label">{isVi ? 'Chờ chấm' : 'Pending'}</span>
-                    <span className="teacher-mini-kpi-val" style={{ color: cls.stats.pending > 0 ? '#dc2626' : 'inherit' }}>
+                    <span className={`teacher-mini-kpi-val ${cls.stats.pending > 0 ? 'pending' : ''}`}>
                       {cls.stats.pending} {isVi ? 'bài' : ''}
                     </span>
                   </div>
                   <div className="teacher-mini-kpi-item">
                     <span className="teacher-mini-kpi-label">{isVi ? 'Điểm TB' : 'Avg Score'}</span>
-                    <span className="teacher-mini-kpi-val" style={{ color: cls.stats.avgScore >= 7.0 ? '#16a34a' : 'inherit' }}>
+                    <span className={`teacher-mini-kpi-val ${cls.stats.avgScore >= 7.0 ? 'good' : ''}`}>
                       {cls.stats.avgScore > 0 ? `${cls.stats.avgScore.toFixed(1)}/10` : '—'}
                     </span>
                   </div>
@@ -480,39 +415,26 @@ export const TeacherClasses: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  style={{ flex: 1, padding: '10px 14px' }}
+              <div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
                   onClick={() => navigate(`/teacher/classes/${cls.id}/progress`)}
                 >
-                  <TrendingUp size={15} />
-                  <span>{isVi ? 'Tiến độ & Bảng điểm' : 'Class Progress'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary bg-white btn-sm"
-                  style={{ padding: '10px 14px' }}
-                  onClick={() => navigate(`/teacher/assignments`)}
-                  title={isVi ? 'Quản lý bài tập' : 'Manage Assignments'}
-                >
-                  <FileText size={15} />
-                </button>
+                  {isVi ? 'Tiến độ & Bảng điểm' : 'Class Progress'}
+                </Button>
               </div>
             </div>
           ))}
 
           {filteredClasses.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 20px', backgroundColor: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--outline-variant)' }}>
-              <BookOpen size={36} color="var(--on-surface-variant)" style={{ margin: '0 auto 10px auto', display: 'block', opacity: 0.5 }} />
-              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>
-                {isVi ? 'Không tìm thấy lớp học nào' : 'No classes match your filter'}
-              </h4>
-              <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-                {isVi ? 'Vui lòng thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc khác.' : 'Try changing your search query or status filter.'}
-              </p>
+            <div className="col-span-full">
+              <EmptyState
+                icon={BookOpen}
+                title={isVi ? 'Không tìm thấy lớp học nào' : 'No classes match your filter'}
+                description={isVi ? 'Vui lòng thay đổi từ khóa tìm kiếm hoặc chọn bộ lọc khác.' : 'Try changing your search query or status filter.'}
+              />
             </div>
           )}
         </div>

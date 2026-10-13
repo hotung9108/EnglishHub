@@ -1,110 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { 
-  GraduationCap, Plus, Search, 
-  Archive, LayoutGrid, List,
-  Clock, User, ArrowRight, Loader2, AlertCircle
+  Plus, Search, 
+  User, Clock, ArrowRight,
+  LayoutGrid, List,
+  Archive, Loader2, AlertCircle, GraduationCap
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
-import { userService } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
-import type { UserListItem } from '../api/services/user.service';
-
-interface EnrichedClass {
-  id: number;
-  code: string;
-  name: string;
-  level: string;
-  teacher: string;
-  students: number;
-  maxStudents: number;
-  schedule: string;
-  status: 'active' | 'completed';
-}
+import { Button, EmptyState } from '../components/common';
 
 export const Classes: React.FC = () => {
   const { t, language } = useLanguage();
-  const navigate = useNavigate();
   const isVi = language === 'vi';
+  const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [classesData, setClassesData] = useState<EnrichedClass[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  const [classesData, setClassesData] = useState<Array<{
+    id: number;
+    name: string;
+    code: string;
+    teacher: string;
+    students: number;
+    maxStudents: number;
+    schedule: string;
+    status: 'active' | 'completed';
+    level: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
+
     const fetchClasses = async () => {
       try {
         setLoading(true);
         setError(null);
-
-        const [classRes, teacherRes] = await Promise.allSettled([
-          classService.list({ page: 1, limit: 100 }),
-          userService.listUsers({ role: 'TEACHER', limit: 100 })
-        ]);
-
+        const res = await classService.list({ page: 1, limit: 100 });
         if (!isMounted) return;
 
-        const rawClasses: ClassSummary[] = classRes.status === 'fulfilled' ? classRes.value.data : [];
-        const teachers: UserListItem[] = teacherRes.status === 'fulfilled' ? teacherRes.value.data : [];
-        const teacherMap = new Map<number, string>();
-        teachers.forEach(tc => teacherMap.set(tc.id, tc.fullName));
+        const mapped = (res.data || []).map((c: ClassSummary) => ({
+          id: c.id,
+          name: c.name,
+          code: `ENG-${c.id}`,
+          teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
+          students: (c as { studentCount?: number }).studentCount || 0,
+          maxStudents: 30,
+          schedule: isVi ? 'Thứ 2, 4, 6 (18:00 - 19:30)' : 'Mon, Wed, Fri (18:00 - 19:30)',
+          status: (c.status?.toLowerCase() === 'inactive' || c.status?.toLowerCase() === 'completed') ? 'completed' as const : 'active' as const,
+          level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'
+        }));
 
-        // Attempt to fetch extra details for first batch of classes
-        const enriched: EnrichedClass[] = await Promise.all(
-          rawClasses.map(async (c) => {
-            let memberCount = 0;
-            let level = 'General';
-            let description = '';
-            try {
-              const detail = await classService.getDetail(c.id);
-              level = detail.level || 'General';
-              description = detail.description || '';
-              if (typeof detail.memberCount === 'number') {
-                memberCount = detail.memberCount;
-              } else {
-                const members = await classService.listMembers(c.id);
-                memberCount = members.length;
-              }
-            } catch {
-              // fallback gracefully
-            }
-
-            const teacherName = c.teacherId && teacherMap.has(c.teacherId)
-              ? teacherMap.get(c.teacherId)!
-              : (isVi ? 'Chưa phân công' : 'Unassigned');
-
-            const isCompleted = c.status === 'COMPLETED' || c.status === 'CANCELLED';
-
-            return {
-              id: c.id,
-              code: `ENG-${c.id}`,
-              name: c.name,
-              level,
-              teacher: teacherName,
-              students: memberCount,
-              maxStudents: 25,
-              schedule: description || (isVi ? 'Theo lịch phân công' : 'Scheduled sessions'),
-              status: isCompleted ? 'completed' : 'active'
-            };
-          })
-        );
-
-        if (isMounted) {
-          setClassesData(enriched);
-        }
+        setClassesData(mapped);
       } catch (err: unknown) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách lớp học.' : 'Failed to load classes.');
-        }
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách lớp học.' : 'Failed to fetch classes.');
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
@@ -120,8 +77,8 @@ export const Classes: React.FC = () => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
-        cls.code.toLowerCase().includes(q) ||
         cls.name.toLowerCase().includes(q) ||
+        cls.code.toLowerCase().includes(q) ||
         cls.teacher.toLowerCase().includes(q)
       );
     }
@@ -131,53 +88,46 @@ export const Classes: React.FC = () => {
   return (
     <div className="adm-container">
       {/* Header */}
-      <div className="adm-header">
+      <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <GraduationCap size={28} color="var(--primary)" />
+            <GraduationCap size={28} className="text-primary" />
             {t('adminClasses.title')}
-            <span className="adm-title-badge">{classesData.length} {isVi ? 'lớp học' : 'classes'}</span>
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Quản lý thông tin khóa học, phân công giảng viên, sĩ số phòng học và tiến độ đào tạo.' 
-              : 'Cohort management, instructor assignments, student capacity, and course syllabus progress.'}
-          </p>
         </div>
 
-        <div className="adm-actions">
-          <Link 
-            to="/admin/classes/archive" 
-            className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        <div className="adm-actions flex items-center gap-3">
+          <Button 
+            variant="secondary"
+            icon={<Archive size={16} />}
+            onClick={() => navigate('/admin/classes/archive')}
           >
-            <Archive size={16} />
-            <span>{t('classArchive.title')}</span>
-          </Link>
-          <Link 
-            to="/admin/classes/create" 
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            {t('classArchive.title')}
+          </Button>
+          <Button 
+            variant="primary"
+            icon={<Plus size={16} />}
+            onClick={() => navigate('/admin/classes/create')}
           >
-            <Plus size={16} />
-            <span>{t('adminClasses.createClass')}</span>
-          </Link>
+            {t('adminClasses.createClass')}
+          </Button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="adm-filter-bar">
+      <div className="adm-filter-bar mb-6">
         {/* Status Pills */}
         <div className="adm-pills">
           {(
             [
               { key: 'all', label: isVi ? 'Tất cả lớp học' : 'All Classes', count: classesData.length },
-              { key: 'active', label: isVi ? 'Đang mở (Active)' : 'Active', count: classesData.filter(c => c.status === 'active').length },
+              { key: 'active', label: isVi ? 'Đang mở' : 'Active', count: classesData.filter(c => c.status === 'active').length },
               { key: 'completed', label: isVi ? 'Đã hoàn thành' : 'Completed', count: classesData.filter(c => c.status === 'completed').length },
             ] as const
           ).map(p => (
             <button
               key={p.key}
+              type="button"
               onClick={() => setStatusFilter(p.key)}
               className={`adm-pill ${statusFilter === p.key ? 'active' : ''}`}
             >
@@ -188,7 +138,7 @@ export const Classes: React.FC = () => {
         </div>
 
         {/* Search & View Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="flex items-center gap-3">
           <div className="adm-search-wrap">
             <Search size={16} className="adm-search-icon" />
             <input 
@@ -200,29 +150,19 @@ export const Classes: React.FC = () => {
             />
           </div>
 
-          <div style={{ display: 'flex', border: '1px solid var(--outline-variant)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div className="flex border-subtle rounded-md overflow-hidden bg-surface">
             <button
+              type="button"
               onClick={() => setViewMode('grid')}
-              style={{
-                padding: '6px 10px',
-                border: 'none',
-                background: viewMode === 'grid' ? 'var(--primary)' : 'var(--surface)',
-                color: viewMode === 'grid' ? '#ffffff' : 'var(--on-surface-variant)',
-                cursor: 'pointer'
-              }}
+              className={`p-2 cursor-pointer border-none ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-surface text-muted'}`}
               title="Grid View"
             >
               <LayoutGrid size={16} />
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('list')}
-              style={{
-                padding: '6px 10px',
-                border: 'none',
-                background: viewMode === 'list' ? 'var(--primary)' : 'var(--surface)',
-                color: viewMode === 'list' ? '#ffffff' : 'var(--on-surface-variant)',
-                cursor: 'pointer'
-              }}
+              className={`p-2 cursor-pointer border-none ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-surface text-muted'}`}
               title="Table View"
             >
               <List size={16} />
@@ -232,125 +172,102 @@ export const Classes: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px'
-        }}>
+        <div className="adm-alert-error mb-6">
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
       )}
 
       {loading ? (
-        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-          <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+        <div className="p-8 text-center text-muted">
+          <Loader2 size={32} className="animate-spin mx-auto mb-3" />
           <div>{isVi ? 'Đang tải danh sách lớp học...' : 'Loading classes...'}</div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="card" style={{ padding: '56px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-          <GraduationCap size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
-          <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
-            {isVi ? 'Không tìm thấy lớp học nào' : 'No classes found'}
-          </h3>
-          <p style={{ margin: 0, fontSize: '13.5px' }}>
-            {searchQuery 
-              ? (isVi ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.' : 'No classes match your search query.')
-              : (isVi ? 'Chưa có lớp học nào được tạo trên hệ thống.' : 'No classes created yet.')}
-          </p>
-          <div style={{ marginTop: '18px' }}>
-            <Link to="/admin/classes/create" className="btn btn-primary btn-sm">
-              <Plus size={14} style={{ marginRight: '6px' }} />
-              <span>{t('adminClasses.createClass')}</span>
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          icon={<GraduationCap size={40} />}
+          title={isVi ? 'Không tìm thấy lớp học nào' : 'No classes found'}
+          description={searchQuery 
+            ? (isVi ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.' : 'No classes match your search query.')
+            : (isVi ? 'Chưa có lớp học nào được tạo trên hệ thống.' : 'No classes created yet.')}
+          action={
+            <Button 
+              variant="primary"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => navigate('/admin/classes/create')}
+            >
+              {t('adminClasses.createClass')}
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* Grid View Mode */}
           {viewMode === 'grid' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '22px' }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
               {filtered.map(cls => {
                 const occupancyPct = Math.min(100, Math.round((cls.students / cls.maxStudents) * 100));
                 return (
                   <div 
                     key={cls.id} 
-                    className="card"
-                    style={{ 
-                      padding: '22px', 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between', 
-                      gap: '16px',
-                      transition: 'all 0.25s ease',
-                      border: '1px solid var(--outline-variant)'
-                    }}
+                    className="eh-card p-5 flex flex-col justify-between gap-4"
                   >
                     <div>
                       {/* Top Badges */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          <span className="badge badge-primary font-mono">{cls.code}</span>
-                          <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', fontSize: '11.5px' }}>{cls.level}</span>
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex gap-2 items-center">
+                          <span className="font-mono text-xs font-bold text-muted">{cls.code}</span>
+                          <span className="badge badge-neutral text-xs">{cls.level}</span>
                         </div>
                         <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
                           {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
                         </span>
                       </div>
 
-                      <h3 style={{ fontSize: '16.5px', fontWeight: 700, margin: '0 0 12px 0', lineHeight: 1.4 }}>
+                      <h3 className="text-base font-bold m-0 mb-3 leading-snug text-surface">
                         {cls.name}
                       </h3>
 
                       {/* Instructor & Meta */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <User size={15} color="var(--primary)" />
+                      <div className="flex flex-col gap-2 text-sm text-muted mb-4">
+                        <div className="flex items-center gap-2">
+                          <User size={15} className="text-primary" />
                           <span>{t('adminClasses.teacherPrefix')}<strong>{cls.teacher}</strong></span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="flex items-center gap-2">
                           <Clock size={15} />
                           <span>{cls.schedule}</span>
                         </div>
                       </div>
 
                       {/* Enrollment Progress Bar */}
-                      <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', marginBottom: '6px' }}>
-                          <span className="text-on-surface-variant">
+                      <div className="p-3 rounded-md bg-surface-low border-subtle mb-1">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted">
                             {isVi ? 'Sĩ số' : 'Class Capacity'}: <strong>{cls.students}/{cls.maxStudents}</strong>
                           </span>
                           <span className="font-semibold text-primary">{occupancyPct}%</span>
                         </div>
-                        <div style={{ height: '6px', backgroundColor: 'var(--surface-container-high)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div className="w-full bg-surface-container rounded-sm overflow-hidden" style={{ height: '6px' }}>
                           <div 
-                            style={{ 
-                              width: `${occupancyPct}%`, 
-                              height: '100%', 
-                              backgroundColor: occupancyPct > 90 ? '#2563eb' : '#059669', 
-                              borderRadius: '3px' 
-                            }} 
+                            className={`h-full rounded-sm ${occupancyPct > 90 ? 'bg-primary' : 'bg-secondary'}`}
+                            style={{ width: `${occupancyPct}%` }} 
                           />
                         </div>
                       </div>
                     </div>
 
                     {/* Footer Action */}
-                    <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--outline-variant)', paddingTop: '14px' }}>
-                      <button
+                    <div className="flex gap-2 pt-3 border-t-subtle">
+                      <Button
+                        variant="secondary"
+                        className="flex-1 text-sm justify-between"
                         onClick={() => navigate(`/admin/classes/${cls.id}`)}
-                        className="btn btn-secondary flex-1"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px' }}
                       >
                         <span>{t('adminClasses.manageClass')}</span>
                         <ArrowRight size={14} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -370,34 +287,35 @@ export const Classes: React.FC = () => {
                     <th>{isVi ? 'SĨ SỐ' : 'ENROLLED'}</th>
                     <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
                     <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                    <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                    <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(cls => (
-                    <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} style={{ cursor: 'pointer' }}>
+                    <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
                       <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                      <td className="font-medium">{cls.name}</td>
+                      <td className="font-medium text-surface">{cls.name}</td>
                       <td>{cls.teacher}</td>
                       <td>
                         <span className="font-semibold">{cls.students}/{cls.maxStudents}</span>
                       </td>
-                      <td className="text-on-surface-variant">{cls.schedule}</td>
+                      <td className="text-muted">{cls.schedule}</td>
                       <td>
                         <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
                           {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-secondary btn-sm"
+                      <td className="text-right">
+                        <Button 
+                          variant="secondary"
+                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/admin/classes/${cls.id}`);
                           }}
                         >
                           {t('adminClasses.viewDetails')}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}

@@ -4,7 +4,7 @@ import {
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
   CheckCircle2, AlertCircle, Users, Calendar, 
-  MapPin, Plus, Download, Sparkles, X, 
+  Plus, Download, Sparkles, X, 
   ArrowUpRight, Clock, Award, FileText, Send, Eye,
   RefreshCw
 } from 'lucide-react';
@@ -619,10 +619,6 @@ export const TeacherClassProgress: React.FC = () => {
                 <Calendar size={14} />
                 <span>{isVi ? 'Lịch cố định' : 'Regular Schedule'}</span>
               </span>
-              <span className="tcd-meta-item">
-                <MapPin size={14} />
-                <span>Phòng học EnglishHub</span>
-              </span>
             </div>
           </div>
 
@@ -687,9 +683,6 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-kpi-icon blue">
               <TrendingUp size={20} />
             </div>
-            <span className="tcd-kpi-chip info">
-              {classKpis.completionRate}%
-            </span>
           </div>
           <div>
             <div className="tcd-kpi-value">{classKpis.completionRate}%</div>
@@ -698,12 +691,12 @@ export const TeacherClassProgress: React.FC = () => {
           <div className="tcd-mini-progress">
             <div 
               className="tcd-mini-progress-fill" 
-              style={{ width: `${classKpis.completionRate}%`, backgroundColor: '#2563eb' }}
+              style={{ width: `${classKpis.completionRate}%`, backgroundColor: 'var(--primary, #1b4d3e)' }}
             />
           </div>
           <div className="tcd-kpi-foot-text">
             <span>{classKpis.totalActualSubs} / {classKpis.totalPossibleSubs} {isVi ? 'bài đã nộp' : 'submitted'}</span>
-            <span style={{ color: '#2563eb', fontWeight: 600 }}>{classKpis.totalPossibleSubs - classKpis.totalActualSubs} {isVi ? 'bài tồn' : 'pending'}</span>
+            <span style={{ color: 'var(--primary, #1b4d3e)', fontWeight: 600 }}>{classKpis.totalPossibleSubs - classKpis.totalActualSubs} {isVi ? 'bài tồn' : 'pending'}</span>
           </div>
         </div>
 
@@ -713,9 +706,6 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-kpi-icon green">
               <CheckCircle2 size={20} />
             </div>
-            <span className="tcd-kpi-chip success">
-              On-track
-            </span>
           </div>
           <div>
             <div className="tcd-kpi-value">{classKpis.onTimeRate}%</div>
@@ -739,9 +729,6 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-kpi-icon purple">
               <Award size={20} />
             </div>
-            <span className="tcd-kpi-chip info">
-              Band {classKpis.avgScore}
-            </span>
           </div>
           <div>
             <div className="tcd-kpi-value">Band {classKpis.avgScore}</div>
@@ -765,9 +752,6 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-kpi-icon amber">
               <AlertCircle size={20} />
             </div>
-            <span className="tcd-kpi-chip warning">
-              {classKpis.supportCount} {isVi ? 'em cần phụ đạo' : 'need support'}
-            </span>
           </div>
           <div>
             <div className="tcd-kpi-value">{classKpis.targetAttainment}%</div>
@@ -920,7 +904,7 @@ export const TeacherClassProgress: React.FC = () => {
                             className="tcd-mini-progress-fill" 
                             style={{ 
                               width: `${(std.assignmentsCompleted / std.totalAssignments) * 100}%`,
-                              backgroundColor: std.assignmentsCompleted < Math.ceil(std.totalAssignments * 0.6) ? '#dc2626' : '#2563eb'
+                              backgroundColor: std.assignmentsCompleted < Math.ceil(std.totalAssignments * 0.6) ? 'var(--error, #dc2626)' : 'var(--primary, #1b4d3e)'
                             }}
                           />
                         </div>
@@ -997,9 +981,6 @@ export const TeacherClassProgress: React.FC = () => {
               <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
                 {isVi ? 'Bài tập đã giao cho lớp này' : 'Assignments for this Class'}
               </h2>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-                {isVi ? 'Quản lý hạn nộp, tỷ lệ hoàn thành và duyệt chấm bài tập của học viên.' : 'Monitor due dates, submission rates and grading queue.'}
-              </p>
             </div>
             <button 
               className="tcd-btn-primary"
@@ -1015,7 +996,7 @@ export const TeacherClassProgress: React.FC = () => {
               <div key={hw.id} className="tcd-assignment-card">
                 <div className="tcd-assignment-card-header">
                   <div>
-                    <span className="tcd-class-code-badge" style={{ backgroundColor: '#2563eb' }}>
+                    <span className="tcd-class-code-badge" style={{ backgroundColor: 'var(--primary, #1b4d3e)' }}>
                       {hw.code}
                     </span>
                     <h3 className="tcd-assignment-title" style={{ marginTop: '8px' }}>
@@ -1030,7 +1011,7 @@ export const TeacherClassProgress: React.FC = () => {
                   </span>
                   <span style={{ 
                     fontWeight: 600, 
-                    color: hw.daysLeft === 0 ? '#dc2626' : '#2563eb' 
+                    color: hw.daysLeft === 0 ? 'var(--error, #dc2626)' : 'var(--primary, #1b4d3e)' 
                   }}>
                     {hw.daysLeft === 0 ? (isVi ? 'Hết hạn hôm nay' : 'Due today') : `${hw.daysLeft} ${isVi ? 'ngày nữa' : 'days left'}`}
                   </span>
@@ -1047,7 +1028,7 @@ export const TeacherClassProgress: React.FC = () => {
                       className="tcd-mini-progress-fill" 
                       style={{ 
                         width: `${Math.min(100, (hw.submittedCount / hw.totalStudents) * 100)}%`,
-                        backgroundColor: '#2563eb'
+                        backgroundColor: 'var(--primary, #1b4d3e)'
                       }}
                     />
                   </div>
@@ -1104,9 +1085,6 @@ export const TeacherClassProgress: React.FC = () => {
             <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               {isVi ? 'Đánh giá Năng lực 4 Kỹ năng & AI Insights' : '4-Skill Analytics & AI Diagnostic'}
             </h2>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Báo cáo tổng hợp từ công cụ AI Grading Engine dựa trên bài làm thực tế của lớp.' : 'Synthesized diagnosis from AI Grading Engine across class submissions.'}
-            </p>
           </div>
 
           <div className="tcd-analytics-grid">
@@ -1114,10 +1092,10 @@ export const TeacherClassProgress: React.FC = () => {
               <div key={sk.skill} className="tcd-analytics-skill-card">
                 <div className="tcd-skill-card-top">
                   <span className="tcd-skill-tag-name">
-                    {sk.skill === 'writing' && <PenTool size={16} color="#2563eb" />}
-                    {sk.skill === 'speaking' && <Mic size={16} color="#9333ea" />}
-                    {sk.skill === 'reading' && <BookOpen size={16} color="#16a34a" />}
-                    {sk.skill === 'listening' && <Headphones size={16} color="#0d9488" />}
+                    {sk.skill === 'writing' && <PenTool size={16} color="var(--skill-writing, #8C5E14)" />}
+                    {sk.skill === 'speaking' && <Mic size={16} color="var(--skill-speaking, #5B21B6)" />}
+                    {sk.skill === 'reading' && <BookOpen size={16} color="var(--skill-reading, #16533D)" />}
+                    {sk.skill === 'listening' && <Headphones size={16} color="var(--skill-listening, #1E3A8A)" />}
                     <span>{sk.name}</span>
                   </span>
 
@@ -1132,15 +1110,16 @@ export const TeacherClassProgress: React.FC = () => {
                     className="tcd-mini-progress-fill" 
                     style={{ 
                       width: `${(sk.avgScore / 9.0) * 100}%`,
-                      backgroundColor: sk.skill === 'writing' ? '#2563eb' : sk.skill === 'speaking' ? '#9333ea' : sk.skill === 'reading' ? '#16a34a' : '#0d9488'
+                      backgroundColor: sk.skill === 'writing' ? 'var(--skill-writing, #8C5E14)' : sk.skill === 'speaking' ? 'var(--skill-speaking, #5B21B6)' : sk.skill === 'reading' ? 'var(--skill-reading, #16533D)' : 'var(--skill-listening, #1E3A8A)'
                     }}
                   />
                 </div>
 
                 {/* Strengths */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', marginBottom: '6px' }}>
-                    {isVi ? '✓ Điểm mạnh của lớp:' : '✓ Class Strengths:'}
+                  <div className="flex items-center gap-1.5" style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', marginBottom: '6px' }}>
+                    <CheckCircle2 size={13} />
+                    <span>{isVi ? 'Điểm mạnh của lớp:' : 'Class Strengths:'}</span>
                   </div>
                   <div className="tcd-tags-list">
                     {sk.strengths.length > 0 ? (
@@ -1157,8 +1136,9 @@ export const TeacherClassProgress: React.FC = () => {
 
                 {/* Weaknesses */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626', marginBottom: '6px' }}>
-                    {isVi ? '⚠ Điểm yếu cần khắc phục:' : '⚠ Common Weaknesses:'}
+                  <div className="flex items-center gap-1.5" style={{ fontSize: '12px', fontWeight: 700, color: '#dc2626', marginBottom: '6px' }}>
+                    <AlertCircle size={13} />
+                    <span>{isVi ? 'Điểm yếu cần khắc phục:' : 'Common Weaknesses:'}</span>
                   </div>
                   <div className="tcd-tags-list">
                     {sk.weaknesses.length > 0 ? (
@@ -1228,9 +1208,6 @@ export const TeacherClassProgress: React.FC = () => {
             <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
               {isVi ? 'Lộ trình & Bài học theo tiến độ' : 'Syllabus & Assignment Timeline'}
             </h2>
-            <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
-              {isVi ? 'Theo dõi nội dung bài tập đã giao và kế hoạch học tập của lớp.' : 'Track completed lessons and active homework.'}
-            </p>
           </div>
 
           <div className="tcd-syllabus-timeline">
@@ -1259,20 +1236,20 @@ export const TeacherClassProgress: React.FC = () => {
                       fontWeight: 600, 
                       padding: '3px 8px', 
                       borderRadius: '6px', 
-                      backgroundColor: '#eff6ff', 
-                      color: '#2563eb' 
+                      backgroundColor: 'var(--primary-light, #eaf0e8)', 
+                      color: 'var(--primary, #1b4d3e)' 
                     }}>
                       {les.homeworkAttached}
                     </span>
                   )}
                   {les.status === 'completed' && (
                     <span className="tcd-status-chip ontime">
-                      <CheckCircle2 size={12} /> {isVi ? 'Đã hoàn tất' : 'Completed'}
+                      {isVi ? 'Đã hoàn tất' : 'Completed'}
                     </span>
                   )}
                   {les.status === 'current' && (
                     <span className="tcd-status-chip exceed">
-                      <Clock size={12} /> {isVi ? 'Đang mở nộp bài' : 'Current'}
+                      {isVi ? 'Đang mở nộp bài' : 'Current'}
                     </span>
                   )}
                   {les.status === 'upcoming' && (
@@ -1341,27 +1318,27 @@ export const TeacherClassProgress: React.FC = () => {
                   {isVi ? 'Chi tiết 4 Kỹ năng' : '4-Skill Performance'}
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  <div style={{ padding: '12px', backgroundColor: '#eff6ff', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>Writing</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1d4ed8' }}>
+                  <div style={{ padding: '12px', backgroundColor: 'var(--skill-writing-bg, #FAF3E5)', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skill-writing, #8C5E14)', fontWeight: 600 }}>Writing</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--skill-writing, #8C5E14)' }}>
                       {selectedStudent.scores.writing > 0 ? `Band ${selectedStudent.scores.writing}` : '—'}
                     </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#faf5ff', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#9333ea', fontWeight: 600 }}>Speaking</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#7e22ce' }}>
+                  <div style={{ padding: '12px', backgroundColor: 'var(--skill-speaking-bg, #F3EEFA)', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skill-speaking, #5B21B6)', fontWeight: 600 }}>Speaking</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--skill-speaking, #5B21B6)' }}>
                       {selectedStudent.scores.speaking > 0 ? `Band ${selectedStudent.scores.speaking}` : '—'}
                     </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>Reading</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d' }}>
+                  <div style={{ padding: '12px', backgroundColor: 'var(--skill-reading-bg, #E9F3ED)', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skill-reading, #16533D)', fontWeight: 600 }}>Reading</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--skill-reading, #16533D)' }}>
                       {selectedStudent.scores.reading > 0 ? `Band ${selectedStudent.scores.reading}` : '—'}
                     </div>
                   </div>
-                  <div style={{ padding: '12px', backgroundColor: '#f0fdfa', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', color: '#0d9488', fontWeight: 600 }}>Listening</div>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e' }}>
+                  <div style={{ padding: '12px', backgroundColor: 'var(--skill-listening-bg, #EDF3FB)', borderRadius: '10px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--skill-listening, #1E3A8A)', fontWeight: 600 }}>Listening</div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--skill-listening, #1E3A8A)' }}>
                       {selectedStudent.scores.listening > 0 ? `Band ${selectedStudent.scores.listening}` : '—'}
                     </div>
                   </div>

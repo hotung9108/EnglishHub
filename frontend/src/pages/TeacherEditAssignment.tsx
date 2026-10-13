@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Users,
+  Calendar, Eye, Save, Send, CheckCircle2,
   RefreshCw, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -619,11 +619,6 @@ export const TeacherEditAssignment: React.FC = () => {
               placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
             />
           </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-            {isVi 
-              ? 'Tùy chỉnh nội dung đề thi, tài liệu đính kèm, rubric chấm điểm AI và thiết lập hạn nộp cho lớp học.'
-              : 'Customize assignment instructions, attachments, AI rubrics, and scheduling constraints.'}
-          </p>
         </div>
 
         {/* Status indicator & class badge */}
@@ -757,7 +752,6 @@ export const TeacherEditAssignment: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Thời gian mở và hạn chót' : 'Open & Close dates'}</p>
                 </div>
               </div>
             </div>
@@ -808,7 +802,6 @@ export const TeacherEditAssignment: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="edit-card-title">{isVi ? 'Trạng Thái Bài Tập' : 'Publish Status'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Công khai hoặc lưu bản nháp' : 'Publish or save as draft'}</p>
                 </div>
               </div>
             </div>
@@ -820,9 +813,9 @@ export const TeacherEditAssignment: React.FC = () => {
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'active' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'active' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'active' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'active' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: assignmentData.status === 'active' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: assignmentData.status === 'active' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'
@@ -837,9 +830,9 @@ export const TeacherEditAssignment: React.FC = () => {
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: currentDbStatus === 'PUBLISHED' ? '#f8fafc' : assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
-                    color: currentDbStatus === 'PUBLISHED' ? '#94a3b8' : assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'draft' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: currentDbStatus === 'PUBLISHED' ? 'var(--surface-dim, #f4efe6)' : assignmentData.status === 'draft' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: currentDbStatus === 'PUBLISHED' ? 'var(--text-muted, #736b63)' : assignmentData.status === 'draft' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: currentDbStatus === 'PUBLISHED' ? 'not-allowed' : 'pointer',
@@ -861,10 +854,9 @@ export const TeacherEditAssignment: React.FC = () => {
           </section>
 
           {/* Quick Stats Summary Card */}
-          <section className="edit-card" style={{ backgroundColor: '#f8fafc' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <Users size={18} color="#2563eb" />
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+          <section className="edit-card" style={{ backgroundColor: 'var(--surface-dim, #f4efe6)' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary, #262320)' }}>
                 {isVi ? 'Thống Kê Lớp Học' : 'Turnout Metrics'}
               </h4>
             </div>

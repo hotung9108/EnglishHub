@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   History, Search, Download, 
   X, 
-  Award, Loader2, AlertCircle,
-  RotateCcw, CheckCircle2, Clock, FileText
+  Loader2, AlertCircle,
+  RotateCcw, CheckCircle2, FileText
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { gradingService } from '../api/services/grading.service';
@@ -24,6 +24,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
   const [gradings, setGradings] = useState<GradingSummaryResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | GradingStatus>('ALL');
+  const [scoreFilter, setScoreFilter] = useState<'ALL' | 'SCORED' | 'UNSCORED'>('ALL');
 
   // Drawer / Inspection
   const [selectedGradingId, setSelectedGradingId] = useState<number | null>(null);
@@ -44,7 +45,6 @@ export const AdminGradingAuditLogs: React.FC = () => {
         const params = {
           page: 1,
           limit: 100,
-          status: statusFilter === 'ALL' ? undefined : statusFilter,
         };
 
         const res = await gradingService.listGradings(params);
@@ -67,7 +67,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [statusFilter, refreshKey, isVi]);
+  }, [refreshKey, isVi]);
 
   // Open inspection drawer
   const handleOpenDetail = async (gradingId: number) => {
@@ -105,21 +105,63 @@ export const AdminGradingAuditLogs: React.FC = () => {
     setChangeLogs([]);
   };
 
-  const filteredGradings = gradings.filter(item => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const code = `GR-${item.id}`.toLowerCase();
-      return (
-        code.includes(q) ||
-        item.status.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const countCompleted = useMemo(() => gradings.filter(i => i.status === 'COMPLETED').length, [gradings]);
+  const countAiGraded = useMemo(() => gradings.filter(i => i.status === 'AI_GRADED').length, [gradings]);
+  const countPending = useMemo(() => gradings.filter(i => i.status === 'PENDING').length, [gradings]);
+  const countFailed = useMemo(() => gradings.filter(i => i.status === 'FAILED').length, [gradings]);
 
-  const countCompleted = gradings.filter(i => i.status === 'COMPLETED').length;
-  const countAiGraded = gradings.filter(i => i.status === 'AI_GRADED').length;
-  const countPending = gradings.filter(i => i.status === 'PENDING').length;
+  const filteredGradings = useMemo(() => {
+    return gradings.filter(item => {
+      // 1. Status segment filter
+      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
+        return false;
+      }
+
+      // 2. Score filter
+      if (scoreFilter === 'SCORED' && (item.finalScore === null || item.finalScore === undefined)) {
+        return false;
+      }
+      if (scoreFilter === 'UNSCORED' && item.finalScore !== null && item.finalScore !== undefined) {
+        return false;
+      }
+
+      // 3. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const code = `gr-${item.id}`.toLowerCase();
+        const idStr = String(item.id);
+        const rawStatus = item.status.toLowerCase();
+        const scoreStr = item.finalScore !== null && item.finalScore !== undefined ? String(item.finalScore) : '';
+
+        // Friendly keyword matching for status
+        let statusMatches = rawStatus.includes(q);
+        if (item.status === 'COMPLETED' && (q.includes('hoàn tất') || q.includes('hoàn thành') || q.includes('xong') || q.includes('complete'))) {
+          statusMatches = true;
+        } else if (item.status === 'AI_GRADED' && (q.includes('ai') || q.includes('máy chấm') || q.includes('tự động'))) {
+          statusMatches = true;
+        } else if (item.status === 'PENDING' && (q.includes('chờ') || q.includes('duyệt') || q.includes('pend'))) {
+          statusMatches = true;
+        } else if (item.status === 'FAILED' && (q.includes('thất bại') || q.includes('lỗi') || q.includes('fail'))) {
+          statusMatches = true;
+        }
+
+        // Score keyword matching
+        let scoreMatches = scoreStr.includes(q);
+        if ((item.finalScore === null || item.finalScore === undefined) && (q.includes('chưa') || q.includes('unscored') || q.includes('null'))) {
+          scoreMatches = true;
+        }
+
+        return (
+          code.includes(q) ||
+          idStr === q ||
+          statusMatches ||
+          scoreMatches
+        );
+      }
+
+      return true;
+    });
+  }, [gradings, statusFilter, scoreFilter, searchQuery]);
 
   const handleExportCsv = () => {
     alert(isVi ? 'Đang trích xuất nhật ký kiểm toán chấm điểm ra tập tin CSV...' : 'Exporting grading audit records to CSV...');
@@ -130,11 +172,11 @@ export const AdminGradingAuditLogs: React.FC = () => {
       case 'COMPLETED':
         return <span className="badge badge-active">{isVi ? 'Đã hoàn thành' : 'Completed'}</span>;
       case 'AI_GRADED':
-        return <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#7e22ce' }}>{isVi ? 'AI Đã Chấm' : 'AI Graded'}</span>;
+        return <span className="badge badge-secondary">{isVi ? 'AI Đã Chấm' : 'AI Graded'}</span>;
       case 'PENDING':
         return <span className="badge badge-onleave">{isVi ? 'Đang chờ duyệt' : 'Pending'}</span>;
       case 'FAILED':
-        return <span className="badge" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>{isVi ? 'Thất bại' : 'Failed'}</span>;
+        return <span className="badge badge-blocked">{isVi ? 'Thất bại' : 'Failed'}</span>;
       default:
         return <span className="badge">{status}</span>;
     }
@@ -150,9 +192,6 @@ export const AdminGradingAuditLogs: React.FC = () => {
               <History size={24} />
             </div>
             <span>{t('auditLogs.title')}</span>
-            <span className="adm-gh-count-badge">
-              {filteredGradings.length} {isVi ? 'hồ sơ chấm điểm' : 'grading records'}
-            </span>
           </h1>
           <p className="adm-subtitle">
             {t('auditLogs.subtitle')}
@@ -197,39 +236,13 @@ export const AdminGradingAuditLogs: React.FC = () => {
         </div>
       )}
 
-      {/* Filter and Quick Chips Bar */}
-      <div className="adm-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '12px', width: '100%', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Search Input */}
-          <div className="adm-search-wrap" style={{ flex: 1, minWidth: '260px' }}>
-            <Search size={16} className="adm-search-icon" />
-            <input 
-              type="text" 
-              className="adm-search-input"
-              placeholder={isVi ? 'Tìm theo mã chấm (GR-...) hoặc trạng thái...' : 'Search by grading ID (GR-...) or status...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {searchQuery && (
-            <button 
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setSearchQuery('')}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '40px' }}
-            >
-              <RotateCcw size={14} />
-              <span>{isVi ? 'Xóa tìm kiếm' : 'Clear Search'}</span>
-            </button>
-          )}
-        </div>
-
+      {/* Filter and Search Bar */}
+      <div className="adm-filter-bar mb-6">
         {/* Status Segment Filter Pills */}
-        <div className="adm-pills" style={{ margin: 0 }}>
+        <div className="adm-pills">
           <button
             type="button"
-            className={`adm-pill-item ${statusFilter === 'ALL' ? 'active' : ''}`}
+            className={`adm-pill ${statusFilter === 'ALL' ? 'active' : ''}`}
             onClick={() => setStatusFilter('ALL')}
           >
             <span>{isVi ? 'Tất cả bài chấm' : 'All Gradings'}</span>
@@ -237,31 +250,86 @@ export const AdminGradingAuditLogs: React.FC = () => {
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${statusFilter === 'COMPLETED' ? 'active' : ''}`}
+            className={`adm-pill ${statusFilter === 'COMPLETED' ? 'active' : ''}`}
             onClick={() => setStatusFilter('COMPLETED')}
           >
-            <CheckCircle2 size={13} color="#16a34a" />
             <span>{isVi ? 'Đã hoàn tất' : 'Completed'}</span>
             <span className="adm-pill-badge">{countCompleted}</span>
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
+            className={`adm-pill ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
             onClick={() => setStatusFilter('AI_GRADED')}
           >
-            <Award size={13} color="#7e22ce" />
             <span>{isVi ? 'AI Đã chấm' : 'AI Graded'}</span>
             <span className="adm-pill-badge">{countAiGraded}</span>
           </button>
           <button
             type="button"
-            className={`adm-pill-item ${statusFilter === 'PENDING' ? 'active' : ''}`}
+            className={`adm-pill ${statusFilter === 'PENDING' ? 'active' : ''}`}
             onClick={() => setStatusFilter('PENDING')}
           >
-            <Clock size={13} color="#d97706" />
             <span>{isVi ? 'Chờ duyệt' : 'Pending'}</span>
             <span className="adm-pill-badge">{countPending}</span>
           </button>
+          {countFailed > 0 && (
+            <button
+              type="button"
+              className={`adm-pill ${statusFilter === 'FAILED' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('FAILED')}
+            >
+              <span>{isVi ? 'Thất bại' : 'Failed'}</span>
+              <span className="adm-pill-badge">{countFailed}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Filter Controls: Score dropdown & Search */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            className="adm-gh-select"
+            value={scoreFilter}
+            onChange={(e) => setScoreFilter(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
+            aria-label={isVi ? 'Lọc theo mức điểm' : 'Filter by score'}
+          >
+            <option value="ALL">{isVi ? 'Tất cả mức điểm' : 'All Scores'}</option>
+            <option value="SCORED">{isVi ? 'Đã có điểm chốt' : 'Has Final Score'}</option>
+            <option value="UNSCORED">{isVi ? 'Chưa có điểm chốt' : 'No Final Score'}</option>
+          </select>
+
+          {/* Search Input */}
+          <div className="adm-search-wrap">
+            <Search size={16} className="adm-search-icon" />
+            <input 
+              type="text" 
+              className="adm-search-input"
+              placeholder={isVi ? 'Tìm mã GR-..., điểm, trạng thái...' : 'Search GR-... ID, score, status...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button 
+                type="button"
+                onClick={() => setSearchQuery('')}
+                title={isVi ? 'Xóa tìm kiếm' : 'Clear search'}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--on-surface-variant)',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '4px'
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -276,13 +344,28 @@ export const AdminGradingAuditLogs: React.FC = () => {
           <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
             <History size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
             <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
-              {isVi ? 'Chưa có hồ sơ chấm điểm nào' : 'No grading records found'}
+              {isVi ? 'Không tìm thấy hồ sơ chấm điểm nào' : 'No grading records found'}
             </h3>
             <p style={{ margin: 0, fontSize: '13.5px' }}>
-              {searchQuery 
-                ? (isVi ? 'Không tìm thấy kết quả phù hợp với từ khóa.' : 'No entries match your search criteria.')
+              {searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL'
+                ? (isVi ? 'Không tìm thấy kết quả phù hợp với bộ lọc hiện tại.' : 'No entries match your current search criteria or filters.')
                 : (isVi ? 'Nhật ký sẽ hiển thị khi học sinh nộp bài và bài làm được xử lý chấm.' : 'Entries will appear here as submissions are processed.')}
             </p>
+            {(searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL') && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                  setScoreFilter('ALL');
+                }}
+                style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <RotateCcw size={14} />
+                <span>{isVi ? 'Đặt lại bộ lọc' : 'Reset Filters'}</span>
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

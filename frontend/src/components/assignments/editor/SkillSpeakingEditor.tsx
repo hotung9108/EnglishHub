@@ -68,10 +68,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Cấu Hình Kỹ Năng Nói (Speaking Assignment)' : 'Speaking Mode & Parameters'}
+                {isVi ? 'Cấu Hình Kỹ Năng Nói' : 'Speaking Configuration'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Thiết lập phần thi Speaking, thời gian chuẩn bị và thời lượng ghi âm.' : 'Configure speaking parts, preparation time, and recording constraints.'}
+                {isVi ? 'Cấu hình thời lượng ghi âm bài nói.' : 'Configure maximum recording duration.'}
               </p>
             </div>
           </div>
@@ -222,10 +222,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Âm Thanh Phát Âm Mẫu / Câu Hỏi Của Giám Khảo' : 'Examiner Audio Prompt & Model Speech'}
+                {isVi ? 'Âm Thanh Phát Âm Mẫu / Câu Hỏi' : 'Audio Prompt & Model Pronunciation'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Tải lên giọng đọc mẫu chuẩn bản ngữ hoặc câu hỏi âm thanh để học viên nghe trước khi trả lời.' : 'Upload native speaker model pronunciation or question audio prompt.'}
+                {isVi ? 'Tệp âm thanh câu hỏi hoặc phát âm mẫu (nếu có).' : 'Optional prompt audio or pronunciation sample.'}
               </p>
             </div>
           </div>
@@ -301,10 +301,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Danh Sách Câu Hỏi Mở Rộng (Discussion Questions)' : 'Follow-up Questions List'}
+                {isVi ? 'Danh Sách Câu Hỏi Mở Rộng' : 'Discussion Questions'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Các câu hỏi tương tác mở rộng theo ngữ cảnh cho Part 1 hoặc Part 3.' : 'Interactive follow-up questions for Part 1/3 discussion.'}
+                {isVi ? 'Câu hỏi gợi ý mở rộng cho học viên.' : 'Follow-up discussion prompts.'}
               </p>
             </div>
           </div>
@@ -340,7 +340,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
               <div className="edit-form-group">
                 <input 
                   type="text" 
-                  className="edit-form-input"
+                  className="edit-form-input" 
                   value={q.question}
                   onChange={(e) => handleUpdateFollowUp(idx, 'question', e.target.value)}
                   placeholder="Enter question text..."
@@ -350,7 +350,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
               <div className="edit-form-group" style={{ marginBottom: 0 }}>
                 <input 
                   type="text" 
-                  className="edit-form-input"
+                  className="edit-form-input" 
                   style={{ fontSize: '13px', color: '#64748b', backgroundColor: '#f1f5f9' }}
                   value={q.hint || ''}
                   onChange={(e) => handleUpdateFollowUp(idx, 'hint', e.target.value)}
@@ -371,10 +371,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Trợ Lý AI Chấm Phát Âm' : 'AI Speech Diagnostics'}
+                {isVi ? 'Trợ Lý AI Nhận Xét Phát Âm' : 'AI Speech Diagnostics'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Bật AI hỗ trợ nhận diện phát âm và độ lưu loát cho bài nói.' : 'Automated pronunciation and fluency evaluation.'}
+                {isVi ? 'Nhận xét tự động phát âm và độ lưu loát.' : 'Automatic pronunciation and fluency evaluation.'}
               </p>
             </div>
           </div>

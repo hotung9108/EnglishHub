@@ -43,6 +43,7 @@ import AdminClassArchive from './pages/AdminClassArchive';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { DocumentTitleManager } from './components/common/DocumentTitleManager';
 import { useAuth } from './hooks/useAuth';
 import NotFound from './pages/NotFound';
 import Forbidden from './pages/Forbidden';
@@ -62,6 +63,7 @@ function App() {
   return (
     <AuthProvider>
       <LanguageProvider>
+        <DocumentTitleManager />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

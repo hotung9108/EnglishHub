@@ -60,21 +60,24 @@
 }
 
 .settings-role-badge.admin {
-  background-color: #0F172A;
-  color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  background-color: #262320;
+  color: #FAF8F5;
+  border: 1px solid #3F3A35;
+  box-shadow: 0 2px 8px rgba(38, 35, 32, 0.15);
 }
 
 .settings-role-badge.teacher {
-  background-color: #065F46;
-  color: #ECFDF5;
-  box-shadow: 0 2px 8px rgba(6, 95, 70, 0.2);
+  background-color: #1B4D3E;
+  color: #FFFFFF;
+  border: 1px solid #133D30;
+  box-shadow: 0 2px 8px rgba(27, 77, 62, 0.2);
 }
 
 .settings-role-badge.student {
-  background-color: #1E40AF;
-  color: #EFF6FF;
-  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
+  background-color: #C5A880;
+  color: #262320;
+  border: 1px solid #A88B60;
+  box-shadow: 0 2px 8px rgba(197, 168, 128, 0.25);
 }
 
 /* Role Switcher Sandbox Banner */
@@ -154,15 +157,15 @@
 }
 
 .settings-hero-card.admin::before {
-  background: linear-gradient(90deg, #0F172A 0%, #4F46E5 100%);
+  background-color: var(--text-primary, #262320);
 }
 
 .settings-hero-card.teacher::before {
-  background: linear-gradient(90deg, #059669 0%, #10B981 100%);
+  background-color: var(--color-success, #16a34a);
 }
 
 .settings-hero-card.student::before {
-  background: linear-gradient(90deg, #2563EB 0%, #6366F1 100%);
+  background-color: var(--accent, #1b4d3e);
 }
 
 .settings-hero-left {
@@ -178,9 +181,9 @@
   width: 80px;
   height: 80px;
   border-radius: var(--radius-full);
-  border: 3px solid #FFFFFF;
-  background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border: 3px solid var(--surface, #ffffff);
+  background-color: var(--surface-dim, #f4efe6);
+  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -188,15 +191,15 @@
 }
 
 .settings-avatar-wrapper.admin {
-  background: linear-gradient(135deg, #E2E8F0 0%, #CBD5E1 100%);
+  background-color: var(--surface-container, #eae3d7);
 }
 
 .settings-avatar-wrapper.teacher {
-  background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+  background-color: var(--color-success-light, #f0fdf4);
 }
 
 .settings-avatar-wrapper.student {
-  background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
+  background-color: var(--primary-light, #eaf0e8);
 }
 
 .settings-avatar-img {
@@ -573,6 +576,20 @@
   font-size: 12px;
   color: var(--on-surface-variant);
   line-height: 1.4;
+  margin-top: 4px;
+  display: block;
+}
+
+.settings-field-error {
+  font-size: 12px;
+  color: var(--error, #ef4444);
+  line-height: 1.4;
+  margin-top: 4px;
+  display: block;
+}
+
+.settings-input.has-error {
+  border-color: var(--error, #ef4444);
 }
 
 /* Avatar Management Section */
@@ -1150,5 +1167,233 @@
 
 .settings-lang-desc {
   margin: 0 0 10px 0;
+}
+
+/* ==========================================================================
+   Profile Modernization Classes (.profile-*)
+   ========================================================================== */
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+  gap: 10px;
+}
+
+.profile-loading-text {
+  color: var(--on-surface-variant);
+  font-size: 14px;
+}
+
+.profile-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.profile-avatar-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.profile-avatar-circle {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-md);
+  border: 4px solid var(--surface-container-low);
+  overflow: hidden;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-name {
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: var(--on-surface);
+}
+
+.profile-role-badge {
+  margin-bottom: 16px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: 600;
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.profile-role-badge.admin { 
+  background-color: #262320; 
+  color: #FAF8F5; 
+  border-color: #3F3A35; 
+}
+.profile-role-badge.teacher { 
+  background-color: #1B4D3E; 
+  color: #FFFFFF; 
+  border-color: #133D30; 
+}
+.profile-role-badge.student { 
+  background-color: #C5A880; 
+  color: #262320; 
+  border-color: #A88B60; 
+}
+
+.profile-preset-section {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.profile-preset-title {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.profile-preset-list {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.profile-preset-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--outline-variant);
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  background: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.profile-preset-btn:hover {
+  transform: scale(1.08);
+}
+
+.profile-preset-btn.is-active {
+  border: 2px solid var(--primary);
+}
+
+.profile-preset-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.profile-btn-delete-avatar {
+  flex: 1;
+  color: var(--error);
+}
+
+.profile-form-card {
+  padding: 24px;
+}
+
+.profile-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-input-readonly {
+  background-color: var(--surface-container-low);
+}
+
+.profile-input-code {
+  background-color: var(--surface-container-low);
+  padding-right: 40px;
+  font-family: monospace;
+}
+
+.profile-copy-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.profile-copy-btn:hover {
+  color: var(--on-surface);
+}
+
+.profile-toggle-pw-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-toggle-pw-btn:hover {
+  color: var(--on-surface);
+}
+
+.profile-input-pw {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.profile-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.profile-label-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 

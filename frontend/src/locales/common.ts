@@ -5,8 +5,8 @@ export const commonVi = {
   menuDashboard: 'Tổng quan',
   menuAccounts: 'Quản lý tài khoản',
   menuRoles: 'Phân quyền vai trò',
-  menuTeachers: 'Hồ sơ Giáo viên',
-  menuStudents: 'Hồ sơ Học viên',
+  menuTeachers: 'Giáo viên',
+  menuStudents: 'Học viên',
   menuClasses: 'Quản lý Lớp học',
   menuReports: 'Báo cáo & Thống kê',
   menuMyClasses: 'Lớp học của tôi',
@@ -71,6 +71,7 @@ export const commonVi = {
   error403Title: 'Bạn không có quyền truy cập vào trang này',
   error403Desc: 'Bạn không thể truy cập vào trang này. Vui lòng quay về trang chủ để tiếp tục.',
   error403BackHome: 'Quay về trang chủ',
+  error403BackPrev: 'Quay lại trang trước',
 };
 
 export const commonEn = {
@@ -80,8 +81,8 @@ export const commonEn = {
   menuDashboard: 'Dashboard',
   menuAccounts: 'Manage Accounts',
   menuRoles: 'Role Permissions',
-  menuTeachers: 'Teacher Profiles',
-  menuStudents: 'Student Profiles',
+  menuTeachers: 'Teachers',
+  menuStudents: 'Students',
   menuClasses: 'Manage Classes',
   menuReports: 'Reports & Analytics',
   menuMyClasses: 'My Classes',
@@ -146,4 +147,5 @@ export const commonEn = {
   error403Title: 'You do not have permission to access this page',
   error403Desc: 'Your account does not have sufficient permissions to access this page. Please return to the homepage to continue.',
   error403BackHome: 'Back to Homepage',
+  error403BackPrev: 'Go Back',
 };

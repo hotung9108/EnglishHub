@@ -12,7 +12,6 @@ import {
   AlertCircle,
   CheckCircle2, 
   XCircle,
-  Sparkles,
   Sliders,
   Briefcase,
   GraduationCap,
@@ -40,7 +39,7 @@ const PRESET_AVATARS = [
 ];
 
 const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
-  const { user, updateUser, login } = useAuth();
+  const { user, updateUser } = useAuth();
   const { language, t } = useLanguage();
   const isVi = language === 'vi';
   const [searchParams, setSearchParams] = useSearchParams();
@@ -208,20 +207,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     }
   };
 
-  const handleRoleSwitch = async (newRole: Role) => {
-    const roleEmails: Record<Role, string> = {
-      admin: 'admin@eh.com',
-      teacher: 'teacher@eh.com',
-      student: 'student@eh.com',
-    };
-
-    try {
-      await login({ email: roleEmails[newRole], password: 'password123' });
-    } catch {
-      // Login failed, keep current user
-    }
-  };
-
   const getRoleTitle = () => {
     if (currentRole === 'admin') return t('settings.titleAdmin');
     if (currentRole === 'teacher') return t('settings.titleTeacher');
@@ -253,36 +238,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
         </div>
       )}
 
-      {/* Role Switcher Sandbox Toolbar for Pairing & QA Test */}
-      <div className="settings-role-sandbox">
-        <div className="settings-role-sandbox-text">
-          <Sparkles size={16} />
-          <span>{t('settings.roleSwitcherNotice')} <strong>{currentRole.toUpperCase()}</strong></span>
-        </div>
-        <div className="settings-role-sandbox-actions">
-          <button 
-            type="button" 
-            className={`settings-role-sandbox-btn ${currentRole === 'admin' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('admin')}
-          >
-            Admin
-          </button>
-          <button 
-            type="button" 
-            className={`settings-role-sandbox-btn ${currentRole === 'teacher' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('teacher')}
-          >
-            Teacher
-          </button>
-          <button 
-            type="button" 
-            className={`settings-role-sandbox-btn ${currentRole === 'student' ? 'active' : ''}`}
-            onClick={() => handleRoleSwitch('student')}
-          >
-            Student
-          </button>
-        </div>
-      </div>
 
       {/* Header */}
       <div className="settings-header">
@@ -473,7 +428,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                 </label>
                 <input 
                   type="text" 
-                  className="settings-input" 
                   value={formData.name}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, name: e.target.value }));
@@ -487,15 +441,15 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                       setNameError('');
                     }
                   }}
-                  style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
+                  className={`settings-input ${nameError ? 'has-error' : ''}`}
                   required 
                 />
                 {nameError ? (
-                  <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                  <span className="settings-field-error">
                     {nameError}
                   </span>
                 ) : (
-                  <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                  <span className="settings-field-hint">
                     {t('settings.fullNameHint')}
                   </span>
                 )}

@@ -4,13 +4,14 @@ import {
   User, Shield, 
   Check, Eye, EyeOff, 
   CheckCircle2, Copy, AlertCircle, Loader2,
-  Calendar, Phone, BookOpen, Building
+  Calendar, Phone, BookOpen
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import { userService } from '../api/services/user.service';
 import type { UserProfile } from '../api/services/user.service';
 import { validateFullName } from '../utils/nameValidation';
+import '../styles/settings.css';
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
@@ -61,7 +62,6 @@ export const Profile: React.FC = () => {
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-
 
   useEffect(() => {
     let isMounted = true;
@@ -150,11 +150,10 @@ export const Profile: React.FC = () => {
         avatar: avatarUrl,
       });
 
-      setFullName(cleanName);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (isVi ? 'Không thể lưu hồ sơ' : 'Failed to update profile');
+      const msg = err instanceof Error ? err.message : (isVi ? 'Không thể cập nhật hồ sơ' : 'Failed to update profile');
       setErrorMessage(msg);
     } finally {
       setSaving(false);
@@ -166,12 +165,12 @@ export const Profile: React.FC = () => {
     setPasswordError('');
 
     if (newPassword.length < 8) {
-      setPasswordError(isVi ? 'Mật khẩu mới phải có tối thiểu 8 ký tự.' : 'Password must be at least 8 characters.');
+      setPasswordError(isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError(isVi ? 'Mật khẩu xác nhận không khớp!' : 'Passwords do not match!');
+      setPasswordError(isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.');
       return;
     }
 
@@ -188,7 +187,7 @@ export const Profile: React.FC = () => {
       setConfirmPassword('');
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (isVi ? 'Mật khẩu hiện tại không chính xác' : 'Current password is incorrect');
+      const msg = err instanceof Error ? err.message : (isVi ? 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.' : 'Failed to change password. Please check your current password.');
       setPasswordError(msg);
     } finally {
       setChangingPassword(false);
@@ -199,91 +198,59 @@ export const Profile: React.FC = () => {
     setAvatarUrl(url);
   };
 
-  const getInitials = (name?: string) => {
+  const getInitials = (name: string) => {
     if (!name) return 'U';
-    const cleanName = name.replace(/\(.*?\)/g, '').trim();
-    const parts = cleanName.split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return 'U';
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   };
 
-  const getRoleBadge = () => {
-    if (currentRole === 'admin') {
-      return {
-        label: isVi ? 'QUẢN TRỊ VIÊN HỆ THỐNG' : 'SYSTEM ADMINISTRATOR',
-        bg: '#0f172a',
-      };
+  const getRoleBadge = (role: 'admin' | 'teacher' | 'student') => {
+    switch (role) {
+      case 'admin':
+        return { label: isVi ? 'Quản trị viên' : 'Administrator', bg: '#262320' };
+      case 'teacher':
+        return { label: isVi ? 'Giảng viên' : 'Teacher', bg: '#1B4D3E' };
+      case 'student':
+      default:
+        return { label: isVi ? 'Học viên' : 'Student', bg: '#C5A880' };
     }
-    if (currentRole === 'teacher') {
-      return {
-        label: isVi ? 'GIÁO VIÊN TIẾNG ANH' : 'ENGLISH INSTRUCTOR',
-        bg: '#059669',
-      };
-    }
-    return {
-      label: isVi ? 'HỌC VIÊN CHÍNH THỨC' : 'STUDENT MEMBER',
-      bg: '#2563eb',
-    };
   };
 
-  const roleBadge = getRoleBadge();
+  const roleBadge = getRoleBadge(currentRole);
 
   return (
-    <div className="adm-container">
-      {/* Header */}
+    <div className="profile-page">
+      {/* Page Header */}
       <div className="adm-header">
-        <div className="adm-title-group">
+        <div className="adm-header-left">
           <h1 className="adm-title">
-            <User size={28} color="var(--primary)" />
             {t('profile.title')}
           </h1>
           <p className="adm-subtitle">
             {isVi 
-              ? 'Quản lý thông tin tài khoản cá nhân, thông tin xác thực bảo mật và thiết bị đăng nhập.' 
-              : 'Manage personal identity, security credentials, and active device sessions.'}
+              ? 'Thông tin tài khoản cá nhân và mật khẩu.' 
+              : 'Personal account details and password.'}
           </p>
         </div>
       </div>
 
       {saveSuccess && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          color: '#15803d',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
+        <div className="settings-alert-success">
           <CheckCircle2 size={18} />
           <span>{isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!'}</span>
         </div>
       )}
 
       {errorMessage && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
+        <div className="settings-alert-error">
           <AlertCircle size={18} />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {/* Settings Navigation Tabs */}
-      <div className="adm-filter-bar" style={{ padding: '8px 12px', marginBottom: '24px' }}>
+      <div className="adm-filter-bar">
         <div className="adm-pills">
           {(
             [
@@ -299,7 +266,6 @@ export const Profile: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={`adm-pill ${isActive ? 'active' : ''}`}
-                style={{ padding: '8px 16px', fontSize: '13.5px' }}
               >
                 <Icon size={16} />
                 <span>{tab.label}</span>
@@ -310,9 +276,9 @@ export const Profile: React.FC = () => {
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', gap: '10px' }}>
-          <Loader2 size={24} className="animate-spin" color="var(--primary)" />
-          <span style={{ color: 'var(--on-surface-variant)', fontSize: '14px' }}>
+        <div className="profile-loading-state">
+          <Loader2 size={24} className="animate-spin text-primary" />
+          <span className="profile-loading-text">
             {isVi ? 'Đang tải thông tin hồ sơ...' : 'Loading profile data...'}
           </span>
         </div>
@@ -320,76 +286,52 @@ export const Profile: React.FC = () => {
         <>
           {/* Tab 1: General Info */}
           {activeTab === 'general' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            <div className="profile-layout-grid">
               {/* Avatar & Summary Card */}
-              <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <div style={{
-                  width: '108px',
-                  height: '108px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--primary)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '36px',
-                  fontWeight: 700,
-                  marginBottom: '16px',
-                  boxShadow: 'var(--shadow-md)',
-                  border: '4px solid var(--surface-container-low)',
-                  overflow: 'hidden'
-                }}>
+              <div className="card profile-avatar-card">
+                <div className="profile-avatar-circle">
                   {avatarUrl ? (
                     <img 
                       src={avatarUrl} 
                       alt={fullName} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      className="profile-avatar-img"
                     />
                   ) : (
                     getInitials(fullName)
                   )}
                 </div>
 
-                <h3 style={{ fontSize: '19px', fontWeight: 700, margin: '0 0 6px 0' }}>{fullName || user?.fullName || 'User'}</h3>
-                <span className="badge" style={{ backgroundColor: roleBadge.bg, color: 'white', marginBottom: '16px', fontSize: '12px', padding: '4px 10px' }}>
+                <h3 className="profile-avatar-name">{fullName || user?.fullName || 'User'}</h3>
+                <span className={`profile-role-badge ${currentRole}`}>
                   {roleBadge.label}
                 </span>
 
                 {/* Preset Avatar Selection */}
-                <div style={{ width: '100%', marginBottom: '16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginBottom: '8px', fontWeight: 600 }}>
+                <div className="profile-preset-section">
+                  <div className="profile-preset-title">
                     {isVi ? 'Chọn ảnh đại diện mẫu' : 'Choose Preset Avatar'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                  <div className="profile-preset-list">
                     {PRESET_AVATARS.map((url, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSelectPresetAvatar(url)}
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          border: avatarUrl === url ? '2px solid var(--primary)' : '1px solid var(--outline-variant)',
-                          padding: 0,
-                          cursor: 'pointer',
-                          overflow: 'hidden',
-                          background: 'none'
-                        }}
+                        className={`profile-preset-btn ${avatarUrl === url ? 'is-active' : ''}`}
+                        aria-label={`Preset avatar ${idx + 1}`}
                       >
-                        <img src={url} alt={`Preset ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={url} alt={`Preset ${idx + 1}`} className="profile-preset-img" />
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '240px' }}>
+                <div className="profile-avatar-actions">
                   {avatarUrl && (
                     <button 
                       type="button"
-                      className="btn btn-secondary btn-sm" 
+                      className="btn btn-secondary btn-sm profile-btn-delete-avatar" 
                       onClick={() => setAvatarUrl('')}
-                      style={{ flex: 1, color: 'var(--error)' }}
                     >
                       {t('profile.btnDeleteAvatar')}
                     </button>
@@ -398,15 +340,15 @@ export const Profile: React.FC = () => {
               </div>
 
               {/* Form Card */}
-              <div className="card" style={{ padding: '24px' }}>
+              <div className="card profile-form-card">
                 <form onSubmit={handleSaveGeneral}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                  <div className="profile-form-body">
                     <div className="adm-form-grid">
                       <div className="adm-form-group">
                         <label className="adm-form-label">{t('profile.fullName')} *</label>
                         <input 
                           type="text" 
-                          className="input" 
+                          className={`input ${nameError ? 'has-error' : ''}`}
                           value={fullName}
                           onChange={(e) => {
                             setFullName(e.target.value);
@@ -420,15 +362,14 @@ export const Profile: React.FC = () => {
                               setNameError('');
                             }
                           }}
-                          style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                           required 
                         />
                         {nameError ? (
-                          <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          <span className="settings-field-error">
                             {nameError}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                          <span className="settings-field-hint">
                             {t('profile.fullNameHint')}
                           </span>
                         )}
@@ -436,18 +377,17 @@ export const Profile: React.FC = () => {
 
                       <div className="adm-form-group">
                         <label className="adm-form-label">{t('profile.userId')}</label>
-                        <div style={{ position: 'relative' }}>
+                        <div className="relative">
                           <input 
                             type="text" 
-                            className="input" 
+                            className="input profile-input-code"
                             value={userCode} 
                             readOnly 
-                            style={{ backgroundColor: 'var(--surface-container-low)', paddingRight: '40px', fontFamily: 'monospace' }} 
                           />
                           <button 
                             type="button" 
                             onClick={handleCopyId}
-                            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+                            className="profile-copy-btn"
                             title={isVi ? 'Sao chép mã' : 'Copy ID'}
                           >
                             {copiedId ? <Check size={16} color="#16a34a" /> : <Copy size={16} />}
@@ -461,10 +401,9 @@ export const Profile: React.FC = () => {
                         <label className="adm-form-label">{t('profile.email')} *</label>
                         <input 
                           type="email" 
-                          className="input" 
+                          className="input profile-input-readonly"
                           value={email}
                           readOnly
-                          style={{ backgroundColor: 'var(--surface-container-low)' }}
                           title={isVi ? 'Email tài khoản do quản trị viên quản lý' : 'Account email managed by administrator'}
                         />
                       </div>
@@ -484,16 +423,15 @@ export const Profile: React.FC = () => {
                     {/* Role-Specific Attributes */}
                     {currentRole === 'teacher' && (
                       <div className="adm-form-group">
-                        <label className="adm-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <BookOpen size={15} color="var(--primary)" />
+                        <label className="adm-form-label profile-label-icon">
+                          <BookOpen size={15} className="text-primary" />
                           <span>{isVi ? 'Chuyên môn giảng dạy' : 'Specialization'}</span>
                         </label>
                         <input 
                           type="text" 
-                          className="input" 
+                          className="input profile-input-readonly"
                           value={specialization || (isVi ? 'Chưa cập nhật' : 'Not specified')}
                           readOnly
-                          style={{ backgroundColor: 'var(--surface-container-low)' }}
                         />
                       </div>
                     )}
@@ -501,30 +439,28 @@ export const Profile: React.FC = () => {
                     {currentRole === 'student' && (
                       <div className="adm-form-grid">
                         <div className="adm-form-group">
-                          <label className="adm-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={15} color="var(--primary)" />
+                          <label className="adm-form-label profile-label-icon">
+                            <Calendar size={15} className="text-primary" />
                             <span>{isVi ? 'Ngày sinh' : 'Date of Birth'}</span>
                           </label>
                           <input 
                             type="text" 
-                            className="input" 
+                            className="input profile-input-readonly"
                             value={dateOfBirth || (isVi ? 'Chưa cập nhật' : 'Not set')}
                             readOnly
-                            style={{ backgroundColor: 'var(--surface-container-low)' }}
                           />
                         </div>
 
                         <div className="adm-form-group">
-                          <label className="adm-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Phone size={15} color="var(--primary)" />
+                          <label className="adm-form-label profile-label-icon">
+                            <Phone size={15} className="text-primary" />
                             <span>{isVi ? 'SĐT Phụ huynh' : 'Parent Phone'}</span>
                           </label>
                           <input 
                             type="text" 
-                            className="input" 
+                            className="input profile-input-readonly"
                             value={parentPhone || (isVi ? 'Chưa cập nhật' : 'Not set')}
                             readOnly
-                            style={{ backgroundColor: 'var(--surface-container-low)' }}
                           />
                         </div>
                       </div>
@@ -532,26 +468,23 @@ export const Profile: React.FC = () => {
 
                     {currentRole === 'admin' && (
                       <div className="adm-form-group">
-                        <label className="adm-form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Building size={15} color="var(--primary)" />
+                        <label className="adm-form-label profile-label-icon">
                           <span>{isVi ? 'Đơn vị / Phòng ban' : 'Department'}</span>
                         </label>
                         <input 
                           type="text" 
-                          className="input" 
+                          className="input profile-input-readonly"
                           value={isVi ? 'Ban Quản trị & Vận hành Hệ thống EnglishHub' : 'System Administration Board'}
                           readOnly
-                          style={{ backgroundColor: 'var(--surface-container-low)' }}
                         />
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <div className="profile-actions-row">
                       <button 
                         type="submit" 
-                        className="btn btn-primary" 
+                        className="btn btn-primary inline-flex items-center gap-2" 
                         disabled={saving}
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                       >
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                         <span>{saving ? (isVi ? 'Đang lưu...' : 'Saving...') : t('profile.btnSave')}</span>
@@ -565,48 +498,37 @@ export const Profile: React.FC = () => {
 
           {/* Tab 2: Security & Password */}
           {activeTab === 'security' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            <div className="profile-layout-grid">
               {/* Password Update */}
-              <div className="card" style={{ padding: '24px' }}>
-                <h3 className="headline-md" style={{ marginBottom: '6px' }}>{t('profile.btnChangePassword')}</h3>
-                <p className="body-sm text-on-surface-variant" style={{ marginBottom: '20px' }}>
+              <div className="card profile-form-card">
+                <h3 className="headline-md mb-2">{t('profile.btnChangePassword')}</h3>
+                <p className="body-sm text-on-surface-variant mb-5">
                   {isVi ? 'Đổi mật khẩu định kỳ giúp bảo vệ tài khoản khỏi truy cập trái phép.' : 'Update your password regularly to prevent unauthorized access.'}
                 </p>
 
                 {passwordError && (
-                  <div style={{
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#b91c1c',
-                    fontSize: '13px',
-                    marginBottom: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
+                  <div className="settings-alert-error">
                     <AlertCircle size={15} />
                     <span>{passwordError}</span>
                   </div>
                 )}
 
-                <form onSubmit={handleUpdatePassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <form onSubmit={handleUpdatePassword} className="profile-password-form">
                   <div className="adm-form-group">
                     <label className="adm-form-label">{isVi ? 'Mật khẩu hiện tại' : 'Current Password'} *</label>
-                    <div style={{ position: 'relative' }}>
+                    <div className="relative">
                       <input 
                         type={showCurrentPw ? 'text' : 'password'} 
-                        className="input" 
+                        className="input profile-input-pw"
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
                         required
-                        style={{ width: '100%', paddingRight: '40px' }} 
                       />
                       <button 
                         type="button"
                         onClick={() => setShowCurrentPw(!showCurrentPw)}
-                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+                        className="profile-toggle-pw-btn"
+                        aria-label={showCurrentPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -615,20 +537,20 @@ export const Profile: React.FC = () => {
 
                   <div className="adm-form-group">
                     <label className="adm-form-label">{isVi ? 'Mật khẩu mới' : 'New Password'} *</label>
-                    <div style={{ position: 'relative' }}>
+                    <div className="relative">
                       <input 
                         type={showNewPw ? 'text' : 'password'} 
-                        className="input" 
+                        className="input profile-input-pw"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         required 
                         placeholder={isVi ? 'Tối thiểu 8 ký tự...' : 'Minimum 8 characters...'}
-                        style={{ width: '100%', paddingRight: '40px' }}
                       />
                       <button 
                         type="button"
                         onClick={() => setShowNewPw(!showNewPw)}
-                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+                        className="profile-toggle-pw-btn"
+                        aria-label={showNewPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -637,31 +559,30 @@ export const Profile: React.FC = () => {
 
                   <div className="adm-form-group">
                     <label className="adm-form-label">{isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} *</label>
-                    <div style={{ position: 'relative' }}>
+                    <div className="relative">
                       <input 
                         type={showConfirmPw ? 'text' : 'password'} 
-                        className="input" 
+                        className="input profile-input-pw"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required 
-                        style={{ width: '100%', paddingRight: '40px' }}
                       />
                       <button 
                         type="button"
                         onClick={() => setShowConfirmPw(!showConfirmPw)}
-                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+                        className="profile-toggle-pw-btn"
+                        aria-label={showConfirmPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       >
                         {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <div className="profile-actions-row">
                     <button 
                       type="submit" 
-                      className="btn btn-primary"
+                      className="btn btn-primary inline-flex items-center gap-2"
                       disabled={changingPassword}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                     >
                       {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                       <span>{changingPassword ? (isVi ? 'Đang cập nhật...' : 'Updating...') : (isVi ? 'Cập nhật mật khẩu' : 'Update Password')}</span>

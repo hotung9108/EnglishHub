@@ -118,10 +118,10 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Đoạn Văn Đọc Hiểu (Reading Passage Management)' : 'Reading Passage & Structure'}
+                {isVi ? 'Đoạn Văn Đọc Hiểu' : 'Reading Passage'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Soạn bài đọc học thuật, phân đoạn [A, B, C...] và định dạng văn bản.' : 'Create academic reading passage with labeled paragraph markers.'}
+                {isVi ? 'Nội dung văn bản bài đọc hiểu.' : 'Reading passage content.'}
               </p>
             </div>
           </div>
@@ -336,10 +336,10 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Bộ Câu Hỏi & Đáp Án Đúng (Questions & Answer Keys)' : 'Reading Questions & Keys'}
+                {isVi ? 'Danh Sách Câu Hỏi & Đáp Án' : 'Reading Questions & Answer Keys'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Soạn 4 dạng câu hỏi: Trắc nghiệm, True/False/Not Given, Nối tiêu đề và Điền từ.' : 'Configure Multiple Choice, T/F/NG, Matching, and Gap Fill questions.'}
+                {isVi ? 'Câu hỏi đọc hiểu (Trắc nghiệm và Trả lời ngắn).' : 'Reading questions (Multiple Choice & Short Answer).'}
               </p>
             </div>
           </div>

@@ -6,6 +6,8 @@ import { ArrowLeft, CheckCircle2, Clock, AlertCircle, RotateCcw, FileText } from
 import { classService, type ClassDetail } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { Button, EmptyState, Skeleton } from '../components/common';
+import '../styles/student-ecosystem.css';
 
 interface EnrichedClassAssignment {
   id: string;
@@ -140,15 +142,15 @@ const StudentClassDetails: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="container p-24">
-        <div className="skeleton mb-24" style={{ height: '24px', width: '180px', borderRadius: '4px' }}></div>
-        <div className="skeleton mb-28" style={{ height: '70px', borderRadius: '12px' }}></div>
-        <div className="grid gap-16 mb-32" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="std-eco-container pb-48">
+        <Skeleton height="24px" width="180px" borderRadius="4px" className="mb-24" />
+        <Skeleton height="70px" borderRadius="12px" className="mb-28" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-32">
           {[1, 2, 3].map(i => (
-            <div key={i} className="skeleton" style={{ height: '64px', borderRadius: '8px' }}></div>
+            <Skeleton key={i} height="64px" borderRadius="8px" />
           ))}
         </div>
-        <div className="skeleton" style={{ height: '240px', borderRadius: '12px' }}></div>
+        <Skeleton height="240px" borderRadius="12px" />
       </div>
     );
   }
@@ -158,178 +160,169 @@ const StudentClassDetails: React.FC = () => {
   const isActive = classDetail?.status !== 'COMPLETED';
 
   return (
-    <div className="container" style={{ padding: '24px' }}>
+    <div className="std-eco-container pb-48">
       {/* Back button */}
-      <button 
-        onClick={() => navigate('/student/classes')} 
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer', marginBottom: '24px', padding: 0 }}
-      >
-        <ArrowLeft size={20} /> Quay lại danh sách lớp
-      </button>
+      <div className="mb-20">
+        <Button 
+          variant="ghost"
+          size="sm"
+          icon={<ArrowLeft size={16} />}
+          onClick={() => navigate('/student/classes')} 
+        >
+          {isVi ? 'Quay lại danh sách lớp' : 'Back to Classes'}
+        </Button>
+      </div>
 
       {error && (
-        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+        <div className="analytics-error-banner">
           <div className="flex items-center gap-12">
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
-            <RotateCcw size={14} />
-            <span>Thử lại</span>
-          </button>
+          <Button variant="secondary" size="sm" icon={<RotateCcw size={14} />} onClick={handleReload}>
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
         </div>
       )}
 
       {/* Class Header Area */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', paddingBottom: '24px' }}>
+      <div className="std-eco-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: 700 }}>{classDetail?.name || 'Chi tiết lớp học'}</h1>
-            <span style={{ 
-              backgroundColor: 'var(--surface-container-low)', 
-              color: '#2563EB', 
-              padding: '4px 12px', 
-              borderRadius: 'var(--radius-full)',
-              fontSize: '14px',
-              fontWeight: 500,
-              border: '1px solid #BFDBFE'
-            }}>{classCode}</span>
+          <div className="flex items-center gap-12 mb-8">
+            <h1 className="std-eco-title">{classDetail?.name || 'Chi tiết lớp học'}</h1>
+            <span className="std-asg-count-badge">{classCode}</span>
           </div>
-          <p className="body-md text-on-surface-variant" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>Giảng viên: <strong>{instructorName}</strong></span>
+          <div className="flex items-center gap-12 text-sm text-slate-500">
+            <span>Giảng viên: <strong className="text-slate-800">{instructorName}</strong></span>
             <span>•</span>
             {isActive ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#166534', backgroundColor: '#dcfce7', padding: '2px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 600 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor' }}></span>
+              <span className="analytics-badge-good flex items-center gap-6">
+                <span className="std-asg-dot bg-emerald-500" />
                 Đang diễn ra
               </span>
             ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#4b5563', backgroundColor: '#f3f4f6', padding: '2px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 600 }}>
+              <span className="std-asg-status-badge not-started flex items-center gap-6">
                 <CheckCircle2 size={12} />
                 Đã hoàn thành
               </span>
             )}
-          </p>
+          </div>
         </div>
       </div>
 
       {/* Assignments Section */}
-      <div className="card" style={{ padding: '32px', border: '1px solid var(--outline-variant)', boxShadow: 'none', backgroundColor: 'var(--surface)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-          <div>
-            <h3 className="headline-md text-on-surface" style={{ marginBottom: '8px', fontSize: '20px' }}>Danh sách bài tập</h3>
-          </div>
-          <div className="body-md text-on-surface-variant">
-            {t('studentAssignments.totalAssignedPrefix')}<strong style={{ color: 'var(--on-surface)' }}>{stats.total} {t('studentAssignments.unitAssignments')}</strong>
+      <div className="std-eco-card">
+        <div className="std-eco-card-header">
+          <h2 className="std-eco-card-title">Danh sách bài tập</h2>
+          <div className="text-sm text-slate-500">
+            {t('studentAssignments.totalAssignedPrefix')}<strong className="text-slate-800 ml-4">{stats.total} {t('studentAssignments.unitAssignments')}</strong>
           </div>
         </div>
 
-        {/* Status Summary Boxes */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-          <div style={{ padding: '16px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#64748B' }}>{t('studentAssignments.statusNotStarted')}</span>
-            <span style={{ backgroundColor: '#E2E8F0', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#475569' }}>{stats.notStarted}</span>
+        <div className="std-eco-card-body">
+          {/* Status Summary Boxes */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-28">
+            <div className="p-16 rounded-lg border border-slate-200 flex justify-between items-center bg-slate-50">
+              <span className="text-sm font-medium text-slate-600">{t('studentAssignments.statusNotStarted')}</span>
+              <span className="bg-slate-200 px-2 py-0.5 rounded-full text-xs font-semibold text-slate-700">{stats.notStarted}</span>
+            </div>
+            <div className="p-16 rounded-lg border border-amber-300 flex justify-between items-center bg-amber-50">
+              <span className="text-sm font-semibold text-amber-700 flex items-center gap-6">
+                <span className="std-asg-dot" />
+                {t('studentAssignments.statusPending')}
+              </span>
+              <span className="bg-amber-200 px-2 py-0.5 rounded-full text-xs font-semibold text-amber-800">{stats.pending}</span>
+            </div>
+            <div className="p-16 rounded-lg border border-emerald-300 flex justify-between items-center bg-emerald-50">
+              <span className="text-sm font-medium text-emerald-700">{t('studentAssignments.statusGraded')}</span>
+              <span className="bg-emerald-200 px-2 py-0.5 rounded-full text-xs font-semibold text-emerald-800">{stats.graded}</span>
+            </div>
           </div>
-          <div style={{ padding: '16px', borderRadius: '8px', border: '2px solid #FBBF24', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFBEB' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600, color: '#D97706', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', backgroundColor: '#F59E0B', borderRadius: '50%' }}></span>
-              {t('studentAssignments.statusPending')}
-            </span>
-            <span style={{ backgroundColor: '#FDE68A', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#D97706' }}>{stats.pending}</span>
-          </div>
-          <div style={{ padding: '16px', borderRadius: '8px', border: '1px solid #BBF7D0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F0FDF4' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#16A34A' }}>{t('studentAssignments.statusGraded')}</span>
-            <span style={{ backgroundColor: '#DCFCE7', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, color: '#16A34A' }}>{stats.graded}</span>
-          </div>
-        </div>
 
-        {/* Assignments List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {assignments.map(a => (
-            <div 
-              key={a.id}
-              onClick={() => handleAssignmentClick(a)}
-              style={{ padding: '20px', borderRadius: '8px', border: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: '#FFFFFF' }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--on-surface)', margin: 0 }}>{a.title}</h4>
-                  <span style={{ backgroundColor: '#EEF2FF', color: '#4F46E5', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', border: '1px solid #C7D2FE', fontWeight: 600 }}>
-                    {a.skill}
-                  </span>
+          {/* Assignments List */}
+          <div className="std-asg-list">
+            {assignments.map(a => (
+              <div 
+                key={a.id}
+                onClick={() => handleAssignmentClick(a)}
+                className="std-asg-card"
+              >
+                <div>
+                  <div className="flex items-center gap-8 mb-4">
+                    <h4 className="std-asg-card-title">{a.title}</h4>
+                    <span className={`std-skill-tag ${a.skill.toLowerCase()}`}>
+                      {a.skill}
+                    </span>
+                  </div>
+                  <p className="std-asg-card-meta">
+                    <span>{t('studentAssignments.deadlinePrefix')}{a.dueDate}</span>
+                    {a.score !== undefined && (
+                      <>
+                        <span>•</span>
+                        <span className="font-semibold text-primary">Điểm: {a.score}/100</span>
+                      </>
+                    )}
+                  </p>
                 </div>
-                <p style={{ fontSize: '13px', color: 'var(--on-surface-variant)', display: 'flex', alignItems: 'center', gap: '12px', margin: 0 }}>
-                  <span>{t('studentAssignments.deadlinePrefix')}{a.dueDate}</span>
-                  {a.score !== undefined && (
+
+                <div className="flex items-center gap-12">
+                  {a.status === 'graded' && (
                     <>
-                      <span>•</span>
-                      <span className="font-semibold text-primary">Điểm: {a.score}/100</span>
+                      <div className="std-asg-status-badge graded">
+                        {t('studentAssignments.statusGraded')}
+                      </div>
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
+                      >
+                        {t('studentAssignments.btnReview')}
+                      </Button>
                     </>
                   )}
-                </p>
+
+                  {a.status === 'pending' && (
+                    <>
+                      <div className="std-asg-status-badge grading">
+                        <Clock size={14} />
+                        {t('studentAssignments.statusPending')}
+                      </div>
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
+                      >
+                        {t('studentAssignments.btnReview')}
+                      </Button>
+                    </>
+                  )}
+
+                  {a.status === 'not_started' && (
+                    <>
+                      <div className="std-asg-status-badge not-started">
+                        {t('studentAssignments.statusNotStarted')}
+                      </div>
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
+                      >
+                        {t('studentAssignments.btnStart')}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
+            ))}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {a.status === 'graded' && (
-                  <>
-                    <div style={{ color: '#16A34A', fontSize: '13px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#DCFCE7', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
-                      {t('studentAssignments.statusGraded')}
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn-secondary" 
-                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                      onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
-                    >
-                      {t('studentAssignments.btnReview')}
-                    </button>
-                  </>
-                )}
-
-                {a.status === 'pending' && (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#D97706', fontSize: '13px', fontWeight: 500, padding: '6px 12px', backgroundColor: '#FFFBEB', borderRadius: '6px', border: '1px solid #FDE68A' }}>
-                      <Clock size={14} />
-                      {t('studentAssignments.statusPending')}
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn-secondary" 
-                      style={{ padding: '6px 12px', fontSize: '12px' }}
-                      onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
-                    >
-                      {t('studentAssignments.btnReview')}
-                    </button>
-                  </>
-                )}
-
-                {a.status === 'not_started' && (
-                  <>
-                    <div style={{ color: '#475569', fontSize: '13px', fontWeight: 500, padding: '6px 14px', backgroundColor: '#E2E8F0', borderRadius: '6px' }}>
-                      {t('studentAssignments.statusNotStarted')}
-                    </div>
-                    <button 
-                      type="button" 
-                      className="btn-primary" 
-                      style={{ padding: '6px 14px', fontSize: '12px' }}
-                      onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
-                    >
-                      {t('studentAssignments.btnStart')}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {assignments.length === 0 && (
-            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-              <FileText size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-              <p>Chưa có bài tập nào được giao cho lớp này.</p>
-            </div>
-          )}
+            {assignments.length === 0 && (
+              <EmptyState
+                icon={<FileText size={40} />}
+                title={isVi ? 'Chưa có bài tập' : 'No assignments'}
+                description={isVi ? 'Chưa có bài tập nào được giao cho lớp này.' : 'No assignments have been assigned to this class yet.'}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

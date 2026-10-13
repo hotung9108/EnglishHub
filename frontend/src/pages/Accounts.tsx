@@ -9,6 +9,7 @@ import { validateFullName } from '../utils/nameValidation';
 import { useUsers } from '../hooks/useUsers';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
+import { Button, EmptyState } from '../components/common';
 
 export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
@@ -163,11 +164,11 @@ export const Accounts: React.FC = () => {
     }
   };
 
-  const getRoleBadgeStyle = (role: string) => {
+  const getRoleClass = (role: string) => {
     switch (role) {
-      case 'ADMIN': return { background: '#0f172a', color: '#ffffff' };
-      case 'TEACHER': return { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' };
-      default: return { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' };
+      case 'ADMIN': return 'role-admin';
+      case 'TEACHER': return 'role-teacher';
+      default: return 'role-student';
     }
   };
 
@@ -177,33 +178,29 @@ export const Accounts: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Users size={28} color="var(--primary)" />
+            <Users size={28} className="text-primary" />
             {t('accounts.title')}
-            <span className="adm-title-badge">{users.length} {isVi ? 'tài khoản' : 'accounts'}</span>
           </h1>
-          <p className="adm-subtitle">
-            {isVi ? 'Quản lý tài khoản người dùng, phân quyền truy cập và kiểm soát trạng thái đăng nhập.' : 'Directory of users across all roles, permission assignments, and active status.'}
-          </p>
         </div>
 
-        <button 
-          className="btn btn-primary"
+        <Button 
+          variant="primary"
+          icon={<UserPlus size={16} />}
           onClick={handleOpenCreateDrawer}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
-          <UserPlus size={16} />
-          <span>{t('accounts.addAccount')}</span>
-        </button>
+          {t('accounts.addAccount')}
+        </Button>
       </div>
 
       {/* Filter Bar */}
       <div className="adm-filter-bar">
         {/* Role & Status Pills */}
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="flex gap-4 items-center flex-wrap">
           <div className="adm-pills">
             {(['All', 'STUDENT', 'TEACHER', 'ADMIN'] as const).map(role => (
               <button
                 key={role}
+                type="button"
                 onClick={() => setRoleFilter(role)}
                 className={`adm-pill ${roleFilter === role ? 'active' : ''}`}
               >
@@ -219,9 +216,9 @@ export const Accounts: React.FC = () => {
             {(['All', 'ACTIVE', 'LOCKED'] as const).map(status => (
               <button
                 key={status}
+                type="button"
                 onClick={() => setStatusFilter(status)}
                 className={`adm-pill ${statusFilter === status ? 'active' : ''}`}
-                style={{ fontSize: '12px', padding: '4px 10px' }}
               >
                 <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
               </button>
@@ -239,23 +236,12 @@ export const Accounts: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <span className="adm-search-shortcut">⌘F</span>
         </div>
       </div>
 
       {/* Error notification if load failed */}
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px'
-        }}>
+        <div className="adm-alert-error">
           <AlertCircle size={18} />
           <span>{error.message || (isVi ? 'Không thể tải danh sách tài khoản từ hệ thống.' : 'Failed to load users from server.')}</span>
         </div>
@@ -264,20 +250,18 @@ export const Accounts: React.FC = () => {
       {/* Modern Data Table */}
       <div className="adm-table-card">
         {isLoading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <div className="p-8 text-center text-muted">
+            <Loader2 size={32} className="animate-spin mx-auto mb-3" />
             <div>{isVi ? 'Đang tải danh sách tài khoản...' : 'Loading accounts...'}</div>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <Users size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-            <div style={{ fontSize: '15px', fontWeight: 600 }}>
-              {isVi ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
-            </div>
-            <div style={{ fontSize: '13px', marginTop: '4px' }}>
-              {searchQuery ? (isVi ? 'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc' : 'Try adjusting your search query or filters') : (isVi ? 'Hệ thống hiện chưa có tài khoản nào trong danh mục này' : 'No accounts currently exist in this category')}
-            </div>
-          </div>
+          <EmptyState
+            icon={<Users size={32} />}
+            title={isVi ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
+            description={searchQuery 
+              ? (isVi ? 'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc' : 'Try adjusting your search query or filters') 
+              : (isVi ? 'Hệ thống hiện chưa có tài khoản nào trong danh mục này' : 'No accounts currently exist in this category')}
+          />
         ) : (
           <table className="adm-table">
             <thead>
@@ -286,7 +270,7 @@ export const Accounts: React.FC = () => {
                 <th>{t('accounts.colEmailPhone')}</th>
                 <th>{t('accounts.colRole')}</th>
                 <th>{t('accounts.colStatus')}</th>
-                <th style={{ textAlign: 'right' }}>{t('accounts.colActions')}</th>
+                <th className="text-right">{t('accounts.colActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -299,26 +283,9 @@ export const Accounts: React.FC = () => {
                   <tr key={user.id}>
                     <td>
                       <div className="adm-cell-user">
-                        <div 
-                          className="adm-avatar"
-                          style={{ 
-                            backgroundColor: user.role === 'ADMIN' ? '#0f172a' : user.role === 'TEACHER' ? '#2563eb' : '#059669',
-                            position: 'relative'
-                          }}
-                        >
+                        <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
                           {initials}
-                          <span 
-                            style={{
-                              position: 'absolute',
-                              bottom: '-1px',
-                              right: '-1px',
-                              width: '10px',
-                              height: '10px',
-                              borderRadius: '50%',
-                              backgroundColor: isActive ? '#22c55e' : '#ef4444',
-                              border: '2px solid white'
-                            }}
-                          />
+                          <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
                         </div>
                         <div className="adm-avatar-info">
                           <div className="adm-avatar-name">{user.fullName}</div>
@@ -327,47 +294,37 @@ export const Accounts: React.FC = () => {
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--on-surface)' }}>{user.email}</span>
+                      <div className="flex flex-col gap-0">
+                        <span className="text-sm text-surface">{user.email}</span>
                       </div>
                     </td>
                     <td>
-                      <span 
-                        className="badge" 
-                        style={{ 
-                          ...getRoleBadgeStyle(user.role),
-                          padding: '4px 10px', 
-                          borderRadius: 'var(--radius-full)', 
-                          fontSize: '11.5px',
-                          fontWeight: 700 
-                        }}
-                      >
+                      <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
                         {user.role}
                       </span>
                     </td>
                     <td>
-                      <span className={`badge ${isActive ? 'badge-active' : 'badge-onleave'}`}>
+                      <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
                         {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        <button 
-                          className="btn btn-secondary btn-sm"
+                    <td className="text-right">
+                      <div className="inline-flex gap-2">
+                        <Button 
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleOpenEditDrawer(user)}
                           title={t('accounts.actionEdit')}
-                          style={{ padding: '6px 10px' }}
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button 
-                          className="btn btn-secondary btn-sm"
+                          icon={<Edit3 size={14} />}
+                        />
+                        <Button 
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleToggleStatus(user)}
                           title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
-                          style={{ padding: '6px 10px', color: isActive ? '#dc2626' : '#16a34a' }}
-                        >
-                          {isActive ? <Lock size={14} /> : <Unlock size={14} />}
-                        </button>
+                          className={isActive ? 'text-error' : 'text-success'}
+                          icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -378,7 +335,7 @@ export const Accounts: React.FC = () => {
         )}
       </div>
 
-      {/* Slide-over Drawer */}
+      {/* Slide-over Drawer for Create / Edit */}
       {isDrawerOpen && (
         <div className="adm-drawer-backdrop" onClick={() => setIsDrawerOpen(false)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
@@ -389,36 +346,29 @@ export const Accounts: React.FC = () => {
                   : (isVi ? 'Khởi Tạo Tài Khoản Người Dùng Mới' : 'Create New User Account')}
               </h2>
               <button 
+                type="button"
+                className="btn-ghost p-1 cursor-pointer"
                 onClick={() => setIsDrawerOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveUser} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <form onSubmit={handleSaveUser} className="flex flex-col flex-1">
               <div className="adm-drawer-body">
                 {actionError && (
-                  <div style={{
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#b91c1c',
-                    fontSize: '13px',
-                    marginBottom: '14px'
-                  }}>
+                  <div className="adm-alert-error">
                     {actionError}
                   </div>
                 )}
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    {t('accounts.colName')} <span style={{ color: 'var(--error)' }}>*</span>
+                    {t('accounts.colName')} <span className="text-error">*</span>
                   </label>
                   <input 
                     type="text" 
-                    className="input"
+                    className={`input ${nameError ? 'border-error' : ''}`}
                     placeholder="Nguyễn Văn A..."
                     value={formData.name}
                     onChange={(e) => {
@@ -433,15 +383,14 @@ export const Accounts: React.FC = () => {
                         setNameError('');
                       }
                     }}
-                    style={nameError ? { borderColor: 'var(--error, #ef4444)' } : undefined}
                     required
                   />
                   {nameError ? (
-                    <span style={{ color: 'var(--error, #ef4444)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="text-error text-xs mt-1 block">
                       {nameError}
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--on-surface-variant, #64748b)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    <span className="text-muted text-xs mt-1 block">
                       {isVi ? 'Chỉ gồm chữ cái, dấu cách, gạch nối hoặc dấu nháy đơn (2 - 50 ký tự)' : 'Letters, spaces, hyphens, or apostrophes only (2 - 50 chars)'}
                     </span>
                   )}
@@ -449,17 +398,16 @@ export const Accounts: React.FC = () => {
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    Email <span style={{ color: 'var(--error)' }}>*</span>
+                    Email <span className="text-error">*</span>
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail size={16} className="text-on-surface-variant" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <div className="adm-input-icon-wrap">
+                    <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className="input"
+                      className="input adm-input-with-icon"
                       placeholder="user@center.edu.vn"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      style={{ paddingLeft: '36px', width: '100%' }}
                       disabled={!!editingUser}
                       required
                     />
@@ -485,15 +433,14 @@ export const Accounts: React.FC = () => {
                   <label className="adm-form-label">
                     {isVi ? 'Số điện thoại' : 'Phone Number'}
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <Phone size={16} className="text-on-surface-variant" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                  <div className="adm-input-icon-wrap">
+                    <Phone size={16} className="adm-input-icon" />
                     <input 
                       type="text" 
-                      className="input"
+                      className="input adm-input-with-icon"
                       placeholder="0912-345-678"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      style={{ paddingLeft: '36px', width: '100%' }}
                     />
                   </div>
                 </div>
@@ -526,9 +473,9 @@ export const Accounts: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-container-low)', fontSize: '13px', color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Shield size={15} color="var(--primary)" />
+                <div className="p-3 rounded-md bg-surface-low text-xs text-muted leading-relaxed">
+                  <div className="font-semibold text-surface mb-1 flex items-center gap-2">
+                    <Shield size={15} className="text-primary" />
                     {isVi ? 'Chính sách bảo mật tài khoản' : 'Security Credential Policy'}
                   </div>
                   {isVi 
@@ -538,23 +485,22 @@ export const Accounts: React.FC = () => {
               </div>
 
               <div className="adm-drawer-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <Button 
+                  variant="secondary"
+                  type="button"
                   onClick={() => setIsDrawerOpen(false)}
                   disabled={actionLoading}
                 >
                   {isVi ? 'Hủy' : 'Cancel'}
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  disabled={actionLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                </Button>
+                <Button 
+                  variant="primary"
+                  type="submit"
+                  loading={actionLoading}
+                  icon={<Check size={16} />}
                 >
-                  {actionLoading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                  <span>{isVi ? 'Lưu tài khoản' : 'Save User'}</span>
-                </button>
+                  {isVi ? 'Lưu tài khoản' : 'Save User'}
+                </Button>
               </div>
             </form>
           </div>

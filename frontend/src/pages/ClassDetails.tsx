@@ -282,10 +282,10 @@ export const ClassDetails: React.FC = () => {
                     className="btn btn-secondary btn-sm"
                     onClick={() => navigate('/admin/students/create')}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                    title={isVi ? 'Tạo mới hồ sơ học viên' : 'Create new student profile'}
+                    title={isVi ? 'Thêm học viên mới' : 'Add new student'}
                   >
                     <Plus size={14} />
-                    <span>{isVi ? 'Tạo mới' : 'Create New'}</span>
+                    <span>{isVi ? 'Thêm mới' : 'Add New'}</span>
                   </button>
                 </div>
               </div>
@@ -297,7 +297,7 @@ export const ClassDetails: React.FC = () => {
                     {isVi ? 'Lớp học chưa có học viên nào' : 'No students enrolled in this class'}
                   </div>
                   <div style={{ fontSize: '13px', marginTop: '4px' }}>
-                    {isVi ? 'Hãy chọn học viên đã có trong hệ thống hoặc tạo hồ sơ học viên mới.' : 'Select existing students from directory or create new students.'}
+                    {isVi ? 'Hãy chọn học viên đã có trong hệ thống hoặc thêm học viên mới.' : 'Select existing students from directory or add new students.'}
                   </div>
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '16px' }}>
                     <button 
@@ -314,7 +314,7 @@ export const ClassDetails: React.FC = () => {
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
                       <Plus size={16} />
-                      <span>{isVi ? 'Tạo mới học viên' : 'Create New Student'}</span>
+                      <span>{isVi ? 'Thêm học viên mới' : 'Add New Student'}</span>
                     </button>
                   </div>
                 </div>

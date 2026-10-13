@@ -543,6 +543,7 @@
 }
 
 .speaking-btn-link:hover {
+  color: var(--link-hover, #144a38);
   text-decoration: underline;
 }
 
@@ -758,3 +759,41 @@
   font-weight: 700;
   color: var(--on-surface);
 }
+
+.speaking-status-recording {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.speaking-status-ready {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.speaking-success-banner {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #166534;
+}
+
+.speaking-weight-badge {
+  font-weight: 600;
+}
+
+.speaking-eval-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--on-surface);
+}
+
+.speaking-eval-subtitle {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+

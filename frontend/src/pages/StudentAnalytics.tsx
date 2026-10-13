@@ -6,11 +6,13 @@ import {
   PenTool, Mic, BookOpen, Headphones, Zap,
   RotateCcw, AlertCircle
 } from 'lucide-react';
+import { Button, Skeleton } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { reportService } from '../api/services/report.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import type { ReportStudentProgressResponse, SkillAverage } from '../types/report.types';
+import '../styles/student-ecosystem.css';
 
 interface SkillScore {
   skill: 'Listening' | 'Reading' | 'Writing' | 'Speaking';
@@ -140,20 +142,20 @@ export const StudentAnalytics: React.FC = () => {
   const getStatusBadge = (status: SkillScore['status']) => {
     if (status === 'strong') {
       return (
-        <span style={{ fontSize: '11.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '12px', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0' }}>
+        <span className="analytics-badge-good">
           {isVi ? 'Vững chắc' : 'Mastered'}
         </span>
       );
     }
     if (status === 'average') {
       return (
-        <span style={{ fontSize: '11.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+        <span className="analytics-badge-avg">
           {isVi ? 'Đang tiến bộ' : 'Developing'}
         </span>
       );
     }
     return (
-      <span style={{ fontSize: '11.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' }}>
+      <span className="analytics-badge-weak">
         {isVi ? 'Cần tập trung' : 'Needs Focus'}
       </span>
     );
@@ -162,14 +164,14 @@ export const StudentAnalytics: React.FC = () => {
   if (loading) {
     return (
       <div className="std-eco-container p-24">
-        <div className="skeleton mb-24" style={{ height: '40px', width: '320px', borderRadius: '8px' }}></div>
-        <div className="skeleton mb-28" style={{ height: '160px', borderRadius: '16px' }}></div>
-        <div className="grid gap-20 mb-28" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+        <Skeleton height="40px" width="320px" borderRadius="8px" className="mb-24" />
+        <Skeleton height="160px" borderRadius="16px" className="mb-28" />
+        <div className="analytics-grid">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="skeleton" style={{ height: '220px', borderRadius: '14px' }}></div>
+            <Skeleton key={i} height="220px" borderRadius="14px" />
           ))}
         </div>
-        <div className="skeleton" style={{ height: '180px', borderRadius: '14px' }}></div>
+        <Skeleton height="180px" borderRadius="14px" />
       </div>
     );
   }
@@ -181,28 +183,20 @@ export const StudentAnalytics: React.FC = () => {
         <div>
           <h1 className="std-eco-title">
             <BarChart3 size={28} color="var(--primary)" />
-            {isVi ? 'Phân Tích Năng Lực & Lộ Trình AI' : 'Competency Analytics & AI Diagnosis'}
+            {isVi ? 'Phân tích tiến độ' : 'Progress Analytics'}
           </h1>
           <p className="std-eco-subtitle">
             {isVi 
-              ? 'Chẩn đoán đa chiều 4 kỹ năng (Writing, Reading, Listening, Speaking), phát hiện lỗ hổng kiến thức và đề xuất bài tập cá nhân hóa.' 
-              : 'Holistic 4-skill diagnostic, component analysis, and adaptive remediation plan.'}
+              ? 'Thống kê kết quả học tập và mức độ hoàn thành bài tập.' 
+              : 'Learning progress and assignment completion statistics.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-8">
           <select 
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value as 'month' | 'quarter' | 'all')}
-            style={{
-              padding: '8px 14px',
-              fontSize: '13px',
-              borderRadius: 'var(--radius-md, 8px)',
-              border: '1px solid var(--outline-variant)',
-              backgroundColor: 'var(--surface)',
-              color: 'var(--on-surface)',
-              outline: 'none'
-            }}
+            className="analytics-select"
           >
             <option value="month">{isVi ? '30 ngày gần nhất' : 'Last 30 days'}</option>
             <option value="quarter">{isVi ? 'Học kỳ hiện tại' : 'Current Term'}</option>
@@ -212,15 +206,14 @@ export const StudentAnalytics: React.FC = () => {
       </div>
 
       {error && (
-        <div className="p-16 mb-24 rounded-xl flex items-center justify-between" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}>
+        <div className="analytics-error-banner">
           <div className="flex items-center gap-12">
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>
-          <button onClick={handleReload} className="btn btn-sm btn-secondary flex items-center gap-6">
-            <RotateCcw size={14} />
-            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-          </button>
+          <Button variant="secondary" size="sm" icon={<RotateCcw size={14} />} onClick={handleReload}>
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
         </div>
       )}
 
@@ -228,22 +221,22 @@ export const StudentAnalytics: React.FC = () => {
       <div className="std-eco-hero">
         <div className="std-eco-hero-content">
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(255,255,255,0.18)', padding: '5px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, marginBottom: '12px' }}>
+            <div className="analytics-hero-target-pill">
               <Target size={15} />
               <span>{isVi ? 'Mục tiêu học tập: 8.5 / 10' : 'Target Goal: 8.5 / 10'}</span>
             </div>
-            <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.01em' }}>
+            <h2 className="analytics-hero-title">
               {currentOverallBand !== null ? (
                 isVi 
-                  ? `Bạn đã đạt ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% chặng đường đến mục tiêu 8.5 điểm 🎉` 
-                  : `You have completed ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% of your target milestone 🎉`
+                  ? `Bạn đã đạt ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% chặng đường đến mục tiêu 8.5 điểm` 
+                  : `You have completed ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% of your target milestone`
               ) : (
                 isVi
-                  ? 'Bắt đầu làm bài tập để theo dõi tiến độ điểm số 🎯'
-                  : 'Start completing assignments to track progress toward your goal 🎯'
+                  ? 'Bắt đầu làm bài tập để theo dõi tiến độ điểm số'
+                  : 'Start completing assignments to track progress toward your goal'
               )}
             </h2>
-            <p style={{ fontSize: '14px', opacity: 0.88, margin: 0, maxWidth: '640px', lineHeight: 1.5 }}>
+            <p className="analytics-hero-desc">
               {currentOverallBand !== null ? (
                 isVi 
                   ? `Kỹ năng ${highestSkill.skill} của bạn đang ở phong độ tốt (${highestSkill.current.toFixed(1)} / 10). Tập trung rèn luyện thêm ${lowestSkill.skill} để bứt phá điểm tổng!`
@@ -256,28 +249,28 @@ export const StudentAnalytics: React.FC = () => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.1)', padding: '18px 24px', borderRadius: '14px', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '32px', fontWeight: 800, lineHeight: 1 }}>
+          <div className="analytics-hero-kpis">
+            <div className="text-center">
+              <div className="analytics-hero-kpi-val">
                 {currentOverallBand !== null ? currentOverallBand.toFixed(1) : '--'}
               </div>
-              <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
+              <div className="analytics-hero-kpi-label">
                 {isVi ? 'Điểm TB Hiện Tại' : 'Current Score'}
               </div>
             </div>
-            <div style={{ width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' }}></div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: '#fde047', lineHeight: 1 }}>8.5</div>
-              <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
+            <div className="analytics-hero-divider"></div>
+            <div className="text-center">
+              <div className="analytics-hero-kpi-val kpi-target">8.5</div>
+              <div className="analytics-hero-kpi-label">
                 {isVi ? 'Mục Tiêu' : 'Target'}
               </div>
             </div>
-            <div style={{ width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' }}></div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '32px', fontWeight: 800, color: '#86efac', lineHeight: 1 }}>
+            <div className="analytics-hero-divider"></div>
+            <div className="text-center">
+              <div className="analytics-hero-kpi-val kpi-graded">
                 {submissions.filter(s => s.status === 'GRADED').length}
               </div>
-              <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', marginTop: '4px' }}>
+              <div className="analytics-hero-kpi-label">
                 {isVi ? 'Bài Đã Chấm' : 'Graded Tests'}
               </div>
             </div>
@@ -286,19 +279,19 @@ export const StudentAnalytics: React.FC = () => {
       </div>
 
       {/* 4-Skill Analysis Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+      <div className="analytics-grid">
         {skillsData.map((item) => (
           <div key={item.skill} className="analytics-skill-block">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="analytics-skill-header">
+              <div className="flex items-center gap-10">
+                <div className="analytics-skill-icon">
                   {getSkillIcon(item.skill)}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--on-surface)' }}>
+                  <h3 className="analytics-skill-name">
                     {item.skill}
                   </h3>
-                  <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                  <div className="analytics-skill-tests">
                     {item.testsCompleted} {isVi ? 'bài đã làm' : 'tests completed'}
                   </div>
                 </div>
@@ -307,29 +300,27 @@ export const StudentAnalytics: React.FC = () => {
             </div>
 
             {/* Score Comparison */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <div className="analytics-score-row">
+              <span className="analytics-score-label">
                 {isVi ? 'Điểm hiện tại' : 'Current Band'}
               </span>
-              <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>
+              <span className="analytics-score-val">
                 {item.current > 0 ? (
                   <>
-                    {item.current.toFixed(1)} <span style={{ fontSize: '13px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>/ {item.max.toFixed(1)}</span>
+                    {item.current.toFixed(1)} <span className="analytics-score-max">/ {item.max.toFixed(1)}</span>
                   </>
                 ) : (
-                  <span style={{ fontSize: '15px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>{isVi ? 'Chưa có điểm' : 'Not graded'}</span>
+                  <span className="analytics-score-max">{isVi ? 'Chưa có điểm' : 'Not graded'}</span>
                 )}
               </span>
             </div>
 
             {/* Radar / Progress Bar */}
-            <div className="analytics-radar-bar" style={{ marginBottom: '16px' }}>
+            <div className="analytics-radar-bar mb-16">
               <div 
+                className="analytics-radar-fill"
                 style={{ 
-                  height: '100%', 
-                  borderRadius: 6,
-                  width: item.current > 0 ? `${(item.current / item.max) * 100}%` : '0%',
-                  background: 'linear-gradient(90deg, #2563eb 0%, #38bdf8 100%)'
+                  width: item.current > 0 ? `${(item.current / item.max) * 100}%` : '0%'
                 }}
               ></div>
             </div>
@@ -344,7 +335,7 @@ export const StudentAnalytics: React.FC = () => {
             <Sparkles size={18} color="#9333ea" />
             {isVi ? 'Trung Tâm Chẩn Đoán AI & Lộ Trình Khắc Phục Lỗ Hổng' : 'AI Diagnostic Engine & Targeted Remedial Plan'}
           </h2>
-          <span style={{ fontSize: '12px', backgroundColor: '#faf5ff', color: '#9333ea', padding: '3px 10px', borderRadius: '12px', fontWeight: 700, border: '1px solid #e9d5ff' }}>
+          <span className="analytics-version-badge">
             Auto-Diagnostic v2.4
           </span>
         </div>
@@ -354,12 +345,12 @@ export const StudentAnalytics: React.FC = () => {
             <>
               {/* Diagnostic 1: Strength */}
               <div className="analytics-diagnostic-card strength">
-                <CheckCircle2 size={20} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }} />
+                <CheckCircle2 size={20} color="#16a34a" className="shrink-0 mt-2" />
                 <div>
-                  <div style={{ fontWeight: 700, marginBottom: '3px' }}>
+                  <div className="font-bold mb-4">
                     {isVi ? `Điểm mạnh nổi bật: ${highestSkill.skill} (${highestSkill.current.toFixed(1)} / 10)` : `Key Strength: ${highestSkill.skill} (${highestSkill.current.toFixed(1)} / 10)`}
                   </div>
-                  <div style={{ opacity: 0.9 }}>
+                  <div className="opacity-90">
                     {isVi 
                       ? `Khả năng làm chủ kỹ năng ${highestSkill.skill} của bạn đạt mức tốt so với mục tiêu đề ra.`
                       : `Your mastery of ${highestSkill.skill} is performing solidly relative to target benchmarks.`}
@@ -369,12 +360,12 @@ export const StudentAnalytics: React.FC = () => {
 
               {/* Diagnostic 2: Weakness */}
               <div className="analytics-diagnostic-card weakness">
-                <AlertTriangle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                <AlertTriangle size={20} color="#dc2626" className="shrink-0 mt-2" />
                 <div>
-                  <div style={{ fontWeight: 700, marginBottom: '3px' }}>
+                  <div className="font-bold mb-4">
                     {isVi ? `Trọng tâm cần bồi dưỡng: ${lowestSkill.skill} (${lowestSkill.current.toFixed(1)} / 10)` : `Focus Area: ${lowestSkill.skill} (${lowestSkill.current.toFixed(1)} / 10)`}
                   </div>
-                  <div style={{ opacity: 0.9 }}>
+                  <div className="opacity-90">
                     {isVi 
                       ? `Điểm trung bình kỹ năng ${lowestSkill.skill} đang ở mức ${lowestSkill.current.toFixed(1)} / 10. Bổ sung thêm các bài tập rèn luyện sẽ giúp nâng điểm nhanh chóng.`
                       : `Average score in ${lowestSkill.skill} currently stands at ${lowestSkill.current.toFixed(1)} / 10. Completing targeted drills will bring noticeable progress.`}
@@ -383,37 +374,36 @@ export const StudentAnalytics: React.FC = () => {
               </div>
 
               {/* Recommended Practice Action */}
-              <div className="analytics-diagnostic-card recommendation" style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Zap size={22} color="#2563eb" style={{ flexShrink: 0 }} />
+              <div className="analytics-diagnostic-card recommendation mt-16 flex items-center justify-between flex-wrap gap-12">
+                <div className="flex items-center gap-12">
+                  <Zap size={22} color="#2563eb" className="shrink-0" />
                   <div>
-                    <div style={{ fontWeight: 700 }}>
+                    <div className="font-bold">
                       {isVi ? `Bộ bài tập tăng tốc kỹ năng ${lowestSkill.skill}` : `Accelerated Drills for ${lowestSkill.skill}`}
                     </div>
-                    <div style={{ opacity: 0.9, fontSize: '13px' }}>
+                    <div className="opacity-90 text-sm">
                       {isVi ? 'Được đề xuất tự động dựa trên kết quả các bài kiểm tra gần nhất' : 'Adaptive curriculum generated from your latest assignment results'}
                     </div>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<ArrowRight size={14} />}
                   onClick={() => navigate('/student/assignments')}
-                  style={{ padding: '8px 18px', fontSize: '13px' }}
                 >
-                  <span>{isVi ? 'Bắt đầu luyện tập ngay' : 'Start Practice Drills'}</span>
-                  <ArrowRight size={14} />
-                </button>
+                  {isVi ? 'Bắt đầu luyện tập ngay' : 'Start Practice Drills'}
+                </Button>
               </div>
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--on-surface-variant)' }}>
-              <AlertCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-              <p style={{ fontWeight: 600, color: 'var(--on-surface)', marginBottom: '4px' }}>
+            <div className="analytics-empty-diagnostic">
+              <AlertCircle size={32} className="analytics-empty-icon" />
+              <p className="analytics-empty-title">
                 {isVi ? 'Chưa có đủ dữ liệu bài nộp để chẩn đoán AI' : 'Not enough submission data for AI diagnostics'}
               </p>
-              <span style={{ fontSize: '13px' }}>
+              <span className="text-sm">
                 {isVi ? 'Hãy hoàn thành các bài tập được giao để AI phân tích điểm mạnh và điểm yếu của bạn.' : 'Complete assigned tasks so the AI can diagnose your strengths and improvement areas.'}
               </span>
             </div>

@@ -67,10 +67,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Quản Lý File Bài Nghe (Audio Track & Playback)' : 'Audio Track Management'}
+                {isVi ? 'Quản Lý File Bài Nghe' : 'Audio Track Management'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Tải lên file MP3 bài thi nghe, thiết lập số lần phát và thời lượng.' : 'Upload MP3 audio file, configure play limits and audio duration.'}
+                {isVi ? 'Tải lên tệp âm thanh (MP3, WAV) cho bài nghe.' : 'Upload audio file (MP3, WAV) for listening.'}
               </p>
             </div>
           </div>
@@ -159,10 +159,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Nội Dung Transcript Kèm Mốc Thời Gian (Audio Transcript)' : 'Audio Transcript & Timestamp Clues'}
+                {isVi ? 'Lời Thoại Bài Nghe (Transcript)' : 'Audio Transcript'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Bản ghi lời thoại với các mốc thời gian [01:25] để hỗ trợ AI đối chiếu và học sinh tra cứu sau khi nộp.' : 'Spoken script with timestamp markers for automated verification.'}
+                {isVi ? 'Lời thoại bài nghe để học viên đối chiếu sau khi nộp bài.' : 'Listening transcript for post-submission review.'}
               </p>
             </div>
           </div>
@@ -215,9 +215,6 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               <h2 className="edit-card-title">
                 {isVi ? 'Danh Sách Câu Hỏi Bài Nghe' : 'Listening Questions'}
               </h2>
-              <p className="edit-card-desc">
-                {isVi ? 'Thiết lập các câu hỏi kiểm tra nội dung bài nghe.' : 'Create questions for the listening track.'}
-              </p>
             </div>
           </div>
 
@@ -370,10 +367,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Phát Hiện Bẫy Nghe & Từ Dễ Nhầm Lẫn (AI Distractor Engine)' : 'AI Distractor & Trap Engine'}
+                {isVi ? 'Gợi Ý Bẫy Nghe & Từ Dễ Nhầm Lẫn' : 'Listening Traps & Distractors'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Tự động kiểm tra các bẫy nghe phổ biến (VD: "fifteen" vs "fifty", sửa đổi ý định của speaker).' : 'Flag phonetic traps, numbers, and speaker self-correction.'}
+                {isVi ? 'Gợi ý các lỗi nghe phát âm và bẫy số thường gặp.' : 'Common phonetic traps and number confusions.'}
               </p>
             </div>
           </div>

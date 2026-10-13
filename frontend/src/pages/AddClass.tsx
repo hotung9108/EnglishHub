@@ -126,9 +126,6 @@ export const AddClass: React.FC = () => {
             </button>
             <h1 className="adm-title">{t('addClass.title')}</h1>
           </div>
-          <p className="adm-subtitle">
-            {isVi ? 'Thiết lập thông tin khóa học mới với bộ chỉ dẫn từng bước trực quan.' : 'Configure new course cohort with live interactive preview.'}
-          </p>
         </div>
       </div>
 
@@ -149,20 +146,45 @@ export const AddClass: React.FC = () => {
         </div>
       )}
 
-      {/* Stepper Indicator */}
-      <div className="adm-stepper">
-        {steps.map(s => (
-          <div 
-            key={s.num}
-            className={`adm-step-item ${currentStep === s.num ? 'active' : currentStep > s.num ? 'completed' : ''}`}
-            onClick={() => s.num < currentStep && setCurrentStep(s.num)}
-          >
-            <div className="adm-step-circle">
-              {currentStep > s.num ? <Check size={16} /> : s.num}
-            </div>
-            <span className="adm-step-text">{s.title}</span>
-          </div>
-        ))}
+      {/* Stepper Indicator with Circles & Connecting Lines */}
+      <div className="adm-stepper-card">
+        <div className="adm-stepper-progress">
+          {steps.map((s, idx) => {
+            const isCompleted = currentStep > s.num;
+            const isActive = currentStep === s.num;
+            const isClickable = s.num < currentStep;
+
+            return (
+              <React.Fragment key={s.num}>
+                <div 
+                  className={`adm-progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                  onClick={() => isClickable && setCurrentStep(s.num)}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isClickable) {
+                      setCurrentStep(s.num);
+                    }
+                  }}
+                >
+                  <div className="adm-progress-circle">
+                    {isCompleted ? <Check size={18} strokeWidth={2.5} /> : s.num}
+                  </div>
+                  <div className="adm-progress-label">
+                    <span className="adm-progress-sub">{isVi ? `Bước ${s.num}` : `Step ${s.num}`}</span>
+                    <span className="adm-progress-title">{s.title}</span>
+                  </div>
+                </div>
+
+                {idx < steps.length - 1 && (
+                  <div className={`adm-progress-connector ${currentStep > s.num ? 'completed' : ''}`}>
+                    <div className="adm-progress-connector-line" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       {/* 2-Column Form & Live Preview */}

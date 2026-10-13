@@ -36,17 +36,21 @@ export interface MenuSection {
 }
 
 const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   
   // Default to admin if no user is found for some reason
   const role = user?.role || 'admin';
 
-  const portalLabels: Record<string, string> = {
-    admin: t('adminPortal'),
-    teacher: t('teacherPortal'),
-    student: t('studentPortal'),
+  const roleLabels: Record<string, { vi: string; en: string }> = {
+    admin: { vi: 'Quản trị viên', en: 'Admin' },
+    teacher: { vi: 'Giáo viên', en: 'Teacher' },
+    student: { vi: 'Học viên', en: 'Student' },
   };
+
+  const currentRoleLabel = language === 'vi'
+    ? (roleLabels[role]?.vi || 'Học viên')
+    : (roleLabels[role]?.en || 'Student');
 
   const menuSections: Record<string, MenuSection[]> = {
     admin: [
@@ -126,11 +130,11 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {/* Brand Header */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <GraduationCap size={22} strokeWidth={2.3} />
+          <img src="/logo-icon.png" alt="EnglishHub" className="sidebar-brand-img" />
         </div>
         <div className="sidebar-brand-info">
           <div className="sidebar-brand-name">{t('systemName')}</div>
-          <div className="sidebar-brand-sub">{portalLabels[role] || portalLabels.student}</div>
+          <div className="sidebar-brand-sub">{currentRoleLabel}</div>
         </div>
       </div>
 

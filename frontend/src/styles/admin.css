@@ -637,14 +637,14 @@
 }
 
 .tab-btn:hover {
-  color: #374151;
-  background-color: #F9FAFB;
+  color: var(--on-surface);
+  background-color: var(--surface-dim);
 }
 
 .tab-btn.active {
-  background-color: #EFF6FF;
-  border-bottom-color: #2563EB;
-  color: #1D4ED8;
+  background-color: var(--primary-light);
+  border-bottom-color: var(--primary);
+  color: var(--primary);
   font-weight: 600;
 }
 

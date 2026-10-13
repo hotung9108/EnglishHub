@@ -5,7 +5,7 @@ import {
   User, Star, Sparkles, MessageSquare,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../api/services/submission.service';
 import { gradingService, type AiGradingSuggestionResponse, type SubmissionModuleGradingResponse } from '../api/services/grading.service';
@@ -270,12 +270,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
-        <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+      <div className="tsd-loading-container">
+        <RefreshCw size={36} color="var(--primary)" className="animate-spin tsd-loading-spinner" />
+        <h3 className="tsd-loading-title">
           {isVi ? 'Đang tải bài làm học viên và phân tích AI...' : 'Loading student submission & AI insights...'}
         </h3>
-        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+        <p className="tsd-loading-desc">
           {isVi ? 'Đang kết nối hệ thống chấm chữa và bài nộp thực tế.' : 'Connecting to grading engine and live answers.'}
         </p>
       </div>
@@ -284,206 +284,179 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   if (error) {
     return (
-      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <AlertCircle size={24} color="#dc2626" />
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>{error}</h3>
+      <div className="tsd-error-card">
+        <div className="tsd-error-header">
+          <AlertCircle size={24} color="var(--error)" />
+          <h3 className="tsd-error-title">{error}</h3>
         </div>
-        <button 
-          className="btn btn-secondary bg-white btn-sm"
+        <Button 
+          variant="secondary"
+          size="sm"
           onClick={handleRetry}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          icon={RefreshCw}
         >
-          <RefreshCw size={14} />
-          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-        </button>
+          {isVi ? 'Thử lại' : 'Retry'}
+        </Button>
       </div>
     );
   }
 
   if (!submission) {
     return (
-      <div style={{ maxWidth: '800px', margin: '60px auto', textAlign: 'center', padding: '48px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-        <FileText size={48} color="#94a3b8" style={{ margin: '0 auto 16px auto', display: 'block', opacity: 0.5 }} />
-        <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
-          {isVi ? 'Học viên này chưa nộp bài tập' : 'No submission found for this student'}
-        </h3>
-        <p style={{ margin: '0 0 24px 0', fontSize: '13.5px', color: '#64748b' }}>
-          {studentInfo?.name || 'Học viên'} {isVi ? 'hiện chưa hoàn thành nộp bài tập này.' : 'has not submitted this assignment yet.'}
-        </p>
-        <button 
-          className="btn btn-primary btn-sm"
-          onClick={() => navigate(`/teacher/assignments/${id}`)}
-        >
-          <ArrowLeft size={14} />
-          <span>{t('submissionDetails.backToList')}</span>
-        </button>
+      <div className="tsd-page-container pt-8">
+        <EmptyState
+          icon={FileText}
+          title={isVi ? 'Học viên này chưa nộp bài tập' : 'No submission found for this student'}
+          description={`${studentInfo?.name || 'Học viên'} ${isVi ? 'hiện chưa hoàn thành nộp bài tập này.' : 'has not submitted this assignment yet.'}`}
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={ArrowLeft}
+              onClick={() => navigate(`/teacher/assignments/${id}`)}
+            >
+              {t('submissionDetails.backToList')}
+            </Button>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div style={{ paddingBottom: '80px', maxWidth: '1280px', margin: '0 auto' }}>
+    <div className="tsd-page-container">
       {/* Toast Alert */}
       {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          backgroundColor: '#0f172a',
-          color: '#ffffff',
-          padding: '12px 20px',
-          borderRadius: '10px',
-          fontSize: '13px',
-          fontWeight: 600,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
+        <div className="tsd-toast">
           <CheckCircle2 size={16} color="#4ade80" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Breadcrumbs & Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button 
-            onClick={() => navigate(`/teacher/assignments/${id}`)}
-            style={{ 
-              display: 'inline-flex', alignItems: 'center', gap: '6px', 
-              color: '#2563EB', background: 'none', border: 'none', 
-              cursor: 'pointer', fontSize: '13px', fontWeight: 600, padding: 0
-            }}
-          >
-            <ArrowLeft size={16} /> {t('submissionDetails.backToList')}
-          </button>
-        </div>
+      <div className="tsd-nav-bar">
+        <button 
+          onClick={() => navigate(`/teacher/assignments/${id}`)}
+          className="tsd-back-link"
+        >
+          <ArrowLeft size={16} /> {t('submissionDetails.backToList')}
+        </button>
         
         {classSubmissions.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: '8px', padding: '4px', border: '1px solid #E2E8F0' }}>
-              <button 
-                onClick={() => handleNavigateSibling('prev')}
-                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}
-              >
-                <ChevronLeft size={14} /> {t('submissionDetails.btnPrev')}
-              </button>
-              <span style={{ padding: '0 8px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
-                {currentIndex + 1} / {classSubmissions.length}
-              </span>
-              <button 
-                onClick={() => handleNavigateSibling('next')}
-                style={{ padding: '4px 8px', borderRadius: '4px', border: 'none', background: 'none', color: '#2563EB', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}
-              >
-                {t('submissionDetails.btnNextPrefix')} <ChevronRight size={14} />
-              </button>
-            </div>
+          <div className="tsd-pager-bar">
+            <button 
+              onClick={() => handleNavigateSibling('prev')}
+              className="tsd-pager-btn"
+            >
+              <ChevronLeft size={14} /> {t('submissionDetails.btnPrev')}
+            </button>
+            <span className="tsd-pager-count">
+              {currentIndex + 1} / {classSubmissions.length}
+            </span>
+            <button 
+              onClick={() => handleNavigateSibling('next')}
+              className="tsd-pager-btn next"
+            >
+              {t('submissionDetails.btnNextPrefix')} <ChevronRight size={14} />
+            </button>
           </div>
         )}
       </div>
 
       {/* Header Info */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-            {assignment?.title || (isVi ? 'BÀI TẬP TIẾNG ANH' : 'ENGLISH ASSIGNMENT')}
-          </h1>
-        </div>
-        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-          {isVi ? 'Bài nộp lần' : 'Attempt'} #{submission.attemptNumber}
-        </p>
+      <div className="tsd-header">
+        <h1 className="tsd-header-title">
+          {assignment?.title || (isVi ? 'BÀI TẬP TIẾNG ANH' : 'ENGLISH ASSIGNMENT')}
+        </h1>
       </div>
 
       {/* Quick Actions Bar */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
-        <button 
-          className="btn btn-secondary bg-white btn-sm" 
+      <div className="tsd-actions-bar">
+        <Button 
+          variant="secondary"
+          size="sm"
           onClick={() => showToast(isVi ? 'Đang chuẩn bị tải về bài nộp...' : 'Downloading submission...')}
-          style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}
+          icon={Download}
         >
-          <Download size={14} color="#64748B" /> {t('submissionDetails.btnDownloadAll')}
-        </button>
-        <button 
-          className="btn btn-secondary bg-white btn-sm" 
+          {t('submissionDetails.btnDownloadAll')}
+        </Button>
+        <Button 
+          variant="secondary" 
+          size="sm"
           onClick={() => window.print()}
-          style={{ fontWeight: 500, color: '#334155', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}
+          icon={Printer}
         >
-          <Printer size={14} color="#64748B" /> {t('submissionDetails.btnPrint')}
-        </button>
-        <button 
-          className="btn btn-secondary bg-white btn-sm"
+          {t('submissionDetails.btnPrint')}
+        </Button>
+        <Button 
+          variant="secondary"
+          size="sm"
           onClick={handleTriggerAiAnalyze}
-          style={{ fontWeight: 600, color: '#4338ca', backgroundColor: '#eef2ff', borderColor: '#c7d2fe' }}
+          icon={Sparkles}
         >
-          <Sparkles size={14} color="#4f46e5" />
-          <span>{isVi ? 'Phân tích lại với AI' : 'Re-run AI Analysis'}</span>
-        </button>
+          {isVi ? 'Phân tích lại với AI' : 'Re-run AI Analysis'}
+        </Button>
       </div>
 
       {/* Student Banner */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <User size={24} color="#94A3B8" />
+      <div className="tsd-student-card">
+        <div className="tsd-student-info-left">
+          <div className="tsd-student-avatar">
+            <User size={24} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="tsd-student-name">
                 {studentInfo?.name || 'Học viên'}
               </h2>
-              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, backgroundColor: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+              <span className="tsd-status-chip">
                 {submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
               </span>
-              <span style={{ fontSize: '12px', color: '#94A3B8', fontFamily: 'monospace' }}>
+              <span className="tsd-student-code">
                 {studentInfo?.code || `HV-${studentId}`}
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="tsd-student-meta">
               <span>{studentInfo?.email}</span>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: '#94A3B8', fontSize: '11px' }}>{t('submissionDetails.submissionTimePrefix')}</div>
-            <div style={{ fontWeight: 600, color: '#334155' }}>
+        <div className="tsd-time-info">
+          <div className="text-right">
+            <div className="tsd-time-label">{t('submissionDetails.submissionTimePrefix')}</div>
+            <div className="tsd-time-val">
               {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'Vừa xong'}
             </div>
           </div>
-          <div style={{ width: '1px', height: '32px', backgroundColor: '#E2E8F0' }}></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10B981' }}></span>
-            <span style={{ fontWeight: 500, color: '#334155' }}>{t('submissionDetails.statusOnTime')}</span>
+          <div className="tsd-time-divider"></div>
+          <div className="tsd-ontime-indicator">
+            <span className="tsd-ontime-dot"></span>
+            <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
           </div>
         </div>
       </div>
 
       {/* Metrics Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        {/* Score Card */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <MetricCard 
           title={isVi ? 'Điểm số đề xuất' : 'Suggested Score'}
           value={finalScoreInput || '7.0'}
           suffix="/ 10"
-          icon={<Star size={16} />}
+          icon={Star}
           footerText={
-            <span style={{ color: 'var(--success)', fontWeight: 500 }}>
-              <Star size={14} style={{ display: 'inline', verticalAlign: 'middle' }}/> 
+            <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
+              <Star size={14} /> 
               {aiSuggestion?.suggestedScore ? `${isVi ? 'AI đề xuất:' : 'AI Suggestion:'} ${aiSuggestion.suggestedScore}` : (isVi ? 'Đã hiệu chuẩn AI' : 'AI Calibrated')}
             </span>
           }
         />
 
-        {/* Time Spent Card */}
         <MetricCard 
           title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
           value={String(wordCount)}
           suffix={isVi ? 'từ' : 'words'}
-          icon={<Clock size={16} />}
+          icon={Clock}
           iconBgColor="var(--surface-container)"
           iconColor="var(--on-surface-variant)"
           footerText={wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu (>= 250 từ)' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target')}
@@ -492,14 +465,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
       {/* Submission Files & Attachments */}
       {moduleDetail?.answers && moduleDetail.answers.some(a => a.docStorageKey || a.audioStorageKey) && (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px', marginBottom: '24px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.025em', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <FileText size={16} color="#2563EB" /> {t('submissionDetails.filesTitle')}
+        <div className="tsd-files-card">
+          <div className="tsd-files-header">
+            <h3 className="tsd-files-title">
+              <FileText size={16} /> {t('submissionDetails.filesTitle')}
             </h3>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="tsd-files-list">
             {moduleDetail.answers.map((ans) => {
               if (ans.docStorageKey) {
                 return (
@@ -532,135 +505,101 @@ export const TeacherSubmissionDetails: React.FC = () => {
       )}
 
       {/* Two-Column Working Space */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-        <style>{`
-          @media (min-width: 1024px) {
-            .grading-grid { grid-template-columns: 7fr 5fr !important; }
-          }
-        `}</style>
-        <div className="grading-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-          
-          {/* Left Column: Student Answer Viewer */}
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '12px', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, color: '#334155' }}>
-                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB' }}></span>
-                <span>{isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748B' }}>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>
-                  {wordCount} {isVi ? 'từ' : 'words'}
-                </span>
-              </div>
+      <div className="tsd-grading-grid">
+        {/* Left Column: Student Answer Viewer */}
+        <div className="tsd-answer-card">
+          <div className="tsd-answer-header">
+            <div className="tsd-answer-title">
+              <span className="tsd-answer-title-dot"></span>
+              <span>{isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}</span>
             </div>
-
-            <div style={{ padding: '24px', fontFamily: 'serif', color: '#1E293B', lineHeight: 1.8, fontSize: '15px', maxHeight: '580px', overflowY: 'auto' }}>
-              <div style={{ fontFamily: 'sans-serif', fontWeight: 600, fontSize: '13px', color: '#94A3B8', paddingBottom: '8px', borderBottom: '1px solid #F1F5F9', letterSpacing: '0.025em', textTransform: 'uppercase', marginBottom: '16px' }}>
-                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
-              </div>
-              <p style={{ margin: 0, whiteSpace: 'pre-line' }}>
-                {studentAnswerText}
-              </p>
-            </div>
-
-            <div style={{ padding: '10px 20px', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#64748B' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span>{t('submissionDetails.wordCountPrefix')}<strong style={{ color: '#1E293B', fontWeight: 600 }}>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong></span>
-              </div>
+            <div className="text-xs text-slate-500">
+              {wordCount} {isVi ? 'từ' : 'words'}
             </div>
           </div>
 
-          {/* Right Column: AI Insights & Feedback Studio */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* AI Grading Insight */}
-            <div style={{ padding: '14px', borderRadius: '12px', backgroundColor: 'rgba(239, 246, 255, 0.8)', border: '1px solid #BFDBFE' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#1E3A8A', fontWeight: 600, fontSize: '12px', marginBottom: '6px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={16} color="#2563EB" /> {t('submissionDetails.aiSuggestionsTitle')}
-                </span>
-                <span style={{ fontSize: '10px', backgroundColor: 'rgba(191, 219, 254, 0.7)', color: '#1E40AF', padding: '2px 6px', borderRadius: '4px', fontWeight: 500 }}>
-                  {aiSuggestion?.modelUsed || 'AI Engine'}
-                </span>
-              </div>
-              <p style={{ color: '#334155', lineHeight: 1.6, fontSize: '12px', margin: 0 }}>
-                {aiSuggestion?.aiFeedback || (isVi 
-                  ? 'AI Engine đã sẵn sàng phân tích cấu trúc ngữ pháp và vốn từ vựng.' 
-                  : 'AI Engine is ready to diagnose grammar and vocabulary.')}
-              </p>
+          <div className="tsd-answer-box">
+            <div className="tsd-prompt-label">
+              {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
             </div>
+            <p className="m-0 whitespace-pre-line">
+              {studentAnswerText}
+            </p>
+          </div>
 
-            {/* Teacher Score Input */}
-            <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1E293B', marginBottom: '8px' }}>
-                {isVi ? 'Điểm Chấm Chính Thức (Thang 10)' : 'Official Final Score (Scale 10)'}
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <input 
-                  type="number" 
-                  step="0.5" 
-                  min="0" 
-                  max="10"
-                  placeholder="0.0"
-                  value={finalScoreInput}
-                  onChange={(e) => setFinalScoreInput(e.target.value)}
-                  style={{
-                    width: '120px',
-                    padding: '8px 12px',
-                    fontSize: '18px',
-                    fontWeight: 800,
-                    borderRadius: '8px',
-                    border: '2px solid #2563eb',
-                    color: '#1e3a8a',
-                    outline: 'none'
-                  }}
-                />
-                <span style={{ fontSize: '13px', color: '#64748b' }}>
-                  {isVi ? 'Thang điểm 0 - 10' : 'Score Scale 0 - 10'}
-                </span>
-              </div>
+          <div className="tsd-answer-footer">
+            <div>
+              {t('submissionDetails.wordCountPrefix')}<strong>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong>
             </div>
+          </div>
+        </div>
 
-            {/* Feedback Editor */}
-            <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.025em', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  <MessageSquare size={16} color="#475569" /> {t('submissionDetails.feedbackTitle')}
-                </h3>
-              </div>
+        {/* Right Column: AI Insights & Feedback Studio */}
+        <div className="tsd-sidebar">
+          {/* AI Grading Insight */}
+          <div className="tsd-ai-box">
+            <div className="tsd-ai-box-header">
+              <span className="flex items-center gap-1.5">
+                <Sparkles size={16} /> {t('submissionDetails.aiSuggestionsTitle')}
+              </span>
+              <span className="tsd-ai-badge">
+                {aiSuggestion?.modelUsed || 'AI Engine'}
+              </span>
+            </div>
+            <p className="tsd-ai-desc">
+              {aiSuggestion?.aiFeedback || (isVi 
+                ? 'AI Engine đã sẵn sàng phân tích cấu trúc ngữ pháp và vốn từ vựng.' 
+                : 'AI Engine is ready to diagnose grammar and vocabulary.')}
+            </p>
+          </div>
 
-              <textarea 
-                style={{ 
-                  width: '100%', fontSize: '13px', color: '#1E293B', borderColor: '#E2E8F0', 
-                  borderRadius: '8px', outline: 'none',
-                  padding: '12px', resize: 'vertical', lineHeight: 1.6, boxSizing: 'border-box'
-                }} 
-                placeholder={t('submissionDetails.feedbackPlaceholder')} 
-                rows={5}
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
+          {/* Teacher Score Input */}
+          <div className="tsd-score-card">
+            <label className="tsd-card-label">
+              {isVi ? 'Điểm Chấm Chính Thức (Thang 10)' : 'Official Final Score (Scale 10)'}
+            </label>
+            <div className="flex items-center gap-3">
+              <input 
+                type="number" 
+                step="0.5" 
+                min="0" 
+                max="10"
+                placeholder="0.0"
+                value={finalScoreInput}
+                onChange={(e) => setFinalScoreInput(e.target.value)}
+                className="tsd-score-input"
               />
+              <span className="text-xs text-slate-500">
+                {isVi ? 'Thang điểm 0 - 10' : 'Score Scale 0 - 10'}
+              </span>
+            </div>
+          </div>
 
-              <div style={{ marginTop: '12px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>
-                  {isVi ? 'Ghi chú nội bộ giáo viên (chỉ giảng viên xem được)' : 'Private Teacher Notes'}
-                </label>
-                <input 
-                  type="text"
-                  placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
-                  value={teacherNote}
-                  onChange={(e) => setTeacherNote(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    fontSize: '12.5px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
+          {/* Feedback Editor */}
+          <div className="tsd-feedback-card">
+            <h3 className="tsd-card-title">
+              <MessageSquare size={16} /> {t('submissionDetails.feedbackTitle')}
+            </h3>
+
+            <textarea 
+              className="tsd-feedback-textarea"
+              placeholder={t('submissionDetails.feedbackPlaceholder')} 
+              rows={5}
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+            />
+
+            <div className="mt-3">
+              <label className="block text-xs font-semibold text-slate-500 mb-1">
+                {isVi ? 'Ghi chú nội bộ giáo viên (chỉ giảng viên xem được)' : 'Private Teacher Notes'}
+              </label>
+              <input 
+                type="text"
+                placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
+                value={teacherNote}
+                onChange={(e) => setTeacherNote(e.target.value)}
+                className="tsd-internal-note-input"
+              />
             </div>
           </div>
         </div>
@@ -669,33 +608,31 @@ export const TeacherSubmissionDetails: React.FC = () => {
       <StickyActionBar 
         leftActions={
           <>
-            <button 
-              className="btn btn-secondary border-none" 
+            <Button 
+              variant="ghost" 
               onClick={() => navigate(`/teacher/assignments/${id}`)}
-              style={{ color: '#475569' }}
             >
               {isVi ? 'Quay lại' : 'Back'}
-            </button>
-            <button 
-              className="btn btn-secondary" 
+            </Button>
+            <Button 
+              variant="secondary" 
               disabled={isSubmittingGrade}
               onClick={() => handleSaveGrade(false)}
-              style={{ backgroundColor: '#F1F5F9', color: '#334155' }}
+              icon={Save}
             >
-              <Save size={14} color="#64748B" /> {t('submissionDetails.btnSaveDraft')}
-            </button>
+              {t('submissionDetails.btnSaveDraft')}
+            </Button>
           </>
         }
         rightActions={
-          <button 
-            className="btn btn-primary" 
+          <Button 
+            variant="primary" 
             disabled={isSubmittingGrade}
             onClick={() => handleSaveGrade(true)}
-            style={{ fontWeight: 700 }}
+            icon={isSubmittingGrade ? RefreshCw : Send}
           >
-            {isSubmittingGrade ? <RefreshCw size={14} className="animate-spin" /> : <Send size={16} />}
-            <span>{isSubmittingGrade ? (isVi ? 'Đang lưu...' : 'Submitting...') : t('submissionDetails.btnSend')}</span>
-          </button>
+            {isSubmittingGrade ? (isVi ? 'Đang lưu...' : 'Submitting...') : t('submissionDetails.btnSend')}
+          </Button>
         }
       />
     </div>

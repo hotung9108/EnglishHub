@@ -11,6 +11,8 @@ import { assignmentService, type AssignmentDetail } from '../api/services/assign
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/common';
+import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -227,101 +229,101 @@ const StudentAssignmentWriting: React.FC = () => {
     'Yêu cầu: Hoàn thành bài viết Writing (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và bố cục mạch lạc. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo thang điểm 10.';
 
   return (
-    <div style={{ padding: '0 24px 40px 24px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="writing-container">
       {/* Breadcrumbs */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B', marginBottom: '24px', paddingTop: '16px' }}>
-        <span style={{ cursor: 'pointer' }} onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
+      <div className="writing-breadcrumbs">
+        <span className="writing-crumb-link" onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
         <ChevronRight size={16} />
-        <span style={{ cursor: 'pointer' }} onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
+        <span className="writing-crumb-link" onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
         <ChevronRight size={16} />
-        <span style={{ color: '#2563EB', fontWeight: 500 }}>
+        <span className="writing-crumb-active">
           {assignment?.title || `Writing #${id}`}
         </span>
       </div>
 
       {error && (
-        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+        <div className="analytics-error-banner">
+          <div className="flex items-center gap-10">
             <AlertCircle size={20} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span className="text-sm">{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            icon={<RefreshCw size={13} />}
           >
-            <RefreshCw size={13} /> Thử lại
-          </button>
+            Thử lại
+          </Button>
         </div>
       )}
 
       {successMessage && (
-        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
+        <div className="p-16 mb-20 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-10 text-emerald-800">
           <CheckCircle size={20} />
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+          <span className="text-sm font-semibold">{successMessage}</span>
         </div>
       )}
 
       {/* Main Layout - 2 Columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '32px', alignItems: 'start' }}>
+      <div className="writing-grid">
         {/* Left Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="writing-main-col">
           {/* Instructions */}
-          <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-              <div style={{ color: '#EF4444', marginTop: '4px' }}>
-                <span style={{ fontSize: '18px' }}>★</span>
-              </div>
-              <p style={{ margin: 0, color: '#334155', fontSize: '15px', lineHeight: '1.6' }}>
+          <div className="writing-card">
+            <div className="writing-prompt-box">
+              <span className="writing-prompt-icon"><Info size={16} /></span>
+              <p className="writing-prompt-text">
                 {isLoading ? 'Đang tải yêu cầu đề bài...' : instructionsText}
               </p>
             </div>
           </div>
 
           {/* Attachments */}
-          <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ padding: '8px', backgroundColor: '#F1F5F9', borderRadius: '50%', color: '#64748B' }}>
+          <div className="writing-card">
+            <div className="flex justify-between items-center mb-20">
+              <div className="flex items-center gap-12">
+                <div className="p-8 bg-slate-100 rounded-full text-slate-500">
                   <Paperclip size={18} />
                 </div>
-                <h2 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Tài liệu đính kèm &amp; Đề bài mẫu</h2>
+                <h2 className="text-lg font-semibold text-slate-800 m-0">Tài liệu đính kèm &amp; Đề bài mẫu</h2>
               </div>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: '1px solid #E2E8F0', borderRadius: '12px', backgroundColor: '#fff' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ padding: '12px', backgroundColor: '#EFF6FF', borderRadius: '10px', color: '#3B82F6' }}>
+            <div className="flex flex-col gap-16">
+              <div className="flex justify-between items-center p-16 border border-slate-200 rounded-xl bg-white">
+                <div className="flex items-center gap-16">
+                  <div className="p-12 bg-blue-50 rounded-lg text-blue-600">
                     <FileText size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>writing-instructions.docx</h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
-                      <span>Hướng dẫn làm bài và tiêu chí đánh giá Writing</span>
+                    <h4 className="m-0 mb-4 text-sm font-semibold text-slate-800">writing-instructions.docx</h4>
+                    <div className="text-xs text-slate-500">
+                      Hướng dẫn làm bài và tiêu chí đánh giá Writing
                     </div>
                   </div>
                 </div>
-                <button 
-                  type="button"
+                <Button 
+                  variant="secondary"
+                  size="sm"
+                  icon={<Download size={16} />}
                   onClick={() => alert('Đang chuẩn bị file tải về...')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: '1px solid #E2E8F0', padding: '8px 16px', borderRadius: '8px', color: '#2563EB', fontWeight: 500, cursor: 'pointer', fontSize: '13px' }}
                 >
-                  <Download size={16} /> Tải xuống
-                </button>
+                  Tải xuống
+                </Button>
               </div>
             </div>
           </div>
 
           {/* Text Editor */}
-          <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '13px', color: '#475569', fontWeight: 500 }}>
-                  Đếm từ: <span style={{ color: '#2563EB', fontWeight: 600 }}>{wordCount}</span> / 150-250 từ
+          <div className="writing-card">
+            <div className="writing-editor-header">
+              <div className="flex items-center gap-16">
+                <div className="px-12 py-4 bg-slate-100 rounded-md text-xs text-slate-700 font-medium">
+                  Đếm từ: <span className="text-primary font-bold">{wordCount}</span> / 150-250 từ
                 </div>
                 {isDraftSaved && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#10B981' }}>
+                  <div className="flex items-center gap-6 text-xs text-emerald-600 font-medium">
                     <CheckCircle size={14} /> Đã lưu bản nháp!
                   </div>
                 )}
@@ -329,19 +331,19 @@ const StudentAssignmentWriting: React.FC = () => {
             </div>
 
             {/* Toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', border: '1px solid #E2E8F0', borderBottom: 'none', borderTopLeftRadius: '8px', borderTopRightRadius: '8px', backgroundColor: '#F8FAFC' }}>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Bold size={16} /></button>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Italic size={16} /></button>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Underline size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><List size={16} /></button>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><ListOrdered size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignLeft size={16} /></button>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><AlignCenter size={16} /></button>
-              <div style={{ width: '1px', height: '20px', backgroundColor: '#CBD5E1', margin: '0 4px' }} />
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Undo size={16} /></button>
-              <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', padding: '4px' }}><Redo size={16} /></button>
+            <div className="writing-toolbar">
+              <button type="button" className="writing-tool-btn"><Bold size={16} /></button>
+              <button type="button" className="writing-tool-btn"><Italic size={16} /></button>
+              <button type="button" className="writing-tool-btn"><Underline size={16} /></button>
+              <div className="writing-tool-divider" />
+              <button type="button" className="writing-tool-btn"><List size={16} /></button>
+              <button type="button" className="writing-tool-btn"><ListOrdered size={16} /></button>
+              <div className="writing-tool-divider" />
+              <button type="button" className="writing-tool-btn"><AlignLeft size={16} /></button>
+              <button type="button" className="writing-tool-btn"><AlignCenter size={16} /></button>
+              <div className="writing-tool-divider" />
+              <button type="button" className="writing-tool-btn"><Undo size={16} /></button>
+              <button type="button" className="writing-tool-btn"><Redo size={16} /></button>
             </div>
 
             {/* Textarea */}
@@ -349,33 +351,19 @@ const StudentAssignmentWriting: React.FC = () => {
               value={editorText}
               onChange={(e) => setEditorText(e.target.value)}
               placeholder="Nhập nội dung bài luận Writing của bạn tại đây... (Ví dụ: The given topic presents significant implications for...)"
-              style={{
-                width: '100%',
-                minHeight: '280px',
-                padding: '20px',
-                border: '1px solid #E2E8F0',
-                borderBottomLeftRadius: '8px',
-                borderBottomRightRadius: '8px',
-                fontSize: '15px',
-                lineHeight: '1.6',
-                color: '#334155',
-                resize: 'vertical',
-                outline: 'none',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box'
-              }}
+              className="writing-textarea"
             />
 
             {/* Footer Editor */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748B' }}>
-                <Info size={14} color="#3B82F6" />
+            <div className="writing-editor-footer">
+              <div className="flex items-center gap-6 text-xs text-slate-500">
+                <Info size={14} className="text-blue-500" />
                 <span>Nội dung soạn thảo sẽ được bảo lưu khi bấm &quot;Lưu bản nháp&quot;.</span>
               </div>
               <button 
                 type="button"
                 onClick={() => setEditorText('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#475569', textDecoration: 'underline' }}
+                className="bg-transparent border-none cursor-pointer text-xs font-semibold text-slate-600 underline"
               >
                 Xóa bài viết &amp; Làm lại từ đầu
               </button>
@@ -384,98 +372,78 @@ const StudentAssignmentWriting: React.FC = () => {
         </div>
 
         {/* Right Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="writing-side-col">
           {/* Your Submission */}
-          <div className="card" style={{ padding: '24px', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div className="writing-card">
             {/* Dropzone */}
             <label 
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '32px 24px',
-                border: `2px dashed ${isDragging ? '#2563EB' : '#CBD5E1'}`,
-                borderRadius: '12px',
-                backgroundColor: isDragging ? '#EFF6FF' : '#fff',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                marginBottom: '20px'
-              }}
+              className={`writing-dropzone mb-20 block ${isDragging ? 'dragging' : ''}`}
             >
-              <input type="file" style={{ display: 'none' }} onChange={handleFileChange} />
+              <input type="file" className="hidden" onChange={handleFileChange} />
               
-              <div style={{ padding: '16px', backgroundColor: '#EFF6FF', borderRadius: '50%', color: '#3B82F6', marginBottom: '16px' }}>
+              <div className="p-16 bg-blue-50 rounded-full text-blue-600 inline-flex mb-16">
                 <UploadCloud size={28} />
               </div>
 
               {uploadedFile ? (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>{uploadedFile.name}</div>
-                  <div style={{ fontSize: '13px', color: '#64748B' }}>{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</div>
+                <div className="text-center">
+                  <div className="text-sm font-semibold text-slate-800 mb-4">{uploadedFile.name}</div>
+                  <div className="text-xs text-slate-500">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</div>
                 </div>
               ) : (
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>Kéo thả tệp hoặc<br/> <span style={{ color: '#2563EB' }}>chọn từ máy tính</span></div>
-                  <div style={{ fontSize: '12px', color: '#94A3B8' }}>Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
+                <div className="text-center">
+                  <div className="text-sm font-semibold text-slate-800 mb-4">Kéo thả tệp hoặc<br/> <span className="text-primary">chọn từ máy tính</span></div>
+                  <div className="text-xs text-slate-400">Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
                 </div>
               )}
             </label>
 
-            <button 
-              type="button"
+            <Button 
+              variant="primary"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="btn btn-primary" 
-              style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 600, backgroundColor: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '12px', cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.7 : 1 }}
+              className="w-full mb-12"
+              icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> Đang nộp bài...
-                </>
-              ) : (
-                <>
-                  <Send size={18} /> Nộp bài (Submit Assignment)
-                </>
-              )}
-            </button>
+              {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Assignment)'}
+            </Button>
 
-            <button 
-              type="button"
+            <Button 
+              variant="secondary"
               onClick={handleSaveDraft}
-              className="btn btn-secondary" 
-              style={{ width: '100%', padding: '14px', fontSize: '15px', fontWeight: 500, backgroundColor: 'white', color: '#334155', border: '1px solid #CBD5E1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px', cursor: 'pointer' }}
+              className="w-full mb-20"
+              icon={<Save size={18} />}
             >
-              <Save size={18} /> Lưu bản nháp (Save Draft)
-            </button>
+              Lưu bản nháp (Save Draft)
+            </Button>
 
             {/* Alert info */}
-            <div style={{ display: 'flex', gap: '12px', padding: '16px', backgroundColor: '#F0FDF4', borderRadius: '8px', border: '1px solid #BBF7D0' }}>
-              <div style={{ color: '#16A34A', flexShrink: 0, marginTop: '2px' }}>
+            <div className="flex gap-12 p-16 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="text-emerald-600 shrink-0 mt-2">
                 <CheckCircle size={18} />
               </div>
-              <p style={{ margin: 0, fontSize: '13px', lineHeight: '1.5', color: '#166534' }}>
+              <p className="m-0 text-xs leading-relaxed text-emerald-800">
                 Bài làm sẽ được phân tích tự động qua Writing AI Grading Pipeline và gửi đến giảng viên chấm chi tiết.
               </p>
             </div>
           </div>
 
           {/* Grading Card */}
-          <div className="card" style={{ padding: '0', border: '1px solid var(--outline-variant)', borderRadius: '12px', backgroundColor: 'var(--surface)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <h3 style={{ margin: 0, padding: '24px 24px 16px', fontSize: '18px', fontWeight: 700, color: '#1E293B' }}>Thông tin chấm điểm</h3>
+          <div className="writing-card">
+            <h3 className="m-0 mb-16 text-base font-bold text-slate-800">Thông tin chấm điểm</h3>
             
-            <div style={{ padding: '0 24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: '15px', color: '#64748B' }}>Thang điểm:</span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: '#0F172A' }}>100 điểm (Quy đổi Band 9.0)</span>
+            <div>
+              <div className="writing-info-row">
+                <span className="writing-info-label">Thang điểm:</span>
+                <span className="writing-info-val">100 điểm (Quy đổi Band 9.0)</span>
               </div>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid #F1F5F9' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B' }}>Lượt thi hiện tại:</span>
-                <span style={{ fontSize: '16px', fontWeight: 700, color: '#2563EB' }}>
+              <div className="writing-info-row">
+                <span className="writing-info-label">Lượt thi hiện tại:</span>
+                <span className="writing-info-val text-primary">
                   Lần {submission?.attemptNumber ?? 1}
                 </span>
               </div>

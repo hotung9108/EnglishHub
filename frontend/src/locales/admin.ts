@@ -85,9 +85,9 @@ export const adminVi = {
   },
   teachers: {
     title: 'Quản Lý Giáo Viên',
-    subtitle: 'Hồ sơ đội ngũ Giáo viên',
+    subtitle: 'Danh sách đội ngũ Giáo viên',
     breadcrumb: 'Admin > Quản lý Giáo viên & Chuyên môn',
-    addTeacher: 'Thêm hồ sơ giáo viên +',
+    addTeacher: 'Thêm giáo viên +',
     statTotal: 'TỔNG SỐ GIÁO VIÊN',
     statTotalUnit: 'Giảng viên',
     statClasses: 'LỚP ĐANG PHỤ TRÁCH',
@@ -96,8 +96,10 @@ export const adminVi = {
     statAvgGradesUnit: 'Bài',
     classesCountSuffix: ' lớp đang dạy',
     pendingGradesSuffix: ' bài chờ chấm',
-    viewProfile: 'Chi tiết hồ sơ',
+    viewProfile: 'Xem chi tiết',
     assignClass: 'Phân lớp',
+    statusActive: 'Đang hoạt động',
+    statusOnLeave: 'Nghỉ phép',
   },
   students: {
     title: 'Quản Lý Học Viên',
@@ -116,6 +118,9 @@ export const adminVi = {
     colActions: 'THAO TÁC',
     actionEdit: 'Sửa',
     actionHistory: 'Lịch sử',
+    actionLock: 'Khóa',
+    actionUnlock: 'Mở',
+    actionViewDetails: 'Chi tiết',
   },
   classDetails: {
     breadcrumbAdmin: 'Admin',
@@ -184,7 +189,7 @@ export const adminVi = {
   },
   addStudent: {
     backToList: 'Quay lại danh sách học viên',
-    title: 'Thêm hồ sơ học viên mới',
+    title: 'Thêm học viên mới',
     step1: 'Thông tin cá nhân',
     step2: 'Tài khoản & Đăng nhập',
     step3: 'Trình độ & Mục tiêu',
@@ -196,7 +201,7 @@ export const adminVi = {
   },
   addTeacher: {
     backToList: 'Quay lại danh sách giáo viên',
-    title: 'Thêm hồ sơ giáo viên mới',
+    title: 'Thêm giáo viên mới',
     step3: 'Chuyên môn & Chứng chỉ',
     step4: 'Phân công lớp học',
     btnNextStep3: 'Tiếp theo: Năng lực chuyên môn',
@@ -204,7 +209,7 @@ export const adminVi = {
   },
   studentDetails: {
     btnBack: 'Danh sách học viên',
-    titlePrefix: 'Hồ Sơ Học Viên: ',
+    titlePrefix: 'Học Viên: ',
     infoTitle: 'Thông tin cá nhân & Hồ sơ',
     infoSubtitle: 'Quản lý thông tin học viên, phụ huynh và mục tiêu đào tạo',
     studentCode: 'Mã học viên: ',
@@ -225,11 +230,8 @@ export const adminVi = {
     btnActivate: 'Kích hoạt lại'
   },
   adminReports: {
-    title: 'Báo Cáo Kết Quả & Đào Tạo',
-    subtitle: 'Theo dõi toàn diện kết quả học tập của học viên, phổ điểm 4 kỹ năng và chất lượng chấm điểm',
-    tabStudentResults: 'Kết Quả Học Viên & Lớp Học',
-    tabCalibration: 'Đánh Giá Hiệu Suất AI',
-    tabTeacher: 'Hiệu Suất Giảng Viên',
+    title: 'Báo cáo & Thống kê',
+    subtitle: 'Thống kê kết quả học tập và tình hình chấm bài',
     exportExcel: 'Xuất file Excel (.xlsx)',
     exportPdf: 'Xuất báo cáo PDF',
     filterPeriod: 'Thời gian: ',
@@ -238,7 +240,7 @@ export const adminVi = {
   },
   adminSettings: {
     title: 'Cài Đặt Hệ Thống Toàn Cục',
-    subtitle: 'Cấu hình tham số AI Engine, ngưỡng duyệt điểm tự động, email thông báo và bảo mật',
+    subtitle: 'Cài đặt hệ thống, mô hình chấm AI và bảo mật',
     tabAi: 'Cấu hình AI Engine',
     tabGrading: 'Quy tắc & Ngưỡng duyệt điểm',
     tabNotifications: 'Thông báo & Email',
@@ -248,7 +250,7 @@ export const adminVi = {
   },
   auditLogs: {
     title: 'Lịch Sử Chấm Điểm',
-    subtitle: 'Theo dõi chi tiết các bài tập giáo viên đã chấm, điểm số và nhận xét bài nộp của học viên',
+    subtitle: 'Lịch sử chấm điểm và đánh giá bài nộp',
     searchPlaceholder: 'Tìm theo giáo viên, học viên, tên bài tập...',
     filterAllTeachers: 'Tất cả giáo viên',
     filterAllSkills: 'Tất cả kỹ năng',
@@ -264,7 +266,7 @@ export const adminVi = {
   },
   classArchive: {
     title: 'Kho Lưu Trữ & Lịch Sử Lớp Học',
-    subtitle: 'Quản lý các lớp học đã hoàn thành hoặc hủy bỏ (status = COMPLETED / CANCELLED)',
+    subtitle: 'Danh sách các lớp học đã kết thúc hoặc lưu trữ',
     btnBack: 'Quay lại danh sách lớp',
     searchPlaceholder: 'Tìm tên lớp, mã lớp, giáo viên...',
     filterStatus: 'Trạng thái lưu trữ',
@@ -360,9 +362,9 @@ export const adminEn = {
   },
   teachers: {
     title: 'Teacher Management',
-    subtitle: 'Teacher Team Profiles',
+    subtitle: 'Teacher Team Directory',
     breadcrumb: 'Admin > Teacher & Expertise Management',
-    addTeacher: 'Add Teacher Profile +',
+    addTeacher: 'Add Teacher +',
     statTotal: 'TOTAL TEACHERS',
     statTotalUnit: 'Teachers',
     statClasses: 'ACTIVE CLASSES',
@@ -371,8 +373,10 @@ export const adminEn = {
     statAvgGradesUnit: 'Submissions',
     classesCountSuffix: ' active classes',
     pendingGradesSuffix: ' pending submissions',
-    viewProfile: 'View Profile',
+    viewProfile: 'View Details',
     assignClass: 'Assign Class',
+    statusActive: 'Active',
+    statusOnLeave: 'On Leave',
   },
   students: {
     title: 'Student Management',
@@ -391,6 +395,9 @@ export const adminEn = {
     colActions: 'ACTIONS',
     actionEdit: 'Edit',
     actionHistory: 'History',
+    actionLock: 'Lock',
+    actionUnlock: 'Unlock',
+    actionViewDetails: 'Details',
   },
   classDetails: {
     breadcrumbAdmin: 'Admin',
@@ -459,7 +466,7 @@ export const adminEn = {
   },
   addStudent: {
     backToList: 'Back to Student List',
-    title: 'Add New Student Profile',
+    title: 'Add New Student',
     step1: 'Personal Information',
     step2: 'Account & Login',
     step3: 'Level & Target',
@@ -471,7 +478,7 @@ export const adminEn = {
   },
   addTeacher: {
     backToList: 'Back to Teacher List',
-    title: 'Add New Teacher Profile',
+    title: 'Add New Teacher',
     step3: 'Expertise & Certificates',
     step4: 'Class Assignment',
     btnNextStep3: 'Next: Expertise',
@@ -479,7 +486,7 @@ export const adminEn = {
   },
   studentDetails: {
     btnBack: 'Back to Students',
-    titlePrefix: 'Student Profile: ',
+    titlePrefix: 'Student: ',
     infoTitle: 'Personal & Profile Information',
     infoSubtitle: 'Manage student identity, parents contact, and academic goals',
     studentCode: 'Student ID: ',
@@ -501,10 +508,7 @@ export const adminEn = {
   },
   adminReports: {
     title: 'Student Performance & Academic Reports',
-    subtitle: 'Comprehensive tracking of student learning outcomes, 4-skill progress, and grading quality',
-    tabStudentResults: 'Student Outcomes & Classes',
-    tabCalibration: 'AI Grading Evaluation',
-    tabTeacher: 'Faculty Operations',
+    subtitle: 'Learning outcomes and grading analytics',
     exportExcel: 'Export Excel (.xlsx)',
     exportPdf: 'Export PDF Report',
     filterPeriod: 'Period: ',
@@ -513,7 +517,7 @@ export const adminEn = {
   },
   adminSettings: {
     title: 'Global System Settings',
-    subtitle: 'Configure AI engine models, auto-grading thresholds, notifications, and security policies',
+    subtitle: 'System configuration, AI models, and security',
     tabAi: 'AI Engine Config',
     tabGrading: 'Grading Rules & Thresholds',
     tabNotifications: 'Notifications & Email',
@@ -523,7 +527,7 @@ export const adminEn = {
   },
   auditLogs: {
     title: 'Grading History',
-    subtitle: 'Monitor graded assignments by teachers, student scores, and instructor feedback',
+    subtitle: 'Grading history and evaluation logs',
     searchPlaceholder: 'Search by teacher, student, assignment title...',
     filterAllTeachers: 'All Teachers',
     filterAllSkills: 'All Skills',
@@ -539,7 +543,7 @@ export const adminEn = {
   },
   classArchive: {
     title: 'Class Archive & History',
-    subtitle: 'Manage classes that have concluded or been cancelled (status = COMPLETED / CANCELLED)',
+    subtitle: 'Completed or archived classes',
     btnBack: 'Back to Classes',
     searchPlaceholder: 'Search class name, code, teacher...',
     filterStatus: 'Archive Status',

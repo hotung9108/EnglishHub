@@ -352,9 +352,6 @@ export const TeacherCreateAssignment: React.FC = () => {
       <div className="assignment-edit-header">
         <div className="assignment-edit-title-wrap">
           <div className="assignment-edit-title-row">
-            <span className="assignment-edit-code-badge" style={{ backgroundColor: '#2563eb' }}>
-              MỚI
-            </span>
             <input 
               type="text" 
               className="assignment-edit-title-input"
@@ -363,11 +360,6 @@ export const TeacherCreateAssignment: React.FC = () => {
               placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
             />
           </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-            {isVi 
-              ? 'Tạo bài tập cho lớp học theo kỹ năng Writing, Reading, Listening hoặc Speaking.'
-              : 'Create class assignments for Writing, Reading, Listening, or Speaking.'}
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -475,7 +467,6 @@ export const TeacherCreateAssignment: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Thời gian mở và hạn chót' : 'Open & Close dates'}</p>
                 </div>
               </div>
             </div>
@@ -526,7 +517,6 @@ export const TeacherCreateAssignment: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="edit-card-title">{isVi ? 'Trạng Thái Bài Tập' : 'Publish Status'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Công khai hoặc lưu bản nháp' : 'Publish or save as draft'}</p>
                 </div>
               </div>
             </div>
@@ -538,9 +528,9 @@ export const TeacherCreateAssignment: React.FC = () => {
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'active' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'active' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'active' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'active' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: assignmentData.status === 'active' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: assignmentData.status === 'active' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'
@@ -554,9 +544,9 @@ export const TeacherCreateAssignment: React.FC = () => {
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'draft' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: assignmentData.status === 'draft' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: assignmentData.status === 'draft' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'

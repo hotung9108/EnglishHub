@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const login = async (payload: { email: string; password: string }) => {
+  const login = async (payload: { email: string; password: string }): Promise<User | null> => {
     const response = await authService.login(payload);
     const initialUser = toUser(response.user);
     if (initialUser) {
@@ -99,8 +99,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const enrichedUser = profileToUser(fullProfile);
       setUser(enrichedUser);
       localStorage.setItem(environment.auth.userKey, JSON.stringify(enrichedUser));
+      return enrichedUser;
     } catch {
       // Retain initial login user
+      return initialUser;
     }
   };
 
