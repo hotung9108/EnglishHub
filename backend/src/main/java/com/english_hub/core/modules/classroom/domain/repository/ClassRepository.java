@@ -19,5 +19,7 @@ public interface ClassRepository extends IRepository<EnglishClass, Long> {
 
 	boolean studentExists(Long studentId);
 
+	boolean existsByNameIgnoreCase(String name);
+
 	boolean hasRelatedData(Long classId);
 }

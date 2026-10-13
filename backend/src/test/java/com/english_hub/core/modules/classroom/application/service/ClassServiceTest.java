@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +55,7 @@ class ClassServiceTest {
 	@BeforeEach
 	void setUp() {
 		classService = new ClassService(classRepository, classMemberRepository, currentUserProvider);
+		lenient().when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
 	}
 
 	@Test
@@ -136,6 +138,54 @@ class ClassServiceTest {
 		assertThat(result.englishClass().getName()).isEqualTo("IELTS 6.5 - K12");
 		assertThat(result.teacher()).isEqualTo(new TeacherInfo(12L, "Đoàn Thái Sơn"));
 		assertThat(result.memberCount()).isEqualTo(18L);
+	}
+
+	@Test
+	void allowsAStudentToReadAClassTheyBelongTo() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.findById(3L)).thenReturn(Optional.of(classWithTeacher(3L)));
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		when(classRepository.findTeacher(12L)).thenReturn(Optional.of(new TeacherInfo(12L, "Teacher")));
+		when(classMemberRepository.countByClassId(3L)).thenReturn(1L);
+
+		ClassDetailResult result = classService.getClassDetail(3L);
+
+		assertThat(result.memberCount()).isEqualTo(1L);
+		verify(classMemberRepository).existsByClassIdAndStudentId(3L, 41L);
+	}
+
+	@Test
+	void rejectsAStudentWhoDoesNotBelongToTheClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.findById(3L)).thenReturn(Optional.of(classWithTeacher(3L)));
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.getClassDetail(3L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		verify(classRepository, never()).findTeacher(anyLong());
+		verify(classMemberRepository, never()).countByClassId(anyLong());
+	}
+
+	@Test
+	void returnsNotFoundBeforeCheckingStudentMembershipForAnUnknownClass() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.findById(404L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> classService.getClassDetail(404L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lớp học.");
+		verify(classMemberRepository, never()).existsByClassIdAndStudentId(anyLong(), anyLong());
+	}
+
+	@Test
+	void requiresAnActiveCallerBeforeLookingUpClassDetails() {
+		when(currentUserProvider.requireActiveUser()).thenThrow(ApiException.unauthorized("Token không hợp lệ."));
+
+		assertThatThrownBy(() -> classService.getClassDetail(3L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Token không hợp lệ.");
+		verify(classRepository, never()).findById(anyLong());
 	}
 
 	@Test
@@ -232,6 +282,19 @@ class ClassServiceTest {
 				tooLongName, null, null, LocalDate.of(2026, 9, 15), null, null)))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Dữ liệu không hợp lệ.");
+		verify(classRepository, never()).existsByNameIgnoreCase(any());
+		verify(classRepository, never()).save(any(EnglishClass.class));
+	}
+
+	@Test
+	void rejectsAClassNameThatAlreadyExistsAfterTrimming() {
+		when(classRepository.existsByNameIgnoreCase("Existing Class")).thenReturn(true);
+
+		assertThatThrownBy(() -> classService.createClass(new CreateClassCommand(
+				"  Existing Class  ", null, null, LocalDate.of(2026, 9, 15), null, null)))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Tên lớp đã tồn tại.");
+		verify(classRepository).existsByNameIgnoreCase("Existing Class");
 		verify(classRepository, never()).save(any(EnglishClass.class));
 	}
 
@@ -396,6 +459,50 @@ class ClassServiceTest {
 		assertThat(members.getFirst().memberId()).isEqualTo(7L);
 		assertThat(members.getFirst().fullName()).isEqualTo("Trần Tiến Sơn");
 		assertThat(members.getFirst().studentCode()).isEqualTo("HV0012");
+	}
+
+	@Test
+	void allowsAStudentToListMembersOfAClassTheyBelongTo() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		when(classMemberRepository.findMembersWithStudentInfo(3L)).thenReturn(List.of());
+
+		assertThat(classService.listClassMembers(3L)).isEmpty();
+		verify(classMemberRepository).existsByClassIdAndStudentId(3L, 41L);
+	}
+
+	@Test
+	void rejectsAStudentWhoListsMembersOfAClassTheyDoNotBelongTo() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.existsById(3L)).thenReturn(true);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.listClassMembers(3L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		verify(classMemberRepository, never()).findMembersWithStudentInfo(anyLong());
+	}
+
+	@Test
+	void returnsNotFoundBeforeCheckingStudentMembershipForAnUnknownRoster() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(classRepository.existsById(404L)).thenReturn(false);
+
+		assertThatThrownBy(() -> classService.listClassMembers(404L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Không tìm thấy lớp học.");
+		verify(classMemberRepository, never()).existsByClassIdAndStudentId(anyLong(), anyLong());
+	}
+
+	@Test
+	void requiresAnActiveCallerBeforeLookingUpAClassRoster() {
+		when(currentUserProvider.requireActiveUser()).thenThrow(ApiException.unauthorized("Token không hợp lệ."));
+
+		assertThatThrownBy(() -> classService.listClassMembers(3L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Token không hợp lệ.");
+		verify(classRepository, never()).existsById(anyLong());
 	}
 
 	@Test

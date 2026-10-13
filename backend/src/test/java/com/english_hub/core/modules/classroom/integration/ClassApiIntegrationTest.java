@@ -11,6 +11,7 @@ import com.english_hub.core.modules.user.infrastructure.persistence.entity.Teach
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -132,6 +134,10 @@ class ClassApiIntegrationTest {
 				.andExpect(jsonPath("$.message").value("Đã xoá học viên khỏi lớp."));
 
 		mockMvc.perform(delete("/api/v1/classes/{id}", classId)
+						.header("Authorization", bearer(teacherAId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(delete("/api/v1/classes/{id}", classId)
 						.header("Authorization", admin))
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.error").value(
@@ -150,6 +156,80 @@ class ClassApiIntegrationTest {
 						.header("Authorization", admin))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Không tìm thấy lớp học."));
+	}
+
+	@Test
+	void onlyAdminsCanCreateClasses() throws Exception {
+		String teacher = bearer(teacherAId, UserRole.TEACHER);
+		String student = bearer(studentMemberId, UserRole.STUDENT);
+
+		mockMvc.perform(post("/api/v1/classes")
+					.header("Authorization", teacher)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "BE35-teacher-create", "startDate": "2026-09-15" }"""))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(post("/api/v1/classes")
+					.header("Authorization", student)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "BE35-student-create", "startDate": "2026-09-15" }"""))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void teacherCannotUpdateAClass() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String teacher = bearer(teacherAId, UserRole.TEACHER);
+		String name = "BE35-teacher-update-" + UUID.randomUUID();
+		long classId = createClassWithName(admin, name);
+
+		mockMvc.perform(put("/api/v1/classes/{id}", classId)
+					.header("Authorization", teacher)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "BE35-updated-by-teacher" }"""))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(get("/api/v1/classes/{id}", classId)
+					.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(name));
+	}
+
+	@Test
+	void studentsCanReadOnlyClassesTheyBelongTo() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String teacherWithoutClass = bearer(teacherBId, UserRole.TEACHER);
+		String memberStudent = bearer(studentMemberId, UserRole.STUDENT);
+		String otherStudent = bearer(studentOtherId, UserRole.STUDENT);
+		long classId = createClass(admin, "BE35-student-read");
+		addStudent(classId, studentMemberId, admin);
+
+		mockMvc.perform(get("/api/v1/classes/{id}", classId)
+					.header("Authorization", memberStudent))
+				.andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/classes/{id}/members", classId)
+					.header("Authorization", memberStudent))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)));
+
+		mockMvc.perform(get("/api/v1/classes/{id}", classId)
+					.header("Authorization", otherStudent))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/classes/{id}/members", classId)
+					.header("Authorization", otherStudent))
+				.andExpect(status().isForbidden());
+
+		for (String bearer : new String[] {admin, teacherWithoutClass}) {
+			mockMvc.perform(get("/api/v1/classes/{id}", classId)
+						.header("Authorization", bearer))
+					.andExpect(status().isOk());
+			mockMvc.perform(get("/api/v1/classes/{id}/members", classId)
+						.header("Authorization", bearer))
+					.andExpect(status().isOk());
+		}
 	}
 
 	@Test
@@ -298,6 +378,39 @@ class ClassApiIntegrationTest {
 	}
 
 	@Test
+	void rejectsDuplicateNamesAfterTrimAndCaseFoldingAcrossStatuses() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String suffix = Long.toString(System.nanoTime());
+		String activeName = "BE35-Duplicate-" + suffix;
+		createClassWithName(admin, activeName);
+		assertDuplicateClassName(admin, "  " + activeName.toLowerCase(Locale.ROOT) + "  ");
+
+		String cancelledName = "BE35-Cancelled-" + suffix;
+		long cancelledClassId = createClassWithName(admin, cancelledName);
+		mockMvc.perform(put("/api/v1/classes/{id}", cancelledClassId)
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "status": "CANCELLED" }"""))
+				.andExpect(status().isOk());
+		assertDuplicateClassName(admin, cancelledName.toLowerCase(Locale.ROOT));
+
+		String completedName = "BE35-Completed-" + suffix;
+		long completedClassId = createClassWithName(admin, completedName);
+		mockMvc.perform(put("/api/v1/classes/{id}", completedClassId)
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "status": "COMPLETED" }"""))
+				.andExpect(status().isOk());
+		assertDuplicateClassName(admin, completedName.toLowerCase(Locale.ROOT));
+
+		String vietnameseName = "Lớp Tiếng Anh " + suffix;
+		createClassWithName(admin, vietnameseName);
+		assertDuplicateClassName(admin, "LỚP TIẾNG ANH " + suffix);
+	}
+
+	@Test
 	void rejectsInvalidCreateAndUpdateInputs() throws Exception {
 		String admin = bearer(adminId, UserRole.ADMIN);
 
@@ -310,13 +423,25 @@ class ClassApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value(
 						"Vui lòng nhập đầy đủ tên lớp và ngày bắt đầu."));
 
+		String tooLongName = "X".repeat(151);
+		assertThat(tooLongName).hasSize(151);
 		mockMvc.perform(post("/api/v1/classes")
-						.header("Authorization", admin)
-						.contentType(MediaType.APPLICATION_JSON)
-						.content("""
-								{ "name": "X".repeat(151), "startDate": "2026-09-15" }"""))
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "%s", "startDate": "2026-09-15" }""".formatted(tooLongName)))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Dữ liệu không hợp lệ."));
+
+		String maxLengthPrefix = "BE35-" + UUID.randomUUID();
+		String maxLengthName = maxLengthPrefix + "X".repeat(150 - maxLengthPrefix.length());
+		assertThat(maxLengthName).hasSize(150);
+		mockMvc.perform(post("/api/v1/classes")
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "%s", "startDate": "2026-09-15" }""".formatted(maxLengthName)))
+				.andExpect(status().isCreated());
 
 		mockMvc.perform(post("/api/v1/classes")
 						.header("Authorization", admin)
@@ -364,6 +489,7 @@ class ClassApiIntegrationTest {
 	@Test
 	void rejectsInvalidMembershipRequests() throws Exception {
 		String admin = bearer(adminId, UserRole.ADMIN);
+		String teacher = bearer(teacherAId, UserRole.TEACHER);
 		long classId = createClass(admin, "Lớp thành viên lỗi");
 
 		mockMvc.perform(post("/api/v1/classes/{id}/members", classId)
@@ -390,6 +516,36 @@ class ClassApiIntegrationTest {
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.error").value("Học viên đã có trong lớp."));
 
+		mockMvc.perform(post("/api/v1/classes/{id}/members", classId)
+					.header("Authorization", teacher)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "studentId": %d }""".formatted(studentOtherId)))
+				.andExpect(status().isForbidden());
+
+		mockMvc.perform(delete("/api/v1/classes/{id}/members/{memberId}", classId, classMemberId)
+					.header("Authorization", teacher))
+				.andExpect(status().isForbidden());
+
+		long otherClassId = createClass(admin, "Lớp thành viên khác");
+		long otherClassMemberId = addStudent(otherClassId, studentOtherId, admin);
+		mockMvc.perform(delete("/api/v1/classes/{id}/members/{memberId}", classId, otherClassMemberId)
+					.header("Authorization", admin))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy thành viên trong lớp."));
+
+		mockMvc.perform(get("/api/v1/classes/{id}/members", otherClassId)
+					.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].studentCode").value("HV0002"));
+
+		mockMvc.perform(get("/api/v1/classes/{id}/members", classId)
+					.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].studentCode").value("HV0001"));
+
 		mockMvc.perform(delete("/api/v1/classes/{id}/members/{memberId}", classId, 999999)
 						.header("Authorization", admin))
 				.andExpect(status().isNotFound())
@@ -415,14 +571,28 @@ class ClassApiIntegrationTest {
 	}
 
 	private long createClass(String bearer, String name) throws Exception {
+		return createClassWithName(bearer, unique(name));
+	}
+
+	private long createClassWithName(String bearer, String name) throws Exception {
 		String response = mockMvc.perform(post("/api/v1/classes")
 						.header("Authorization", bearer)
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{ "name": "%s", "startDate": "2026-09-15" }""".formatted(unique(name))))
+							{ "name": "%s", "startDate": "2026-09-15" }""".formatted(name)))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return extractId(response);
+	}
+
+	private void assertDuplicateClassName(String admin, String duplicateName) throws Exception {
+		mockMvc.perform(post("/api/v1/classes")
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "%s", "startDate": "2026-09-15" }""".formatted(duplicateName)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Tên lớp đã tồn tại."));
 	}
 
 	private long addStudent(long classId, long studentId, String bearer) throws Exception {
