@@ -269,7 +269,7 @@ Update assignment information.
 
 **Request Body:** `UpdateAssignmentRequest`
 
-**Response:** `MessageResponse`
+**Response:** `UpdateAssignmentResponse`
 
 ---
 
@@ -1125,7 +1125,16 @@ Delete an evaluation.
 | `id` | int64 | Assignment ID |
 | `title` | string | Title |
 | `status` | string | Status |
+| `maxSubmissions` | integer (nullable) | Maximum number of submissions |
 | `modules` | `AssignmentModuleSummaryResponse[]` | List of modules |
+
+---
+
+#### `UpdateAssignmentResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Result message |
+| `maxSubmissions` | integer (nullable) | Maximum number of submissions |
 
 ---
 
@@ -1367,7 +1376,7 @@ Same structure as `AnswerResponse`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `finalScore` | number | Final score |
-| `maxScoreSnapshot` | number | Maximum score at time of grading |
+| `maxScoreSnapshot` | number \| null | Module maximum-score snapshot, captured when the attempt starts and written again when AUTO grading runs. It is null for a legacy grading that has not received a valid teacher score, or when the module maximum score is null or non-positive. |
 | `status` | string | Grading status |
 
 ---
@@ -1379,7 +1388,7 @@ Same structure as `AnswerResponse`.
 | `method` | string | Grading method (AI / MANUAL) |
 | `status` | string | Grading status |
 | `finalScore` | number | Final score |
-| `maxScoreSnapshot` | number | Maximum score |
+| `maxScoreSnapshot` | number \| null | Module maximum-score snapshot, captured when the attempt starts and written again when AUTO grading runs. It is null for a legacy grading that has not received a valid teacher score, or when the module maximum score is null or non-positive. |
 | `aiFeedback` | string | AI-generated feedback |
 | `finalFeedback` | string | Teacher's final feedback |
 
