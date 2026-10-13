@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.classroom.application.service;
 
 import com.english_hub.core.common.ApiException;
+import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
@@ -39,6 +40,8 @@ public class ClassService {
 	private static final String MISSING_STUDENT_ID_MESSAGE = "Thiếu mã học viên.";
 	private static final String CLASS_OR_STUDENT_NOT_FOUND_MESSAGE = "Không tìm thấy lớp học hoặc học viên.";
 	private static final String DUPLICATE_STUDENT_MESSAGE = "Học viên đã có trong lớp.";
+	private static final String DUPLICATE_CLASS_NAME_MESSAGE = "Tên lớp đã tồn tại.";
+	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String MEMBER_NOT_FOUND_MESSAGE = "Không tìm thấy thành viên trong lớp.";
 	private static final int NAME_MAX_LENGTH = 150;
 	private static final int LEVEL_MAX_LENGTH = 50;
@@ -72,8 +75,10 @@ public class ClassService {
 
 	@Transactional(readOnly = true)
 	public ClassDetailResult getClassDetail(long classId) {
+		User caller = currentUserProvider.requireActiveUser();
 		EnglishClass englishClass = classRepository.findById(classId)
 				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		requireStudentMembership(caller, classId);
 		TeacherInfo teacher = englishClass.getTeacherId() == null
 				? null
 				: classRepository.findTeacher(englishClass.getTeacherId()).orElse(null);
@@ -106,6 +111,9 @@ public class ClassService {
 		}
 		validateDateRange(command.startDate(), command.endDate());
 		validateTeacherExists(command.teacherId());
+		if (classRepository.existsByNameIgnoreCase(name)) {
+			throw ApiException.badRequest(DUPLICATE_CLASS_NAME_MESSAGE);
+		}
 		EnglishClass englishClass = new EnglishClass(
 				name,
 				trimToNull(command.level()),
@@ -168,7 +176,9 @@ public class ClassService {
 
 	@Transactional(readOnly = true)
 	public List<ClassMemberDetail> listClassMembers(long classId) {
+		User caller = currentUserProvider.requireActiveUser();
 		requireClassExists(classId);
+		requireStudentMembership(caller, classId);
 		return classMemberRepository.findMembersWithStudentInfo(classId);
 	}
 
@@ -196,6 +206,13 @@ public class ClassService {
 	private void requireClassExists(long classId) {
 		if (!classRepository.existsById(classId)) {
 			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
+		}
+	}
+
+	private void requireStudentMembership(User caller, long classId) {
+		if (caller.role() == UserRole.STUDENT
+				&& !classMemberRepository.existsByClassIdAndStudentId(classId, caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 	}
 

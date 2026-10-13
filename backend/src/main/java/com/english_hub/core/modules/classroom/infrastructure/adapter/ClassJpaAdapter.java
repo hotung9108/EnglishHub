@@ -126,6 +126,16 @@ public class ClassJpaAdapter implements ClassRepository {
 		return studentProfileRepository.existsById(studentId);
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public boolean existsByNameIgnoreCase(String name) {
+		Specification<ClassEntity> specification = (root, query, criteriaBuilder) ->
+				criteriaBuilder.equal(
+						criteriaBuilder.upper(root.get("name")),
+						criteriaBuilder.upper(criteriaBuilder.literal(name)));
+		return jpaRepository.count(specification) > 0;
+	}
+
 	@Transactional(readOnly = true)
 	@Override
 	public boolean hasRelatedData(Long classId) {

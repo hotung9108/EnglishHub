@@ -37,8 +37,11 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.POST, "/api/v1/classes", List.of("ADMIN")),
 			// TẠM — test hiện có cho STUDENT xem danh sách lớp của mình; cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.GET, "/api/v1/classes", List.of("ADMIN", "TEACHER", "STUDENT")),
-			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}", List.of("ADMIN", "TEACHER")),
-			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}/members", List.of("ADMIN", "TEACHER")),
+			new RouteRule(HttpMethod.GET, "/api/v1/classes/{id}", List.of("ADMIN", "TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/classes/{id}/members",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.PUT, "/api/v1/classes/{id}", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
