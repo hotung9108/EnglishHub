@@ -241,13 +241,58 @@ class AssignmentServiceTest {
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
 
-		assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(
-				"Updated title", null, null, CLOSE_AT.plusDays(1), null));
+		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
+				5L,
+				new UpdateAssignmentCommand("Updated title", null, null, CLOSE_AT.plusDays(1), null));
 
 		verify(assignmentRepository).save(assignment);
+		assertThat(result.maxSubmissions()).isEqualTo(2);
 		assertThat(assignment.title()).isEqualTo("Updated title");
 		assertThat(assignment.closeAt()).isEqualTo(CLOSE_AT.plusDays(1));
+	}
+
+	@Test
+	void teacherCanUpdateMaxSubmissionsAndReturnsSavedValue() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
+		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
+
+		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
+				5L,
+				new UpdateAssignmentCommand(null, null, null, null, 3));
+
+		assertThat(result.maxSubmissions()).isEqualTo(3);
+		assertThat(assignment.maxSubmissions()).isEqualTo(3);
+		verify(assignmentRepository).save(assignment);
+	}
+
+	@Test
+	void returnsMaxSubmissionsFromSavedAssignment() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
+		Assignment savedAssignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
+		savedAssignment.updateDetails(
+				savedAssignment.title(),
+				savedAssignment.description(),
+				savedAssignment.openAt(),
+				savedAssignment.closeAt(),
+				5);
+		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(assignmentRepository.save(assignment)).thenReturn(savedAssignment);
+
+		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
+				5L,
+				new UpdateAssignmentCommand(null, null, null, null, 3));
+
+		assertThat(savedAssignment).isNotSameAs(assignment);
+		assertThat(assignment.maxSubmissions()).isEqualTo(3);
+		assertThat(result.maxSubmissions()).isEqualTo(5);
+		verify(assignmentRepository).save(assignment);
 	}
 
 	@Test

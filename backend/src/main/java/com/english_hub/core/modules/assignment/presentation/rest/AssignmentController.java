@@ -4,6 +4,7 @@ import com.english_hub.core.modules.assignment.application.command.CreateAssignm
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentUpdateResult;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.AssignmentDetailResponse;
@@ -14,6 +15,7 @@ import com.english_hub.core.modules.assignment.presentation.rest.dto.CreateAssig
 import com.english_hub.core.modules.assignment.presentation.rest.dto.MessageResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.PaginationResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentRequest;
+import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentStatusRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -72,16 +74,20 @@ public class AssignmentController {
 	}
 
 	@PutMapping("/assignments/{assignmentId}")
-	public ResponseEntity<MessageResponse> updateAssignment(
+	public ResponseEntity<UpdateAssignmentResponse> updateAssignment(
 			@PathVariable long assignmentId,
 			@Valid @RequestBody UpdateAssignmentRequest request) {
-		assignmentService.updateAssignment(assignmentId, new UpdateAssignmentCommand(
-				request.title(),
-				request.description(),
-				request.openAt(),
-				request.closeAt(),
-				request.maxSubmissions()));
-		return ResponseEntity.ok(new MessageResponse("Cập nhật bài tập thành công."));
+		AssignmentUpdateResult result = assignmentService.updateAssignment(
+				assignmentId,
+				new UpdateAssignmentCommand(
+					request.title(),
+					request.description(),
+					request.openAt(),
+					request.closeAt(),
+					request.maxSubmissions()));
+		return ResponseEntity.ok(new UpdateAssignmentResponse(
+				"Cập nhật bài tập thành công.",
+				result.maxSubmissions()));
 	}
 
 	@DeleteMapping("/assignments/{assignmentId}")

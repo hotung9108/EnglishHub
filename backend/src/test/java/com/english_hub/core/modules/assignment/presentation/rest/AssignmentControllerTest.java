@@ -8,6 +8,7 @@ import com.english_hub.core.modules.assignment.application.command.CreateAssignm
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentUpdateResult;
 import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
@@ -18,6 +19,7 @@ import com.english_hub.core.modules.assignment.presentation.rest.dto.CreateAssig
 import com.english_hub.core.modules.assignment.presentation.rest.dto.CreatedAssignmentResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.MessageResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentRequest;
+import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentStatusRequest;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -85,6 +87,7 @@ class AssignmentControllerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody().id()).isEqualTo(5L);
+		assertThat(response.getBody().maxSubmissions()).isEqualTo(2);
 		assertThat(response.getBody().modules()).hasSize(1);
 		assertThat(response.getBody().modules().getFirst().skill()).isEqualTo("READING");
 	}
@@ -92,13 +95,17 @@ class AssignmentControllerTest {
 	@Test
 	void mapsUpdateResponse() {
 		UpdateAssignmentRequest request = new UpdateAssignmentRequest(
-				"Updated", null, null, CLOSE_AT.plusDays(1), null);
+				"Updated", null, null, CLOSE_AT.plusDays(1), 3);
+		when(assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(
+				"Updated", null, null, CLOSE_AT.plusDays(1), 3)))
+				.thenReturn(new AssignmentUpdateResult(3));
 
-		ResponseEntity<MessageResponse> response = assignmentController.updateAssignment(5L, request);
+		ResponseEntity<UpdateAssignmentResponse> response = assignmentController.updateAssignment(5L, request);
 
 		verify(assignmentService).updateAssignment(5L, new UpdateAssignmentCommand(
-				"Updated", null, null, CLOSE_AT.plusDays(1), null));
-		assertThat(response.getBody()).isEqualTo(new MessageResponse("Cập nhật bài tập thành công."));
+				"Updated", null, null, CLOSE_AT.plusDays(1), 3));
+		assertThat(response.getBody()).isEqualTo(
+				new UpdateAssignmentResponse("Cập nhật bài tập thành công.", 3));
 	}
 
 	@Test
