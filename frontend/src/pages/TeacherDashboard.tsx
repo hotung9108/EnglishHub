@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Users, BookOpen, Clock, Sparkles, Plus, 
-  ArrowUpRight, CheckCircle2, TrendingUp, 
+  Users, BookOpen, Clock, Plus, 
+  CheckCircle2, 
   FileText, PenTool, Mic, Headphones, Library,
-  Calendar, Zap, ChevronRight, AlertCircle, Award,
+  ChevronRight, AlertCircle,
   RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -20,6 +20,7 @@ import type {
   TeacherUpcomingDeadline,
   TeacherActivityItem
 } from '../types/teacher-dashboard.types';
+import { Button, EmptyState } from '../components/common';
 import '../styles/teacher-dashboard.css';
 
 interface EnrichedClassData {
@@ -238,6 +239,12 @@ export const TeacherDashboard: React.FC = () => {
     if (selectedSkill === 'all') return pendingSubmissions;
     return pendingSubmissions.filter((item) => item.skill === selectedSkill);
   }, [pendingSubmissions, selectedSkill]);
+
+  // Condensed queue items for concise dashboard overview
+  const MAX_OVERVIEW_QUEUE_ITEMS = 4;
+  const displayedQueue = useMemo(() => {
+    return filteredQueue.slice(0, MAX_OVERVIEW_QUEUE_ITEMS);
+  }, [filteredQueue]);
 
   // Skill counts for tabs
   const queueCounts = useMemo(() => {
@@ -500,46 +507,37 @@ export const TeacherDashboard: React.FC = () => {
       {/* 1. Hero Banner */}
       <section className="teacher-dash-hero">
         <div className="teacher-dash-hero-content">
-          <div className="teacher-dash-badge-wrap">
-            <Sparkles size={14} />
-            <span>{isVi ? 'Học kỳ Hiện Tại • Giảng Viên EnglishHub' : 'Current Term • EnglishHub Instructor'}</span>
-          </div>
           <h1 className="teacher-dash-greeting">
-            {isVi ? `Chào mừng trở lại, ${teacherName}! 👋` : `Welcome back, ${teacherName}! 👋`}
+            {isVi ? `Chào mừng trở lại, ${teacherName}!` : `Welcome back, ${teacherName}!`}
           </h1>
-          <p className="teacher-dash-subgreeting">
-            {isVi 
-              ? `Hiện bạn đang phụ trách ${enrichedClasses.length} lớp học với ${pendingSubmissions.length} bài tập cần chấm duyệt.` 
-              : `You are managing ${enrichedClasses.length} classes with ${pendingSubmissions.length} submissions pending review.`}
-          </p>
         </div>
 
         <div className="teacher-dash-hero-actions">
-          <button 
-            className="teacher-dash-btn-primary"
+          <Button 
+            variant="primary"
+            icon={<Plus size={16} />}
             onClick={() => navigate('/teacher/assignments/create')}
           >
-            <Plus size={16} />
-            <span>{isVi ? 'Giao bài tập mới' : 'Create Assignment'}</span>
-          </button>
-          <button 
-            className="teacher-dash-btn-glass"
-            onClick={() => navigate('/teacher/exam-bank')}
+            {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
+          </Button>
+          <Button 
+            variant="secondary"
+            icon={<Library size={16} />}
+            onClick={() => navigate('/teacher/assignments')}
           >
-            <Library size={16} />
-            <span>{isVi ? 'Kho đề thi & Mẫu' : 'Exam Bank'}</span>
-          </button>
+            {isVi ? 'Quản lý bài tập' : 'Assignments'}
+          </Button>
         </div>
       </section>
 
       {/* Loading Skeleton */}
       {isLoading && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-          <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+        <div className="eh-card p-8 text-center text-muted">
+          <RefreshCw size={36} className="animate-spin mx-auto mb-3 text-primary block" />
+          <h3 className="m-0 text-base font-bold text-surface">
             {isVi ? 'Đang tải dữ liệu thực tế từ hệ thống...' : 'Loading live dashboard metrics...'}
           </h3>
-          <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+          <p className="mt-1 text-xs text-muted">
             {isVi ? 'Đang đồng bộ lớp học, bài tập nộp và điểm số học viên.' : 'Syncing classes, submissions, and performance data.'}
           </p>
         </div>
@@ -547,28 +545,19 @@ export const TeacherDashboard: React.FC = () => {
 
       {/* Error Alert */}
       {!isLoading && error && (
-        <div style={{ 
-          padding: '20px 24px', 
-          backgroundColor: '#fef2f2', 
-          border: '1px solid #fecaca', 
-          borderRadius: '12px', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          gap: '16px' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <AlertCircle size={22} color="#dc2626" />
-            <span style={{ fontSize: '14px', color: '#b91c1c', fontWeight: 600 }}>{error}</span>
+        <div className="adm-alert-error justify-between p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <AlertCircle size={22} className="text-error" />
+            <span className="text-sm text-error font-semibold">{error}</span>
           </div>
-          <button 
-            className="btn btn-secondary bg-white btn-sm"
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw size={14} />}
             onClick={handleRetry}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <RefreshCw size={14} />
-            <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-          </button>
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
         </div>
       )}
 
@@ -577,73 +566,33 @@ export const TeacherDashboard: React.FC = () => {
         <section className="teacher-dash-kpi-grid">
           {/* KPI 1: Active Classes */}
           <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/classes')}>
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
-                <BookOpen size={22} />
-              </div>
-              <span className="teacher-dash-kpi-trend positive">
-                <TrendingUp size={12} /> {enrichedClasses.length > 0 ? '100% On-track' : 'Chưa có lớp'}
-              </span>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{enrichedClasses.length}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Lớp đang giảng dạy' : 'Active Classes'}</div>
-              <div className="teacher-dash-kpi-subtext">{isVi ? 'Được phân công giảng dạy' : 'Assigned teaching load'}</div>
             </div>
           </div>
 
           {/* KPI 2: Total Students */}
           <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon" style={{ backgroundColor: '#faf5ff', color: '#7e22ce' }}>
-                <Users size={22} />
-              </div>
-              <span className="teacher-dash-kpi-trend neutral">
-                <Users size={12} /> {isVi ? 'Sĩ số' : 'Roster'}
-              </span>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{totalStudentsCount}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Tổng số học viên' : 'Enrolled Students'}</div>
-              <div className="teacher-dash-kpi-subtext">
-                {enrichedClasses.length > 0 
-                  ? (isVi ? `TB ${(totalStudentsCount / enrichedClasses.length).toFixed(1)} học viên/lớp` : `Avg ${(totalStudentsCount / enrichedClasses.length).toFixed(1)}/class`)
-                  : (isVi ? '0 học viên' : '0 students')}
-              </div>
             </div>
           </div>
 
           {/* KPI 3: Pending Grading Queue */}
           <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/assignments')}>
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>
-                <Clock size={22} />
-              </div>
-              <span className="teacher-dash-kpi-trend urgent">
-                <AlertCircle size={12} /> {pendingSubmissions.length > 0 ? (isVi ? 'Cần chấm' : 'Action needed') : (isVi ? 'Đã xong' : 'Clear')}
-              </span>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{pendingSubmissions.length}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Bài nộp chờ chấm' : 'Pending Submissions'}</div>
-              <div className="teacher-dash-kpi-subtext">{isVi ? 'Cần giáo viên nhận xét & chấm điểm' : 'Awaiting evaluation'}</div>
             </div>
           </div>
 
           {/* KPI 4: Average Score */}
           <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-                <Award size={22} />
-              </div>
-              <span className={`teacher-dash-kpi-trend ${overallAvgBand !== 'Band 0.0' ? 'positive' : 'neutral'}`}>
-                <ArrowUpRight size={12} /> {overallAvgBand !== 'Band 0.0' ? (isVi ? 'Đang đạt chuẩn' : 'Target Met') : (isVi ? 'Chưa có điểm' : 'No data')}
-              </span>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{overallAvgBand}</div>
-              <div className="teacher-dash-kpi-label">{isVi ? 'Điểm trung bình các lớp' : 'Overall Band Avg'}</div>
-              <div className="teacher-dash-kpi-subtext">{isVi ? 'Mục tiêu khóa: Band 7.0' : 'Target Goal: Band 7.0'}</div>
+              <div className="teacher-dash-kpi-label">{isVi ? 'Điểm trung bình các lớp' : 'Overall Average'}</div>
             </div>
           </div>
         </section>
@@ -653,24 +602,21 @@ export const TeacherDashboard: React.FC = () => {
       {!isLoading && !error && (
         <div className="teacher-dash-main-cols">
           {/* Left Column: Pending Submissions Queue & 4-Skill Matrix */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            {/* Pending Submissions Queue */}
+          <div className="flex flex-col gap-6">
+            {/* Pending Submissions Queue (Condensed Overview) */}
             <section className="teacher-dash-card-section">
               <div className="teacher-dash-section-header">
                 <div className="teacher-dash-section-title-wrap">
-                  <Clock size={20} color="#4f46e5" />
                   <h2 className="teacher-dash-section-title">
                     {isVi ? 'Hàng đợi bài nộp cần chấm & duyệt' : 'Pending Grading & Review Queue'}
                   </h2>
-                  <span className={`teacher-dash-section-badge ${pendingSubmissions.length > 0 ? 'urgent' : ''}`}>
-                    {pendingSubmissions.length} {isVi ? 'bài' : 'items'}
-                  </span>
                 </div>
                 <button 
+                  type="button"
                   className="teacher-dash-link-action"
                   onClick={() => navigate('/teacher/assignments')}
                 >
-                  <span>{isVi ? 'Xem tất cả bài tập' : 'View all assignments'}</span>
+                  <span>{isVi ? 'Xem tất cả' : 'View all'}</span>
                   <ChevronRight size={14} />
                 </button>
               </div>
@@ -678,49 +624,54 @@ export const TeacherDashboard: React.FC = () => {
               {/* Skill Filter Tabs */}
               <div className="teacher-dash-skill-tabs">
                 <button 
+                  type="button"
                   className={`teacher-dash-skill-tab-btn ${selectedSkill === 'all' ? 'active' : ''}`}
                   onClick={() => setSelectedSkill('all')}
                 >
-                  <span>{isVi ? 'Tất cả' : 'All Skills'}</span>
+                  <span>{isVi ? 'Tất cả' : 'All'}</span>
                   <span className="teacher-dash-tab-count">{queueCounts.all}</span>
                 </button>
                 <button 
+                  type="button"
                   className={`teacher-dash-skill-tab-btn ${selectedSkill === 'writing' ? 'active' : ''}`}
                   onClick={() => setSelectedSkill('writing')}
                 >
-                  <PenTool size={13} />
+                  <PenTool size={12} />
                   <span>Writing</span>
                   <span className="teacher-dash-tab-count">{queueCounts.writing}</span>
                 </button>
                 <button 
+                  type="button"
                   className={`teacher-dash-skill-tab-btn ${selectedSkill === 'speaking' ? 'active' : ''}`}
                   onClick={() => setSelectedSkill('speaking')}
                 >
-                  <Mic size={13} />
+                  <Mic size={12} />
                   <span>Speaking</span>
                   <span className="teacher-dash-tab-count">{queueCounts.speaking}</span>
                 </button>
                 <button 
+                  type="button"
                   className={`teacher-dash-skill-tab-btn ${selectedSkill === 'reading' ? 'active' : ''}`}
                   onClick={() => setSelectedSkill('reading')}
                 >
-                  <BookOpen size={13} />
+                  <BookOpen size={12} />
                   <span>Reading</span>
                   <span className="teacher-dash-tab-count">{queueCounts.reading}</span>
                 </button>
                 <button 
+                  type="button"
                   className={`teacher-dash-skill-tab-btn ${selectedSkill === 'listening' ? 'active' : ''}`}
                   onClick={() => setSelectedSkill('listening')}
                 >
-                  <Headphones size={13} />
+                  <Headphones size={12} />
                   <span>Listening</span>
                   <span className="teacher-dash-tab-count">{queueCounts.listening}</span>
                 </button>
               </div>
 
-              {/* Submission Queue Items */}
+              {/* Submission Queue Items (Overview Condensed) */}
               <div className="teacher-dash-queue-list">
-                {filteredQueue.map((item) => (
+                {displayedQueue.map((item) => (
                   <div 
                     key={item.id} 
                     className={`teacher-dash-queue-item ${item.urgency === 'high' ? 'high-urgency' : ''}`}
@@ -744,8 +695,7 @@ export const TeacherDashboard: React.FC = () => {
                           <span>{item.submittedAt}</span>
                           <span>•</span>
                           <span className="teacher-dash-ai-pill">
-                            <Sparkles size={11} />
-                            {isVi ? `AI: ${item.aiPreScore}` : `AI: ${item.aiPreScore}`}
+                            AI: {item.aiPreScore}
                           </span>
                         </div>
                       </div>
@@ -753,25 +703,24 @@ export const TeacherDashboard: React.FC = () => {
 
                     <div className="teacher-dash-queue-actions">
                       <button 
+                        type="button"
                         className="teacher-dash-btn-grade"
                         onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`)}
                       >
-                        <Zap size={13} />
-                        <span>{isVi ? 'Chấm bài' : 'Grade Now'}</span>
+                        <span>{isVi ? 'Chấm bài' : 'Grade'}</span>
                       </button>
                     </div>
                   </div>
                 ))}
 
                 {filteredQueue.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '36px 20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                    <CheckCircle2 size={32} color="#16a34a" style={{ margin: '0 auto 8px auto', display: 'block' }} />
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                      {isVi ? 'Không có bài nộp chờ chấm nào' : 'No submissions waiting in queue'}
-                    </h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#64748b' }}>
-                      {isVi ? 'Tất cả bài tập đã được chấm hoặc học sinh chưa nộp bài mới.' : 'All submissions have been reviewed or none are pending.'}
-                    </p>
+                  <div className="teacher-dash-queue-empty">
+                    <CheckCircle2 size={18} className="text-primary" />
+                    <span>
+                      {isVi 
+                        ? 'Không có bài nộp chờ chấm. Tất cả bài tập đã được chấm hoặc học sinh chưa nộp bài mới.' 
+                        : 'No pending submissions in queue.'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -781,12 +730,12 @@ export const TeacherDashboard: React.FC = () => {
             <section className="teacher-dash-card-section">
               <div className="teacher-dash-section-header">
                 <div className="teacher-dash-section-title-wrap">
-                  <Award size={20} color="#4f46e5" />
                   <h2 className="teacher-dash-section-title">
                     {isVi ? 'Năng lực 4 Kỹ năng (Tổng hợp các lớp)' : '4-Skill Competence Matrix'}
                   </h2>
                 </div>
                 <button 
+                  type="button"
                   className="teacher-dash-link-action"
                   onClick={() => navigate('/teacher/classes')}
                 >
@@ -800,9 +749,9 @@ export const TeacherDashboard: React.FC = () => {
                   <div key={item.skill} className="teacher-dash-skill-box">
                     <div className="teacher-dash-skill-box-top">
                       <span className="teacher-dash-skill-title">
-                        {item.skill === 'writing' && <PenTool size={14} color="#2563eb" />}
+                        {item.skill === 'writing' && <PenTool size={14} className="text-primary" />}
                         {item.skill === 'speaking' && <Mic size={14} color="#9333ea" />}
-                        {item.skill === 'reading' && <BookOpen size={14} color="#16a34a" />}
+                        {item.skill === 'reading' && <BookOpen size={14} className="text-secondary" />}
                         {item.skill === 'listening' && <Headphones size={14} color="#0d9488" />}
                         {item.skillName}
                       </span>
@@ -812,13 +761,13 @@ export const TeacherDashboard: React.FC = () => {
                     </div>
 
                     <div className="teacher-dash-skill-benchmark">
-                      {isVi ? `Mục tiêu chuẩn: Band ${item.benchmark}` : `Benchmark: Band ${item.benchmark}`}
+                      {isVi ? `Mục tiêu chuẩn: ${item.benchmark}` : `Benchmark: ${item.benchmark}`}
                     </div>
 
                     <div className="teacher-dash-progress-track">
                       <div 
                         className={`teacher-dash-progress-bar ${item.skill}`}
-                        style={{ width: `${(item.avgScore / 9.0) * 100}%` }}
+                        style={{ width: `${Math.min(100, Math.round((item.avgScore / 10.0) * 100))}%` }}
                       />
                     </div>
 
@@ -835,11 +784,9 @@ export const TeacherDashboard: React.FC = () => {
             <section className="teacher-dash-card-section">
               <div className="teacher-dash-section-header">
                 <div className="teacher-dash-section-title-wrap">
-                  <BookOpen size={20} color="#4f46e5" />
                   <h2 className="teacher-dash-section-title">
                     {isVi ? 'Tổng quan các Lớp đang phụ trách' : 'My Active Classes Overview'}
                   </h2>
-                  <span className="teacher-dash-section-badge">{classesData.length} {isVi ? 'lớp' : 'classes'}</span>
                 </div>
                 <button 
                   className="teacher-dash-link-action"
@@ -889,8 +836,7 @@ export const TeacherDashboard: React.FC = () => {
                           {cls.pendingGrading} {isVi ? 'bài cần chấm' : 'to grade'}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
-                          <CheckCircle2 size={12} style={{ display: 'inline', marginRight: 3 }} />
+                        <span className="teacher-dash-class-done-badge">
                           {isVi ? 'Đã hoàn tất' : 'All Graded'}
                         </span>
                       )}
@@ -899,14 +845,12 @@ export const TeacherDashboard: React.FC = () => {
                 ))}
 
                 {classesData.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px 20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                    <BookOpen size={32} color="#94a3b8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
-                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                      {isVi ? 'Chưa có lớp học nào được phân công' : 'No classes assigned'}
-                    </h4>
-                    <p style={{ margin: '4px 0 12px 0', fontSize: '12.5px', color: '#64748b' }}>
-                      {isVi ? 'Liên hệ Quản trị viên để được xếp lớp giảng dạy.' : 'Contact administrator to be assigned classes.'}
-                    </p>
+                  <div className="col-span-full">
+                    <EmptyState
+                      icon={BookOpen}
+                      title={isVi ? 'Chưa có lớp học nào được phân công' : 'No classes assigned'}
+                      description={isVi ? 'Liên hệ Quản trị viên để được xếp lớp giảng dạy.' : 'Contact administrator to be assigned classes.'}
+                    />
                   </div>
                 )}
               </div>
@@ -919,7 +863,6 @@ export const TeacherDashboard: React.FC = () => {
             <section className="teacher-dash-card-section">
               <div className="teacher-dash-section-header">
                 <div className="teacher-dash-section-title-wrap">
-                  <Calendar size={18} color="#4f46e5" />
                   <h3 className="teacher-dash-section-title">
                     {isVi ? 'Hạn nộp & Lịch sắp tới' : 'Upcoming Deadlines'}
                   </h3>
@@ -930,11 +873,7 @@ export const TeacherDashboard: React.FC = () => {
                 {upcomingDeadlines.map((item) => (
                   <div key={item.id} className="teacher-dash-deadline-item">
                     <div 
-                      className="teacher-dash-deadline-icon"
-                      style={{ 
-                        backgroundColor: item.status === 'urgent' ? '#fef2f2' : '#eff6ff',
-                        color: item.status === 'urgent' ? '#dc2626' : '#2563eb'
-                      }}
+                      className={`teacher-dash-deadline-icon ${item.status === 'urgent' ? 'urgent' : 'normal'}`}
                     >
                       <FileText size={16} />
                     </div>
@@ -949,7 +888,7 @@ export const TeacherDashboard: React.FC = () => {
                 ))}
 
                 {upcomingDeadlines.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 12px', color: '#64748b', fontSize: '12.5px' }}>
+                  <div className="teacher-dash-widget-empty">
                     {isVi ? 'Không có hạn nộp nào trong thời gian tới.' : 'No upcoming deadlines.'}
                   </div>
                 )}
@@ -960,7 +899,6 @@ export const TeacherDashboard: React.FC = () => {
             <section className="teacher-dash-card-section">
               <div className="teacher-dash-section-header">
                 <div className="teacher-dash-section-title-wrap">
-                  <Zap size={18} color="#4f46e5" />
                   <h3 className="teacher-dash-section-title">
                     {isVi ? 'Hoạt động gần đây' : 'Recent Activity Stream'}
                   </h3>
@@ -971,12 +909,7 @@ export const TeacherDashboard: React.FC = () => {
                 {recentActivities.map((act) => (
                   <div key={act.id} className="teacher-dash-activity-item">
                     <div 
-                      className="teacher-dash-activity-dot"
-                      style={{ 
-                        backgroundColor: 
-                          act.type === 'submission' ? '#2563eb' :
-                          act.type === 'ai_graded' ? '#7e22ce' : '#16a34a'
-                      }}
+                      className={`teacher-dash-activity-dot ${act.type === 'submission' ? 'submission' : act.type === 'ai_graded' ? 'ai_graded' : 'normal'}`}
                     />
                     <div className="teacher-dash-activity-content">
                       <div className="teacher-dash-activity-title">{act.title}</div>
@@ -987,7 +920,7 @@ export const TeacherDashboard: React.FC = () => {
                 ))}
 
                 {recentActivities.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 12px', color: '#64748b', fontSize: '12.5px' }}>
+                  <div className="teacher-dash-widget-empty">
                     {isVi ? 'Chưa có hoạt động mới ghi nhận.' : 'No recent activities recorded.'}
                   </div>
                 )}

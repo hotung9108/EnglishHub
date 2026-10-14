@@ -43,7 +43,7 @@
 }
 
 .tcd-breadcrumb-link:hover {
-  color: #2563eb;
+  color: var(--primary, #1b4d3e);
 }
 
 .tcd-breadcrumb-active {
@@ -85,18 +85,19 @@
 }
 
 .tcd-class-code-badge {
-  background-color: #0f172a;
-  color: #ffffff;
+  background-color: #262320;
+  color: #FAF8F5;
   font-weight: 700;
   font-size: 12px;
   padding: 4px 12px;
   border-radius: 8px;
   letter-spacing: 0.04em;
+  border: 1px solid #3F3A35;
 }
 
 .tcd-target-band-badge {
-  background-color: #eff6ff;
-  color: #1d4ed8;
+  background-color: var(--primary-light, #EAF0E8);
+  color: var(--accent, #1B4D3E);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 12px;
@@ -104,12 +105,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--primary-fixed-dim, #C2D9C5);
 }
 
 .tcd-status-badge-active {
-  background-color: #f0fdf4;
-  color: #16a34a;
+  background-color: var(--secondary-container, #E7F3EC);
+  color: var(--on-secondary-container, #17523F);
   font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
@@ -117,6 +118,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  border: 1px solid var(--secondary-fixed, #B7DEC8);
 }
 
 .tcd-class-title {
@@ -172,7 +174,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background-color: #2563eb;
+  background-color: var(--primary, #1b4d3e);
   color: #ffffff;
   font-weight: 700;
   font-size: 13px;
@@ -181,11 +183,11 @@
   border: none;
   cursor: pointer;
   transition: all 0.15s ease;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(27, 77, 62, 0.25);
 }
 
 .tcd-btn-primary:hover {
-  background-color: #1d4ed8;
+  background-color: var(--primary-hover, #133d30);
   transform: translateY(-1px);
 }
 
@@ -230,14 +232,14 @@
 .tcd-lesson-track {
   width: 100%;
   height: 8px;
-  background-color: #f1f5f9;
+  background-color: var(--surface-container, #e7e5e4);
   border-radius: 9999px;
   overflow: hidden;
 }
 
 .tcd-lesson-bar {
   height: 100%;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  background-color: var(--accent, #1b4d3e);
   border-radius: 9999px;
   transition: width 0.4s ease-out;
 }
@@ -252,20 +254,21 @@
 }
 
 .tcd-kpi-card {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e7e5e4);
   border-radius: 16px;
   padding: 20px 22px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .tcd-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 18px -4px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: var(--shadow-card);
 }
 
 .tcd-kpi-head {
@@ -283,10 +286,10 @@
   justify-content: center;
 }
 
-.tcd-kpi-icon.blue { background-color: #eff6ff; color: #2563eb; }
-.tcd-kpi-icon.green { background-color: #f0fdf4; color: #16a34a; }
-.tcd-kpi-icon.purple { background-color: #faf5ff; color: #7e22ce; }
-.tcd-kpi-icon.amber { background-color: #fffbeb; color: #d97706; }
+.tcd-kpi-icon.blue { background-color: var(--primary-light, #eaf0e8); color: var(--primary, #1b4d3e); }
+.tcd-kpi-icon.green { background-color: var(--secondary-container, #E7F3EC); color: var(--secondary, #17523F); }
+.tcd-kpi-icon.purple { background-color: var(--skill-speaking-bg, #F3EEFA); color: var(--skill-speaking, #5B21B6); }
+.tcd-kpi-icon.amber { background-color: var(--tertiary-container, #FBF4E6); color: var(--tertiary, #8C5E14); }
 
 .tcd-kpi-chip {
   font-size: 11px;
@@ -295,9 +298,9 @@
   border-radius: 12px;
 }
 
-.tcd-kpi-chip.success { background-color: #f0fdf4; color: #16a34a; }
-.tcd-kpi-chip.warning { background-color: #fef2f2; color: #dc2626; }
-.tcd-kpi-chip.info { background-color: #eff6ff; color: #2563eb; }
+.tcd-kpi-chip.success { background-color: var(--secondary-container, #E7F3EC); color: var(--secondary, #17523F); }
+.tcd-kpi-chip.warning { background-color: var(--error-container, #FBEBEB); color: var(--error, #8F2222); }
+.tcd-kpi-chip.info { background-color: var(--primary-light, #eaf0e8); color: var(--primary, #1b4d3e); }
 
 .tcd-kpi-value {
   font-size: 26px;
@@ -371,8 +374,8 @@
 }
 
 .tcd-tab-item.active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
+  color: var(--primary, #1b4d3e);
+  border-bottom-color: var(--primary, #1b4d3e);
   font-weight: 700;
 }
 
@@ -386,8 +389,8 @@
 }
 
 .tcd-tab-item.active .tcd-tab-count {
-  background-color: #eff6ff;
-  color: #2563eb;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
 }
 
 /* --------------------------------------------------------------------------
@@ -439,9 +442,9 @@
 }
 
 .tcd-search-input:focus {
-  border-color: #2563eb;
+  border-color: var(--primary, #1b4d3e);
   background-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.12);
 }
 
 .tcd-filter-pills {
@@ -453,26 +456,28 @@
 
 .tcd-pill-btn {
   padding: 6px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-full);
   font-size: 12.5px;
-  font-weight: 600;
-  border: 1px solid #e2e8f0;
-  background-color: #ffffff;
-  color: #64748b;
+  font-weight: 500;
+  border: none;
+  background-color: transparent;
+  color: var(--on-surface-variant);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   white-space: nowrap;
 }
 
 .tcd-pill-btn:hover {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--surface-dim);
+  color: var(--on-surface);
 }
 
 .tcd-pill-btn.active {
-  background-color: #2563eb;
+  background-color: var(--primary);
   color: #ffffff;
-  border-color: #2563eb;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 6px -1px rgba(27, 77, 62, 0.28);
 }
 
 /* Gradebook Table */
@@ -567,9 +572,9 @@
   min-width: 44px;
 }
 
-.tcd-score-pill.high { background-color: #f0fdf4; color: #16a34a; }
-.tcd-score-pill.medium { background-color: #eff6ff; color: #2563eb; }
-.tcd-score-pill.low { background-color: #fef2f2; color: #dc2626; }
+.tcd-score-pill.high { background-color: var(--secondary-container, #E7F3EC); color: var(--secondary, #17523F); }
+.tcd-score-pill.medium { background-color: var(--primary-light, #eaf0e8); color: var(--primary, #1b4d3e); }
+.tcd-score-pill.low { background-color: var(--error-container, #FBEBEB); color: var(--error, #8F2222); }
 
 .tcd-overall-score {
   font-size: 15px;
@@ -588,9 +593,9 @@
   border-radius: 12px;
 }
 
-.tcd-status-chip.exceed { background-color: #eff6ff; color: #1d4ed8; }
-.tcd-status-chip.ontime { background-color: #f0fdf4; color: #16a34a; }
-.tcd-status-chip.support { background-color: #fef2f2; color: #dc2626; }
+.tcd-status-chip.exceed { background-color: var(--primary-light, #eaf0e8); color: var(--primary, #1b4d3e); }
+.tcd-status-chip.ontime { background-color: var(--secondary-container, #E7F3EC); color: var(--secondary, #17523F); }
+.tcd-status-chip.support { background-color: var(--error-container, #FBEBEB); color: var(--error, #8F2222); }
 
 .tcd-btn-action-icon {
   background: none;
@@ -632,8 +637,8 @@
 }
 
 .tcd-assignment-card:hover {
-  border-color: #93c5fd;
-  box-shadow: 0 6px 16px -2px rgba(37, 99, 235, 0.08);
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: 0 6px 16px -2px rgba(27, 77, 62, 0.1);
   transform: translateY(-2px);
 }
 
@@ -791,8 +796,8 @@
 }
 
 .tcd-syllabus-item.current {
-  border-color: #93c5fd;
-  background-color: #eff6ff;
+  border-color: var(--border-hover, #c2a882);
+  background-color: var(--primary-light, #eaf0e8);
 }
 
 .tcd-syllabus-left {
@@ -816,13 +821,13 @@
 }
 
 .tcd-syllabus-item.current .tcd-session-badge {
-  background-color: #2563eb;
+  background-color: var(--accent, #1B4D3E);
   color: #ffffff;
 }
 
 .tcd-syllabus-item.completed .tcd-session-badge {
-  background-color: #dcfce7;
-  color: #16a34a;
+  background-color: var(--secondary-container, #E7F3EC);
+  color: var(--on-secondary-container, #17523F);
 }
 
 .tcd-syllabus-title-text {

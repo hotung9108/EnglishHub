@@ -37,7 +37,11 @@ export class LoginPage extends BasePage {
     assert.ok(Object.hasOwn(roleLabels, role), 'Login role must be admin, teacher or student');
     const labels = roleLabels[role].map(label => `normalize-space(.)="${label}"`).join(' or ');
     const locator = By.xpath(`//div[contains(concat(' ', normalize-space(@class), ' '), ' login-role-tabs ')]//button[${labels}]`);
-    const tab = await this.visible(locator);
+    const tabs = await this.driver.findElements(locator);
+    if (tabs.length === 0) {
+      return;
+    }
+    const tab = tabs[0];
     await this.driver.wait(until.elementIsEnabled(tab), this.config.timeout);
     await tab.click();
     await this.driver.wait(async () => {

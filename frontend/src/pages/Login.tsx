@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
+import { authService } from '@/api';
 import { 
-  Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, 
-  ShieldCheck, GraduationCap, Users, BookOpen, 
-  CheckCircle2, Globe, AlertCircle, Award, Star
+  Mail, Lock, Eye, EyeOff, ArrowRight, 
+  Globe, AlertCircle 
 } from 'lucide-react';
 
 const LoginForm: React.FC = () => {
@@ -20,23 +20,16 @@ const LoginForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'admin' | 'teacher' | 'student'>('admin');
-
-  const handleRoleSelect = (role: 'admin' | 'teacher' | 'student') => {
-    setSelectedRole(role);
-    setEmail('');
-    setPassword('');
-    setError('');
-  };
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
     try {
-      await login({ email, password });
-      const savedUser = JSON.parse(localStorage.getItem('englishhub_user') || '{}');
-      const actualRole = savedUser?.role || selectedRole;
+      const loggedUser = await login({ email, password });
+      const actualRole = loggedUser?.role || authService.getSavedUser()?.role || 'student';
       const from = location.state?.from?.pathname || '/';
       if (from === '/') {
         if (actualRole === 'admin') navigate('/admin', { replace: true });
@@ -46,264 +39,137 @@ const LoginForm: React.FC = () => {
         navigate(from, { replace: true });
       }
     } catch {
-      setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác' : 'Invalid email or password credentials');
+      setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác.' : 'Invalid email or password credentials.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="login-page-wrapper">
-      {/* Background ambient lighting effects */}
-      <div className="login-ambient-orb-1"></div>
-      <div className="login-ambient-orb-2"></div>
+      {/* Top Navigation: Language Toggle */}
+      <nav className="login-top-nav">
+        <button
+          type="button"
+          className="login-lang-pill"
+          onClick={toggleLanguage}
+          title={isVi ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+        >
+          <Globe size={14} />
+          <span>{isVi ? 'Tiếng Việt' : 'English'}</span>
+        </button>
+      </nav>
 
+      {/* Main Centered Academic Focus Card */}
       <main className="login-card-container">
-        {/* Left Side: Brand Showcase & Features */}
-        <div className="login-left-showcase">
-          <div>
-            {/* Logo */}
-            <div className="login-brand-logo">
-              <div className="login-logo-icon">
-                <GraduationCap size={26} strokeWidth={2.4} />
-              </div>
-              <div>
-                <div className="login-brand-name">EnglishHub</div>
-                <div className="login-brand-tag">IELTS & Academic Platform</div>
-              </div>
-            </div>
-
-            {/* Hero Copy */}
-            <h1 className="login-hero-title">
-              {isVi ? (
-                <>
-                  Học tập & Đánh giá Tiếng Anh <span>chuẩn Quốc tế cùng AI</span>
-                </>
-              ) : (
-                <>
-                  Next-Generation <span>AI-Assisted</span> English Assessment
-                </>
-              )}
-            </h1>
-            <p className="login-hero-desc">
-              {isVi
-                ? 'Nền tảng đồng bộ dành cho Nhà trường, Giảng viên và Học viên với công nghệ chấm thi AI 4 kỹ năng Listening - Speaking - Reading - Writing.'
-                : 'Comprehensive educational ecosystem powering automated rubric evaluation, real-time acoustics, and targeted remediation.'}
-            </p>
-
-            {/* Feature Badges */}
-            <div className="login-features-list">
-              <div className="login-feature-item">
-                <div className="login-feature-icon">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h2 className="login-feature-text-title">
-                    {isVi ? 'AI Chấm Điểm 4 Kỹ Năng' : 'AI Multi-Skill Evaluation'}
-                  </h2>
-                  <p className="login-feature-text-sub">
-                    {isVi ? 'Đánh giá tự động theo chuẩn tiêu chí Band Descriptors của British Council & IDP.' : 'Automated grading calibrated with official IELTS descriptors.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="login-feature-item">
-                <div className="login-feature-icon login-feature-icon-purple">
-                  <Award size={18} />
-                </div>
-                <div>
-                  <h2 className="login-feature-text-title">
-                    {isVi ? 'Phân Tích Âm Vị & Ngữ Điệu Thời Gian Thực' : 'Real-Time Acoustic Diagnostic'}
-                  </h2>
-                  <p className="login-feature-text-sub">
-                    {isVi ? 'Nhận diện phát âm sai, nối âm và độ ngắt nghỉ trôi chảy của bài nói Speaking.' : 'Speech-to-text phoneme precision and fluency rhythm tracking.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="login-feature-item">
-                <div className="login-feature-icon login-feature-icon-green">
-                  <CheckCircle2 size={18} />
-                </div>
-                <div>
-                  <h2 className="login-feature-text-title">
-                    {isVi ? 'Lộ Trình Ôn Luyện Cá Nhân Hóa' : 'Adaptive Diagnostic Roadmap'}
-                  </h2>
-                  <p className="login-feature-text-sub">
-                    {isVi ? 'Phát hiện lỗ hổng kiến thức và đề xuất bài tập khắc phục trực tiếp.' : 'Pinpoint cognitive traps and generate customized remedial drills.'}
-                  </p>
-                </div>
-              </div>
-            </div>
+        {/* Brand Header */}
+        <div className="login-brand-header">
+          <div className="login-logo-emblem">
+            <img src="/logo-icon.png" alt="EnglishHub Logo" className="login-logo-img" />
           </div>
-
-          {/* Testimonial Quote */}
-          <div className="login-testimonial">
-            <div className="login-testimonial-stars">
-              <Star size={13} fill="#facc15" />
-              <Star size={13} fill="#facc15" />
-              <Star size={13} fill="#facc15" />
-              <Star size={13} fill="#facc15" />
-              <Star size={13} fill="#facc15" />
-              <span className="login-testimonial-rating">5.0 Rating</span>
-            </div>
-            <p className="login-testimonial-quote">
-              {isVi 
-                ? '"Hệ thống gợi ý sửa lỗi phát âm và bài viết IELTS giúp em tăng từ Band 6.5 lên 7.5 chỉ sau 2 tháng luyện tập!"' 
-                : '"The AI sentence annotation and teacher feedback helped me advance from Band 6.5 to 7.5 in 2 months!"'}
-            </p>
-            <div className="login-testimonial-author">
-              — Alice Johnson (IELTS 8.0 Candidate)
-            </div>
-          </div>
+          <h1 className="login-brand-name">EnglishHub</h1>
+          <p className="login-form-subtitle">
+            {isVi ? 'Đăng nhập vào tài khoản của bạn' : 'Sign in to your account'}
+          </p>
         </div>
 
-        {/* Right Side: Login Form */}
-        <div className="login-right-form-wrap">
-          <div>
-            {/* Top Bar: Language Switcher */}
-            <div className="login-top-bar">
-              <button
-                type="button"
-                className="login-lang-btn"
-                onClick={toggleLanguage}
-              >
-                <Globe size={14} color="#2563eb" />
-                <span>{isVi ? 'Tiếng Việt (VN)' : 'English (US)'}</span>
-              </button>
+        {/* Error Alert Box */}
+        {error && (
+          <div className="login-error-box" role="alert">
+            <AlertCircle size={16} className="flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Form Fields */}
+        <form onSubmit={handleLogin} className="login-form">
+          {/* Email */}
+          <div className="login-input-group">
+            <label className="login-input-label" htmlFor="login-email">
+              Email
+            </label>
+            <div className="login-input-wrapper">
+              <Mail size={16} className="login-input-icon" />
+              <input
+                id="login-email"
+                type="email"
+                className="login-input-field"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@eh.com"
+                required
+                autoComplete="email"
+                autoFocus
+              />
             </div>
-
-            {/* Form Title */}
-            <div className="login-form-title">
-              <h2>
-                {isVi ? 'Đăng Nhập Tài Khoản' : 'Welcome to EnglishHub'}
-              </h2>
-              <p>
-                {isVi 
-                  ? 'Chọn vai trò demo hoặc nhập thông tin đăng nhập của bạn.' 
-                  : 'Select a demo role or enter your credentials to access the portal.'}
-              </p>
-            </div>
-
-            {/* Quick Demo Role Tabs */}
-            <div className="login-role-tabs">
-              <button
-                type="button"
-                className={`login-role-tab ${selectedRole === 'admin' ? 'active' : ''}`}
-                onClick={() => handleRoleSelect('admin')}
-              >
-                <ShieldCheck size={15} />
-                <span>Admin</span>
-              </button>
-              <button
-                type="button"
-                className={`login-role-tab ${selectedRole === 'teacher' ? 'active' : ''}`}
-                onClick={() => handleRoleSelect('teacher')}
-              >
-                <Users size={15} />
-                <span>{isVi ? 'Giáo viên' : 'Teacher'}</span>
-              </button>
-              <button
-                type="button"
-                className={`login-role-tab ${selectedRole === 'student' ? 'active' : ''}`}
-                onClick={() => handleRoleSelect('student')}
-              >
-                <BookOpen size={15} />
-                <span>{isVi ? 'Học viên' : 'Student'}</span>
-              </button>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="login-error-box">
-                <AlertCircle size={18} className="flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Form Fields */}
-            <form onSubmit={handleLogin}>
-              {/* Email */}
-              <div className="login-input-group">
-                <label className="login-input-label">
-                  <span>{isVi ? 'Địa chỉ Email' : 'Email Address'}</span>
-                  <span className="login-role-hint">
-                    {selectedRole === 'admin' && (isVi ? 'Quyền: Quản trị viên' : 'Role: Administrator')}
-                    {selectedRole === 'teacher' && (isVi ? 'Quyền: Giảng viên' : 'Role: Teacher')}
-                    {selectedRole === 'student' && (isVi ? 'Quyền: Học viên' : 'Role: Student')}
-                  </span>
-                </label>
-                <div className="login-input-wrapper">
-                  <Mail size={16} className="login-input-icon" />
-                  <input
-                    type="email"
-                    className="login-input-field"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="yourname@eh.com"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="login-input-group">
-                <div className="login-input-label">
-                  <span>{isVi ? 'Mật khẩu' : 'Password'}</span>
-                  <Link 
-                    to="/forgot-password" 
-                    className="login-forgot-link"
-                  >
-                    {isVi ? 'Quên mật khẩu?' : 'Forgot password?'}
-                  </Link>
-                </div>
-                <div className="login-input-wrapper">
-                  <Lock size={16} className="login-input-icon" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    className="login-input-field"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="login-pwd-toggle"
-                    onClick={() => setShowPassword(!showPassword)}
-                    title={showPassword ? (isVi ? 'Ẩn mật khẩu' : 'Hide password') : (isVi ? 'Hiện mật khẩu' : 'Show password')}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember Me */}
-              <div className="login-remember-row">
-                <label className="login-remember-label">
-                  <input 
-                    type="checkbox" 
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="login-remember-checkbox"
-                  />
-                  <span>{isVi ? 'Ghi nhớ đăng nhập trên thiết bị này' : 'Remember me on this device'}</span>
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <button type="submit" className="login-submit-btn">
-                <span>{isVi ? 'ĐĂNG NHẬP HỆ THỐNG' : 'SIGN IN TO PORTAL'}</span>
-                <ArrowRight size={17} />
-              </button>
-            </form>
           </div>
 
-          {/* Footer Security Badge */}
-          <div className="login-footer">
-            <ShieldCheck size={14} color="#10b981" />
-            <span>{isVi ? 'Bảo mật chuẩn SSL 256-Bit • Tích hợp AI Chấm Thi EnglishHub' : '256-Bit SSL Encrypted • Powered by EnglishHub AI Engine'}</span>
+          {/* Password */}
+          <div className="login-input-group">
+            <div className="login-label-row">
+              <label className="login-input-label" htmlFor="login-password">
+                {isVi ? 'Mật khẩu' : 'Password'}
+              </label>
+              <Link 
+                to="/forgot-password" 
+                className="login-forgot-link"
+              >
+                {isVi ? 'Quên mật khẩu?' : 'Forgot password?'}
+              </Link>
+            </div>
+            <div className="login-input-wrapper">
+              <Lock size={16} className="login-input-icon" />
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                className="login-input-field"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="login-pwd-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                title={showPassword ? (isVi ? 'Ẩn mật khẩu' : 'Hide password') : (isVi ? 'Hiện mật khẩu' : 'Show password')}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
-        </div>
+
+          {/* Remember Me */}
+          <div className="login-remember-row">
+            <label className="login-remember-label">
+              <input 
+                type="checkbox" 
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="login-remember-checkbox"
+              />
+              <span>{isVi ? 'Ghi nhớ đăng nhập' : 'Remember me'}</span>
+            </label>
+          </div>
+
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            className="login-submit-btn" 
+            disabled={isSubmitting}
+          >
+            <span>{isSubmitting ? (isVi ? 'Đang xác thực...' : 'Authenticating...') : (isVi ? 'Đăng nhập' : 'Sign in')}</span>
+            <ArrowRight size={16} />
+          </button>
+        </form>
       </main>
+
+      {/* Page Footer */}
+      <footer className="login-page-footer">
+        <span>© 2026 EnglishHub</span>
+      </footer>
     </div>
   );
 };

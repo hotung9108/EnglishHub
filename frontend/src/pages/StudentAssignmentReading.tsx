@@ -3,13 +3,16 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, BookOpen, 
   Timer, Bookmark, Highlighter, 
-  ChevronLeft, AlertCircle, RefreshCw, Loader2, CheckCircle2
+  ChevronLeft, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { questionService, extractMcqOptions, type QuestionResponse } from '../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/common/Button';
+import { Skeleton } from '../components/common/Skeleton';
+import '../styles/student-exam.css';
 
 const StudentAssignmentReading: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -224,34 +227,30 @@ const StudentAssignmentReading: React.FC = () => {
   const currentQuestionItem = questions[activeQuestion - 1] || questions[0];
 
   return (
-    <div style={{ 
-      margin: 'calc(var(--margin-desktop, 40px) * -1)',
-      display: 'flex', 
-      flexDirection: 'column', 
-      backgroundColor: '#F8FAFC'
-    }}>
+    <div className="exam-page">
       {/* Page Header */}
-      <div style={{ padding: '16px 24px', backgroundColor: 'white', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-          <button 
-            type="button"
+      <div className="exam-header">
+        <div className="exam-header-left">
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={ArrowLeft}
             onClick={() => navigate('/student/assignments')}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', color: '#475569', fontWeight: 500, cursor: 'pointer' }}
           >
-            <ArrowLeft size={16} /> Quay lại danh sách bài tập
-          </button>
+            Quay lại danh sách bài tập
+          </Button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#64748B' }}>
+          <div className="exam-breadcrumbs">
             <span>Hệ thống</span> <ChevronRight size={14} />
             <span>Lớp học</span> <ChevronRight size={14} />
-            <span style={{ color: '#2563EB', fontWeight: 500 }}>
+            <span className="exam-breadcrumbs-current">
               {assignment?.title || `Reading Practice #${id}`}
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 14px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '20px', color: '#DC2626', fontWeight: 600, fontSize: '14px' }}>
+        <div className="exam-header-right">
+          <div className="exam-timer-badge">
             <Timer size={16} />
             <span>40:00</span>
           </div>
@@ -259,77 +258,79 @@ const StudentAssignmentReading: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+        <div className="exam-alert-error">
+          <div className="exam-alert-msg">
             <AlertCircle size={20} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span>{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
+            icon={RefreshCw}
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
           >
-            <RefreshCw size={13} /> Thử lại
-          </button>
+            Thử lại
+          </Button>
         </div>
       )}
 
       {successMessage && (
-        <div style={{ margin: '16px 24px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
-          <CheckCircle2 size={20} />
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+        <div className="exam-alert-success">
+          <AlertCircle size={20} />
+          <span>{successMessage}</span>
         </div>
       )}
 
       {/* Main 2-Column Split Workspace */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 480px', flex: 1, minHeight: 'calc(100vh - 128px)' }}>
+      <div className="exam-workspace-grid">
         {/* Left Column: Reading Passage */}
-        <div style={{ borderRight: '1px solid #E2E8F0', backgroundColor: 'white', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 32px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FAFAFA' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <BookOpen size={18} color="#2563EB" />
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#1E293B' }}>READING PASSAGE</span>
+        <div className="exam-pane-left">
+          <div className="exam-passage-header">
+            <div className="exam-passage-label">
+              <BookOpen size={18} />
+              <span>READING PASSAGE</span>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                type="button"
-                style={{ padding: '6px 12px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '6px', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            <div>
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={Highlighter}
               >
-                <Highlighter size={14} /> Highlight
-              </button>
+                Highlight
+              </Button>
             </div>
           </div>
 
-          <div style={{ padding: '32px', overflowY: 'auto', flex: 1 }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#0F172A', marginBottom: '8px' }}>
+          <div className="exam-passage-body">
+            <h1 className="exam-passage-title">
               {assignment?.title || 'Bài đọc'}
             </h1>
-            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px', fontStyle: 'italic' }}>
+            <p className="exam-passage-subtitle">
               {totalQuestions > 0 ? `Đọc đoạn văn sau và trả lời các câu hỏi từ 1 đến ${totalQuestions}.` : 'Đọc đoạn văn sau.'}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="exam-passage-paragraphs">
               {moduleDetail?.instructions ? (
                 moduleDetail.instructions
                   .split('\n\n')
                   .filter((p: string) => p.trim())
                   .map((paragraph: string, index: number) => (
-                    <div key={index} style={{ marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <span style={{ padding: '2px 8px', backgroundColor: '#EFF6FF', color: '#2563EB', fontSize: '11px', fontWeight: 700, borderRadius: '4px' }}>
+                    <div key={index} className="exam-paragraph-item">
+                      <div className="exam-paragraph-header">
+                        <span className="exam-paragraph-tag">
                           PARAGRAPH {index + 1}
                         </span>
                       </div>
-                      <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', textAlign: 'justify', margin: 0, whiteSpace: 'pre-line' }}>
+                      <p className="exam-paragraph-text">
                         {paragraph}
                       </p>
                     </div>
                   ))
               ) : (
-                <div style={{ textAlign: 'center', padding: '48px 16px', color: '#64748B' }}>
-                  <BookOpen size={40} style={{ margin: '0 auto 12px', color: '#94A3B8' }} />
-                  <p style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>Chưa có nội dung bài đọc</p>
-                  <span style={{ fontSize: '13px' }}>Nội dung bài đọc chưa được cập nhật cho phần thi này.</span>
+                <div className="exam-empty-box">
+                  <BookOpen size={40} className="exam-empty-icon" />
+                  <p className="exam-empty-title">Chưa có nội dung bài đọc</p>
+                  <span className="exam-empty-desc">Nội dung bài đọc chưa được cập nhật cho phần thi này.</span>
                 </div>
               )}
             </div>
@@ -337,19 +338,19 @@ const StudentAssignmentReading: React.FC = () => {
         </div>
 
         {/* Right Column: Questions */}
-        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: '#F8FAFC' }}>
-          <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', backgroundColor: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: totalQuestions > 0 ? '16px' : 0 }}>
+        <div className="exam-pane-right">
+          <div className="exam-questions-header">
+            <div className="exam-questions-meta">
               <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 4px 0' }}>
+                <h2 className="exam-questions-title">
                   Danh sách câu hỏi {totalQuestions > 0 ? `(1 - ${totalQuestions})` : ''}
                 </h2>
-                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                <span className="exam-questions-hint">
                   {totalQuestions > 0 ? 'Chọn đáp án đúng nhất cho từng câu' : 'Chưa có câu hỏi nào được gán'}
                 </span>
               </div>
               {totalQuestions > 0 && (
-                <div style={{ padding: '6px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px', color: '#2563EB', fontSize: '14px', fontWeight: 600 }}>
+                <div className="exam-progress-badge">
                   {answeredCount} / {totalQuestions} đã làm
                 </div>
               )}
@@ -357,39 +358,26 @@ const StudentAssignmentReading: React.FC = () => {
 
             {/* Question Navigator */}
             {totalQuestions > 0 && (
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div className="exam-nav-grid">
                 {questions.map((_, i) => {
                   const qId = i + 1;
                   const isAnswered = !!selectedAnswers[qId];
                   const isBookmarked = bookmarkedQuestions[qId];
                   const isActive = activeQuestion === qId;
                   
-                  let bgColor = '#F1F5F9';
-                  let textColor = '#475569';
-
-                  if (isActive) {
-                    bgColor = '#2563EB';
-                    textColor = 'white';
-                  } else if (isBookmarked) {
-                    bgColor = '#FEF08A';
-                    textColor = '#A16207';
-                  } else if (isAnswered) {
-                    bgColor = '#DBEAFE';
-                    textColor = '#1D4ED8';
-                  }
+                  const btnClasses = [
+                    'exam-nav-btn',
+                    isActive ? 'is-active' : '',
+                    isBookmarked ? 'is-bookmarked' : '',
+                    !isActive && !isBookmarked && isAnswered ? 'is-answered' : ''
+                  ].filter(Boolean).join(' ');
 
                   return (
                     <button 
                       key={qId}
                       type="button"
                       onClick={() => setActiveQuestion(qId)}
-                      style={{ 
-                        width: '36px', height: '36px', borderRadius: '6px', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none',
-                        backgroundColor: bgColor, color: textColor,
-                        transition: 'all 0.2s'
-                      }}
+                      className={btnClasses}
                     >
                       {qId}
                     </button>
@@ -399,44 +387,45 @@ const StudentAssignmentReading: React.FC = () => {
             )}
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+          <div className="exam-questions-body">
             {isLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ height: 100, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
-                <div style={{ height: 60, borderRadius: 8, backgroundColor: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+              <div className="exam-skeleton-group">
+                <Skeleton height={100} borderRadius={8} />
+                <Skeleton height={60} borderRadius={8} />
               </div>
             ) : totalQuestions === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 16px', color: '#64748B' }}>
-                <BookOpen size={40} style={{ margin: '0 auto 12px', color: '#94A3B8' }} />
-                <p style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>Chưa có câu hỏi cho bài đọc này</p>
-                <span style={{ fontSize: '13px' }}>Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
+              <div className="exam-empty-box">
+                <BookOpen size={40} className="exam-empty-icon" />
+                <p className="exam-empty-title">Chưa có câu hỏi cho bài đọc này</p>
+                <span className="exam-empty-desc">Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
               </div>
             ) : currentQuestionItem ? (
-              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#2563EB', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
+              <div className="exam-question-card">
+                <div className="exam-question-top">
+                  <div className="exam-question-type-wrap">
+                    <span className="exam-question-number-badge">
                       {activeQuestion}
                     </span>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase' }}>
+                    <span className="exam-question-type-badge">
                       {currentQuestionItem.questionType}
                     </span>
                   </div>
                   <button 
                     type="button"
                     onClick={() => toggleBookmark(activeQuestion)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: bookmarkedQuestions[activeQuestion] ? '#EAB308' : '#94A3B8' }}
+                    className={`exam-bookmark-btn ${bookmarkedQuestions[activeQuestion] ? 'is-active' : ''}`}
+                    aria-label="Đánh dấu câu hỏi"
                   >
                     <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
                   </button>
                 </div>
 
-                <p style={{ fontSize: '15px', fontWeight: 600, color: '#1E293B', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+                <p className="exam-question-prompt">
                   {currentQuestionItem.content}
                 </p>
 
                 {/* Options */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="exam-options-group">
                   {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
                     const isSelected = selectedAnswers[activeQuestion] === optKey;
                     const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
@@ -451,20 +440,13 @@ const StudentAssignmentReading: React.FC = () => {
                       <label 
                         key={optKey}
                         onClick={() => handleSelectAnswer(activeQuestion, optKey)}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '14px 16px',
-                          borderRadius: '8px', border: `1px solid ${isSelected ? '#2563EB' : '#E2E8F0'}`,
-                          backgroundColor: isSelected ? '#EFF6FF' : 'white', cursor: 'pointer', transition: 'all 0.15s'
-                        }}
+                        className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
                       >
-                        <div style={{
-                          width: '18px', height: '18px', borderRadius: '50%', border: `2px solid ${isSelected ? '#2563EB' : '#CBD5E1'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px', backgroundColor: 'white'
-                        }}>
-                          {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB' }}></div>}
+                        <div className="exam-radio-indicator">
+                          {isSelected && <div className="exam-radio-dot" />}
                         </div>
-                        <div style={{ fontSize: '14px', color: '#334155', lineHeight: '1.5' }}>
-                          <strong style={{ color: '#1E293B' }}>{optKey}.</strong> {optText}
+                        <div className="exam-option-content">
+                          <strong className="exam-option-key">{optKey}.</strong> {optText}
                         </div>
                       </label>
                     );
@@ -475,51 +457,35 @@ const StudentAssignmentReading: React.FC = () => {
           </div>
 
           {/* Right Column Footer */}
-          <div style={{ padding: '16px 24px', backgroundColor: 'white', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                type="button"
+          <div className="exam-pane-footer">
+            <div className="exam-pane-footer-nav">
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={ChevronLeft}
                 onClick={() => setActiveQuestion(Math.max(1, activeQuestion - 1))}
-                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                <ChevronLeft size={16} /> Câu trước
-              </button>
-              <button 
-                type="button"
+                Câu trước
+              </Button>
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={ChevronRight}
+                iconPosition="right"
                 onClick={() => setActiveQuestion(Math.min(totalQuestions, activeQuestion + 1))}
-                style={{ padding: '8px 14px', border: '1px solid #E2E8F0', backgroundColor: 'white', borderRadius: '8px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
               >
-                Câu sau <ChevronRight size={16} />
-              </button>
+                Câu sau
+              </Button>
             </div>
 
-            <button 
-              type="button"
+            <Button 
+              variant="primary"
+              size="md"
+              loading={isSubmitting}
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              style={{
-                padding: '10px 28px',
-                border: 'none',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                opacity: isSubmitting ? 0.7 : 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Đang nộp bài...
-                </>
-              ) : (
-                'Hoàn thành & Nộp bài'
-              )}
-            </button>
+              Hoàn thành & Nộp bài
+            </Button>
           </div>
         </div>
       </div>

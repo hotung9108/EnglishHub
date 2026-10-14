@@ -145,41 +145,26 @@ export const AdminClassArchive: React.FC = () => {
     <div className="adm-container">
       {/* Header */}
       <div className="adm-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div className="flex items-center gap-3.5">
           <button 
             type="button"
-            className="btn btn-secondary" 
+            className="btn btn-secondary adm-btn-back" 
             onClick={() => navigate('/admin/classes')}
-            style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <ArrowLeft size={16} />
             <span>{t('classArchive.btnBack')}</span>
           </button>
           <div className="adm-title-group">
             <h1 className="adm-title">
-              <Archive size={26} color="var(--primary)" />
               <span>{t('classArchive.title')}</span>
               <span className="adm-title-badge">Historical Records</span>
             </h1>
-            <p className="adm-subtitle">
-              {t('classArchive.subtitle')}
-            </p>
           </div>
         </div>
       </div>
 
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
+        <div className="adm-alert-error mb-5">
           <AlertCircle size={18} />
           <span>{error}</span>
         </div>
@@ -190,7 +175,7 @@ export const AdminClassArchive: React.FC = () => {
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <span className="adm-kpi-title">{isVi ? 'TỔNG LỚP ĐÃ KẾT KHÓA' : 'CONCLUDED COURSES'}</span>
-            <div className="adm-kpi-icon-wrapper" style={{ backgroundColor: 'rgba(37, 99, 235, 0.1)', color: 'var(--primary)' }}>
+            <div className="adm-kpi-icon-wrapper adm-kpi-icon-primary">
               <Archive size={18} />
             </div>
           </div>
@@ -206,12 +191,12 @@ export const AdminClassArchive: React.FC = () => {
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <span className="adm-kpi-title">{isVi ? 'TỔNG SỐ LỚP LƯU TRỮ' : 'TOTAL ARCHIVED'}</span>
-            <div className="adm-kpi-icon-wrapper" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+            <div className="adm-kpi-icon-wrapper adm-kpi-icon-success">
               <Award size={18} />
             </div>
           </div>
           <div className="adm-kpi-value-row">
-            <span className="adm-kpi-value" style={{ color: '#16a34a' }}>{classes.length}</span>
+            <span className="adm-kpi-value text-emerald-600">{classes.length}</span>
             <span className="adm-kpi-badge positive">Archived</span>
           </div>
           <div className="adm-kpi-footer">
@@ -222,12 +207,12 @@ export const AdminClassArchive: React.FC = () => {
         <div className="adm-kpi-card">
           <div className="adm-kpi-header">
             <span className="adm-kpi-title">{isVi ? 'LỚP ĐÃ HỦY' : 'CANCELLED ENROLLMENTS'}</span>
-            <div className="adm-kpi-icon-wrapper" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' }}>
+            <div className="adm-kpi-icon-wrapper adm-kpi-icon-danger">
               <XCircle size={18} />
             </div>
           </div>
           <div className="adm-kpi-value-row">
-            <span className="adm-kpi-value" style={{ color: '#dc2626' }}>{cancelledCount}</span>
+            <span className="adm-kpi-value text-rose-600">{cancelledCount}</span>
             <span className="adm-kpi-badge neutral">Cancelled</span>
           </div>
           <div className="adm-kpi-footer">
@@ -238,21 +223,20 @@ export const AdminClassArchive: React.FC = () => {
 
       {/* Filter and Search Bar */}
       <div className="adm-filter-bar">
-        <div style={{ display: 'flex', gap: '12px', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-            <Search size={16} className="text-on-surface-variant" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+        <div className="flex-1 min-w-[280px]">
+          <div className="adm-search-wrap">
+            <Search size={16} className="adm-search-icon" />
             <input 
               type="text" 
-              className="input" 
+              className="adm-search-input" 
               placeholder={t('classArchive.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '100%', paddingLeft: '36px' }}
             />
           </div>
         </div>
 
-        <div className="adm-pills" style={{ margin: 0 }}>
+        <div className="adm-pills m-0">
           {(
             [
               { key: 'ALL', label: isVi ? 'Tất cả trạng thái' : 'All Statuses' },
@@ -279,29 +263,29 @@ export const AdminClassArchive: React.FC = () => {
             <h3 className="adm-table-title">
               {isVi ? 'Danh Sách Lớp Học Đã Lưu Trữ' : 'Archived Classrooms'}
             </h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <p className="mt-1 mb-0 text-[13px] text-on-surface-variant">
               {isVi ? `Hiển thị ${filtered.length} lớp học trong kho lưu trữ` : `Showing ${filtered.length} archived classrooms`}
             </p>
           </div>
         </div>
 
         {loading ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <div className="adm-loading-state">
+            <Loader2 size={32} className="animate-spin adm-loading-state-icon" />
             <div>{isVi ? 'Đang tải kho lưu trữ...' : 'Loading archive...'}</div>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <Archive size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-            <div style={{ fontSize: '15px', fontWeight: 600 }}>
+          <div className="adm-empty-state-card">
+            <Archive size={36} className="adm-empty-state-icon" />
+            <div className="text-[15px] font-semibold text-on-surface">
               {isVi ? 'Kho lưu trữ hiện chưa có lớp học nào' : 'No archived classes found'}
             </div>
-            <div style={{ fontSize: '13px', marginTop: '4px' }}>
+            <div className="text-[13px] text-on-surface-variant mt-1">
               {isVi ? 'Các lớp học khi hoàn thành khóa hoặc đóng sẽ hiển thị tại đây.' : 'Classes will appear here once they conclude or are archived.'}
             </div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="overflow-x-auto">
             <table className="adm-table">
               <thead>
                 <tr>
@@ -311,60 +295,58 @@ export const AdminClassArchive: React.FC = () => {
                   <th>{isVi ? 'SĨ SỐ' : 'STUDENTS'}</th>
                   <th>{isVi ? 'NGÀY KẾT THÚC' : 'CONCLUDED DATE'}</th>
                   <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                  <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((cls) => (
                   <tr key={cls.id}>
                     <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                    <td className="font-medium" style={{ fontSize: '14.5px' }}>{cls.name}</td>
+                    <td className="font-medium text-[14.5px]">{cls.name}</td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div className="flex items-center gap-1.5">
                         <User size={14} className="text-on-surface-variant" />
                         <span>{cls.teacher}</span>
                       </div>
                     </td>
                     <td>
-                      <span className="adm-badge" style={{ backgroundColor: 'var(--surface-container-high)', color: 'var(--on-surface)' }}>
-                        <GraduationCap size={12} style={{ marginRight: '4px' }} />
+                      <span className="adm-badge adm-badge-neutral">
+                        <GraduationCap size={12} className="mr-1" />
                         {cls.enrolledStudents} {isVi ? 'học viên' : 'students'}
                       </span>
                     </td>
-                    <td className="text-on-surface-variant font-mono" style={{ fontSize: '13px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <td className="text-on-surface-variant font-mono text-[13px]">
+                      <div className="flex items-center gap-1.5">
                         <Calendar size={13} />
                         <span>{cls.completedDate}</span>
                       </div>
                     </td>
                     <td>
                       {cls.status === 'COMPLETED' ? (
-                        <span className="adm-badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="adm-badge badge-active inline-flex items-center gap-1">
                           <CheckCircle2 size={12} /> {isVi ? 'Đã hoàn thành' : 'Completed'}
                         </span>
                       ) : (
-                        <span className="adm-badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="adm-badge badge-warning inline-flex items-center gap-1">
                           <XCircle size={12} /> {isVi ? 'Đã hủy' : 'Cancelled'}
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <td className="text-right">
+                      <div className="flex gap-2 justify-end">
                         <button 
                           type="button"
-                          className="btn btn-secondary btn-sm"
+                          className="btn btn-secondary btn-sm px-2.5 py-1.5"
                           onClick={() => handleExport(cls.code)}
                           title={t('classArchive.btnExport')}
-                          style={{ padding: '6px 10px' }}
                         >
                           <Download size={14} />
                         </button>
                         <button 
                           type="button"
-                          className="btn btn-secondary btn-sm"
+                          className="btn btn-secondary btn-sm px-2.5 py-1.5"
                           onClick={() => handleRestore(cls)}
                           title={t('classArchive.btnRestore')}
-                          style={{ padding: '6px 10px' }}
                         >
                           <RotateCcw size={14} />
                         </button>

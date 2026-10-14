@@ -12,9 +12,7 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  Layout,
-  History,
-  Library
+  History
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -38,17 +36,21 @@ export interface MenuSection {
 }
 
 const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   
   // Default to admin if no user is found for some reason
   const role = user?.role || 'admin';
 
-  const portalLabels: Record<string, string> = {
-    admin: t('adminPortal'),
-    teacher: t('teacherPortal'),
-    student: t('studentPortal'),
+  const roleLabels: Record<string, { vi: string; en: string }> = {
+    admin: { vi: 'Quản trị viên', en: 'Admin' },
+    teacher: { vi: 'Giáo viên', en: 'Teacher' },
+    student: { vi: 'Học viên', en: 'Student' },
   };
+
+  const currentRoleLabel = language === 'vi'
+    ? (roleLabels[role]?.vi || 'Học viên')
+    : (roleLabels[role]?.en || 'Student');
 
   const menuSections: Record<string, MenuSection[]> = {
     admin: [
@@ -61,15 +63,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {
         title: t('sectionManagement'),
         items: [
-          { 
-            path: '/admin/accounts', 
-            label: t('menuAccounts'),
-            icon: Users,
-            children: [
-              { path: '/admin/accounts/profile', label: t('menuProfile') },
-              { path: '/admin/roles', label: t('menuRoles') }
-            ]
-          },
+          { path: '/admin/accounts', label: t('menuAccounts'), icon: Users },
           { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
           { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
           { path: '/admin/students', label: t('menuStudents'), icon: Users },
@@ -95,7 +89,6 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
-          { path: '/teacher/exam-bank', label: t('menuExamBank'), icon: Library },
         ]
       },
       {
@@ -117,7 +110,6 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList, badge: '7' },
-          { path: '/student/workspace', label: t('menuStudentWorkspace'), icon: Layout },
         ]
       },
       {
@@ -138,11 +130,11 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       {/* Brand Header */}
       <div className="sidebar-brand">
         <div className="sidebar-brand-icon">
-          <GraduationCap size={22} strokeWidth={2.3} />
+          <img src="/logo-icon.png" alt="EnglishHub" className="sidebar-brand-img" />
         </div>
         <div className="sidebar-brand-info">
           <div className="sidebar-brand-name">{t('systemName')}</div>
-          <div className="sidebar-brand-sub">{portalLabels[role] || portalLabels.student}</div>
+          <div className="sidebar-brand-sub">{currentRoleLabel}</div>
         </div>
       </div>
 

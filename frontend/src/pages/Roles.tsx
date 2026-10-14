@@ -86,29 +86,21 @@ export const Roles: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Shield size={28} color="var(--primary)" />
             {t('roles.title')}
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Ma trận phân quyền chi tiết (RBAC) kiểm soát quyền đọc, ghi, duyệt và kết xuất dữ liệu cho từng nhóm tài khoản.' 
-              : 'Role-Based Access Control matrix configuring granular Read, Write, Approve, and Export capabilities.'}
-          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="flex gap-2.5">
           <button 
-            className="btn btn-secondary"
+            className="btn btn-secondary inline-flex items-center gap-1.5"
             onClick={() => alert(isVi ? 'Đã khôi phục các thiết lập phân quyền mặc định của hệ thống.' : 'Default permissions restored.')}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <RotateCcw size={15} />
             <span>{t('roles.restoreDefault')}</span>
           </button>
           <button 
-            className="btn btn-primary"
+            className="btn btn-primary inline-flex items-center gap-1.5"
             onClick={handleSave}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Save size={15} />
             <span>{t('roles.updatePerms')}</span>
@@ -117,25 +109,14 @@ export const Roles: React.FC = () => {
       </div>
 
       {saveSuccess && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          color: '#15803d',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
+        <div className="adm-alert-success mb-5">
           <CheckCircle2 size={18} />
           <span>{isVi ? 'Cập nhật phân quyền vai trò thành công! Quyền hạn đã có hiệu lực ngay lập tức.' : 'Role permissions updated successfully and propagated.'}</span>
         </div>
       )}
 
       {/* Role Selector Tabs (Mobbin Segmented Bar) */}
-      <div className="adm-filter-bar" style={{ padding: '8px 12px', marginBottom: '24px' }}>
+      <div className="adm-filter-bar mb-6">
         <div className="adm-pills">
           {(
             [
@@ -151,8 +132,7 @@ export const Roles: React.FC = () => {
               <button
                 key={r.key}
                 onClick={() => setActiveRole(r.key)}
-                className={`adm-pill ${isActive ? 'active' : ''}`}
-                style={{ padding: '8px 16px', fontSize: '13.5px' }}
+                className={`adm-pill py-2 px-4 text-[13.5px] ${isActive ? 'active' : ''}`}
               >
                 <Icon size={16} />
                 <span>{r.label}</span>
@@ -162,13 +142,12 @@ export const Roles: React.FC = () => {
         </div>
 
         {/* Preset Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-          <span className="text-on-surface-variant">{isVi ? 'Mẫu phân quyền:' : 'Preset:'}</span>
+        <div className="adm-roles-preset-wrap">
+          <span>{isVi ? 'Mẫu phân quyền:' : 'Preset:'}</span>
           <select 
-            className="input"
+            className="input adm-roles-preset-select"
             onChange={(e) => handleApplyPreset(e.target.value)}
             defaultValue=""
-            style={{ padding: '6px 12px', fontSize: '12.5px' }}
           >
             <option value="" disabled>{isVi ? '-- Chọn mẫu có sẵn --' : '-- Choose Preset --'}</option>
             <option value="super-admin">Super Administrator (Full Privileges)</option>
@@ -181,16 +160,16 @@ export const Roles: React.FC = () => {
 
       {/* RBAC Capabilities Table */}
       <div className="adm-table-card">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--outline-variant)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--surface-container-low)' }}>
+        <div className="adm-table-card-header">
           <div>
-            <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--on-surface-variant)' }}>
+            <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               {t('roles.permHeading')}
             </span>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--on-surface)', marginTop: '2px' }}>
+            <div className="text-sm font-semibold text-on-surface mt-0.5">
               {isVi ? `Đang cấu hình quyền hạn cho: ${activeRole.toUpperCase()}` : `Configuring capability rules for: ${activeRole.toUpperCase()}`}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>
+          <div className="flex items-center gap-1.5 text-[12.5px] text-on-surface-variant">
             <HelpCircle size={15} />
             <span>{isVi ? 'Bật công tắc để kích hoạt quyền' : 'Toggle switches to adjust access'}</span>
           </div>
@@ -199,26 +178,26 @@ export const Roles: React.FC = () => {
         <table className="adm-table">
           <thead>
             <tr>
-              <th style={{ width: '38%' }}>{t('roles.colModule')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colRead')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colWrite')}</th>
-              <th style={{ textAlign: 'center', width: '15%' }}>{t('roles.colApprove')}</th>
-              <th style={{ textAlign: 'center', width: '17%' }}>{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
+              <th className="w-[38%]">{t('roles.colModule')}</th>
+              <th className="text-center w-[15%]">{t('roles.colRead')}</th>
+              <th className="text-center w-[15%]">{t('roles.colWrite')}</th>
+              <th className="text-center w-[15%]">{t('roles.colApprove')}</th>
+              <th className="text-center w-[17%]">{isVi ? 'XUẤT DỮ LIỆU' : 'EXPORT'}</th>
             </tr>
           </thead>
           <tbody>
             {permissions[activeRole].map((mod) => (
               <tr key={mod.id}>
                 <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span className="font-semibold" style={{ fontSize: '14px', color: 'var(--on-surface)' }}>{mod.module}</span>
-                    <span style={{ fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>{mod.description}</span>
+                  <div className="flex flex-col gap-[3px]">
+                    <span className="font-semibold text-sm text-on-surface">{mod.module}</span>
+                    <span className="text-[12.5px] text-on-surface-variant">{mod.description}</span>
                   </div>
                 </td>
 
                 {/* Read Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
+                <td className="text-center">
+                  <label className="adm-switch mx-auto">
                     <input 
                       type="checkbox" 
                       checked={mod.read} 
@@ -229,8 +208,8 @@ export const Roles: React.FC = () => {
                 </td>
 
                 {/* Write Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
+                <td className="text-center">
+                  <label className="adm-switch mx-auto">
                     <input 
                       type="checkbox" 
                       checked={mod.write} 
@@ -241,8 +220,8 @@ export const Roles: React.FC = () => {
                 </td>
 
                 {/* Approve Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
+                <td className="text-center">
+                  <label className="adm-switch mx-auto">
                     <input 
                       type="checkbox" 
                       checked={mod.approve} 
@@ -253,8 +232,8 @@ export const Roles: React.FC = () => {
                 </td>
 
                 {/* Export Toggle */}
-                <td style={{ textAlign: 'center' }}>
-                  <label className="adm-switch" style={{ margin: '0 auto' }}>
+                <td className="text-center">
+                  <label className="adm-switch mx-auto">
                     <input 
                       type="checkbox" 
                       checked={mod.export} 
@@ -268,7 +247,7 @@ export const Roles: React.FC = () => {
           </tbody>
         </table>
 
-        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', fontSize: '12.5px', color: 'var(--on-surface-variant)' }}>
+        <div className="adm-table-card-footer">
           {t('roles.note')}
         </div>
       </div>

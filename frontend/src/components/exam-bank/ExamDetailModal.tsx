@@ -99,7 +99,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                  {exam.details.taskType || 'IELTS Writing Task 2'}
+                  {exam.details.taskType || 'Writing Task'}
                 </h4>
                 <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6, color: '#334155' }}>
                   {exam.details.prompt}
@@ -112,7 +112,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               {exam.details.rubricsSummary && (
                 <div style={{ padding: '14px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                   <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1d4ed8', display: 'block', marginBottom: '4px' }}>
-                    {isVi ? 'Cấu hình tiêu chí chấm điểm IELTS chuẩn:' : 'Official Rubrics:'}
+                    {isVi ? 'Cấu hình tiêu chí chấm điểm chuẩn:' : 'Official Rubrics:'}
                   </span>
                   <p style={{ margin: 0, fontSize: '13px', color: '#1e3a8a' }}>
                     {exam.details.rubricsSummary}
@@ -123,7 +123,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               {exam.details.modelAnswerSummary && (
                 <div>
                   <h4 style={{ margin: '0 0 6px 0', fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>
-                    {isVi ? 'Đoạn trích bài mẫu Band 8.0+:' : 'Model Answer Excerpt:'}
+                    {isVi ? 'Đoạn trích bài mẫu xuất sắc:' : 'Model Answer Excerpt:'}
                   </h4>
                   <div style={{ padding: '14px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '13px', lineHeight: 1.6, color: '#166534', fontStyle: 'italic' }}>
                     "{exam.details.modelAnswerSummary}"
@@ -139,7 +139,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
                 <div className="cue-card-container">
                   <div className="cue-card-header">
                     <Mic size={18} />
-                    <span>{isVi ? 'IELTS Candidate Cue Card' : 'Candidate Cue Card'}</span>
+                    <span>{isVi ? 'Thẻ gợi ý chủ đề Speaking' : 'Candidate Cue Card'}</span>
                   </div>
                   <h3 style={{ margin: '0 0 10px 0', fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>
                     {exam.details.cueCard.topic}
@@ -163,7 +163,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               {exam.details.questionsPreview && (
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                    {isVi ? 'Câu hỏi mở rộng Part 3:' : 'Part 3 Discussion Questions:'}
+                    {isVi ? 'Câu hỏi thảo luận mở rộng:' : 'Discussion Questions:'}
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {exam.details.questionsPreview.map((q, idx) => (

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   Search, 
   Bell, 
@@ -8,7 +8,6 @@ import {
   Globe, 
   User as UserIcon, 
   ShieldCheck, 
-  Sliders, 
   LogOut, 
   ChevronDown 
 } from 'lucide-react';
@@ -18,24 +17,27 @@ import { useAuth } from '../../hooks/useAuth';
 const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
   const { language, toggleLanguage, t } = useLanguage();
   const { user, logout } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const role = user?.role || 'student';
-  const isStudent = location.pathname.startsWith('/student') || role === 'student';
-  const profileBasePath = role === 'admin' 
+  const normalizedRole = (user?.role || 'student').toLowerCase();
+  const profileBasePath = normalizedRole === 'admin' 
     ? '/admin/profile' 
-    : role === 'teacher' 
+    : normalizedRole === 'teacher' 
       ? '/teacher/profile' 
       : '/student/profile';
-  const settingsBasePath = role === 'admin' 
-    ? '/admin/settings' 
-    : role === 'teacher' 
-      ? '/teacher/settings' 
-      : '/student/settings';
+
+  const roleLabels: Record<string, { vi: string; en: string }> = {
+    admin: { vi: 'Quản trị viên', en: 'Admin' },
+    teacher: { vi: 'Giáo viên', en: 'Teacher' },
+    student: { vi: 'Học viên', en: 'Student' },
+  };
+
+  const userRoleLabel = language === 'vi'
+    ? (roleLabels[normalizedRole]?.vi || 'Học viên')
+    : (roleLabels[normalizedRole]?.en || 'Student');
 
   // Click outside to close user dropdown
   useEffect(() => {
@@ -80,10 +82,9 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           <span className="topbar-search-label"><Search size={16} /></span>
           <input
             type="text"
-            className={`topbar-search-input ${isStudent ? 'student-pad' : ''}`}
+            className="topbar-search-input"
             placeholder={t('search')}
           />
-          {!isStudent && <kbd className="topbar-search-kbd">⌘K</kbd>}
         </div>
       </div>
 
@@ -96,7 +97,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
           onClick={toggleLanguage}
           title={language === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
         >
-          <Globe size={14} color="#64748B" />
+          <Globe size={14} />
           <span>{language === 'vi' ? 'VI' : 'EN'}</span>
         </button>
 
@@ -140,9 +141,9 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
             </div>
             <div className="topbar-user-details">
               <span className="topbar-user-name">{user?.fullName || 'User'}</span>
-              <span className="topbar-user-role">{user?.role || 'Student'}</span>
+              <span className="topbar-user-role">{userRoleLabel}</span>
             </div>
-            <ChevronDown size={14} color="#64748B" />
+            <ChevronDown size={14} />
           </button>
 
           {isMenuOpen && (
@@ -157,7 +158,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
                 className="topbar-dropdown-item"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <UserIcon size={16} color="var(--primary)" />
+                <UserIcon size={16} color="var(--text-primary)" />
                 <span>{t('settings.tabProfile')}</span>
               </Link>
 
@@ -166,17 +167,8 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
                 className="topbar-dropdown-item"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <ShieldCheck size={16} color="#059669" />
+                <ShieldCheck size={16} color="var(--text-primary)" />
                 <span>{t('settings.tabSecurity')}</span>
-              </Link>
-
-              <Link 
-                to={`${settingsBasePath}?tab=preferences`} 
-                className="topbar-dropdown-item"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Sliders size={16} color="#4F46E5" />
-                <span>{t('settings.tabPreferences')}</span>
               </Link>
 
               <div className="topbar-dropdown-divider"></div>
@@ -186,7 +178,7 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
                 className="topbar-dropdown-item danger"
                 onClick={handleLogout}
               >
-                <LogOut size={16} />
+                <LogOut size={16} color="var(--text-primary)" />
                 <span>{t('logout')}</span>
               </button>
             </div>

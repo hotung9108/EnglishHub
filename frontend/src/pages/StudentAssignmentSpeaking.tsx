@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { Button } from '../components/common';
 import '../styles/student-speaking.css';
 
 const StudentAssignmentSpeaking: React.FC = () => {
@@ -228,41 +229,42 @@ const StudentAssignmentSpeaking: React.FC = () => {
         </button>
         <span className="speaking-breadcrumb-divider">/</span>
         <span>Hệ thống</span>
-        <ChevronRight size={12} style={{ color: 'var(--outline-variant)' }} />
+        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
         <span 
-          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}
+          className="speaking-breadcrumb-link"
           onClick={() => navigate('/student/classes')}
           role="button"
           tabIndex={0}
         >
           Lớp học của tôi
         </span>
-        <ChevronRight size={12} style={{ color: 'var(--outline-variant)' }} />
-        <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
+        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
+        <span className="speaking-breadcrumb-link">
           {assignment?.title || `Speaking Practice #${id}`}
         </span>
       </div>
 
       {error && (
-        <div style={{ marginBottom: '16px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B' }}>
+        <div className="p-16 mb-16 rounded-lg bg-red-50 border border-red-200 flex items-center justify-between">
+          <div className="flex items-center gap-8 text-red-700">
             <AlertCircle size={18} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span className="text-sm">{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            icon={<RefreshCw size={13} />}
           >
-            <RefreshCw size={13} /> Thử lại
-          </button>
+            Thử lại
+          </Button>
         </div>
       )}
 
       {successMessage && (
-        <div style={{ marginBottom: '16px', padding: '16px', borderRadius: '8px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px', color: '#166534' }}>
+        <div className="speaking-success-banner">
           <CheckCircle2 size={20} />
-          <span style={{ fontSize: '14px', fontWeight: 600 }}>{successMessage}</span>
+          <span className="text-sm font-semibold">{successMessage}</span>
         </div>
       )}
 
@@ -299,7 +301,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               {hasPdfScript && (
                 <div className="speaking-sample-script-box">
                   <div className="speaking-sample-header">
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="flex items-center gap-6">
                       <FileText size={16} color="var(--primary)" />
                       <strong>{t('studentSpeaking.cueCardReference')}</strong>
                     </span>
@@ -364,10 +366,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
                   <button 
                     type="button"
-                    className="speaking-btn-icon"
+                    className={`speaking-btn-icon ${!recordedAudioReady ? 'opacity-50' : ''}`}
                     onClick={togglePlay}
                     disabled={!recordedAudioReady}
-                    style={{ opacity: recordedAudioReady ? 1 : 0.5 }}
                     title="Phát lại bản ghi"
                   >
                     {isPlaying ? <Pause size={18} /> : <Play size={18} />}
@@ -376,9 +377,12 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
                 <div className="speaking-recorder-hint">
                   {isRecording ? (
-                    <span style={{ color: '#dc2626', fontWeight: 600 }}>● Đang ghi âm trực tiếp qua Microphone...</span>
+                    <span className="speaking-status-recording">● Đang ghi âm trực tiếp qua Microphone...</span>
                   ) : recordedAudioReady ? (
-                    <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Đã ghi âm xong ({formatTime(recordingSeconds)}). Bấm nút nộp bài bên dưới.</span>
+                    <span className="speaking-status-ready inline-flex items-center gap-1.5">
+                      <CheckCircle2 size={14} />
+                      <span>Đã ghi âm xong ({formatTime(recordingSeconds)}). Bấm nút nộp bài bên dưới.</span>
+                    </span>
                   ) : (
                     'Bấm nút Micro để bắt đầu ghi âm bài nói của bạn.'
                   )}
@@ -387,13 +391,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
               {/* Personal Notes Box */}
               <div className="speaking-notes-section">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex justify-between items-center mb-8">
                   <label htmlFor="speaking-prep-notes" className="speaking-notes-label">
                     {t('studentSpeaking.prepNotesLabel')}
                   </label>
                   {isNotesSaved && (
-                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
-                      ✓ {t('studentSpeaking.notesSaved')}
+                    <span className="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1">
+                      <CheckCircle2 size={13} />
+                      <span>{t('studentSpeaking.notesSaved')}</span>
                     </span>
                   )}
                 </div>
@@ -405,14 +410,13 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   onChange={(e) => setPersonalNotes(e.target.value)}
                   rows={4}
                 />
-                <button 
-                  type="button"
-                  className="btn-secondary"
-                  style={{ alignSelf: 'flex-start', padding: '6px 14px', fontSize: '12px' }}
+                <Button 
+                  variant="secondary"
+                  size="sm"
                   onClick={handleSaveNotes}
                 >
                   {t('studentSpeaking.btnSaveNotes')}
-                </button>
+                </Button>
               </div>
             </div>
           </section>
@@ -434,7 +438,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 <div className="submission-file-icon">
                   <Music size={20} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div className="flex-1">
                   <div className="submission-file-title">
                     {recordedAudioReady ? `speaking_attempt_${numericId}.mp3` : 'chua_co_ban_ghi.mp3'}
                   </div>
@@ -442,8 +446,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                     {recordedAudioReady ? `${formatTime(recordingSeconds)} • Audio WebM/MPEG` : 'Chưa có tệp'}
                   </div>
                 </div>
-                <span style={{ fontSize: '11px', color: recordedAudioReady ? 'var(--secondary)' : '#94A3B8', fontWeight: 600 }}>
-                  <CheckCircle2 size={14} style={{ display: 'inline', marginRight: 4 }} />
+                <span className={`text-xs font-semibold flex items-center gap-4 ${recordedAudioReady ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  <CheckCircle2 size={14} />
                   {recordedAudioReady ? 'Sẵn sàng nộp' : 'Chưa ghi âm'}
                 </span>
               </div>
@@ -454,7 +458,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 onClick={handleSubmitAssignment}
                 disabled={isSubmitting}
                 type="button"
-                style={{ opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
               >
                 {isSubmitting ? (
                   <>
@@ -483,7 +486,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <span className="speaking-cue-timing">{t('studentSpeaking.gradingScale')}</span>
             </div>
 
-            <div className="speaking-card-body" style={{ gap: '12px' }}>
+            <div className="speaking-card-body gap-12">
               <div className="grading-row">
                 <span className="grading-label">{t('studentSpeaking.totalPoints')}</span>
                 <span className="grading-val-total">100 (Band 9.0)</span>
@@ -492,28 +495,28 @@ const StudentAssignmentSpeaking: React.FC = () => {
               {/* Criteria breakdown */}
               <div className="grading-row">
                 <span className="grading-label">{t('studentSpeaking.criteriaPronunciation')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
+                <span className="speaking-weight-badge">25%</span>
               </div>
               <div className="grading-row">
                 <span className="grading-label">{t('studentSpeaking.criteriaFluency')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
+                <span className="speaking-weight-badge">25%</span>
               </div>
               <div className="grading-row">
                 <span className="grading-label">{t('studentSpeaking.criteriaLexical')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
+                <span className="speaking-weight-badge">25%</span>
               </div>
               <div className="grading-row">
                 <span className="grading-label">{t('studentSpeaking.criteriaGrammar')}</span>
-                <span style={{ fontWeight: 600 }}>25%</span>
+                <span className="speaking-weight-badge">25%</span>
               </div>
 
               {/* Current Score Display */}
               <div className="grading-current-grade">
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--on-surface)' }}>
+                  <div className="speaking-eval-title">
                     {t('studentSpeaking.currentGrade')}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>
+                  <div className="speaking-eval-subtitle">
                     Lần {submission?.attemptNumber ?? 1}
                   </div>
                 </div>
