@@ -3,7 +3,8 @@ import {
   History, Search, Download, 
   X, 
   Loader2, AlertCircle,
-  RotateCcw, CheckCircle2, FileText
+  RotateCcw, CheckCircle2, FileText,
+  Award, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { gradingService } from '../api/services/grading.service';
@@ -188,14 +189,8 @@ export const AdminGradingAuditLogs: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <div className="adm-gh-header-icon">
-              <History size={24} />
-            </div>
             <span>{t('auditLogs.title')}</span>
           </h1>
-          <p className="adm-subtitle">
-            {t('auditLogs.subtitle')}
-          </p>
         </div>
 
         <div className="adm-gh-header-actions">
@@ -211,18 +206,8 @@ export const AdminGradingAuditLogs: React.FC = () => {
       </div>
 
       {error && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="adm-alert-error justify-between mb-6">
+          <div className="flex items-center gap-2">
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
@@ -286,16 +271,20 @@ export const AdminGradingAuditLogs: React.FC = () => {
 
         {/* Filter Controls: Score dropdown & Search */}
         <div className="flex items-center gap-3 flex-wrap">
-          <select
-            className="adm-gh-select"
-            value={scoreFilter}
-            onChange={(e) => setScoreFilter(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
-            aria-label={isVi ? 'Lọc theo mức điểm' : 'Filter by score'}
-          >
-            <option value="ALL">{isVi ? 'Tất cả mức điểm' : 'All Scores'}</option>
-            <option value="SCORED">{isVi ? 'Đã có điểm chốt' : 'Has Final Score'}</option>
-            <option value="UNSCORED">{isVi ? 'Chưa có điểm chốt' : 'No Final Score'}</option>
-          </select>
+          <div className={`adm-gh-select-wrap ${scoreFilter !== 'ALL' ? 'has-value' : ''}`}>
+            <Award size={15} className="adm-gh-select-icon" />
+            <select
+              className={`adm-gh-select ${scoreFilter !== 'ALL' ? 'has-value' : ''}`}
+              value={scoreFilter}
+              onChange={(e) => setScoreFilter(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
+              aria-label={isVi ? 'Lọc theo mức điểm' : 'Filter by score'}
+            >
+              <option value="ALL">{isVi ? 'Tất cả mức điểm' : 'All Scores'}</option>
+              <option value="SCORED">{isVi ? 'Đã có điểm chốt' : 'Has Final Score'}</option>
+              <option value="UNSCORED">{isVi ? 'Chưa có điểm chốt' : 'No Final Score'}</option>
+            </select>
+            <ChevronDown size={14} className="adm-gh-select-arrow" />
+          </div>
 
           {/* Search Input */}
           <div className="adm-search-wrap">
@@ -310,21 +299,9 @@ export const AdminGradingAuditLogs: React.FC = () => {
             {searchQuery && (
               <button 
                 type="button"
+                className="adm-search-clear-btn"
                 onClick={() => setSearchQuery('')}
                 title={isVi ? 'Xóa tìm kiếm' : 'Clear search'}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--on-surface-variant)',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '4px'
-                }}
               >
                 <X size={14} />
               </button>
@@ -336,17 +313,17 @@ export const AdminGradingAuditLogs: React.FC = () => {
       {/* Main Table Card */}
       <div className="adm-table-card">
         {loading ? (
-          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+          <div className="adm-loading-state">
+            <Loader2 size={32} className="animate-spin adm-loading-state-icon" />
             <div>{isVi ? 'Đang tải danh sách hồ sơ chấm điểm từ máy chủ...' : 'Loading grading records from server...'}</div>
           </div>
         ) : filteredGradings.length === 0 ? (
-          <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-            <History size={40} style={{ margin: '0 auto 14px', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--on-surface)' }}>
+          <div className="adm-empty-state-card">
+            <History size={40} className="adm-empty-state-icon" />
+            <h3 className="adm-empty-state-title">
               {isVi ? 'Không tìm thấy hồ sơ chấm điểm nào' : 'No grading records found'}
             </h3>
-            <p style={{ margin: 0, fontSize: '13.5px' }}>
+            <p className="adm-empty-state-desc">
               {searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL'
                 ? (isVi ? 'Không tìm thấy kết quả phù hợp với bộ lọc hiện tại.' : 'No entries match your current search criteria or filters.')
                 : (isVi ? 'Nhật ký sẽ hiển thị khi học sinh nộp bài và bài làm được xử lý chấm.' : 'Entries will appear here as submissions are processed.')}
@@ -354,13 +331,12 @@ export const AdminGradingAuditLogs: React.FC = () => {
             {(searchQuery || statusFilter !== 'ALL' || scoreFilter !== 'ALL') && (
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm mt-4 inline-flex items-center gap-1.5"
                 onClick={() => {
                   setSearchQuery('');
                   setStatusFilter('ALL');
                   setScoreFilter('ALL');
                 }}
-                style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
                 <RotateCcw size={14} />
                 <span>{isVi ? 'Đặt lại bộ lọc' : 'Reset Filters'}</span>
@@ -368,14 +344,14 @@ export const AdminGradingAuditLogs: React.FC = () => {
             )}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="overflow-x-auto">
             <table className="adm-table">
               <thead>
                 <tr>
                   <th>{isVi ? 'MÃ CHẤM' : 'GRADING ID'}</th>
                   <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
                   <th>{isVi ? 'ĐIỂM CHỐT' : 'FINAL SCORE'}</th>
-                  <th style={{ textAlign: 'right' }}>{isVi ? 'NHẬT KÝ SỬA ĐIỂM' : 'AUDIT ACTION'}</th>
+                  <th className="text-right">{isVi ? 'NHẬT KÝ SỬA ĐIỂM' : 'AUDIT ACTION'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,16 +359,16 @@ export const AdminGradingAuditLogs: React.FC = () => {
                   <tr 
                     key={item.id}
                     onClick={() => handleOpenDetail(item.id)}
-                    style={{ cursor: 'pointer' }}
+                    className="cursor-pointer"
                   >
                     <td className="font-mono font-semibold text-primary">GR-{item.id}</td>
                     <td>{formatStatusBadge(item.status)}</td>
                     <td>
-                      <span className="font-bold font-mono" style={{ fontSize: '15px', color: item.finalScore !== null ? 'var(--primary)' : 'var(--on-surface-variant)' }}>
+                      <span className={`font-bold font-mono text-[15px] ${item.finalScore !== null ? 'text-primary' : 'text-on-surface-variant'}`}>
                         {item.finalScore !== null ? item.finalScore : (isVi ? 'Chưa có điểm' : 'Unscored')}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="text-right">
                       <button 
                         type="button"
                         className="btn btn-secondary btn-sm"
@@ -415,50 +391,51 @@ export const AdminGradingAuditLogs: React.FC = () => {
       {/* Drawer: Detailed Inspection and Change Logs */}
       {selectedGradingId !== null && (
         <div className="adm-drawer-backdrop" onClick={handleCloseDrawer}>
-          <div className="adm-drawer" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px' }}>
+          <div className="adm-drawer adm-drawer-wide" onClick={(e) => e.stopPropagation()}>
             <div className="adm-drawer-header">
               <div>
                 <h2 className="adm-drawer-title">
                   {isVi ? `Chi Tiết Kiểm Toán & Lịch Sử Sửa Điểm: GR-${selectedGradingId}` : `Grading Audit & Change Logs: GR-${selectedGradingId}`}
                 </h2>
-                <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '2px' }}>
+                <div className="text-xs text-on-surface-variant mt-0.5">
                   Hồ sơ chấm điểm #GR-{selectedGradingId}
                 </div>
               </div>
               <button 
                 type="button"
                 onClick={handleCloseDrawer}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--on-surface-variant)' }}
+                className="adm-btn-ghost p-1 text-on-surface-variant"
+                aria-label={isVi ? 'Đóng' : 'Close'}
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="adm-drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="adm-drawer-body flex flex-col gap-5">
               {loadingDrawer ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                  <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                <div className="adm-loading-state">
+                  <Loader2 size={32} className="animate-spin adm-loading-state-icon" />
                   <div>{isVi ? 'Đang truy xuất thông tin chấm và nhật ký chỉnh sửa...' : 'Fetching grading context and change history...'}</div>
                 </div>
               ) : drawerError ? (
-                <div style={{ padding: '16px', background: '#fef2f2', color: '#b91c1c', borderRadius: '8px' }}>
+                <div className="adm-alert-error">
                   {drawerError}
                 </div>
               ) : gradingDetail ? (
                 <>
                   {/* Status & Scores Strip */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                  <div className="adm-drawer-metrics-grid">
+                    <div className="adm-drawer-metric-item">
                       <div className="label-sm text-on-surface-variant">{isVi ? 'Trạng thái' : 'Status'}</div>
-                      <div style={{ marginTop: '4px' }}>{formatStatusBadge(gradingDetail.status)}</div>
+                      <div className="mt-1">{formatStatusBadge(gradingDetail.status)}</div>
                     </div>
-                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                    <div className="adm-drawer-metric-item">
                       <div className="label-sm text-on-surface-variant">{isVi ? 'Phương thức' : 'Method'}</div>
-                      <div className="font-semibold" style={{ fontSize: '14px', marginTop: '4px' }}>{gradingDetail.method}</div>
+                      <div className="font-semibold text-sm mt-1">{gradingDetail.method}</div>
                     </div>
-                    <div style={{ padding: '14px', borderRadius: '8px', background: 'var(--surface-container-low)' }}>
+                    <div className="adm-drawer-metric-item">
                       <div className="label-sm text-on-surface-variant">{isVi ? 'Điểm chốt hiện tại' : 'Final Score'}</div>
-                      <div className="font-bold text-primary font-mono" style={{ fontSize: '20px', marginTop: '2px' }}>
+                      <div className="adm-drawer-metric-val font-mono text-primary">
                         {gradingDetail.finalScore !== null ? gradingDetail.finalScore : '-'}
                       </div>
                     </div>
@@ -466,23 +443,23 @@ export const AdminGradingAuditLogs: React.FC = () => {
 
                   {/* Feedback Notes */}
                   {gradingDetail.finalFeedback && (
-                    <div className="card" style={{ padding: '16px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FileText size={15} color="var(--primary)" />
+                    <div className="card adm-drawer-feedback-card">
+                      <div className="text-[13px] font-bold mb-1.5 flex items-center gap-1.5">
+                        <FileText size={15} className="text-primary" />
                         <span>{isVi ? 'Lời phê chính thức' : 'Official Instructor Feedback'}</span>
                       </div>
-                      <div style={{ fontSize: '13.5px', lineHeight: 1.5, color: 'var(--on-surface)' }}>
+                      <div className="text-[13.5px] leading-relaxed text-on-surface">
                         {gradingDetail.finalFeedback}
                       </div>
                     </div>
                   )}
 
                   {gradingDetail.aiFeedback && (
-                    <div className="card" style={{ padding: '16px', background: 'rgba(126, 34, 206, 0.04)', borderColor: 'rgba(126, 34, 206, 0.15)' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '6px', color: '#7e22ce' }}>
+                    <div className="card adm-ai-feedback-card">
+                      <div className="adm-ai-feedback-title">
                         {isVi ? 'Nhận xét từ AI Engine' : 'AI Engine Feedback'}
                       </div>
-                      <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
+                      <div className="text-[13px] leading-relaxed">
                         {gradingDetail.aiFeedback}
                       </div>
                     </div>
@@ -490,26 +467,25 @@ export const AdminGradingAuditLogs: React.FC = () => {
 
                   {/* REAL CHANGE LOGS SECTION */}
                   <div>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <History size={16} color="var(--primary)" />
+                    <h3 className="text-[15px] font-bold mb-2.5">
                       <span>{isVi ? 'Nhật Ký Các Lần Sửa Điểm (Change Logs Audit)' : 'Grading Adjustment History'}</span>
                     </h3>
 
                     {changeLogs.length === 0 ? (
-                      <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-container-low)', borderRadius: '8px', color: 'var(--on-surface-variant)' }}>
-                        <CheckCircle2 size={28} style={{ margin: '0 auto 8px', color: '#16a34a', opacity: 0.8 }} />
-                        <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                      <div className="p-6 text-center bg-surface-container-low rounded-lg text-on-surface-variant">
+                        <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-600 opacity-80" />
+                        <div className="font-semibold text-sm">
                           {isVi ? 'Chưa có lượt sửa điểm nào' : 'No grade changes recorded'}
                         </div>
-                        <p style={{ margin: '4px 0 0', fontSize: '12.5px' }}>
+                        <p className="mt-1 mb-0 text-[12.5px]">
                           {isVi 
                             ? 'Điểm số của bài làm này vẫn giữ nguyên vẹn từ lần chấm đầu tiên.' 
                             : 'The score for this submission remains unchanged from the initial evaluation.'}
                         </p>
                       </div>
                     ) : (
-                      <div style={{ overflowX: 'auto', border: '1px solid var(--outline-variant)', borderRadius: '8px' }}>
-                        <table className="adm-table" style={{ margin: 0 }}>
+                      <div className="adm-audit-table-wrap">
+                        <table className="adm-table m-0">
                           <thead>
                             <tr>
                               <th>{isVi ? 'NGƯỜI ĐIỀU CHỈNH' : 'CHANGED BY'}</th>
@@ -525,10 +501,10 @@ export const AdminGradingAuditLogs: React.FC = () => {
                                 <td className="font-medium">{log.changedBy}</td>
                                 <td className="font-mono text-on-surface-variant">{log.oldScore ?? '-'}</td>
                                 <td className="font-mono font-bold text-primary">{log.newScore ?? '-'}</td>
-                                <td style={{ maxWidth: '200px', fontSize: '13px' }}>
+                                <td className="max-w-[200px] text-[13px]">
                                   {log.note || <span className="text-on-surface-variant italic">{isVi ? 'Không có ghi chú' : 'No note provided'}</span>}
                                 </td>
-                                <td className="font-mono text-on-surface-variant" style={{ fontSize: '12px' }}>
+                                <td className="font-mono text-on-surface-variant text-xs">
                                   {log.changedAt}
                                 </td>
                               </tr>

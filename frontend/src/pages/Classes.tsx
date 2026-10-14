@@ -91,7 +91,6 @@ export const Classes: React.FC = () => {
       <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <GraduationCap size={28} className="text-primary" />
             {t('adminClasses.title')}
           </h1>
         </div>
@@ -205,7 +204,7 @@ export const Classes: React.FC = () => {
         <>
           {/* Grid View Mode */}
           {viewMode === 'grid' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+            <div className="adm-cards-grid">
               {filtered.map(cls => {
                 const occupancyPct = Math.min(100, Math.round((cls.students / cls.maxStudents) * 100));
                 return (
@@ -249,7 +248,7 @@ export const Classes: React.FC = () => {
                           </span>
                           <span className="font-semibold text-primary">{occupancyPct}%</span>
                         </div>
-                        <div className="w-full bg-surface-container rounded-sm overflow-hidden" style={{ height: '6px' }}>
+                        <div className="w-full bg-surface-container rounded-sm overflow-hidden h-1.5">
                           <div 
                             className={`h-full rounded-sm ${occupancyPct > 90 ? 'bg-primary' : 'bg-secondary'}`}
                             style={{ width: `${occupancyPct}%` }} 

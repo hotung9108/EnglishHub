@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileEdit, BookOpen, Clock,
+  BookOpen, Clock,
   ArrowRight, Plus, Trash2, CheckCircle2,
   Download, BookmarkCheck, PenTool, Mic, Headphones,
   Copy, Check, FileText, RotateCcw, AlertCircle
@@ -349,14 +349,8 @@ export const StudentWorkspace: React.FC = () => {
       <div className="std-eco-header">
         <div>
           <h1 className="std-eco-title">
-            <FileEdit size={28} color="var(--primary)" />
             {isVi ? 'Không Gian Học Tập & Tự Luyện (Workspace)' : 'Personal Study & Practice Workspace'}
           </h1>
-          <p className="std-eco-subtitle">
-            {isVi
-              ? 'Quản lý bản nháp đang làm dở, sổ tay ghi chú từ vựng/ngữ pháp và tài liệu ôn thi độc quyền.'
-              : 'Resume in-progress drafts, manage your vocabulary notebook, and access curated exam materials.'}
-          </p>
         </div>
 
         <div className="flex gap-10">

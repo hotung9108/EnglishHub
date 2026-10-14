@@ -950,7 +950,6 @@ export const StudentSubmissionResult: React.FC = () => {
               <div className="result-card">
                 <div className="result-card-header">
                   <h2 className="result-card-title">
-                    <FileText size={18} className="text-primary" />
                     Bài Nộp &amp; Chữa Lỗi Trực Tuyến
                   </h2>
                   <span className="result-filter-badge-text">
@@ -1030,7 +1029,6 @@ export const StudentSubmissionResult: React.FC = () => {
                 <div className="result-card">
                   <div className="result-card-header">
                     <h3 className="result-card-title">
-                      <Sparkles size={16} className="text-secondary" />
                       {t('studentResult.selectedAnnotationHeader')}
                     </h3>
                     {selectedAnnotation && (
@@ -1193,7 +1191,6 @@ export const StudentSubmissionResult: React.FC = () => {
                 <div className="result-card">
                   <div className="result-card-header">
                     <h3 className="result-card-title">
-                      <Sparkles size={16} className="text-secondary" />
                       {t('studentResult.sttTranscript')}
                     </h3>
                   </div>
@@ -1499,14 +1496,10 @@ export const StudentSubmissionResult: React.FC = () => {
           {/* Inquiry / Student Question Form */}
           <div className="inquiry-form-card">
             <div className="result-inquiry-header">
-              <HelpCircle size={18} className="text-primary" />
               <h4 className="result-inquiry-title">
                 {t('studentResult.askTeacherTitle')}
               </h4>
             </div>
-            <p className="result-inquiry-sub">
-              {t('studentResult.askTeacherSubtitle')}
-            </p>
 
             <form onSubmit={handleSendInquiry}>
               <textarea

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
-  Award, CheckCircle2,
   Loader2, AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -88,7 +87,6 @@ export const Students: React.FC = () => {
       <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Users size={28} className="text-primary" />
             {t('students.title')}
           </h1>
         </div>
@@ -116,27 +114,18 @@ export const Students: React.FC = () => {
         <MetricCard
           title={isVi ? 'TỔNG SỐ HỌC VIÊN' : 'TOTAL COHORT'}
           value={totalEnrolled}
-          icon={<Users size={20} />}
-          iconBgColor="var(--primary-container)"
-          iconColor="var(--primary)"
           footerText={`${activeCount} ${isVi ? 'tài khoản đang hoạt động' : 'active accounts'}`}
         />
 
         <MetricCard
           title={isVi ? 'TRẠNG THÁI HỆ THỐNG' : 'ACCOUNT STATUS'}
           value={totalEnrolled > 0 ? `${Math.round((activeCount / totalEnrolled) * 100)}%` : '100%'}
-          icon={<CheckCircle2 size={20} />}
-          iconBgColor="var(--secondary-container)"
-          iconColor="var(--secondary)"
           footerText={isVi ? 'Tỷ lệ kích hoạt' : 'Activation rate'}
         />
 
         <MetricCard
           title={isVi ? 'TÀI KHOẢN TẠM KHÓA' : 'LOCKED USERS'}
           value={studentsData.filter(s => s.status === 'LOCKED').length}
-          icon={<Award size={20} />}
-          iconBgColor="var(--tertiary-container)"
-          iconColor="var(--tertiary)"
           footerText={isVi ? 'Cần hỗ trợ học vụ' : 'Needs attention'}
         />
       </div>

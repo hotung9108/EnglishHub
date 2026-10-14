@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   CheckCircle2, 
-  Clock, 
   Headphones, 
   PenTool, 
   Mic, 
-  Award,
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
@@ -197,16 +195,6 @@ const StudentDashboard: React.FC = () => {
         <div className="std-dash-hero-content">
           <div>
             <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}!</h1>
-            <p className="std-dash-subgreeting">
-              {upcomingDeadlines.length > 0 ? (
-                <>
-                  Hôm nay là một ngày tuyệt vời để nâng cao kỹ năng Tiếng Anh. Bạn có{' '}
-                  <strong>{upcomingDeadlines.length} bài tập</strong> sắp đến hạn cần hoàn thành.
-                </>
-              ) : (
-                'Tất cả bài tập đã được nộp đúng hạn. Tiếp tục duy trì phong độ học tập xuất sắc!'
-              )}
-            </p>
           </div>
 
           <div className="std-dash-target-pill">
@@ -246,21 +234,14 @@ const StudentDashboard: React.FC = () => {
         <MetricCard
           title="Bài tập đã hoàn thành"
           value={isLoading ? '...' : `${completedAssignmentsCount} / ${totalAssignments}`}
-          icon={CheckCircle2}
         />
         <MetricCard
           title="Điểm TB 4 Kỹ năng"
           value={isLoading ? '...' : (averageScore10 !== '--' ? `${averageScore10} / 10` : '--')}
-          icon={Award}
-          iconBgColor="#f0fdf4"
-          iconColor="#16a34a"
         />
         <MetricCard
           title="Đang chờ chấm điểm"
           value={isLoading ? '...' : `${pendingGradingCount} bài`}
-          icon={Clock}
-          iconBgColor="#fffbeb"
-          iconColor="#d97706"
         />
       </section>
 
@@ -270,7 +251,6 @@ const StudentDashboard: React.FC = () => {
           <div className="std-dash-card">
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
-                <Clock size={18} color="var(--primary)" />
                 Bài Tập Sắp Đến Hạn (Deadlines)
               </h2>
               <button 
@@ -328,7 +308,6 @@ const StudentDashboard: React.FC = () => {
           <div className="std-dash-card">
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
-                <BookOpen size={18} color="var(--primary)" />
                 Lớp Học Đang Diễn Ra
               </h2>
               <button 

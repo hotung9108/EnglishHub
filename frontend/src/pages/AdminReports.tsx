@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  GraduationCap, Sparkles, 
-  Download, CheckCircle2, 
-  FileSpreadsheet, Award,
+  Download, 
+  FileSpreadsheet,
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
   TrendingDown, User, ChevronDown
@@ -171,12 +170,8 @@ export const AdminReports: React.FC = () => {
       <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <GraduationCap size={28} className="text-primary" />
             <span>{t('adminReports.title')}</span>
           </h1>
-          <p className="adm-subtitle">
-            {t('adminReports.subtitle')}
-          </p>
         </div>
 
         {/* Export Buttons */}
@@ -335,36 +330,24 @@ export const AdminReports: React.FC = () => {
         <MetricCard
           title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
           value={loading ? '...' : (overview?.classCount ?? reportClasses.length)}
-          icon={<BookOpen size={18} />}
-          iconBgColor="var(--primary-container)"
-          iconColor="var(--primary)"
           footerText={isVi ? 'Theo dõi sĩ số và điểm trung bình' : 'Tracking cohort progress'}
         />
 
         <MetricCard
           title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
           value={loading ? '...' : `${overview?.completionRatePercent ?? 0}%`}
-          icon={<CheckCircle2 size={18} />}
-          iconBgColor="var(--secondary-container)"
-          iconColor="var(--secondary)"
           footerText={isVi ? 'Tỷ lệ nộp bài trung bình toàn trung tâm' : 'Average submission completion'}
         />
 
         <MetricCard
           title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
           value={loading ? '...' : `${overview?.averageScorePercent ?? 0}%`}
-          icon={<Award size={18} />}
-          iconBgColor="var(--tertiary-container)"
-          iconColor="var(--tertiary)"
           footerText={isVi ? 'Thang đo chuẩn hóa' : 'Normalized scale'}
         />
 
         <MetricCard
           title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
           value={loading ? '...' : (overview?.pendingGradingCount ?? 0)}
-          icon={<Sparkles size={18} />}
-          iconBgColor="#ede9fe"
-          iconColor="#7c3aed"
           footerText={isVi ? 'Bài tự luận chờ duyệt' : 'Awaiting instructor verification'}
         />
       </div>

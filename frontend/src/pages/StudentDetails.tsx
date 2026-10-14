@@ -300,8 +300,7 @@ export const StudentDetails: React.FC = () => {
           {activeTab === 'overview' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
               <div className="card">
-                <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <User size={18} color="var(--primary)" />
+                <h3 className="headline-md" style={{ marginBottom: '16px' }}>
                   {isVi ? 'Hồ Sơ CSDL (Student Profile)' : 'Database Student Profile'}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
@@ -324,8 +323,7 @@ export const StudentDetails: React.FC = () => {
 
               {progressData && progressData.skillAverages && progressData.skillAverages.length > 0 && (
                 <div className="card">
-                  <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Award size={18} color="var(--secondary)" />
+                  <h3 className="headline-md" style={{ marginBottom: '16px' }}>
                     {isVi ? 'Thống Kê Điểm Số 4 Kỹ Năng' : 'Skill Performance'}
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '14px' }}>
@@ -417,8 +415,7 @@ export const StudentDetails: React.FC = () => {
           {/* Tab 4: Security */}
           {activeTab === 'security' && (
             <div className="card" style={{ maxWidth: '640px' }}>
-              <h3 className="headline-md" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={18} color="var(--primary)" />
+              <h3 className="headline-md" style={{ marginBottom: '16px' }}>
                 {t('studentDetails.tabSecurity')}
               </h3>
               <p className="body-md text-on-surface-variant" style={{ marginBottom: '20px' }}>

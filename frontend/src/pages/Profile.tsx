@@ -227,11 +227,13 @@ export const Profile: React.FC = () => {
           <h1 className="adm-title">
             {t('profile.title')}
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Thông tin tài khoản cá nhân và mật khẩu.' 
-              : 'Personal account details and password.'}
-          </p>
+          {currentRole !== 'admin' && (
+            <p className="adm-subtitle">
+              {isVi 
+                ? 'Thông tin tài khoản cá nhân và mật khẩu.' 
+                : 'Personal account details and password.'}
+            </p>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, UserPlus, Search, 
-  ArrowRight, BookOpen, Clock, Loader2, AlertCircle
+  ArrowRight, Loader2, AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -149,27 +149,18 @@ export const Teachers: React.FC = () => {
         <MetricCard
           title={isVi ? 'TỔNG ĐỘI NGŨ GIẢNG VIÊN' : 'TOTAL FACULTY'}
           value={teachers.length}
-          icon={<GraduationCap size={20} />}
-          iconBgColor="var(--primary-container)"
-          iconColor="var(--primary)"
           footerText={`${activeTeachersCount} ${isVi ? 'đang hoạt động' : 'active instructors'}`}
         />
 
         <MetricCard
           title={isVi ? 'LỚP ĐANG GIẢNG DẠY' : 'ASSIGNED CLASSES'}
           value={totalClassesCount}
-          icon={<BookOpen size={20} />}
-          iconBgColor="var(--tertiary-container)"
-          iconColor="var(--tertiary)"
           footerText={`${teachers.length > 0 ? (totalClassesCount / teachers.length).toFixed(1) : '0'} ${isVi ? 'lớp/GV' : 'classes/teacher'}`}
         />
 
         <MetricCard
           title={isVi ? 'QUY CHUẨN ĐÀO TẠO' : 'ACADEMIC STANDARDS'}
           value="100%"
-          icon={<Clock size={20} />}
-          iconBgColor="var(--secondary-container)"
-          iconColor="var(--secondary)"
           footerText={isVi ? 'Đạt chuẩn đào tạo' : 'Standard Compliant'}
         />
       </div>
@@ -226,7 +217,7 @@ export const Teachers: React.FC = () => {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
+        <div className="adm-cards-grid">
           {filtered.map(tc => (
             <div 
               key={tc.id} 

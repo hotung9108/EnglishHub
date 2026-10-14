@@ -6,7 +6,7 @@ import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService } from '../api/services/submission.service';
 import { 
-  BookOpen, Users, Clock, Award, Search, Plus, 
+  BookOpen, Users, Search, Plus, 
   Calendar, MapPin, 
   RefreshCw, AlertCircle
 } from 'lucide-react';
@@ -244,9 +244,6 @@ export const TeacherClasses: React.FC = () => {
             className={`teacher-stat-card ${filter === 'active' ? 'active' : ''}`}
             onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
           >
-            <div className="teacher-stat-icon active">
-              <BookOpen size={22} />
-            </div>
             <div>
               <div className="teacher-stat-num">{counts.active} {isVi ? 'Lớp' : 'Classes'}</div>
               <div className="teacher-stat-label">{isVi ? 'Lớp đang dạy' : 'Active Classes'}</div>
@@ -255,9 +252,6 @@ export const TeacherClasses: React.FC = () => {
 
           {/* Total Students Card */}
           <div className="teacher-stat-card">
-            <div className="teacher-stat-icon total">
-              <Users size={22} />
-            </div>
             <div>
               <div className="teacher-stat-num">{counts.totalStudents} {isVi ? 'Học viên' : 'Students'}</div>
               <div className="teacher-stat-label">{isVi ? 'Tổng học viên' : 'Total Students'}</div>
@@ -269,9 +263,6 @@ export const TeacherClasses: React.FC = () => {
             className={`teacher-stat-card ${counts.totalPending > 0 ? 'has-pending' : ''}`}
             onClick={() => navigate('/teacher/assignments')}
           >
-            <div className="teacher-stat-icon pending">
-              <Clock size={22} />
-            </div>
             <div>
               <div className="teacher-stat-num">
                 {counts.totalPending} {isVi ? 'Bài nộp' : 'Submissions'}
@@ -282,9 +273,6 @@ export const TeacherClasses: React.FC = () => {
 
           {/* Average Score Card */}
           <div className="teacher-stat-card">
-            <div className="teacher-stat-icon turnout">
-              <Award size={22} />
-            </div>
             <div>
               <div className="teacher-stat-num">Band {counts.overallAvg}</div>
               <div className="teacher-stat-label">{isVi ? 'Điểm trung bình' : 'Average Score'}</div>

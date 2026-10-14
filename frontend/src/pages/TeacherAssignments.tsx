@@ -5,9 +5,9 @@ import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { 
-  Plus, Mic, BookOpen, Headphones, PenTool, Clock, 
-  Search, CheckCircle2, AlertCircle, FileText, 
-  UploadCloud, X, Zap, Edit2, RefreshCw
+  Plus, Mic, BookOpen, Headphones, PenTool, 
+  Search, AlertCircle, FileText, 
+  UploadCloud, X, Edit2, RefreshCw
 } from 'lucide-react';
 import { Button, EmptyState, MetricCard } from '../components/common';
 
@@ -367,22 +367,18 @@ export const TeacherAssignments: React.FC = () => {
           <MetricCard
             title={isVi ? 'Tổng bài tập trong học kỳ' : 'Total Course Assignments'}
             value={`${stats.total} ${isVi ? 'Bài tập' : 'Items'}`}
-            icon={FileText}
           />
           <MetricCard
             title={isVi ? 'Học viên đang làm & nộp bài' : 'Currently Open for Submissions'}
             value={`${stats.openCount} ${isVi ? 'Bài đang mở' : 'Active'}`}
-            icon={CheckCircle2}
           />
           <MetricCard
             title={isVi ? 'Chờ giáo viên nhận xét & chấm điểm' : 'Pending Teacher Evaluation'}
             value={`${stats.pendingTotal} ${isVi ? 'Bài cần chấm' : 'To Grade'}`}
-            icon={Clock}
           />
           <MetricCard
             title={isVi ? 'Tỷ lệ nộp bài trung bình' : 'Avg Submission Turnout'}
             value={`${stats.avgSubmission}%`}
-            icon={Zap}
           />
         </div>
       )}

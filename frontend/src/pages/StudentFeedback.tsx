@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  MessageSquare, Sparkles, UserCheck, Star,
+  Sparkles, UserCheck, Star,
   ArrowRight, Search, CheckCircle2, AlertCircle,
   Lightbulb, PenTool, Mic, BookOpen, Headphones,
   RotateCcw
@@ -226,14 +226,8 @@ export const StudentFeedback: React.FC = () => {
       <div className="std-eco-header">
         <div>
           <h1 className="std-eco-title">
-            <MessageSquare size={28} color="var(--primary)" />
             {isVi ? 'Nhận xét & Phản hồi' : 'Feedback'}
           </h1>
-          <p className="std-eco-subtitle">
-            {isVi
-              ? 'Nhận xét và góp ý chi tiết từ giáo viên.'
-              : 'Detailed feedback and comments from teachers.'}
-          </p>
         </div>
       </div>
 

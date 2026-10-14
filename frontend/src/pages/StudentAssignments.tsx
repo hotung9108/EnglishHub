@@ -19,7 +19,9 @@ import {
   Layers, 
   AlertCircle, 
   RefreshCw,
-  ClipboardList
+  GraduationCap,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { Button, MetricCard, EmptyState, Skeleton } from '../components/common';
 import '../styles/student-ecosystem.css';
@@ -288,17 +290,8 @@ const StudentAssignments: React.FC = () => {
             <span className="current">{t('studentAssignments.title')}</span>
           </div>
           <h1 className="std-eco-title">
-            <ClipboardList size={26} color="var(--primary)" />
             <span>{t('studentAssignments.title')}</span>
           </h1>
-          <p className="std-eco-subtitle">
-            {t('studentAssignments.subtitle')}
-          </p>
-        </div>
-
-        <div className="std-eco-header-badge">
-          <span className="std-eco-badge-num">{classAssignments.length}</span>
-          <span className="std-eco-badge-label">{t('studentAssignments.unitAssignments') || 'bài tập'}</span>
         </div>
       </div>
 
@@ -325,23 +318,14 @@ const StudentAssignments: React.FC = () => {
         <MetricCard
           title={t('studentAssignments.statNotStarted')}
           value={isLoading ? '...' : stats.notStarted}
-          icon={<Clock size={20} />}
-          iconBgColor="var(--surface-dim, #F4EFE6)"
-          iconColor="var(--text-secondary, #736B63)"
         />
         <MetricCard
           title={t('studentAssignments.statGrading')}
           value={isLoading ? '...' : stats.grading}
-          icon={<Sparkles size={20} />}
-          iconBgColor="var(--tertiary-container, #FBF4E6)"
-          iconColor="var(--tertiary, #8C5E14)"
         />
         <MetricCard
           title={t('studentAssignments.statGraded')}
           value={isLoading ? '...' : stats.graded}
-          icon={<CheckCircle2 size={20} />}
-          iconBgColor="var(--primary-light, #EAF0E8)"
-          iconColor="var(--accent, #1B4D3E)"
         />
       </div>
 
@@ -384,12 +368,13 @@ const StudentAssignments: React.FC = () => {
 
         {/* Search & Class Dropdown */}
         <div className="std-asg-toolbar-right">
-          <div className="std-asg-select-wrap">
+          <div className={`std-asg-select-wrap ${selectedClassId !== 'all' ? 'has-value' : ''}`}>
+            <GraduationCap size={15} className="std-asg-select-icon" />
             <select
               id="student-class-select"
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="std-asg-select"
+              className={`std-asg-select ${selectedClassId !== 'all' ? 'has-value' : ''}`}
               aria-label={t('studentAssignments.filterClassLabel')}
             >
               <option value="all">{t('studentAssignments.filterAllClasses')}</option>
@@ -399,6 +384,7 @@ const StudentAssignments: React.FC = () => {
                 </option>
               ))}
             </select>
+            <ChevronDown size={14} className="std-asg-select-arrow" />
           </div>
 
           <div className="std-eco-search-wrap">
@@ -427,7 +413,7 @@ const StudentAssignments: React.FC = () => {
               title="Xem tất cả lớp"
               aria-label="Xóa bộ lọc lớp"
             >
-              ×
+              <X size={12} strokeWidth={2.5} />
             </button>
           </span>
         </div>

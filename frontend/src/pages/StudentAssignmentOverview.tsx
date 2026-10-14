@@ -10,7 +10,6 @@ import {
   CheckCircle2, 
   Play, 
   FileText,
-  HelpCircle,
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
@@ -301,7 +300,6 @@ const StudentAssignmentOverview: React.FC = () => {
         {/* Instructions */}
         <div className="overview-instructions-box">
           <h3 className="overview-instructions-title">
-            <HelpCircle size={16} color="var(--primary)" />
             Hướng dẫn &amp; Yêu cầu bài làm:
           </h3>
           <p className="overview-instructions-content">

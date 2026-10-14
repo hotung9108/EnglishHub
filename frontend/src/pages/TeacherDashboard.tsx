@@ -4,7 +4,7 @@ import {
   Users, BookOpen, Clock, Plus, 
   CheckCircle2, 
   FileText, PenTool, Mic, Headphones, Library,
-  ChevronRight, AlertCircle, Award,
+  ChevronRight, AlertCircle,
   RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -566,11 +566,6 @@ export const TeacherDashboard: React.FC = () => {
         <section className="teacher-dash-kpi-grid">
           {/* KPI 1: Active Classes */}
           <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/classes')}>
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon blue">
-                <BookOpen size={22} />
-              </div>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{enrichedClasses.length}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Lớp đang giảng dạy' : 'Active Classes'}</div>
@@ -579,11 +574,6 @@ export const TeacherDashboard: React.FC = () => {
 
           {/* KPI 2: Total Students */}
           <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon purple">
-                <Users size={22} />
-              </div>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{totalStudentsCount}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Tổng số học viên' : 'Enrolled Students'}</div>
@@ -592,11 +582,6 @@ export const TeacherDashboard: React.FC = () => {
 
           {/* KPI 3: Pending Grading Queue */}
           <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/assignments')}>
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon red">
-                <Clock size={22} />
-              </div>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{pendingSubmissions.length}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Bài nộp chờ chấm' : 'Pending Submissions'}</div>
@@ -605,11 +590,6 @@ export const TeacherDashboard: React.FC = () => {
 
           {/* KPI 4: Average Score */}
           <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-header">
-              <div className="teacher-dash-kpi-icon green">
-                <Award size={22} />
-              </div>
-            </div>
             <div className="teacher-dash-kpi-body">
               <div className="teacher-dash-kpi-value">{overallAvgBand}</div>
               <div className="teacher-dash-kpi-label">{isVi ? 'Điểm trung bình các lớp' : 'Overall Average'}</div>

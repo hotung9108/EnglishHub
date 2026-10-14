@@ -178,7 +178,6 @@ export const Accounts: React.FC = () => {
       <div className="adm-header">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            <Users size={28} className="text-primary" />
             {t('accounts.title')}
           </h1>
         </div>

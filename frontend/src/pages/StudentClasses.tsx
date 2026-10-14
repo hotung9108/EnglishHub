@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, BookOpen, CheckCircle2, GraduationCap, X, RotateCcw, AlertCircle } from 'lucide-react';
+import { Search, BookOpen, X, RotateCcw, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,7 +13,8 @@ import '../styles/student-classes.css';
 import '../styles/student-ecosystem.css';
 
 const StudentClasses: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -132,6 +133,11 @@ const StudentClasses: React.FC = () => {
       if (filter === 'active') return matchesSearch && c.status === 'active';
       if (filter === 'completed') return matchesSearch && c.status === 'completed';
       return matchesSearch;
+    }).sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'active' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
     });
   }, [classesList, searchTerm, filter]);
 
@@ -147,8 +153,8 @@ const StudentClasses: React.FC = () => {
     return (
       <div className="std-eco-container pb-48">
         <Skeleton height="36px" width="240px" borderRadius="8px" className="mb-24" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-28">
-          {[1, 2, 3].map(i => (
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map(i => (
             <Skeleton key={i} height="110px" borderRadius="12px" />
           ))}
         </div>
@@ -166,12 +172,9 @@ const StudentClasses: React.FC = () => {
       {/* 1. Page Header */}
       <div className="std-eco-header">
         <div>
-          <h1 className="std-eco-title mb-8">
+          <h1 className="std-eco-title">
             {t('studentClasses.title')}
           </h1>
-          <p className="std-eco-subtitle">
-            {t('studentClasses.subtitle')}
-          </p>
         </div>
       </div>
 
@@ -188,25 +191,28 @@ const StudentClasses: React.FC = () => {
       )}
 
       {/* 2. Overview Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-28">
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <MetricCard
+          title={isVi ? 'Tất cả lớp học' : 'All Classes'}
+          value={counts.all}
+          onClick={() => setFilter('all')}
+          className="cursor-pointer"
+        />
         <MetricCard
           title={t('studentClasses.filterActive')}
           value={counts.active}
-          icon={<BookOpen size={20} />}
           onClick={() => setFilter('active')}
           className="cursor-pointer"
         />
         <MetricCard
           title={t('studentClasses.filterCompleted')}
           value={counts.completed}
-          icon={<CheckCircle2 size={20} />}
           onClick={() => setFilter('completed')}
           className="cursor-pointer"
         />
         <MetricCard
-          title="Chứng chỉ hoàn thành"
+          title={isVi ? 'Chứng chỉ hoàn thành' : 'Certificates'}
           value={counts.certificates}
-          icon={<GraduationCap size={20} />}
           onClick={() => setFilter('completed')}
           className="cursor-pointer"
         />

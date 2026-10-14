@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  ArrowLeft, Download, Printer, Clock, FileText, ChevronLeft, ChevronRight,
+  ArrowLeft, Download, Printer, FileText, ChevronLeft, ChevronRight,
   User, Star, Sparkles, MessageSquare,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
@@ -443,7 +443,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
           title={isVi ? 'Điểm số đề xuất' : 'Suggested Score'}
           value={finalScoreInput || '7.0'}
           suffix="/ 10"
-          icon={Star}
           footerText={
             <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
               <Star size={14} /> 
@@ -456,9 +455,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
           title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
           value={String(wordCount)}
           suffix={isVi ? 'từ' : 'words'}
-          icon={Clock}
-          iconBgColor="var(--surface-container)"
-          iconColor="var(--on-surface-variant)"
           footerText={wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu (>= 250 từ)' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target')}
         />
       </div>

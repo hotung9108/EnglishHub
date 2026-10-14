@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Award, CheckCircle2, Clock, 
-  TrendingUp, ArrowRight, Download, Search,
+  ArrowRight, Download, Search,
   PenTool, Mic, BookOpen, Headphones, AlertCircle, FileText,
   RotateCcw
 } from 'lucide-react';
@@ -237,14 +236,8 @@ export const StudentGrades: React.FC = () => {
       <div className="std-eco-header">
         <div>
           <h1 className="std-eco-title">
-            <Award size={28} color="var(--primary)" />
             {isVi ? 'Bảng điểm' : 'Grade Book'}
           </h1>
-          <p className="std-eco-subtitle">
-            {isVi 
-              ? 'Điểm số và kết quả các bài tập đã nộp.' 
-              : 'Your assignment grades and scores.'}
-          </p>
         </div>
 
         <div>
@@ -275,30 +268,18 @@ export const StudentGrades: React.FC = () => {
         <MetricCard
           title={isVi ? 'Điểm TB Tích lũy (Thang 10)' : 'Cumulative Grade (Scale 10)'}
           value={overallAvg !== null && overallAvg > 0 ? `${overallAvg.toFixed(1)} / 10` : '--'}
-          icon={Award}
-          iconBgColor="#eff6ff"
-          iconColor="#2563eb"
         />
         <MetricCard
           title={isVi ? 'Bài tập đã có kết quả' : 'Assignments Graded'}
           value={`${gradedCount} / ${grades.length}`}
-          icon={CheckCircle2}
-          iconBgColor="#f0fdf4"
-          iconColor="#16a34a"
         />
         <MetricCard
-          title={isVi ? 'Đang chờ giáo viên/AI chấm' : 'Awaiting Grading'}
+          title={isVi ? 'Đang chờ chấm' : 'Awaiting Grading'}
           value={`${pendingCount} ${isVi ? 'bài' : 'items'}`}
-          icon={Clock}
-          iconBgColor="#fffbeb"
-          iconColor="#d97706"
         />
         <MetricCard
           title={isVi ? 'Tăng trưởng so với đầu kỳ' : 'Progress vs Diagnostic'}
           value={progressDelta > 0 ? `+${progressDelta} Band` : '--'}
-          icon={TrendingUp}
-          iconBgColor="#faf5ff"
-          iconColor="#9333ea"
         />
       </div>
 
@@ -348,7 +329,6 @@ export const StudentGrades: React.FC = () => {
       <div className="std-eco-card">
         <div className="std-eco-card-header">
           <h2 className="std-eco-card-title">
-            <FileText size={18} color="var(--primary)" />
             {isVi ? 'Chi tiết điểm bài tập' : 'Assignment Grades'}
           </h2>
           <span className="text-xs text-slate-500 font-medium">
@@ -360,7 +340,7 @@ export const StudentGrades: React.FC = () => {
           <table className="grades-table">
             <thead>
               <tr>
-                <th className="text-left" style={{ minWidth: '240px' }}>
+                <th className="text-left min-w-[240px]">
                   {isVi ? 'Bài tập & Khóa học' : 'Assignment & Class'}
                 </th>
                 <th className="text-center">{isVi ? 'Kỹ năng' : 'Skill'}</th>

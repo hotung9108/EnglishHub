@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
   Users, 
-  GraduationCap, 
   BookOpen, 
-  Sparkles, 
   Plus, 
   BarChart3, 
   History, 
   FileSpreadsheet, 
-  Zap,
   ShieldCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -98,11 +95,6 @@ export const Dashboard = () => {
           <h1 className="adm-title">
             {isVi ? 'Bảng điều khiển quản trị' : 'Admin Dashboard'}
           </h1>
-          <p className="adm-subtitle">
-            {isVi 
-              ? 'Tổng quan hoạt động lớp học, bài nộp và hệ thống.' 
-              : 'Overview of classes, submissions, and system status.'}
-          </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -128,9 +120,6 @@ export const Dashboard = () => {
         <MetricCard
           title={isVi ? 'TỔNG HỌC VIÊN' : 'TOTAL STUDENTS'}
           value={loading ? '...' : stats.totalStudents}
-          icon={<Users size={20} />}
-          iconBgColor="var(--primary-container)"
-          iconColor="var(--primary)"
           footerText={isVi ? 'Hồ sơ đã kích hoạt' : 'Registered accounts'}
           onClick={() => navigate('/admin/students')}
         />
@@ -138,9 +127,6 @@ export const Dashboard = () => {
         <MetricCard
           title={isVi ? 'GIẢNG VIÊN HOẠT ĐỘNG' : 'ACTIVE TEACHERS'}
           value={loading ? '...' : stats.totalTeachers}
-          icon={<GraduationCap size={20} />}
-          iconBgColor="var(--secondary-container)"
-          iconColor="var(--secondary)"
           footerText={isVi ? 'Giáo viên trong hệ thống' : 'Active faculty'}
           onClick={() => navigate('/admin/teachers')}
         />
@@ -148,9 +134,6 @@ export const Dashboard = () => {
         <MetricCard
           title={isVi ? 'LỚP HỌC ĐANG MỞ' : 'ACTIVE CLASSES'}
           value={loading ? '...' : stats.totalClasses}
-          icon={<BookOpen size={20} />}
-          iconBgColor="var(--tertiary-container)"
-          iconColor="var(--tertiary)"
           footerText={isVi ? 'Theo dõi sĩ số và tiến độ' : 'Class cohorts'}
           onClick={() => navigate('/admin/classes')}
         />
@@ -158,9 +141,6 @@ export const Dashboard = () => {
         <MetricCard
           title={isVi ? 'BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}
           value={loading ? '...' : stats.totalAssignments}
-          icon={<Sparkles size={20} />}
-          iconBgColor="#ede9fe"
-          iconColor="#7c3aed"
           footerText={stats.pendingGradings > 0 ? `${stats.pendingGradings} ${isVi ? 'chờ chấm' : 'pending'}` : (isVi ? 'Đã hoàn tất xử lý' : 'All graded')}
           onClick={() => navigate('/admin/reports')}
         />
@@ -168,7 +148,7 @@ export const Dashboard = () => {
 
       {/* Main 2-Column Bento Layout */}
       <div className="grid grid-cols-1 gap-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
+        <div className="adm-bento-grid">
           
           {/* Left Column: Live Activity Feed */}
           <div className="eh-card p-6">
@@ -177,9 +157,6 @@ export const Dashboard = () => {
                 <h3 className="headline-md m-0">
                   {isVi ? 'Hoạt Động Gần Đây' : 'Recent Activity'}
                 </h3>
-                <p className="label-md text-muted mt-1">
-                  {isVi ? 'Hoạt động mới nhất từ các lớp học' : 'Recent activity across your classes'}
-                </p>
               </div>
             </div>
 
@@ -201,8 +178,7 @@ export const Dashboard = () => {
             
             {/* Quick Action Commands */}
             <div className="eh-card p-6">
-              <h3 className="headline-md mb-3 flex items-center gap-2">
-                <Zap size={18} className="text-primary" />
+              <h3 className="headline-md mb-3">
                 {isVi ? 'Phím Tắt Điều Hành Nhanh' : 'Executive Command Launchers'}
               </h3>
               
@@ -260,8 +236,7 @@ export const Dashboard = () => {
             {/* System Node Telemetry */}
             <div className="eh-card p-5">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="m-0 text-sm font-bold flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-secondary" />
+                <h4 className="m-0 text-sm font-bold">
                   {isVi ? 'Trạng Thái Hạ Tầng & Dịch Vụ' : 'Core Infrastructure Health'}
                 </h4>
                 <span className="badge badge-active">{isVi ? 'Đang hoạt động' : 'Operational'}</span>

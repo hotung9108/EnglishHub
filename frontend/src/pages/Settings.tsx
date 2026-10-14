@@ -243,12 +243,14 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
       <div className="settings-header">
         <div className="settings-header-info">
           <h1 className="settings-header-title">
-            <Sliders size={26} color="var(--primary)" />
+            {currentRole !== 'admin' && <Sliders size={26} color="var(--primary)" />}
             {getRoleTitle()}
           </h1>
-          <p className="settings-header-subtitle">
-            {t('settings.subtitle')}
-          </p>
+          {currentRole !== 'admin' && (
+            <p className="settings-header-subtitle">
+              {t('settings.subtitle')}
+            </p>
+          )}
         </div>
         <span className={`settings-role-badge ${currentRole}`}>
           {currentRole === 'admin' && <ShieldCheck size={14} />}

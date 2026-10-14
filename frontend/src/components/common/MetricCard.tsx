@@ -4,7 +4,7 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   suffix?: string;
-  icon: ReactNode | ElementType;
+  icon?: ReactNode | ElementType;
   iconBgColor?: string;
   iconColor?: string;
   footerText?: ReactNode;
@@ -43,15 +43,17 @@ export const MetricCard = ({
     <div className={cardClasses} onClick={onClick}>
       <div className="flex justify-between items-start">
         <span className="metric-title">{title}</span>
-        <div 
-          className="metric-icon-wrap"
-          style={{
-            backgroundColor: iconBgColor,
-            color: iconColor
-          }}
-        >
-          {renderIcon()}
-        </div>
+        {icon && (
+          <div 
+            className="metric-icon-wrap"
+            style={{
+              backgroundColor: iconBgColor,
+              color: iconColor
+            }}
+          >
+            {renderIcon()}
+          </div>
+        )}
       </div>
       <div className="metric-value-wrap">
         <span className="metric-value">{value}</span>

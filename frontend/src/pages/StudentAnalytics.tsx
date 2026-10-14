@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
-  BarChart3, Sparkles, AlertTriangle, 
-  CheckCircle2, ArrowRight, Target,
-  PenTool, Mic, BookOpen, Headphones, Zap,
+  AlertTriangle, 
+  CheckCircle2,
+  PenTool, Mic, BookOpen, Headphones,
   RotateCcw, AlertCircle
 } from 'lucide-react';
 import { Button, Skeleton } from '../components/common';
@@ -17,9 +16,7 @@ import '../styles/student-ecosystem.css';
 interface SkillScore {
   skill: 'Listening' | 'Reading' | 'Writing' | 'Speaking';
   current: number;
-  target: number;
   max: number;
-  status: 'strong' | 'average' | 'needs_work';
   testsCompleted: number;
 }
 
@@ -28,12 +25,10 @@ function convertScoreTo10(score: number): number {
 }
 
 export const StudentAnalytics: React.FC = () => {
-  const navigate = useNavigate();
   const { language } = useLanguage();
   const { user } = useAuth();
   const isVi = language === 'vi';
 
-  const [timeRange, setTimeRange] = useState<'month' | 'quarter' | 'all'>('month');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [progressData, setProgressData] = useState<ReportStudentProgressResponse | null>(null);
@@ -81,8 +76,7 @@ export const StudentAnalytics: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [user?.id, timeRange, isVi, reloadKey]);
-
+  }, [user?.id, isVi, reloadKey]);
 
   const skillsData: SkillScore[] = useMemo(() => {
     const skillList: ('Listening' | 'Reading' | 'Writing' | 'Speaking')[] = ['Listening', 'Reading', 'Writing', 'Speaking'];
@@ -95,15 +89,12 @@ export const StudentAnalytics: React.FC = () => {
       const apiScore = skillMap.get(skill.toUpperCase());
       const hasSkill = apiScore !== undefined;
       const score10 = hasSkill ? convertScoreTo10(apiScore) : 0;
-      const status: 'strong' | 'average' | 'needs_work' = score10 >= 8.0 ? 'strong' : score10 >= 6.5 ? 'average' : 'needs_work';
       const testsCompleted = submissions.filter(s => s.status === 'GRADED').length;
 
       return {
         skill,
         current: score10,
-        target: 8.5,
         max: 10.0,
-        status,
         testsCompleted: hasSkill ? Math.max(1, testsCompleted) : 0,
       };
     });
@@ -139,69 +130,29 @@ export const StudentAnalytics: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: SkillScore['status']) => {
-    if (status === 'strong') {
-      return (
-        <span className="analytics-badge-good">
-          {isVi ? 'Vững chắc' : 'Mastered'}
-        </span>
-      );
-    }
-    if (status === 'average') {
-      return (
-        <span className="analytics-badge-avg">
-          {isVi ? 'Đang tiến bộ' : 'Developing'}
-        </span>
-      );
-    }
-    return (
-      <span className="analytics-badge-weak">
-        {isVi ? 'Cần tập trung' : 'Needs Focus'}
-      </span>
-    );
-  };
-
   if (loading) {
     return (
-      <div className="std-eco-container p-24">
-        <Skeleton height="40px" width="320px" borderRadius="8px" className="mb-24" />
-        <Skeleton height="160px" borderRadius="16px" className="mb-28" />
+      <div className="std-eco-container pb-48">
+        <Skeleton height="36px" width="240px" borderRadius="8px" className="mb-24" />
+        <Skeleton height="140px" borderRadius="16px" className="mb-28" />
         <div className="analytics-grid">
           {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} height="220px" borderRadius="14px" />
+            <Skeleton key={i} height="130px" borderRadius="14px" />
           ))}
         </div>
-        <Skeleton height="180px" borderRadius="14px" />
+        <Skeleton height="160px" borderRadius="14px" />
       </div>
     );
   }
 
   return (
-    <div className="std-eco-container">
+    <div className="std-eco-container pb-48">
       {/* Header */}
       <div className="std-eco-header">
         <div>
           <h1 className="std-eco-title">
-            <BarChart3 size={28} color="var(--primary)" />
             {isVi ? 'Phân tích tiến độ' : 'Progress Analytics'}
           </h1>
-          <p className="std-eco-subtitle">
-            {isVi 
-              ? 'Thống kê kết quả học tập và mức độ hoàn thành bài tập.' 
-              : 'Learning progress and assignment completion statistics.'}
-          </p>
-        </div>
-
-        <div className="flex gap-8">
-          <select 
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as 'month' | 'quarter' | 'all')}
-            className="analytics-select"
-          >
-            <option value="month">{isVi ? '30 ngày gần nhất' : 'Last 30 days'}</option>
-            <option value="quarter">{isVi ? 'Học kỳ hiện tại' : 'Current Term'}</option>
-            <option value="all">{isVi ? 'Toàn bộ khóa học' : 'All-time History'}</option>
-          </select>
         </div>
       </div>
 
@@ -221,15 +172,11 @@ export const StudentAnalytics: React.FC = () => {
       <div className="std-eco-hero">
         <div className="std-eco-hero-content">
           <div>
-            <div className="analytics-hero-target-pill">
-              <Target size={15} />
-              <span>{isVi ? 'Mục tiêu học tập: 8.5 / 10' : 'Target Goal: 8.5 / 10'}</span>
-            </div>
             <h2 className="analytics-hero-title">
               {currentOverallBand !== null ? (
                 isVi 
-                  ? `Bạn đã đạt ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% chặng đường đến mục tiêu 8.5 điểm` 
-                  : `You have completed ${Math.min(100, Math.round((currentOverallBand / 8.5) * 100))}% of your target milestone`
+                  ? `Điểm trung bình tích lũy: ${currentOverallBand.toFixed(1)} / 10` 
+                  : `Cumulative Average Score: ${currentOverallBand.toFixed(1)} / 10`
               ) : (
                 isVi
                   ? 'Bắt đầu làm bài tập để theo dõi tiến độ điểm số'
@@ -239,7 +186,7 @@ export const StudentAnalytics: React.FC = () => {
             <p className="analytics-hero-desc">
               {currentOverallBand !== null ? (
                 isVi 
-                  ? `Kỹ năng ${highestSkill.skill} của bạn đang ở phong độ tốt (${highestSkill.current.toFixed(1)} / 10). Tập trung rèn luyện thêm ${lowestSkill.skill} để bứt phá điểm tổng!`
+                  ? `Kỹ năng ${highestSkill.skill} của bạn đang ở phong độ tốt (${highestSkill.current.toFixed(1)} / 10). Tập trung rèn luyện thêm ${lowestSkill.skill} để nâng cao điểm tổng thể!`
                   : `Your ${highestSkill.skill} skill is performing well (${highestSkill.current.toFixed(1)} / 10). Channel focused practice into ${lowestSkill.skill} to elevate your overall score!`
               ) : (
                 isVi
@@ -256,13 +203,6 @@ export const StudentAnalytics: React.FC = () => {
               </div>
               <div className="analytics-hero-kpi-label">
                 {isVi ? 'Điểm TB Hiện Tại' : 'Current Score'}
-              </div>
-            </div>
-            <div className="analytics-hero-divider"></div>
-            <div className="text-center">
-              <div className="analytics-hero-kpi-val kpi-target">8.5</div>
-              <div className="analytics-hero-kpi-label">
-                {isVi ? 'Mục Tiêu' : 'Target'}
               </div>
             </div>
             <div className="analytics-hero-divider"></div>
@@ -296,13 +236,12 @@ export const StudentAnalytics: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {getStatusBadge(item.status)}
             </div>
 
             {/* Score Comparison */}
             <div className="analytics-score-row">
               <span className="analytics-score-label">
-                {isVi ? 'Điểm hiện tại' : 'Current Band'}
+                {isVi ? 'Điểm hiện tại' : 'Current Score'}
               </span>
               <span className="analytics-score-val">
                 {item.current > 0 ? (
@@ -316,7 +255,7 @@ export const StudentAnalytics: React.FC = () => {
             </div>
 
             {/* Radar / Progress Bar */}
-            <div className="analytics-radar-bar mb-16">
+            <div className="analytics-radar-bar">
               <div 
                 className="analytics-radar-fill"
                 style={{ 
@@ -328,16 +267,12 @@ export const StudentAnalytics: React.FC = () => {
         ))}
       </div>
 
-      {/* AI Diagnostic Center & Remedial Recommendations */}
+      {/* Competency Assessment & Remedial Recommendations */}
       <div className="std-eco-card">
         <div className="std-eco-card-header">
           <h2 className="std-eco-card-title">
-            <Sparkles size={18} color="#9333ea" />
-            {isVi ? 'Trung Tâm Chẩn Đoán AI & Lộ Trình Khắc Phục Lỗ Hổng' : 'AI Diagnostic Engine & Targeted Remedial Plan'}
+            {isVi ? 'Đánh giá năng lực & Trọng tâm rèn luyện' : 'Competency Assessment & Improvement Focus'}
           </h2>
-          <span className="analytics-version-badge">
-            Auto-Diagnostic v2.4
-          </span>
         </div>
 
         <div className="std-eco-card-body">
@@ -372,39 +307,15 @@ export const StudentAnalytics: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Recommended Practice Action */}
-              <div className="analytics-diagnostic-card recommendation mt-16 flex items-center justify-between flex-wrap gap-12">
-                <div className="flex items-center gap-12">
-                  <Zap size={22} color="#2563eb" className="shrink-0" />
-                  <div>
-                    <div className="font-bold">
-                      {isVi ? `Bộ bài tập tăng tốc kỹ năng ${lowestSkill.skill}` : `Accelerated Drills for ${lowestSkill.skill}`}
-                    </div>
-                    <div className="opacity-90 text-sm">
-                      {isVi ? 'Được đề xuất tự động dựa trên kết quả các bài kiểm tra gần nhất' : 'Adaptive curriculum generated from your latest assignment results'}
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={<ArrowRight size={14} />}
-                  onClick={() => navigate('/student/assignments')}
-                >
-                  {isVi ? 'Bắt đầu luyện tập ngay' : 'Start Practice Drills'}
-                </Button>
-              </div>
             </>
           ) : (
             <div className="analytics-empty-diagnostic">
               <AlertCircle size={32} className="analytics-empty-icon" />
               <p className="analytics-empty-title">
-                {isVi ? 'Chưa có đủ dữ liệu bài nộp để chẩn đoán AI' : 'Not enough submission data for AI diagnostics'}
+                {isVi ? 'Chưa có đủ dữ liệu bài nộp để phân tích' : 'Not enough submission data for analytics'}
               </p>
               <span className="text-sm">
-                {isVi ? 'Hãy hoàn thành các bài tập được giao để AI phân tích điểm mạnh và điểm yếu của bạn.' : 'Complete assigned tasks so the AI can diagnose your strengths and improvement areas.'}
+                {isVi ? 'Hãy hoàn thành các bài tập được giao để hệ thống phân tích điểm mạnh và điểm yếu của bạn.' : 'Complete assigned tasks so the system can evaluate your strengths and improvement areas.'}
               </span>
             </div>
           )}

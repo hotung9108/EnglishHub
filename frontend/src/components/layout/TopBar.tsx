@@ -8,7 +8,6 @@ import {
   Globe, 
   User as UserIcon, 
   ShieldCheck, 
-  Sliders, 
   LogOut, 
   ChevronDown 
 } from 'lucide-react';
@@ -29,11 +28,6 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
     : normalizedRole === 'teacher' 
       ? '/teacher/profile' 
       : '/student/profile';
-  const settingsBasePath = normalizedRole === 'admin' 
-    ? '/admin/settings' 
-    : normalizedRole === 'teacher' 
-      ? '/teacher/settings' 
-      : '/student/settings';
 
   const roleLabels: Record<string, { vi: string; en: string }> = {
     admin: { vi: 'Quản trị viên', en: 'Admin' },
@@ -175,15 +169,6 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
               >
                 <ShieldCheck size={16} color="var(--text-primary)" />
                 <span>{t('settings.tabSecurity')}</span>
-              </Link>
-
-              <Link 
-                to={`${settingsBasePath}?tab=preferences`} 
-                className="topbar-dropdown-item"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <Sliders size={16} color="var(--text-primary)" />
-                <span>{t('settings.tabPreferences')}</span>
               </Link>
 
               <div className="topbar-dropdown-divider"></div>
