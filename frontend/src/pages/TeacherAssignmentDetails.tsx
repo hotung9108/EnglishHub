@@ -11,6 +11,7 @@ import { assignmentService, type AssignmentDetail } from '../api/services/assign
 import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
 import { moduleService } from '../api/services/module.service';
 import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
+import { Button, EmptyState } from '../components/common';
 
 interface EnrolledStudentSubmissionRow {
   studentId: number;
@@ -164,8 +165,8 @@ export const TeacherAssignmentDetails: React.FC = () => {
       }
 
       // 5. Combine class members with submissions
-      const bgColors = ['#E0E7FF', '#FEF3C7', '#FCE7F3', '#F3E8FF', '#ECFDF5', '#EFF6FF'];
-      const textColors = ['#4338CA', '#D97706', '#BE185D', '#7E22CE', '#059669', '#2563EB'];
+      const bgColors = ['#EAF0E8', '#FEF3C7', '#FCE7F3', '#F3E8FF', '#ECFDF5', '#FAF3E5'];
+      const textColors = ['#1B4D3E', '#D97706', '#BE185D', '#7E22CE', '#059669', '#8C5E14'];
 
       const studentRows: EnrolledStudentSubmissionRow[] = classMembers.map((member, index) => {
         const matchedSub = submissionsList.find((s) => s.studentId === member.studentId);
@@ -282,12 +283,12 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
-        <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+      <div className="eh-card p-8 max-w-xl mx-auto my-8 text-center">
+        <RefreshCw size={36} className="text-primary animate-spin m-auto mb-4" />
+        <h3 className="m-0 text-sm font-bold text-main">
           {isVi ? 'Đang tải dữ liệu bài tập và danh sách nộp bài...' : 'Loading assignment and submissions...'}
         </h3>
-        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+        <p className="mt-1 text-xs text-muted">
           {isVi ? 'Đang đồng bộ số liệu chấm điểm và học viên từ hệ thống.' : 'Syncing grading turnout and enrolled student roster.'}
         </p>
       </div>
@@ -296,198 +297,163 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
   if (error || !assignment) {
     return (
-      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <AlertCircle size={24} color="#dc2626" />
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>
+      <div className="adm-alert-error max-w-xl mx-auto my-8">
+        <div className="flex items-center gap-3 mb-3">
+          <AlertCircle size={24} className="text-danger flex-shrink-0" />
+          <h3 className="m-0 text-sm font-bold text-danger">
             {error || (isVi ? 'Không tìm thấy bài tập này.' : 'Assignment not found.')}
           </h3>
         </div>
-        <button 
-          className="btn btn-secondary bg-white btn-sm"
+        <Button 
+          variant="secondary"
+          size="sm"
+          icon={RefreshCw}
           onClick={handleRetry}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          <RefreshCw size={14} />
-          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-        </button>
+          {isVi ? 'Thử lại' : 'Retry'}
+        </Button>
       </div>
     );
   }
 
   return (
-    <div style={{ paddingBottom: '40px' }}>
+    <div className="tad-container">
       {/* Toast Alert */}
       {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          backgroundColor: '#0f172a',
-          color: '#ffffff',
-          padding: '12px 20px',
-          borderRadius: '10px',
-          fontSize: '13px',
-          fontWeight: 600,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <CheckCircle2 size={16} color="#4ade80" />
+        <div className="tad-toast">
+          <CheckCircle2 size={16} className="text-secondary" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Back button */}
       <button 
+        type="button"
         onClick={() => navigate('/teacher/assignments')}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px', 
-          color: '#2563EB', 
-          background: 'none', 
-          border: 'none', 
-          cursor: 'pointer', 
-          fontSize: '14px', 
-          fontWeight: 500, 
-          marginBottom: '20px', 
-          padding: 0 
-        }}
+        className="tad-back-btn"
       >
         <ArrowLeft size={16} /> {t('assignmentDetails.backToLibrary')}
       </button>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+      <div className="tad-header">
         <div>
-          <h1 style={{ margin: '0 0 12px 0', fontSize: '24px', fontWeight: 700, color: '#111827' }}>
+          <h1 className="tad-title">
             HW-{assignment.id.toString().padStart(2, '0')}: {assignment.title}
           </h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ 
-              backgroundColor: assignment.status === 'PUBLISHED' ? '#DCFCE7' : '#F1F5F9', 
-              color: assignment.status === 'PUBLISHED' ? '#16A34A' : '#475569', 
-              padding: '4px 12px', 
-              borderRadius: '16px', 
-              fontSize: '13px', 
-              fontWeight: 600 
-            }}>
+          <div className="tad-meta-row">
+            <span className={`tad-status-pill ${assignment.status === 'PUBLISHED' ? 'open' : 'closed'}`}>
               {assignment.status === 'PUBLISHED' ? t('assignmentDetails.statusOpen') : assignment.status}
             </span>
-            <span style={{ backgroundColor: '#F3E8FF', color: '#9333EA', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
+            <span className="tad-skill-tag">
               {skillLabel}
             </span>
-            <span style={{ color: '#6B7280', fontSize: '14px' }}>•</span>
-            <span style={{ color: '#4B5563', fontSize: '14px', fontWeight: 500 }}>
+            <span className="text-muted text-sm">•</span>
+            <span className="text-muted text-sm font-medium">
               {t('assignmentDetails.classPrefix')}{className}
             </span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            type="button"
+        <div className="flex gap-3">
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={Edit2}
             onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', 
-              padding: '8px 16px', borderRadius: '8px', 
-              border: '1px solid #D1D5DB', backgroundColor: 'white', 
-              color: '#374151', fontWeight: 500, cursor: 'pointer' 
-            }}
           >
-            <Edit2 size={16} /> {t('assignmentDetails.btnEdit')}
-          </button>
-          <button 
-            type="button"
+            {t('assignmentDetails.btnEdit')}
+          </Button>
+          <Button 
+            variant="secondary"
+            size="sm"
+            icon={Download}
             onClick={() => showToast(isVi ? 'Đang xuất bảng điểm bài tập ra file Excel...' : 'Exporting submissions to Excel...')}
-            style={{ 
-              display: 'flex', alignItems: 'center', gap: '8px', 
-              padding: '8px 16px', borderRadius: '8px', 
-              border: '1px solid #D1D5DB', backgroundColor: 'white', 
-              color: '#374151', fontWeight: 500, cursor: 'pointer' 
-            }}
           >
-            <Download size={16} /> {t('assignmentDetails.btnExport')}
-          </button>
+            {t('assignmentDetails.btnExport')}
+          </Button>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {/* Card 1: Time */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardTimeTitle')}</h3>
-            <div style={{ backgroundColor: '#EFF6FF', color: '#3B82F6', padding: '8px', borderRadius: '8px' }}>
+        <div className="eh-card p-5">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="m-0 text-sm text-muted font-medium">{t('assignmentDetails.cardTimeTitle')}</h3>
+            <div className="p-2 rounded-md bg-primary-container text-primary flex items-center justify-center">
               <Calendar size={18} />
             </div>
           </div>
-          <div style={{ color: '#6B7280', fontSize: '13.5px', marginBottom: '8px' }}>
-            {t('assignmentDetails.assignedPrefix')}<span style={{ color: '#374151', fontWeight: 500 }}>{openAtDate || 'Đang mở'}</span>
+          <div className="text-xs text-muted mb-2">
+            {t('assignmentDetails.assignedPrefix')}<span className="text-main font-medium">{openAtDate || 'Đang mở'}</span>
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: '#111827' }}>
+          <div className="text-base font-bold text-main">
             {closeAtDate || (isVi ? 'Không thời hạn' : 'No deadline')}
           </div>
         </div>
 
         {/* Card 2: Progress */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardProgressTitle')}</h3>
-            <div style={{ backgroundColor: '#ECFDF5', color: '#10B981', padding: '8px', borderRadius: '8px' }}>
+        <div className="eh-card p-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="m-0 text-sm text-muted font-medium">{t('assignmentDetails.cardProgressTitle')}</h3>
+            <div className="p-2 rounded-md bg-secondary-container text-secondary flex items-center justify-center">
               <Shield size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#111827', marginBottom: '12px' }}>
-            {metrics.submittedCount}<span style={{ fontSize: '16px', color: '#9CA3AF', fontWeight: 500 }}>/{metrics.totalStudents}</span>
+          <div className="text-2xl font-bold text-main mb-3">
+            {metrics.submittedCount}<span className="text-base text-muted font-medium">/{metrics.totalStudents}</span>
           </div>
-          <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
-            <div style={{ width: `${Math.round((metrics.submittedCount / metrics.totalStudents) * 100)}%`, backgroundColor: '#10B981' }}></div>
-            <div style={{ width: `${Math.round((metrics.missingCount / metrics.totalStudents) * 100)}%`, backgroundColor: '#EF4444' }}></div>
+          <div className="flex h-1-5 rounded-full overflow-hidden mb-2 bg-surface-variant">
+            <div 
+              className="bg-secondary"
+              style={{ width: `${Math.round((metrics.submittedCount / metrics.totalStudents) * 100)}%` }}
+            />
+            <div 
+              className="bg-danger"
+              style={{ width: `${Math.round((metrics.missingCount / metrics.totalStudents) * 100)}%` }}
+            />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: '#6B7280' }}>{t('assignmentDetails.submittedCount')}<span style={{ color: '#374151', fontWeight: 500 }}>{metrics.submittedCount}</span></span>
-            <span style={{ color: '#EF4444', fontWeight: 500 }}>{t('assignmentDetails.missingCount')}{metrics.missingCount}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted">{t('assignmentDetails.submittedCount')}<span className="text-main font-medium">{metrics.submittedCount}</span></span>
+            <span className="text-danger font-medium">{t('assignmentDetails.missingCount')}{metrics.missingCount}</span>
           </div>
         </div>
 
         {/* Card 3: Grading */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardGradingTitle')}</h3>
-            <div style={{ backgroundColor: '#FFFBEB', color: '#D97706', padding: '8px', borderRadius: '8px' }}>
+        <div className="eh-card p-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="m-0 text-sm text-muted font-medium">{t('assignmentDetails.cardGradingTitle')}</h3>
+            <div className="p-2 rounded-md bg-warning-container text-warning flex items-center justify-center">
               <PenTool size={18} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-              {metrics.gradedCount}<span style={{ fontSize: '16px', color: '#9CA3AF', fontWeight: 500 }}>/{metrics.submittedCount}</span>
+          <div className="flex items-baseline gap-2 mb-3">
+            <div className="text-2xl font-bold text-main">
+              {metrics.gradedCount}<span className="text-base text-muted font-medium">/{metrics.submittedCount}</span>
             </div>
-            <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 8px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}>
+            <span className="p-1 px-2 rounded-sm bg-primary-container text-primary text-xs font-semibold">
               {metrics.gradedPercentage}% {t('assignmentDetails.gradedSuffix')}
             </span>
           </div>
-          <div style={{ color: '#D97706', fontSize: '13px', fontWeight: 600, backgroundColor: '#FEF3C7', display: 'inline-block', padding: '4px 12px', borderRadius: '12px' }}>
+          <div className="text-warning text-xs font-semibold bg-warning-container inline-block px-3 py-1 rounded-full">
             {metrics.pendingCount} {t('assignmentDetails.pendingSuffix')}
           </div>
         </div>
 
         {/* Card 4: Average Score */}
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontWeight: 500 }}>{t('assignmentDetails.cardAverageTitle')}</h3>
-            <div style={{ backgroundColor: '#F5F3FF', color: '#8B5CF6', padding: '8px', borderRadius: '8px' }}>
+        <div className="eh-card p-5">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="m-0 text-sm text-muted font-medium">{t('assignmentDetails.cardAverageTitle')}</h3>
+            <div className="p-2 rounded-md bg-tertiary-container text-tertiary flex items-center justify-center">
               <Zap size={18} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '8px' }}>
-            <div style={{ fontSize: '32px', fontWeight: 700, color: '#2563EB' }}>
+          <div className="flex items-baseline gap-2 mt-2">
+            <div className="text-3xl font-bold text-primary">
               {metrics.avgBand !== '0.0' ? metrics.avgBand : '—'}
             </div>
-            <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: 500 }}>
-              {t('assignmentDetails.bandSuffix')}
+            <span className="text-muted text-sm font-medium">
+              / 10
             </span>
           </div>
         </div>
@@ -495,16 +461,13 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
       {/* Prompt & Rubrics Box */}
       {instructions && (
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-            <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-              <FileText size={20} color="#2563EB" /> {t('assignmentDetails.promptTitle')}
+        <div className="tad-card">
+          <div className="flex justify-between items-start mb-3">
+            <h2 className="flex items-center gap-2 m-0 text-base font-semibold text-main">
+              <FileText size={20} className="text-primary" /> {t('assignmentDetails.promptTitle')}
             </h2>
-            <span style={{ border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '6px', fontSize: '13px', color: '#6B7280', backgroundColor: '#F9FAFB' }}>
-              IELTS Standard
-            </span>
           </div>
-          <div style={{ color: '#374151', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>
+          <div className="text-muted text-sm leading-relaxed whitespace-pre-line">
             {instructions}
           </div>
         </div>
@@ -512,153 +475,90 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
       {/* Assignment Questions Preview Section */}
       {(questions.length > 0 || skillLabel.toLowerCase().includes('reading') || skillLabel.toLowerCase().includes('listening') || (assignment?.modules && assignment.modules.some(m => ['READING', 'LISTENING'].includes(m.skill)))) && (
-        <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="tad-card">
+          <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-primary-container text-primary flex items-center justify-center">
                 <HelpCircle size={20} />
               </div>
               <div>
-                <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 className="m-0 text-base font-bold text-main flex items-center gap-2">
                   {isVi ? 'Danh sách câu hỏi đề bài' : 'Assignment Questions'}
-                  <span style={{ fontSize: '12px', fontWeight: 600, padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#F1F5F9', color: '#475569' }}>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-variant text-muted">
                     {questions.length} {isVi ? 'câu' : 'questions'}
                   </span>
                 </h2>
-                <span style={{ fontSize: '13px', color: '#6B7280' }}>
+                <span className="text-xs text-muted">
                   {isVi ? 'Bộ câu hỏi trắc nghiệm / tự luận học sinh phải hoàn thành' : 'Configured questions students must complete'}
                 </span>
               </div>
             </div>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Edit2}
               onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                border: '1px solid #D1D5DB',
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
             >
-              <Edit2 size={14} />
-              <span>{isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}</span>
-            </button>
+              {isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}
+            </Button>
           </div>
 
           {questions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '36px 16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
-              <AlertCircle size={32} color="#94A3B8" style={{ margin: '0 auto 8px auto', display: 'block' }} />
-              <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#334155' }}>
+            <div className="p-8 text-center bg-surface-variant border-dashed rounded-md">
+              <AlertCircle size={32} className="text-muted m-auto mb-2" />
+              <p className="m-0 mb-1 text-sm font-semibold text-main">
                 {isVi ? 'Chưa có câu hỏi nào trong bài tập này' : 'No questions created yet'}
               </p>
-              <span style={{ fontSize: '13px', color: '#64748B' }}>
+              <span className="text-xs text-muted">
                 {isVi ? 'Vui lòng nhấn Chỉnh sửa để thêm câu hỏi trắc nghiệm hoặc tự luận.' : 'Please edit the assignment to add questions.'}
               </span>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="flex flex-col gap-4">
               {questions.map((q, idx) => {
                 const isMcq = q.questionType === 'MULTIPLE_CHOICE';
                 const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
                 const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
 
                 return (
-                  <div
-                    key={q.id || idx}
-                    style={{
-                      border: '1px solid #E2E8F0',
-                      borderRadius: '10px',
-                      padding: '16px 20px',
-                      backgroundColor: '#FFFFFF',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '50%',
-                          backgroundColor: '#2563EB',
-                          color: '#FFFFFF',
-                          fontSize: '12px',
-                          fontWeight: 700
-                        }}>
+                  <div key={q.id || idx} className="tad-question-item">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="tad-q-badge-num">
                           {q.orderIndex || idx + 1}
                         </span>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.04em',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: isMcq ? '#EFF6FF' : '#FEF3C7',
-                          color: isMcq ? '#1D4ED8' : '#B45309'
-                        }}>
+                        <span className={`tad-q-badge-type ${isMcq ? 'mcq' : 'short-ans'}`}>
                           {isMcq ? (isVi ? 'Trắc nghiệm' : 'Multiple Choice') : (isVi ? 'Điền từ / Tự luận' : 'Short Answer')}
                         </span>
                       </div>
-                      <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500 }}>
+                      <span className="text-xs text-muted font-medium">
                         {q.score || 1} {isVi ? 'điểm' : 'pts'}
                       </span>
                     </div>
 
-                    <p style={{ margin: '0 0 12px 0', fontSize: '14.5px', fontWeight: 600, color: '#1E293B', lineHeight: 1.5 }}>
+                    <p className="m-0 mb-3 text-sm font-semibold text-main leading-relaxed">
                       {q.content}
                     </p>
 
                     {isMcq && mcq && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px' }}>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {mcq.options.map((optText, optIdx) => {
                           const optLetter = String.fromCharCode(65 + optIdx);
                           const isCorrect = optIdx === mcq.correctOptionIndex;
                           return (
                             <div
                               key={optIdx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 12px',
-                                borderRadius: '6px',
-                                border: isCorrect ? '1.5px solid #10B981' : '1px solid #E2E8F0',
-                                backgroundColor: isCorrect ? '#ECFDF5' : '#F8FAFC',
-                                fontSize: '13px',
-                                color: isCorrect ? '#065F46' : '#334155',
-                                fontWeight: isCorrect ? 600 : 400
-                              }}
+                              className={`tad-opt-item ${isCorrect ? 'correct' : ''}`}
                             >
-                              <span style={{
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                backgroundColor: isCorrect ? '#10B981' : '#E2E8F0',
-                                color: isCorrect ? '#FFFFFF' : '#475569',
-                                flexShrink: 0
-                              }}>
+                              <span className={`tad-opt-letter ${isCorrect ? 'correct' : ''}`}>
                                 {optLetter}
                               </span>
-                              <span style={{ flex: 1 }}>{optText}</span>
+                              <span className="flex-1">{optText}</span>
                               {isCorrect && (
-                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  ✓ {isVi ? 'Đáp án đúng' : 'Correct'}
+                                <span className="text-xs font-bold text-success inline-flex items-center gap-1">
+                                  <CheckCircle2 size={13} />
+                                  <span>{isVi ? 'Đáp án đúng' : 'Correct'}</span>
                                 </span>
                               )}
                             </div>
@@ -668,16 +568,9 @@ export const TeacherAssignmentDetails: React.FC = () => {
                     )}
 
                     {!isMcq && (
-                      <div style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#F8FAFC',
-                        borderRadius: '6px',
-                        border: '1px solid #E2E8F0',
-                        fontSize: '13px',
-                        color: '#334155'
-                      }}>
-                        <strong style={{ color: '#0F172A' }}>{isVi ? 'Đáp án chuẩn:' : 'Correct answer:'} </strong>
-                        <span style={{ color: '#059669', fontWeight: 600 }}>{shortAns || '(Chưa cấu hình)'}</span>
+                      <div className="p-3 bg-surface-variant rounded-md text-xs text-main">
+                        <strong className="text-main">{isVi ? 'Đáp án chuẩn:' : 'Correct answer:'} </strong>
+                        <span className="text-success font-semibold">{shortAns || '(Chưa cấu hình)'}</span>
                       </div>
                     )}
                   </div>
@@ -689,9 +582,9 @@ export const TeacherAssignmentDetails: React.FC = () => {
       )}
 
       {/* Students List */}
-      <div style={{ backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', overflow: 'hidden' }}>
+      <div className="tad-card p-0 overflow-hidden">
         {/* Tabs */}
-        <div style={{ borderBottom: '1px solid #E5E7EB', display: 'flex', padding: '0 16px', gap: '24px' }}>
+        <div className="tad-tabs-bar">
           {[
             { id: 'all' as const, label: t('assignmentDetails.tabAll'), count: students.length },
             { id: 'submitted' as const, label: t('assignmentDetails.tabSubmitted'), count: metrics.submittedCount },
@@ -699,20 +592,9 @@ export const TeacherAssignmentDetails: React.FC = () => {
           ].map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '16px 0',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #111827' : '2px solid transparent',
-                color: activeTab === tab.id ? '#111827' : (tab.isRed ? '#EF4444' : '#6B7280'),
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
+              className={`tad-tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.isRed && activeTab !== tab.id ? 'missing' : ''}`}
             >
               {tab.label} {tab.count !== undefined && `(${tab.count})`}
             </button>
@@ -720,173 +602,138 @@ export const TeacherAssignmentDetails: React.FC = () => {
         </div>
 
         {/* Toolbar */}
-        <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="tad-toolbar">
+          <div className="flex gap-2">
             <button 
+              type="button"
               onClick={() => setSubTab('all')}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '20px', 
-                border: subTab === 'all' ? '1px solid #D1D5DB' : '1px solid transparent', 
-                backgroundColor: subTab === 'all' ? 'white' : 'transparent', 
-                color: subTab === 'all' ? '#374151' : '#6B7280', 
-                fontSize: '13px', 
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
+              className={`tad-subtab-btn ${subTab === 'all' ? 'active' : ''}`}
             >
               {isVi ? 'Tất cả' : 'All'}
             </button>
             <button 
+              type="button"
               onClick={() => setSubTab('graded')}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '20px', 
-                border: subTab === 'graded' ? '1px solid #D1D5DB' : '1px solid transparent', 
-                backgroundColor: subTab === 'graded' ? 'white' : 'transparent', 
-                color: subTab === 'graded' ? '#374151' : '#6B7280', 
-                fontSize: '13px', 
-                fontWeight: 500,
-                cursor: 'pointer'
-              }}
+              className={`tad-subtab-btn ${subTab === 'graded' ? 'active' : ''}`}
             >
               {t('assignmentDetails.subTabGraded')} ({metrics.gradedCount})
             </button>
             <button 
+              type="button"
               onClick={() => setSubTab('pending')}
-              style={{ 
-                padding: '6px 16px', 
-                borderRadius: '20px', 
-                border: subTab === 'pending' ? '1px solid #FCD34D' : '1px solid transparent', 
-                backgroundColor: subTab === 'pending' ? '#FEF3C7' : 'transparent', 
-                color: '#D97706', 
-                fontSize: '13px', 
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
+              className={`tad-subtab-btn ${subTab === 'pending' ? 'pending-active' : ''}`}
             >
               {t('assignmentDetails.subTabPending')} ({metrics.pendingCount})
             </button>
           </div>
           
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
+          <div className="flex gap-3 items-center">
+            <div className="relative">
               <input 
                 type="text" 
                 placeholder={t('assignmentDetails.searchPlaceholder')} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ 
-                  padding: '8px 16px 8px 36px', 
-                  borderRadius: '8px', 
-                  border: '1px solid #D1D5DB', 
-                  fontSize: '14px', 
-                  width: '240px',
-                  outline: 'none'
-                }} 
+                className="tad-search-input"
               />
-              <Search size={16} color="#9CA3AF" style={{ position: 'absolute', left: '12px', top: '10px' }} />
+              <Search size={16} className="absolute left-3 top-2.5 text-muted pointer-events-none" />
             </div>
             {metrics.missingCount > 0 && (
-              <button 
-                className="btn btn-secondary btn-sm text-tertiary" 
-                style={{ backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }}
+              <Button 
+                variant="secondary"
+                size="sm"
+                icon={Bell}
                 onClick={() => showToast(isVi ? `Đã gửi thông báo nhắc nộp bài tới ${metrics.missingCount} học viên` : `Sent reminders to ${metrics.missingCount} students`)}
               >
-                <Bell size={16} /> {t('assignmentDetails.btnRemind')} ({metrics.missingCount}{t('assignmentDetails.unitFriends')})
-              </button>
+                {t('assignmentDetails.btnRemind')} ({metrics.missingCount}{t('assignmentDetails.unitFriends')})
+              </Button>
             )}
           </div>
         </div>
 
         {/* Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="overflow-x-auto">
+          <table className="tad-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid #E5E7EB', color: '#6B7280', fontSize: '12px', fontWeight: 600 }}>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStudent')}</th>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colStatus')}</th>
-                <th style={{ padding: '16px' }}>{t('assignmentDetails.colGrading')}</th>
-                <th style={{ padding: '16px', textAlign: 'right' }}>{t('assignmentDetails.colActions')}</th>
+              <tr>
+                <th>{t('assignmentDetails.colStudent')}</th>
+                <th>{t('assignmentDetails.colStatus')}</th>
+                <th>{t('assignmentDetails.colGrading')}</th>
+                <th className="text-right">{t('assignmentDetails.colActions')}</th>
               </tr>
             </thead>
             <tbody>
-              {filteredStudents.map((student, idx) => (
-                <tr key={student.studentId} style={{ borderBottom: idx === filteredStudents.length - 1 ? 'none' : '1px solid #E5E7EB' }}>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ 
-                        width: '36px', height: '36px', borderRadius: '50%', 
-                        backgroundColor: student.avatarBg, color: student.avatarColor, 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                        fontWeight: 600, fontSize: '14px' 
-                      }}>
+              {filteredStudents.map((student) => (
+                <tr key={student.studentId}>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="tad-avatar"
+                        style={{ backgroundColor: student.avatarBg, color: student.avatarColor }}
+                      >
                         {student.initials}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: '#111827', fontSize: '14px' }}>{student.name}</div>
-                        <div style={{ color: '#6B7280', fontSize: '13px' }}>{student.email} • {student.code}</div>
+                        <div className="font-semibold text-main text-sm">{student.name}</div>
+                        <div className="text-muted text-xs">{student.email} • {student.code}</div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td>
                     {student.status === 'submitted' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#ECFDF5', color: '#10B981', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10B981' }}></div>
+                      <span className="tad-badge-submitted">
+                        <div className="tad-badge-dot submitted" />
                         {t('assignmentDetails.statusSubmittedLabel')}
                       </span>
                     ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', backgroundColor: '#FEF2F2', color: '#EF4444', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 500 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#EF4444' }}></div>
+                      <span className="tad-badge-missing">
+                        <div className="tad-badge-dot missing" />
                         {t('assignmentDetails.statusMissingLabel')}
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td>
                     {student.gradingStatus === 'graded' && (
-                      <span style={{ backgroundColor: '#EFF6FF', color: '#2563EB', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 600 }}>
+                      <span className="tad-grading-graded">
                         {t('assignmentDetails.gradingGraded')} {student.finalScore !== null && `(Band ${student.finalScore})`}
                       </span>
                     )}
                     {student.gradingStatus === 'pending' && (
-                      <span style={{ border: '1px solid #FCD34D', color: '#D97706', padding: '4px 10px', borderRadius: '4px', fontSize: '13px', fontWeight: 500 }}>
+                      <span className="tad-grading-pending">
                         {t('assignmentDetails.gradingPending')}
                       </span>
                     )}
                     {student.gradingStatus === 'none' && (
-                      <span style={{ color: '#9CA3AF', fontSize: '13px' }}>{t('assignmentDetails.gradingNone')}</span>
+                      <span className="text-muted text-xs">{t('assignmentDetails.gradingNone')}</span>
                     )}
                   </td>
-                  <td style={{ padding: '16px', textAlign: 'right' }}>
+                  <td className="text-right">
                     {student.gradingStatus === 'graded' && (
-                      <button 
+                      <Button 
+                        variant="secondary"
+                        size="sm"
                         onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`)}
-                        style={{ 
-                          border: '1px solid #D1D5DB', backgroundColor: 'white', color: '#374151', 
-                          padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-                        }}
                       >
                         {t('assignmentDetails.btnView')}
-                      </button>
+                      </Button>
                     )}
                     {student.gradingStatus === 'pending' && (
-                      <button 
-                        className="btn btn-primary btn-sm"
+                      <Button 
+                        variant="primary"
+                        size="sm"
                         onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`)}
                       >
                         {t('assignmentDetails.btnGradeNow')}
-                      </button>
+                      </Button>
                     )}
                     {student.gradingStatus === 'none' && (
-                      <button 
+                      <Button 
+                        variant="secondary"
+                        size="sm"
                         onClick={() => showToast(isVi ? `Đã gửi nhắc nhở tới ${student.name}` : `Reminder sent to ${student.name}`)}
-                        style={{ 
-                          border: '1px solid #FCD34D', backgroundColor: 'white', color: '#D97706', 
-                          padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' 
-                        }}
                       >
                         {t('assignmentDetails.btnSendReminder')}
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -894,8 +741,11 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
               {filteredStudents.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '36px', color: '#64748b', fontSize: '13.5px' }}>
-                    {isVi ? 'Không tìm thấy học viên phù hợp.' : 'No students match your filter.'}
+                  <td colSpan={4}>
+                    <EmptyState
+                      icon={AlertCircle}
+                      title={isVi ? 'Không tìm thấy học viên phù hợp.' : 'No students match your filter.'}
+                    />
                   </td>
                 </tr>
               )}

@@ -23,7 +23,7 @@ export const AddClass: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    level: 'IELTS 6.5+',
+    level: 'Trung cấp (B1-B2)',
     room: '',
     startDate: new Date().toISOString().slice(0, 10),
     endDate: '',
@@ -126,9 +126,6 @@ export const AddClass: React.FC = () => {
             </button>
             <h1 className="adm-title">{t('addClass.title')}</h1>
           </div>
-          <p className="adm-subtitle">
-            {isVi ? 'Thiết lập thông tin khóa học mới với bộ chỉ dẫn từng bước trực quan.' : 'Configure new course cohort with live interactive preview.'}
-          </p>
         </div>
       </div>
 
@@ -149,20 +146,45 @@ export const AddClass: React.FC = () => {
         </div>
       )}
 
-      {/* Stepper Indicator */}
-      <div className="adm-stepper">
-        {steps.map(s => (
-          <div 
-            key={s.num}
-            className={`adm-step-item ${currentStep === s.num ? 'active' : currentStep > s.num ? 'completed' : ''}`}
-            onClick={() => s.num < currentStep && setCurrentStep(s.num)}
-          >
-            <div className="adm-step-circle">
-              {currentStep > s.num ? <Check size={16} /> : s.num}
-            </div>
-            <span className="adm-step-text">{s.title}</span>
-          </div>
-        ))}
+      {/* Stepper Indicator with Circles & Connecting Lines */}
+      <div className="adm-stepper-card">
+        <div className="adm-stepper-progress">
+          {steps.map((s, idx) => {
+            const isCompleted = currentStep > s.num;
+            const isActive = currentStep === s.num;
+            const isClickable = s.num < currentStep;
+
+            return (
+              <React.Fragment key={s.num}>
+                <div 
+                  className={`adm-progress-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                  onClick={() => isClickable && setCurrentStep(s.num)}
+                  role={isClickable ? 'button' : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isClickable) {
+                      setCurrentStep(s.num);
+                    }
+                  }}
+                >
+                  <div className="adm-progress-circle">
+                    {isCompleted ? <Check size={18} strokeWidth={2.5} /> : s.num}
+                  </div>
+                  <div className="adm-progress-label">
+                    <span className="adm-progress-sub">{isVi ? `Bước ${s.num}` : `Step ${s.num}`}</span>
+                    <span className="adm-progress-title">{s.title}</span>
+                  </div>
+                </div>
+
+                {idx < steps.length - 1 && (
+                  <div className={`adm-progress-connector ${currentStep > s.num ? 'completed' : ''}`}>
+                    <div className="adm-progress-connector-line" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       {/* 2-Column Form & Live Preview */}
@@ -178,7 +200,7 @@ export const AddClass: React.FC = () => {
                   <input 
                     type="text"
                     className="input"
-                    placeholder={isVi ? 'Ví dụ: IELTS Intensive Band 6.5 - 7.5' : 'e.g., IELTS Intensive Band 6.5 - 7.5'}
+                    placeholder={isVi ? 'Ví dụ: Tiếng Anh Tổng Quát 4 Kỹ Năng K24' : 'e.g., General English 4 Skills K24'}
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
@@ -204,11 +226,10 @@ export const AddClass: React.FC = () => {
                       value={formData.level}
                       onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                     >
-                      <option value="IELTS 5.5+">IELTS Pre-Int (5.5+)</option>
-                      <option value="IELTS 6.5+">IELTS Intensive (6.5+)</option>
-                      <option value="IELTS 7.0+">IELTS Master (7.0+)</option>
-                      <option value="TOEIC 750+">TOEIC Cấp tốc 750+</option>
-                      <option value="CEFR B2">Tiếng Anh Giao tiếp B2</option>
+                      <option value="Sơ cấp (A2-B1)">Sơ cấp (A2 - B1)</option>
+                      <option value="Trung cấp (B1-B2)">Trung cấp (B1 - B2)</option>
+                      <option value="Cao cấp (C1)">Cao cấp (C1)</option>
+                      <option value="Giao tiếp 4 kỹ năng">Giao tiếp 4 kỹ năng</option>
                     </select>
                   </div>
                 </div>

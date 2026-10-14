@@ -1,6 +1,7 @@
 export * from './core';
 export * from './useAuth';
 export * from './useCurrentUser';
+export * from './useDocumentTitle';
 export * from './useClasses';
 export type { UseClassesOptions, UseClassesResult } from '@/types/classes.types';
 export * from './useAssignments';

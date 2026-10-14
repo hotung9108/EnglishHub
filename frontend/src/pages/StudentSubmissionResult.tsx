@@ -99,7 +99,8 @@ export const StudentSubmissionResult: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { user } = useAuth();
 
   // State
@@ -368,9 +369,10 @@ export const StudentSubmissionResult: React.FC = () => {
     return 100;
   }, [gradingDetail, activeSubModule, moduleDetail, aiSuggestion]);
 
-  const bandScore = useMemo<string>(() => {
+  const standardScore10 = useMemo<string>(() => {
     if (rawScore == null) return '--';
-    const computed = (rawScore / maxScore) * 9;
+    if (maxScore === 10) return rawScore.toFixed(1);
+    const computed = (rawScore / maxScore) * 10;
     return computed.toFixed(1);
   }, [rawScore, maxScore]);
 
@@ -649,17 +651,17 @@ export const StudentSubmissionResult: React.FC = () => {
           </button>
         </div>
 
-        <div className="result-card p-24" style={{ textAlign: 'center', marginTop: '40px' }}>
-          <AlertCircle size={48} color="#f59e0b" style={{ margin: '0 auto 16px' }} />
-          <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px' }}>
+        <div className="result-card p-24 result-empty-card">
+          <AlertCircle size={48} className="result-empty-icon" />
+          <h2 className="result-empty-title">
             Chưa tìm thấy bài nộp nào
           </h2>
-          <p style={{ color: 'var(--on-surface-variant)', maxWidth: '520px', margin: '0 auto 24px', lineHeight: 1.6 }}>
+          <p className="result-empty-desc">
             {assignment?.title 
               ? `Bạn chưa nộp bài cho bài tập "${assignment.title}". Hãy vào phần làm bài để hoàn thành và nhận đánh giá từ hệ thống.`
               : 'Hiện tại chưa ghi nhận lượt nộp bài nào của bạn cho mã bài tập này.'}
           </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <div className="result-empty-actions">
             <button
               type="button"
               className="btn btn-secondary"
@@ -720,15 +722,15 @@ export const StudentSubmissionResult: React.FC = () => {
 
       {/* Error Alert */}
       {error && (
-        <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#991B1B' }}>
+        <div className="result-alert-error">
+          <div className="result-alert-msg">
             <AlertCircle size={20} />
-            <span style={{ fontSize: '14px', fontWeight: 500 }}>{error}</span>
+            <span>{error}</span>
           </div>
           <button
             type="button"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '8px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            className="btn btn-danger btn-sm"
           >
             <RefreshCw size={13} /> Thử lại
           </button>
@@ -737,13 +739,13 @@ export const StudentSubmissionResult: React.FC = () => {
 
       {/* Pending Grading Alert */}
       {!isGraded && !isLoading && (
-        <div style={{ marginBottom: '24px', padding: '20px 24px', borderRadius: '14px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: '18px', boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)' }}>
-          <Clock size={32} color="#D97706" style={{ flexShrink: 0 }} />
+        <div className="result-alert-pending">
+          <Clock size={32} className="result-pending-icon" />
           <div>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 700, color: '#92400E' }}>
+            <h3 className="result-pending-title">
               {t('studentResult.statusPending')} ({submission?.status || 'SUBMITTED'})
             </h3>
-            <p style={{ margin: 0, fontSize: '13.5px', color: '#B45309', lineHeight: 1.5 }}>
+            <p className="result-pending-text">
               Bài nộp của bạn đã được tiếp nhận thành công vào lúc {submission?.submittedAt ? new Date(submission.submittedAt).toLocaleString('vi-VN') : 'vừa xong'}. Điểm số và bài chữa chi tiết từ AI và Giảng viên sẽ xuất hiện tại đây ngay khi hoàn tất.
             </p>
           </div>
@@ -797,25 +799,25 @@ export const StudentSubmissionResult: React.FC = () => {
           <div className="result-hero-score-box">
             <div className="result-score-main">
               <span className="result-score-number">
-                {isLoading ? '...' : bandScore}
+                {isLoading ? '...' : standardScore10}
               </span>
-              <span className="result-score-label">{t('studentResult.bandScore')}</span>
+              <span className="result-score-label">{isVi ? 'Thang 10' : 'Scale 10'}</span>
             </div>
             <div className="result-score-divider" />
             <div className="result-score-sub">
               <span className="result-score-100">
                 {isLoading ? '...' : rawScore != null ? `${rawScore} / ${maxScore}` : `-- / ${maxScore}`}
               </span>
-              <span className="result-score-sub-label">{t('studentResult.score100')}</span>
+              <span className="result-score-sub-label">{isVi ? 'Điểm thô' : 'Raw Score'}</span>
               <span className="result-score-status-pill">
                 {rawScore != null && (maxScore > 0 ? (rawScore / maxScore) >= 0.5 : rawScore >= 50) ? (
                   <>
-                    <CheckCircle2 size={12} style={{ display: 'inline', marginRight: 3 }} /> 
+                    <CheckCircle2 size={12} className="result-inline-icon" /> 
                     {t('studentResult.meetsStandard')}
                   </>
                 ) : rawScore != null ? (
                   <>
-                    <XCircle size={12} style={{ display: 'inline', marginRight: 3 }} /> 
+                    <XCircle size={12} className="result-inline-icon" /> 
                     {t('studentResult.belowStandard')}
                   </>
                 ) : (
@@ -858,7 +860,7 @@ export const StudentSubmissionResult: React.FC = () => {
       {/* 3. Skill / Module Switcher */}
       {availableSkills.length > 0 && (
         <section className="result-skill-switcher">
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--on-surface-variant)', marginLeft: '8px', marginRight: '4px' }}>
+          <span className="result-filter-count">
             {t('studentResult.moduleSwitcherLabel')}
           </span>
 
@@ -948,10 +950,9 @@ export const StudentSubmissionResult: React.FC = () => {
               <div className="result-card">
                 <div className="result-card-header">
                   <h2 className="result-card-title">
-                    <FileText size={18} className="text-primary" />
                     Bài Nộp &amp; Chữa Lỗi Trực Tuyến
                   </h2>
-                  <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>
+                  <span className="result-filter-badge-text">
                     {annotations.length > 0 ? (
                       <>Tổng cộng <strong>{annotations.length}</strong> {t('studentResult.annotationsCount')}</>
                     ) : (
@@ -963,7 +964,7 @@ export const StudentSubmissionResult: React.FC = () => {
                 {/* Filter Bar */}
                 {annotations.length > 0 && (
                   <div className="annotation-filters-bar">
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--on-surface-variant)', marginRight: '4px' }}>
+                    <span className="result-filter-count">
                       Lọc ghi chú:
                     </span>
                     <button 
@@ -978,7 +979,7 @@ export const StudentSubmissionResult: React.FC = () => {
                       className={`annotation-filter-btn ${activeFilter === 'grammar' ? 'active' : ''}`}
                       onClick={() => setActiveFilter('grammar')}
                     >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block' }} />
+                      <span className="result-dot-indicator result-dot-red" />
                       {t('studentResult.filterGrammar')} ({annotations.filter(a => a.type === 'grammar').length})
                     </button>
                     <button 
@@ -986,7 +987,7 @@ export const StudentSubmissionResult: React.FC = () => {
                       className={`annotation-filter-btn ${activeFilter === 'vocabulary' ? 'active' : ''}`}
                       onClick={() => setActiveFilter('vocabulary')}
                     >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block' }} />
+                      <span className="result-dot-indicator result-dot-amber" />
                       {t('studentResult.filterVocab')} ({annotations.filter(a => a.type === 'vocabulary').length})
                     </button>
                     <button 
@@ -994,7 +995,7 @@ export const StudentSubmissionResult: React.FC = () => {
                       className={`annotation-filter-btn ${activeFilter === 'positive' ? 'active' : ''}`}
                       onClick={() => setActiveFilter('positive')}
                     >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+                      <span className="result-dot-indicator result-dot-green" />
                       {t('studentResult.filterPositive')} ({annotations.filter(a => a.type === 'positive').length})
                     </button>
                   </div>
@@ -1004,20 +1005,20 @@ export const StudentSubmissionResult: React.FC = () => {
                 <div className="essay-text-canvas">
                   {studentEssay ? (
                     studentEssay.split('\n').filter(Boolean).map((paragraph, pIdx) => (
-                      <p key={pIdx} style={{ lineHeight: 1.75, marginBottom: '16px' }}>
+                      <p key={pIdx} className="result-essay-paragraph">
                         {paragraph}
                       </p>
                     ))
                   ) : attachedDocKey ? (
-                    <div style={{ padding: '24px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                      <File size={36} color="#3b82f6" style={{ margin: '0 auto 12px' }} />
-                      <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>Tệp tài liệu bài nộp</div>
-                      <div style={{ fontSize: '13px', color: '#64748b', wordBreak: 'break-all' }}>{attachedDocKey}</div>
+                    <div className="result-doc-card">
+                      <File size={36} className="result-doc-icon" />
+                      <div className="result-doc-title">Tệp tài liệu bài nộp</div>
+                      <div className="result-doc-name">{attachedDocKey}</div>
                     </div>
                   ) : (
-                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                      <FileText size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                      <p style={{ margin: 0, fontSize: '14px' }}>Chưa có nội dung văn bản bài nộp cho phần này.</p>
+                    <div className="result-empty-tab-content">
+                      <FileText size={32} className="result-empty-tab-icon" />
+                      <p className="result-empty-tab-msg">Chưa có nội dung văn bản bài nộp cho phần này.</p>
                     </div>
                   )}
                 </div>
@@ -1028,7 +1029,6 @@ export const StudentSubmissionResult: React.FC = () => {
                 <div className="result-card">
                   <div className="result-card-header">
                     <h3 className="result-card-title">
-                      <Sparkles size={16} className="text-secondary" />
                       {t('studentResult.selectedAnnotationHeader')}
                     </h3>
                     {selectedAnnotation && (
@@ -1042,7 +1042,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     {selectedAnnotation ? (
                       <>
                         <div>
-                          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: '6px' }}>
+                          <div className="result-ann-section-label">
                             {t('studentResult.originalSegment')}
                           </div>
                           <div className="diff-box original">
@@ -1051,7 +1051,7 @@ export const StudentSubmissionResult: React.FC = () => {
                         </div>
 
                         <div>
-                          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: '6px' }}>
+                          <div className="result-ann-section-label">
                             {t('studentResult.suggestedFix')}
                           </div>
                           <div className="diff-box suggestion">
@@ -1060,7 +1060,7 @@ export const StudentSubmissionResult: React.FC = () => {
                         </div>
 
                         <div className="explanation-card">
-                          <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--on-surface)' }}>
+                          <div className="result-ann-header-title">
                             {t('studentResult.ruleExplanation')}
                           </div>
                           {selectedAnnotation.explanation}
@@ -1068,7 +1068,7 @@ export const StudentSubmissionResult: React.FC = () => {
 
                         {selectedAnnotation.teacherNote && (
                           <div className="teacher-annotation-note">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                            <div className="result-ann-item-row">
                               <UserCheck size={14} />
                               {t('studentResult.teacherAdvice')}
                             </div>
@@ -1077,7 +1077,7 @@ export const StudentSubmissionResult: React.FC = () => {
                         )}
                       </>
                     ) : (
-                      <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: '13.5px' }}>
+                      <div className="result-ann-empty">
                         {annotations.length === 0 
                           ? 'Chưa có điểm sửa lỗi nào được ghi nhận từ AI hoặc giáo viên.'
                           : 'Chọn một ghi chú ở danh sách để xem chi tiết.'}
@@ -1086,8 +1086,8 @@ export const StudentSubmissionResult: React.FC = () => {
 
                     {/* Annotation list chips */}
                     {filteredAnnotations.length > 0 && (
-                      <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>
+                      <div className="result-ann-summary-list">
+                        <div className="result-ann-summary-title">
                           Danh sách điểm chữa ({filteredAnnotations.length})
                         </div>
                         {filteredAnnotations.map(ann => (
@@ -1095,17 +1095,9 @@ export const StudentSubmissionResult: React.FC = () => {
                             key={ann.id}
                             type="button"
                             onClick={() => setSelectedAnnotationId(ann.id)}
-                            style={{
-                              padding: '8px 12px',
-                              borderRadius: '8px',
-                              border: selectedAnnotationId === ann.id ? '2px solid var(--primary)' : '1px solid var(--outline-variant)',
-                              backgroundColor: selectedAnnotationId === ann.id ? 'var(--primary-container)' : 'var(--surface)',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              fontSize: '12.5px'
-                            }}
+                            className={`result-ann-chip ${selectedAnnotationId === ann.id ? 'is-active' : ''}`}
                           >
-                            <span style={{ fontWeight: 600, color: 'var(--on-surface)' }}>#{ann.id} {ann.type}</span>: {ann.suggestion}
+                            <span className="result-ann-summary-text">#{ann.id} {ann.type}</span>: {ann.suggestion}
                           </button>
                         ))}
                       </div>
@@ -1115,14 +1107,14 @@ export const StudentSubmissionResult: React.FC = () => {
 
                 {/* Rubrics Preview summary card */}
                 <div className="result-card p-20">
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: 'var(--on-surface)' }}>
+                  <h4 className="result-criteria-card-title">
                     Tóm tắt tiêu chí Writing:
                   </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
+                  <div className="result-criteria-list">
                     {criteriaList.map((crit) => (
                       <div key={crit.key} className="flex-between">
                         <span className="text-on-surface-variant">{crit.title}:</span>
-                        <strong className="text-primary">{crit.score} / 9.0</strong>
+                        <strong className="text-primary">{crit.score} / 10</strong>
                       </div>
                     ))}
                   </div>
@@ -1142,7 +1134,7 @@ export const StudentSubmissionResult: React.FC = () => {
                       <Volume2 size={16} />
                       {audioStorageKey ? audioStorageKey.split('/').pop() : `Speaking_Attempt_${submission?.attemptNumber ?? 1}`}
                     </span>
-                    <span style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                    <span className="result-player-timestamp">
                       {audioStorageKey ? 'File ghi âm bài nộp' : 'Chưa có file âm thanh'}
                     </span>
                   </div>
@@ -1165,14 +1157,14 @@ export const StudentSubmissionResult: React.FC = () => {
 
                   {/* Player Controls */}
                   <div className="audio-controls-row">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div className="flex items-center gap-14">
                       <button
                         type="button"
                         className="audio-play-btn"
                         onClick={() => setIsPlaying(!isPlaying)}
                         disabled={!audioStorageKey}
                       >
-                        {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: 2 }} />}
+                        {isPlaying ? <Pause size={18} /> : <Play size={18} className="result-play-icon" />}
                       </button>
                       <span className="audio-time-label">
                         00:{currentTime < 10 ? `0${currentTime}` : currentTime} / {audioStorageKey ? '02:00' : '00:00'}
@@ -1180,7 +1172,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     </div>
 
                     <div className="audio-speed-chips">
-                      <span style={{ fontSize: '11px', color: '#94a3b8', marginRight: '4px' }}>Tốc độ:</span>
+                      <span className="result-player-speed-label">Tốc độ:</span>
                       {[0.75, 1, 1.25].map((speed) => (
                         <button
                           key={speed}
@@ -1199,7 +1191,6 @@ export const StudentSubmissionResult: React.FC = () => {
                 <div className="result-card">
                   <div className="result-card-header">
                     <h3 className="result-card-title">
-                      <Sparkles size={16} className="text-secondary" />
                       {t('studentResult.sttTranscript')}
                     </h3>
                   </div>
@@ -1207,11 +1198,11 @@ export const StudentSubmissionResult: React.FC = () => {
                   <div className="result-card-body">
                     <div className="stt-transcript-box">
                       {transcriptContent ? (
-                        <p style={{ margin: 0, lineHeight: 1.7, fontSize: '14px' }}>
+                        <p className="result-transcript-text">
                           {transcriptContent}
                         </p>
                       ) : (
-                        <p style={{ margin: 0, color: 'var(--on-surface-variant)', fontStyle: 'italic', fontSize: '13.5px' }}>
+                        <p className="result-transcript-empty">
                           {isGraded 
                             ? 'Bản gỡ băng tự động chưa được lưu lại trong kết quả này.' 
                             : 'Đang chờ phân tích bản gỡ băng (transcript) từ AI...'}
@@ -1225,17 +1216,17 @@ export const StudentSubmissionResult: React.FC = () => {
               {/* Right Sidebar: Criteria for Speaking */}
               <div className="flex-col gap-20">
                 <div className="result-card p-20">
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: 'var(--on-surface)' }}>
-                    Tiêu chí IELTS Speaking:
+                  <h4 className="result-criteria-card-title">
+                    {isVi ? 'Tiêu chí đánh giá Speaking:' : 'Speaking Criteria:'}
                   </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12.5px' }}>
+                  <div className="result-criteria-list">
                     {criteriaList.map((crit) => (
                       <div key={crit.key}>
-                        <div className="flex-between" style={{ marginBottom: 4 }}>
+                        <div className="flex-between mb-4">
                           <span className="text-on-surface-variant">{crit.title}:</span>
-                          <strong className="text-primary">{crit.score} / 9.0</strong>
+                          <strong className="text-primary">{crit.score} / 10</strong>
                         </div>
-                        <p style={{ margin: 0, fontSize: '11.5px', color: 'var(--on-surface-variant)' }}>{crit.desc}</p>
+                        <p className="result-criteria-desc">{crit.desc}</p>
                       </div>
                     ))}
                   </div>
@@ -1249,15 +1240,15 @@ export const StudentSubmissionResult: React.FC = () => {
             <div className="flex-col gap-20">
               <div className="result-card p-20">
                 <div className="flex-between items-center mb-16 flex-wrap">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="result-mcq-header-title">
                     {selectedSkill === 'READING' ? <BookOpen size={20} className="text-primary" /> : <Headphones size={20} className="text-primary" />}
-                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                    <h3 className="result-mcq-title-h3">
                       {t('studentResult.questionReview')} ({questionsList.length} câu)
                     </h3>
                   </div>
 
                   {questionsList.length > 0 && (
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="result-mcq-filter-group">
                       <button
                         type="button"
                         className={`annotation-filter-btn ${questionFilter === 'all' ? 'active' : ''}`}
@@ -1284,104 +1275,68 @@ export const StudentSubmissionResult: React.FC = () => {
                 </div>
 
                 {questionsList.length === 0 ? (
-                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                    <HelpCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                    <p style={{ margin: 0, fontSize: '14px' }}>Không có câu hỏi trắc nghiệm nào trong module này.</p>
+                  <div className="result-empty-tab-content">
+                    <HelpCircle size={32} className="result-empty-tab-icon" />
+                    <p className="result-empty-tab-msg">Không có câu hỏi trắc nghiệm nào trong module này.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="result-mcq-list">
                     {filteredQuestions.map((q) => (
                       <div 
                         key={q.id}
-                        style={{
-                          padding: '16px',
-                          borderRadius: '10px',
-                          border: '1px solid var(--outline-variant)',
-                          backgroundColor: q.isCorrect === true ? '#f0fdf4' : q.isCorrect === false ? '#fef2f2' : 'var(--surface)'
-                        }}
+                        className={`result-mcq-card ${q.isCorrect === true ? 'is-correct' : q.isCorrect === false ? 'is-incorrect' : ''}`}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                          <span style={{ fontWeight: 700, fontSize: '14px' }}>
+                        <div className="result-mcq-card-top">
+                          <span className="result-mcq-card-num">
                             Câu {q.questionNumber}: {q.prompt}
                           </span>
                           {q.isCorrect !== undefined && (
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: q.isCorrect ? '#86efac' : '#fca5a5',
-                              color: q.isCorrect ? '#14532d' : '#7f1d1d'
-                            }}>
+                            <span className={`result-mcq-status-badge ${q.isCorrect ? 'is-correct' : 'is-incorrect'}`}>
                               {q.isCorrect ? 'ĐÚNG' : 'SAI'}
                             </span>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '20px', fontSize: '13px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <div className="result-mcq-meta">
                           <div>
-                            <span style={{ color: 'var(--on-surface-variant)' }}>{t('studentResult.yourAnswer')}: </span>
-                            <strong style={{ color: q.isCorrect === true ? '#16a34a' : q.isCorrect === false ? '#dc2626' : undefined }}>
+                            <span className="text-on-surface-variant">{t('studentResult.yourAnswer')}: </span>
+                            <strong className={q.isCorrect === true ? 'result-mcq-answer-correct' : q.isCorrect === false ? 'result-mcq-answer-incorrect' : ''}>
                               {q.studentAnswer}
                             </strong>
                           </div>
                           <div>
-                            <span style={{ color: 'var(--on-surface-variant)' }}>{t('studentResult.correctAnswer')}: </span>
-                            <strong style={{ color: '#16a34a' }}>{q.correctAnswer}</strong>
+                            <span className="text-on-surface-variant">{t('studentResult.correctAnswer')}: </span>
+                            <strong className="result-mcq-answer-correct">{q.correctAnswer}</strong>
                           </div>
                         </div>
 
                         {q.options && q.options.length > 0 && (
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px', marginTop: '12px' }}>
+                          <div className="result-mcq-options-grid">
                             {q.options.map((opt) => {
                               const isStudentPick = q.studentAnswer.startsWith(opt.key);
                               const isCorrectOption = q.correctAnswer.startsWith(opt.key);
-                              let borderColor = 'var(--outline-variant, #E2E8F0)';
-                              let bg = 'var(--surface, #FFFFFF)';
-                              if (isCorrectOption) {
-                                borderColor = '#86efac';
-                                bg = '#ecfdf5';
-                              } else if (isStudentPick && !q.isCorrect) {
-                                borderColor = '#fca5a5';
-                                bg = '#fef2f2';
-                              }
                               return (
                                 <div
                                   key={opt.key}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '8px 12px',
-                                    borderRadius: '6px',
-                                    border: `1px solid ${borderColor}`,
-                                    backgroundColor: bg,
-                                    fontSize: '13px'
-                                  }}
+                                  className={`result-mcq-opt-item ${isCorrectOption ? 'is-correct' : isStudentPick && !q.isCorrect ? 'is-student-wrong' : ''}`}
                                 >
-                                  <span style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    borderRadius: '50%',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    backgroundColor: isCorrectOption ? '#16a34a' : isStudentPick ? '#ef4444' : '#e2e8f0',
-                                    color: (isCorrectOption || isStudentPick) ? '#ffffff' : '#475569',
-                                    flexShrink: 0
-                                  }}>
+                                  <span className={`result-mcq-opt-key ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
                                     {opt.key}
                                   </span>
-                                  <span style={{ flex: 1, color: isCorrectOption ? '#15803d' : isStudentPick ? '#b91c1c' : 'var(--on-surface, #334155)' }}>
+                                  <span className={`result-mcq-opt-text ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
                                     {opt.text}
                                   </span>
                                   {isCorrectOption && (
-                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#16a34a' }}>✓ Đáp án đúng</span>
+                                    <span className="result-mcq-tag-correct inline-flex items-center gap-1">
+                                      <CheckCircle2 size={12} />
+                                      <span>Đáp án đúng</span>
+                                    </span>
                                   )}
                                   {isStudentPick && !isCorrectOption && (
-                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#dc2626' }}>✗ Lựa chọn của bạn</span>
+                                    <span className="result-mcq-tag-wrong inline-flex items-center gap-1">
+                                      <XCircle size={12} />
+                                      <span>Lựa chọn của bạn</span>
+                                    </span>
                                   )}
                                 </div>
                               );
@@ -1416,14 +1371,14 @@ export const StudentSubmissionResult: React.FC = () => {
                   <div className="result-rubric-header">
                     <h3 className="result-rubric-title">{crit.title}</h3>
                     <span className="result-rubric-score" style={{ color }}>
-                      {hasScore ? `${crit.score} / 9.0` : '-- / 9.0'}
+                      {hasScore ? `${crit.score} / 10` : '-- / 10'}
                     </span>
                   </div>
                   <div className="result-rubric-bar-track">
                     <div 
                       className="result-rubric-bar-fill" 
                       style={{ 
-                        width: hasScore ? `${(numScore / 9) * 100}%` : '0%', 
+                        width: hasScore ? `${(numScore / 10) * 100}%` : '0%', 
                         backgroundColor: color 
                       }} 
                     />
@@ -1435,7 +1390,7 @@ export const StudentSubmissionResult: React.FC = () => {
           </section>
 
           {/* AI Diagnostics & Remedial Path */}
-          <div className="grid gap-24" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}>
+          <div className="result-feedback-grid">
             <div className="result-card p-24">
               <div className="flex items-center gap-10 mb-16">
                 <Sparkles size={20} className="text-secondary" />
@@ -1446,13 +1401,13 @@ export const StudentSubmissionResult: React.FC = () => {
 
               <div className="flex-col gap-12">
                 {aiSuggestion?.aiFeedback ? (
-                  <div className="p-14 rounded-lg bg-surface-container-low border" style={{ borderColor: 'var(--outline-variant)' }}>
-                    <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--on-surface)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  <div className="p-14 rounded-lg bg-surface-container-low border">
+                    <p className="result-feedback-text">
                       {aiSuggestion.aiFeedback}
                     </p>
                   </div>
                 ) : (
-                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: '13.5px' }}>
+                  <div className="result-feedback-empty">
                     {isGraded 
                       ? 'Không có chẩn đoán chi tiết bổ sung từ hệ thống AI.'
                       : 'Hệ thống AI đang phân tích bài làm để tạo chẩn đoán năng lực.'}
@@ -1470,10 +1425,10 @@ export const StudentSubmissionResult: React.FC = () => {
               </div>
 
               <div className="flex-col gap-12">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface)' }}>
+                <div className="result-recommendation-card">
                   <div>
-                    <h4 style={{ margin: '0 0 2px 0', fontSize: '13.5px', fontWeight: 700 }}>Tiếp tục ôn tập kỹ năng {selectedSkill}</h4>
-                    <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>Bài tập rèn luyện tương ứng</span>
+                    <h4 className="result-recommendation-title">Tiếp tục ôn tập kỹ năng {selectedSkill}</h4>
+                    <span className="result-recommendation-sub">Bài tập rèn luyện tương ứng</span>
                   </div>
                   <button 
                     type="button" 
@@ -1495,10 +1450,10 @@ export const StudentSubmissionResult: React.FC = () => {
       {activeTab === 'feedback' && (
         <div className="teacher-discussion-card">
           <div>
-            <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 700, color: 'var(--on-surface)' }}>
+            <h3 className="result-teacher-title">
               {t('studentResult.teacherSummaryTitle')}
             </h3>
-            <span style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
+            <span className="result-teacher-sub">
               Lời phê chính thức từ Giảng viên phụ trách chấm bài
             </span>
           </div>
@@ -1507,22 +1462,22 @@ export const StudentSubmissionResult: React.FC = () => {
             <div className="teacher-avatar-circ">
               GV
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="flex-1">
               <div className="flex-between items-center mb-8 flex-wrap">
                 <div>
-                  <strong style={{ fontSize: '14px', color: 'var(--on-surface)' }}>
+                  <strong className="result-teacher-name">
                     {gradingDetail?.reviewedBy ? `Giảng viên phụ trách (ID: #${gradingDetail.reviewedBy})` : 'Giảng viên chấm bài'}
                   </strong>
-                  <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginLeft: 8 }}>
+                  <span className="result-teacher-org">
                     • Hệ thống đào tạo Anh ngữ EnglishHub
                   </span>
                 </div>
-                <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                <span className="result-teacher-date">
                   {gradingDetail?.gradedAt ? new Date(gradingDetail.gradedAt).toLocaleDateString('vi-VN') : '--'}
                 </span>
               </div>
 
-              <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.7, color: 'var(--on-surface)', fontStyle: 'italic' }}>
+              <p className="result-teacher-feedback-p">
                 {gradingDetail?.finalFeedback ? (
                   `"${gradingDetail.finalFeedback}"`
                 ) : gradingDetail?.aiFeedback ? (
@@ -1530,7 +1485,7 @@ export const StudentSubmissionResult: React.FC = () => {
                 ) : aiSuggestion?.aiFeedback ? (
                   `"${aiSuggestion.aiFeedback}"`
                 ) : (
-                  <span style={{ color: 'var(--on-surface-variant)', fontStyle: 'normal' }}>
+                  <span className="result-teacher-feedback-empty">
                     Chưa có nhận xét bằng văn bản từ giảng viên cho bài nộp này.
                   </span>
                 )}
@@ -1540,15 +1495,11 @@ export const StudentSubmissionResult: React.FC = () => {
 
           {/* Inquiry / Student Question Form */}
           <div className="inquiry-form-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <HelpCircle size={18} className="text-primary" />
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--on-surface)' }}>
+            <div className="result-inquiry-header">
+              <h4 className="result-inquiry-title">
                 {t('studentResult.askTeacherTitle')}
               </h4>
             </div>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-              {t('studentResult.askTeacherSubtitle')}
-            </p>
 
             <form onSubmit={handleSendInquiry}>
               <textarea
@@ -1558,12 +1509,11 @@ export const StudentSubmissionResult: React.FC = () => {
                 onChange={(e) => setInquiryText(e.target.value)}
               />
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <div className="result-inquiry-actions">
                 <button 
                   type="submit" 
-                  className="btn btn-primary"
+                  className="btn btn-primary result-inquiry-btn-icon"
                   disabled={!inquiryText.trim()}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   <Send size={14} />
                   {t('studentResult.btnSendQuestion')}
@@ -1572,7 +1522,7 @@ export const StudentSubmissionResult: React.FC = () => {
             </form>
 
             {inquirySent && (
-              <div style={{ padding: '12px 16px', borderRadius: '8px', backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#166534', fontSize: '13px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="result-inquiry-sent-banner">
                 <CheckCircle2 size={16} />
                 <span>{t('studentResult.questionSentSuccess')}</span>
               </div>

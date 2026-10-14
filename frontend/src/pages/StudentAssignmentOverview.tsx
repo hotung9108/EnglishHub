@@ -10,14 +10,15 @@ import {
   CheckCircle2, 
   Play, 
   FileText,
-  HelpCircle,
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
+import { Button } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem, getRemainingAttempts, findInProgressAttempt } from '../api/services/submission.service';
+import '../styles/student-overview.css';
 
 interface AttemptRecord {
   id: number;
@@ -25,7 +26,7 @@ interface AttemptRecord {
   submittedAt: string;
   score: number | null;
   maxScore: number;
-  bandScore: string;
+  score10: string;
   status: 'graded' | 'pending' | 'in_progress';
   isBest: boolean;
 }
@@ -96,14 +97,14 @@ const StudentAssignmentOverview: React.FC = () => {
             const records: AttemptRecord[] = list.map((item) => {
               const rawScore = item.modules?.[0]?.grading?.finalScore ?? null;
               const isGraded = item.status === 'GRADED';
-              const band = rawScore !== null ? (rawScore / 100 * 9).toFixed(1) : '--';
+              const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
               return {
                 id: item.id,
                 attemptNumber: item.attemptNumber,
                 submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
                 score: rawScore,
-                maxScore: 100,
-                bandScore: band,
+                maxScore: 10,
+                score10: s10,
                 status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
                 isBest: rawScore !== null && rawScore === maxVal && maxVal > 0,
               };
@@ -188,38 +189,39 @@ const StudentAssignmentOverview: React.FC = () => {
           <ArrowLeft size={14} />
           <span>{t('studentSpeaking.backToList') || 'Quay lại danh sách bài tập'}</span>
         </button>
-        <span style={{ color: 'var(--outline-variant)' }}>/</span>
+        <span className="text-slate-300">/</span>
         <span>Hệ thống</span>
-        <ChevronRight size={12} style={{ color: 'var(--outline-variant)' }} />
+        <ChevronRight size={12} className="text-slate-300" />
         <span 
-          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}
+          className="text-primary font-medium cursor-pointer"
           onClick={() => navigate('/student/classes')}
           role="button"
           tabIndex={0}
         >
           Lớp học của tôi
         </span>
-        <ChevronRight size={12} style={{ color: 'var(--outline-variant)' }} />
-        <span style={{ color: 'var(--primary)', fontWeight: 500 }}>Lớp học</span>
-        <ChevronRight size={12} style={{ color: 'var(--outline-variant)' }} />
-        <span style={{ fontWeight: 600, color: 'var(--on-surface)' }}>
+        <ChevronRight size={12} className="text-slate-300" />
+        <span className="text-primary font-medium">Lớp học</span>
+        <ChevronRight size={12} className="text-slate-300" />
+        <span className="font-semibold text-slate-900">
           Tổng quan bài tập ({assignment?.title || id || 'HW-01'})
         </span>
       </div>
 
       {error && (
-        <div style={{ marginBottom: '16px', padding: '16px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991B1B' }}>
+        <div className="std-error-banner">
+          <div className="std-error-msg">
             <AlertCircle size={18} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span>{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+            icon={RefreshCw}
           >
-            <RefreshCw size={13} /> Thử lại
-          </button>
+            Thử lại
+          </Button>
         </div>
       )}
 
@@ -228,26 +230,26 @@ const StudentAssignmentOverview: React.FC = () => {
         {/* Header */}
         <div className="overview-header">
           <div>
-            <div className="overview-badge-row" style={{ marginBottom: '8px' }}>
+            <div className="overview-badge-row mb-2">
               <span className={`overview-skill-badge ${assignment?.modules?.[0]?.skill?.toLowerCase() || 'writing'}`}>
-                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'IELTS Skill Practice'}
+                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'Skill Practice'}
               </span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>
+              <span className={`overview-status-badge ${assignment?.status === 'PUBLISHED' ? '' : 'closed'}`}>
                 ● {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}
               </span>
             </div>
             <h1 className="overview-title">
               {isLoading ? 'Đang tải bài tập...' : (assignment?.title || `Bài tập ${id || 'HW-01'}`)}
             </h1>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-              Mã bài tập: <strong>#{numericAssignmentId}</strong> • Hệ thống chấm điểm tự động &amp; Giảng viên phê duyệt
+            <p className="overview-code-text">
+              Mã bài tập: <strong>#{numericAssignmentId}</strong>
             </p>
           </div>
 
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>Điểm cao nhất hiện tại</span>
-            <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--primary)' }}>
-              {bestAttempt ? `Band ${bestAttempt.bandScore}` : 'Chưa có điểm'}
+          <div className="text-right">
+            <span className="overview-best-score-label">Điểm cao nhất hiện tại</span>
+            <div className="overview-best-score-val">
+              {bestAttempt ? `${bestAttempt.score10} / 10` : 'Chưa có điểm'}
             </div>
           </div>
         </div>
@@ -298,7 +300,6 @@ const StudentAssignmentOverview: React.FC = () => {
         {/* Instructions */}
         <div className="overview-instructions-box">
           <h3 className="overview-instructions-title">
-            <HelpCircle size={16} color="var(--primary)" />
             Hướng dẫn &amp; Yêu cầu bài làm:
           </h3>
           <p className="overview-instructions-content">
@@ -313,7 +314,7 @@ const StudentAssignmentOverview: React.FC = () => {
         <div className="overview-attempts-section">
           <div className="overview-attempts-title">
             <span>Lịch sử các lần làm bài (Attempts History)</span>
-            <span style={{ fontSize: '13px', color: 'var(--on-surface-variant)', fontWeight: 500 }}>
+            <span className="overview-attempts-count">
               Đã làm {attempts.length} lần
             </span>
           </div>
@@ -324,80 +325,77 @@ const StudentAssignmentOverview: React.FC = () => {
                 <tr>
                   <th>Lần nộp</th>
                   <th>Thời gian nộp</th>
-                  <th>Điểm số (Hệ 100)</th>
-                  <th>IELTS Band</th>
+                  <th>Điểm số (Thang 10)</th>
                   <th>Trạng thái</th>
-                  <th style={{ textAlign: 'right' }}>Thao tác</th>
+                  <th className="text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
+                    <td colSpan={5} className="text-center p-6 text-slate-500">
                       Đang tải lịch sử các lần nộp bài...
                     </td>
                   </tr>
                 ) : attempts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: '#64748B' }}>
+                    <td colSpan={5} className="text-center p-6 text-slate-500">
                       Chưa có lần nộp bài nào. Nhấn &quot;Bắt đầu làm bài&quot; bên dưới để làm lần đầu tiên.
                     </td>
                   </tr>
                 ) : (
                   attempts.map((att) => (
                     <tr key={att.id}>
-                      <td style={{ fontWeight: 700 }}>
+                      <td className="font-bold">
                         Lần {att.attemptNumber}
                         {att.isBest && (
-                          <span style={{ marginLeft: 8, fontSize: '11px', fontWeight: 700, color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: 4 }}>
-                            ★ Điểm cao nhất
+                          <span className="overview-best-tag">
+                            <Award size={12} className="inline mr-1" />
+                            Điểm cao nhất
                           </span>
                         )}
                       </td>
-                      <td style={{ color: 'var(--on-surface-variant)' }}>{att.submittedAt}</td>
-                      <td style={{ fontWeight: 600 }}>{att.score !== null ? `${att.score} / ${att.maxScore}` : '--'}</td>
+                      <td className="text-slate-500">{att.submittedAt}</td>
                       <td>
-                        <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--primary)' }}>
-                          Band {att.bandScore}
+                        <span className="overview-score-cell">
+                          {att.score10 !== '--' ? `${att.score10} / 10` : '--'}
                         </span>
                       </td>
                       <td>
                         {att.status === 'graded' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#059669', fontWeight: 600, fontSize: '12px' }}>
+                          <span className="overview-status-chip graded">
                             <CheckCircle2 size={13} />
                             Đã có điểm
                           </span>
                         ) : att.status === 'in_progress' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#2563EB', fontWeight: 600, fontSize: '12px' }}>
+                          <span className="overview-status-chip in-progress">
                             <Clock size={13} />
                             Đang làm dở
                           </span>
                         ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#D97706', fontWeight: 600, fontSize: '12px' }}>
+                          <span className="overview-status-chip pending">
                             <Clock size={13} />
                             Chờ chấm điểm
                           </span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className="text-right">
                         {att.status === 'graded' || att.status === 'pending' ? (
-                          <button 
-                            type="button"
-                            className="btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                          <Button 
+                            variant="secondary"
+                            size="sm"
                             onClick={() => navigate(`/student/submissions/${att.id}`)}
                           >
                             Xem kết quả bài nộp
-                          </button>
+                          </Button>
                         ) : (
-                          <button 
-                            type="button"
-                            className="btn-primary"
-                            style={{ padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                          <Button 
+                            variant="primary"
+                            size="sm"
                             onClick={handleStartAttempt}
                           >
                             Tiếp tục làm bài
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -411,14 +409,14 @@ const StudentAssignmentOverview: React.FC = () => {
         {/* CTA Start Attempt */}
         <div className="overview-cta-box">
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#1e3a8a' }}>
+            <div className="overview-cta-title">
               {inProgressSub
                 ? `Bạn đang có bài làm dở (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
                 : remainingAttempts > 0 
                   ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
                   : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
             </div>
-            <div style={{ fontSize: '13px', color: '#3b82f6', marginTop: 2 }}>
+            <div className="overview-cta-desc">
               Điểm số tổng kết môn học sẽ ghi nhận lần làm bài có kết quả tốt nhất của bạn.
             </div>
           </div>

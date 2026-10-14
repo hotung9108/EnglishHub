@@ -2,45 +2,68 @@
 
 /* Metric Card */
 .metric-card {
-  background-color: var(--surface);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--outline-variant);
-  padding: 16px;
+  background-color: var(--surface, #ffffff);
+  border-radius: var(--radius-lg, 14px);
+  border: 1px solid var(--border-color, #e6dfd5);
+  padding: 20px;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: var(--shadow-card);
+}
+
+.metric-title,
 .metric-card-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #78716c);
+}
+
+.metric-icon-wrap,
+.metric-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md, 10px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--on-surface-variant);
-  font-weight: 500;
-  margin-bottom: 8px;
+  justify-content: center;
+  background-color: var(--surface-dim, #f5f5f4);
+  color: var(--text-primary, #292524);
+  flex-shrink: 0;
 }
 
-.metric-card-icon {
-  padding: 8px;
-  border-radius: var(--radius-default);
-}
-
+.metric-value-wrap,
 .metric-card-value {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
+.metric-value,
 .metric-card-number {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--on-surface);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary, #292524);
+  line-height: 1.1;
 }
 
+.metric-suffix,
 .metric-card-suffix {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--on-surface-variant);
+  color: var(--text-secondary, #78716c);
+}
+
+.metric-footer {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #78716c);
 }
 
 /* Status Badge */
@@ -71,7 +94,7 @@
 .status-badge.error {
   background-color: var(--error-container);
   color: var(--on-error-container);
-  border: 1px solid #FECDD3;
+  border: 1px solid var(--color-danger-border, #fecaca);
 }
 .status-badge.error .status-badge-dot {
   background-color: var(--error);
@@ -82,11 +105,26 @@
   color: var(--on-primary-container);
   border: 1px solid var(--primary-fixed-dim);
 }
+.status-badge.info .status-badge-dot {
+  background-color: var(--primary, #1b4d3e);
+}
 
 .status-badge.warning {
   background-color: var(--tertiary-container);
   color: var(--on-tertiary-container);
   border: 1px solid var(--tertiary-fixed);
+}
+.status-badge.warning .status-badge-dot {
+  background-color: var(--tertiary, #8c5e14);
+}
+
+.status-badge.neutral {
+  background-color: var(--surface-dim, #f5f5f4);
+  color: var(--text-secondary, #78716c);
+  border: 1px solid var(--border-color, #e7e5e4);
+}
+.status-badge.neutral .status-badge-dot {
+  background-color: var(--text-secondary, #78716c);
 }
 
 /* Sticky Action Bar */
@@ -125,7 +163,8 @@
   cursor: pointer;
 }
 .file-item:hover {
-  background-color: var(--surface-container-lowest);
+  background-color: var(--surface-hover, #f7f4ee);
+  border-color: var(--border-hover, #c2a882);
 }
 .file-item-icon {
   width: 40px;
@@ -143,9 +182,9 @@
   border: 1px solid #FECDD3;
 }
 .file-item-icon.docx {
-  background-color: #DBEAFE;
-  color: #1D4ED8;
-  border: 1px solid #BFDBFE;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--accent, #1b4d3e);
+  border: 1px solid var(--border-color, #e6dfd5);
 }
 
 /* Form inputs (from inline styles) */
@@ -163,8 +202,8 @@
 }
 .form-input:focus {
   background-color: var(--surface);
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  border-color: var(--accent, #1b4d3e);
+  box-shadow: var(--focus-ring);
 }
 .form-label {
   display: block;
@@ -175,3 +214,112 @@
   letter-spacing: 0.05em;
   margin-bottom: 6px;
 }
+
+/* === Skill Badges (English 4 Skills) === */
+.skill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.skill-badge.listening {
+  background-color: var(--skill-listening-bg);
+  color: var(--skill-listening);
+  border-color: var(--skill-listening-border);
+}
+.skill-badge.speaking {
+  background-color: var(--skill-speaking-bg);
+  color: var(--skill-speaking);
+  border-color: var(--skill-speaking-border);
+}
+.skill-badge.reading {
+  background-color: var(--skill-reading-bg);
+  color: var(--skill-reading);
+  border-color: var(--skill-reading-border);
+}
+.skill-badge.writing {
+  background-color: var(--skill-writing-bg);
+  color: var(--skill-writing);
+  border-color: var(--skill-writing-border);
+}
+
+/* === Minimal SaaS Card Surface (.eh-card) === */
+.eh-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+}
+.eh-card:hover {
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: var(--shadow-md);
+}
+.eh-card-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.eh-card-body {
+  padding: 24px;
+}
+.eh-card-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--outline-variant);
+  background-color: var(--surface-container-low);
+  border-bottom-left-radius: var(--radius-md, 12px);
+  border-bottom-right-radius: var(--radius-md, 12px);
+}
+
+/* === Empty State Component (.eh-empty-state) === */
+.eh-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+}
+.eh-empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-container-low);
+  color: var(--on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.eh-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-surface);
+  margin-bottom: 6px;
+}
+.eh-empty-desc {
+  font-size: 14px;
+  color: var(--on-surface-variant);
+  max-width: 400px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* === Skeleton Shimmer (.eh-skeleton) === */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.eh-skeleton {
+  background: linear-gradient(90deg, var(--surface-container-low) 25%, var(--surface-container) 50%, var(--surface-container-low) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm, 6px);
+}
+

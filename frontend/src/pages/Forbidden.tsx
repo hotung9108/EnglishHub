@@ -1,13 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Home } from 'lucide-react';
+import { Home, ArrowLeft, Globe } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Button } from '../components/common/Button';
 
 export const Forbidden: React.FC = () => {
-  const { t } = useLanguage();
+  const { language, t, toggleLanguage } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const isVi = language === 'vi';
+
+  useDocumentTitle(isVi ? 'Truy cập bị từ chối' : 'Access Denied');
 
   // Determine authorized home destination
   const getHomePath = (): string => {
@@ -26,30 +31,58 @@ export const Forbidden: React.FC = () => {
 
   return (
     <div className="error-page-wrapper">
-      <main className="error-card">
-        {/* Visual 403 Presentation */}
-        <div className="error-visual-container" aria-hidden="true">
-          <span className="error-big-number error-big-number-accent-403">4</span>
-          <div className="error-visual-center error-center-403">
-            <div className="error-center-ring error-center-ring-403" />
-            <ShieldAlert size={44} className="error-center-icon-animated" />
-          </div>
-          <span className="error-big-number error-big-number-accent-403">3</span>
+      {/* Top Bar with Brand & Language Switcher */}
+      <header className="error-top-nav">
+        <div 
+          className="error-brand-link" 
+          onClick={() => navigate(getHomePath())}
+          role="button"
+          tabIndex={0}
+        >
+          <img src="/logo-icon.png" alt="EnglishHub" className="error-brand-logo" />
+          <span className="error-brand-name">EnglishHub</span>
         </div>
 
-        {/* Title & Description */}
+        <button
+          type="button"
+          className="error-lang-pill"
+          onClick={toggleLanguage}
+          title={isVi ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+        >
+          <Globe size={13} />
+          <span>{isVi ? 'Tiếng Việt' : 'English'}</span>
+        </button>
+      </header>
+
+      {/* Main Screen Content - Direct on Screen, No Card */}
+      <main className="error-content">
+        <div className="error-huge-number">403</div>
+
         <h1 className="error-title">{t('error403Title')}</h1>
         <p className="error-desc">{t('error403Desc')}</p>
 
-        {/* Action Button: Return to Homepage */}
-        <button 
-          type="button" 
-          className="btn-error-primary btn-error-crimson" 
-          onClick={() => navigate(getHomePath())}
-        >
-          <Home size={18} />
-          <span>{t('error403BackHome')}</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="error-actions">
+          <Button 
+            variant="primary" 
+            icon={Home}
+            onClick={() => navigate(getHomePath())}
+          >
+            {t('error403BackHome')}
+          </Button>
+          <Button 
+            variant="secondary" 
+            icon={ArrowLeft}
+            onClick={() => navigate(-1)}
+          >
+            {t('error403BackPrev')}
+          </Button>
+        </div>
+
+        {/* System Status Subtext */}
+        <div className="error-subtext">
+          {isVi ? 'Mã lỗi HTTP: 403 • Không có quyền truy cập' : 'HTTP Status: 403 • Access Forbidden'}
+        </div>
       </main>
     </div>
   );

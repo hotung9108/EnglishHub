@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, Bell, RefreshCw
+  Calendar, Eye, Save, Send, CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -64,98 +64,50 @@ export const TeacherCreateAssignment: React.FC = () => {
       taskType: 'task2',
       promptText: '',
       minWords: 250,
-      scale: '9.0',
+      scale: '10',
       rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
       enableAi: true,
-      aiInstruction: 'Khắt khe với các lỗi diễn đạt chung chung; gạch chân cấu trúc ngữ pháp Band 7.5+ và collocations cao cấp.',
+      aiInstruction: '',
       enablePlagiarismCheck: true,
       modelAnswer: '',
       attachments: []
     },
     speaking: {
       partType: 'part2',
-      cueCardTopic: 'Describe an eco-friendly action you took to protect the local environment.',
-      cueCardBullets: [
-        'What the action was',
-        'When and where you took it',
-        'Why you decided to do it',
-        'And explain how you felt after completing this action.'
-      ],
+      cueCardTopic: '',
+      cueCardBullets: [],
       prepTimeSeconds: 60,
       speakingTimeSeconds: 120,
       maxRetries: 3,
       examinerSampleAudioUrl: '',
-      examinerTranscript: 'You have one minute to prepare your speech on this topic.',
-      followUpQuestions: [
-        {
-          id: 'sq-new-1',
-          order: 1,
-          question: 'Do schools in your country educate students about environmental conservation?',
-          hint: 'Discuss curriculum, extracurricular recycling campaigns, and tree-planting days.'
-        }
-      ],
+      examinerTranscript: '',
+      followUpQuestions: [],
       rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
       enableAi: true,
       aiModel: 'Whisper V3 Large',
-      aiInstruction: 'Đặc biệt kiểm tra phụ âm cuối /s/, /z/, /t/ và ngữ điệu câu hỏi.'
+      aiInstruction: ''
     },
     reading: {
-      passageTitle: 'The Architecture of Green Smart Cities',
-      passageSubtitle: 'Cambridge Academic Reading Section',
-      passageSource: 'Journal of Urban Ecology & Architecture',
+      passageTitle: '',
+      passageSubtitle: '',
+      passageSource: '',
       timeLimitMinutes: 20,
       enableAiExplanation: true,
-      aiInstruction: 'Cung cấp phân tích chi tiết cho từng phương án bẫy.',
-      paragraphs: [
-        {
-          id: 'p-new-1',
-          label: 'A',
-          title: 'The Rise of Smart Cities',
-          content: 'Smart cities leverage IoT sensors, real-time analytics, and energy-efficient building materials to minimize greenhouse gas emissions and enhance civic infrastructure.'
-        }
-      ],
-      questions: [
-        {
-          id: 'rq-new-1',
-          order: 1,
-          type: 'multiple_choice',
-          prompt: 'What is the primary objective of deploying IoT sensors in green smart cities?',
-          options: [
-            'To monitor energy consumption and minimize greenhouse emissions',
-            'To replace human architects with artificial intelligence',
-            'To increase the cost of commercial real estate',
-            'To conduct surveillance on residential neighborhoods'
-          ],
-          correctAnswer: 'To monitor energy consumption and minimize greenhouse emissions',
-          explanation: 'Paragraph A confirms: "minimize greenhouse gas emissions and enhance civic infrastructure".',
-          paragraphRef: 'A',
-          points: 1
-        }
-      ]
+      aiInstruction: '',
+      paragraphs: [],
+      questions: []
     },
     listening: {
-      audioTitle: 'Campus_Orientation_Eco_Initiatives.mp3',
+      audioTitle: '',
       audioUrl: '',
       audioDurationSeconds: 1200,
       playbackLimit: 'single',
-      transcript: 'Campus orientation audio track.',
+      transcript: '',
       hideTranscriptUntilGraded: true,
       activeSection: 'section1',
       enableAiDistractorCheck: true,
-      aiInstruction: 'Lưu ý người nói có đính chính ngày nộp đơn đăng ký.',
-      questions: [
-        {
-          id: 'lq-new-1',
-          order: 1,
-          section: 'section1',
-          type: 'form_completion',
-          prompt: 'Society registration name: [ _____ ] Initiative',
-          correctAnswer: 'Campus Recycling',
-          acceptableAnswers: ['campus recycling', 'Campus Recycling Initiative'],
-          timestampClue: '00:30',
-          points: 1
-        }
-      ]
+      aiInstruction: '',
+      questions: []
     }
   }));
 
@@ -400,9 +352,6 @@ export const TeacherCreateAssignment: React.FC = () => {
       <div className="assignment-edit-header">
         <div className="assignment-edit-title-wrap">
           <div className="assignment-edit-title-row">
-            <span className="assignment-edit-code-badge" style={{ backgroundColor: '#2563eb' }}>
-              MỚI
-            </span>
             <input 
               type="text" 
               className="assignment-edit-title-input"
@@ -411,11 +360,6 @@ export const TeacherCreateAssignment: React.FC = () => {
               placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
             />
           </div>
-          <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
-            {isVi 
-              ? 'Thiết lập nội dung đề thi theo 4 kỹ năng chuẩn IELTS, đính kèm học liệu và cấu hình chấm điểm AI.'
-              : 'Configure 4 IELTS skill assignment templates, attachments, and automated AI scoring.'}
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -523,7 +467,6 @@ export const TeacherCreateAssignment: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Thời gian mở và hạn chót' : 'Open & Close dates'}</p>
                 </div>
               </div>
             </div>
@@ -551,37 +494,17 @@ export const TeacherCreateAssignment: React.FC = () => {
               />
             </div>
 
-            <div className="edit-form-group">
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={assignmentData.allowLate}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, allowLate: e.target.checked })}
-                  style={{ marginTop: '3px', accentColor: '#2563eb' }}
-                />
-                <span style={{ fontSize: '13px', color: '#334155', lineHeight: 1.4 }}>
-                  <strong style={{ display: 'block', color: '#0f172a' }}>{isVi ? 'Cho phép nộp muộn' : 'Allow late submissions'}</strong>
-                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
-                    {isVi ? 'Tối đa trễ 24 giờ sau hạn chót (tự động gắn cờ Nộp muộn).' : 'Max 24h grace period.'}
-                  </span>
-                </span>
-              </label>
-            </div>
-
             <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <label className="edit-form-label">{isVi ? 'Thời lượng làm bài có bấm giờ' : 'Duration Limit'}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="number" 
-                  className="edit-form-input" 
-                  value={assignmentData.durationMinutes || 60}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, durationMinutes: parseInt(e.target.value) || 0 })}
-                  style={{ width: '90px' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                  {isVi ? 'phút' : 'minutes'}
-                </span>
-              </div>
+              <label className="edit-form-label">{isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}</label>
+              <input 
+                type="number" 
+                min={1}
+                max={10}
+                className="edit-form-input" 
+                value={assignmentData.maxSubmissions || 3}
+                onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: parseInt(e.target.value) || 1 })}
+                style={{ width: '90px' }}
+              />
             </div>
           </section>
 
@@ -593,23 +516,21 @@ export const TeacherCreateAssignment: React.FC = () => {
                   <Eye size={18} />
                 </div>
                 <div>
-                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái & Đối Tượng' : 'Publish & Audience'}</h3>
-                  <p className="edit-card-desc">{isVi ? 'Quyền truy cập của học viên' : 'Student access'}</p>
+                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái Bài Tập' : 'Publish Status'}</h3>
                 </div>
               </div>
             </div>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Trạng thái phát hành' : 'Publish Status'}</label>
+            <div className="edit-form-group" style={{ marginBottom: 0 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <button
                   type="button"
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'active' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'active' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'active' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'active' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: assignmentData.status === 'active' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: assignmentData.status === 'active' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'
@@ -623,9 +544,9 @@ export const TeacherCreateAssignment: React.FC = () => {
                   style={{ 
                     padding: '8px 10px', 
                     borderRadius: '8px', 
-                    border: assignmentData.status === 'draft' ? '2px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: assignmentData.status === 'draft' ? '#eff6ff' : '#ffffff',
-                    color: assignmentData.status === 'draft' ? '#1d4ed8' : '#64748b',
+                    border: assignmentData.status === 'draft' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
+                    backgroundColor: assignmentData.status === 'draft' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
+                    color: assignmentData.status === 'draft' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
                     fontSize: '12.5px',
                     fontWeight: 700,
                     cursor: 'pointer'
@@ -635,47 +556,6 @@ export const TeacherCreateAssignment: React.FC = () => {
                   {isVi ? 'Bản nháp' : 'Draft'}
                 </button>
               </div>
-            </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Phạm vi giao bài' : 'Audience Target'}</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'all'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'all' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? 'Toàn bộ học viên trong lớp' : 'All class students'}
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: '#334155', cursor: 'pointer' }}>
-                  <input 
-                    type="radio" 
-                    name="audience" 
-                    checked={assignmentData.targetAudience === 'specific'}
-                    onChange={() => setAssignmentData({ ...assignmentData, targetAudience: 'specific' })}
-                    style={{ accentColor: '#2563eb' }}
-                  />
-                  {isVi ? 'Chỉ định nhóm học viên cụ thể' : 'Specific student group'}
-                </label>
-              </div>
-            </div>
-
-            <div style={{ paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={assignmentData.notifyStudents}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, notifyStudents: e.target.checked })}
-                  style={{ accentColor: '#2563eb' }}
-                />
-                <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 600 }}>
-                  <Bell size={13} style={{ display: 'inline', marginRight: 4 }} />
-                  {isVi ? 'Gửi thông báo & email đến học sinh' : 'Send app & email alerts'}
-                </span>
-              </label>
             </div>
           </section>
         </div>

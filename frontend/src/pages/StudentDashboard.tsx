@@ -3,17 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   CheckCircle2, 
-  Clock, 
-  Flame, 
-  Sparkles, 
   Headphones, 
   PenTool, 
   Mic, 
-  TrendingUp,
-  Award,
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
+import { MetricCard, Button, EmptyState } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
@@ -150,44 +146,21 @@ const StudentDashboard: React.FC = () => {
       .slice(0, 4);
   }, [assignments]);
 
-  // Average score derivation
-  const averageBand = useMemo(() => {
+  // Average score derivation (Scale 10)
+  const averageScore10 = useMemo(() => {
     if (progress?.skillAverages && progress.skillAverages.length > 0) {
       const sumPercent = progress.skillAverages.reduce((acc, curr) => acc + (Number(curr.averageScorePercent) || 0), 0);
       const avgPercent = sumPercent / progress.skillAverages.length;
-      return (avgPercent / 100 * 9).toFixed(1);
+      return (avgPercent / 10).toFixed(1);
     }
     const scores = assignments.map((a) => a.score).filter((s): s is number => s !== null && s !== undefined);
     if (scores.length > 0) {
       const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      return (avg / 100 * 9).toFixed(1);
+      return (avg > 10 ? avg / 10 : avg).toFixed(1);
     }
     return '--';
   }, [progress, assignments]);
 
-  // Skill scores for 4 skills
-  const skillScores = useMemo(() => {
-    const defaultSkills = [
-      { skill: 'LISTENING', name: 'Listening', band: '--', percent: 0, icon: Headphones, color: '#3b82f6', cls: 'listening' },
-      { skill: 'READING', name: 'Reading', band: '--', percent: 0, icon: BookOpen, color: '#10b981', cls: 'reading' },
-      { skill: 'WRITING', name: 'Writing', band: '--', percent: 0, icon: PenTool, color: '#f59e0b', cls: 'writing' },
-      { skill: 'SPEAKING', name: 'Speaking', band: '--', percent: 0, icon: Mic, color: '#8b5cf6', cls: 'speaking' },
-    ];
-
-    if (!progress?.skillAverages || progress.skillAverages.length === 0) {
-      return defaultSkills;
-    }
-
-    return defaultSkills.map((def) => {
-      const found = progress.skillAverages.find((item) => String(item.skill).toUpperCase() === def.skill);
-      if (found) {
-        const percent = Math.min(100, Math.max(0, Math.round(Number(found.averageScorePercent) || 0)));
-        const band = (percent / 100 * 9).toFixed(1);
-        return { ...def, percent, band };
-      }
-      return def;
-    });
-  }, [progress]);
 
   const getAssignmentIcon = (title: string) => {
     const lower = title.toLowerCase();
@@ -221,28 +194,18 @@ const StudentDashboard: React.FC = () => {
       <section className="std-dash-hero">
         <div className="std-dash-hero-content">
           <div>
-            <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}! 👋</h1>
-            <p className="std-dash-subgreeting">
-              {upcomingDeadlines.length > 0 ? (
-                <>
-                  Hôm nay là một ngày tuyệt vời để nâng cao kỹ năng Tiếng Anh. Bạn có{' '}
-                  <strong>{upcomingDeadlines.length} bài tập</strong> sắp đến hạn cần hoàn thành.
-                </>
-              ) : (
-                'Tất cả bài tập đã được nộp đúng hạn. Tiếp tục duy trì phong độ học tập xuất sắc!'
-              )}
-            </p>
+            <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}!</h1>
           </div>
 
           <div className="std-dash-target-pill">
             <div>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.8 }}>Mục tiêu chứng chỉ</div>
-              <div style={{ fontSize: '14px', fontWeight: 700 }}>IELTS Academic</div>
+              <div className="std-dash-target-title">Mục tiêu học tập</div>
+              <div className="std-dash-target-sub">Tiếng Anh Tổng Quát</div>
             </div>
-            <div style={{ width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
+            <div className="std-dash-target-divider"></div>
             <div>
-              <div className="std-dash-target-val">7.5</div>
-              <div style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>Target Band</div>
+              <div className="std-dash-target-val">8.5</div>
+              <div className="std-dash-target-unit">Thang 10</div>
             </div>
           </div>
         </div>
@@ -250,79 +213,44 @@ const StudentDashboard: React.FC = () => {
 
       {/* Error state alert */}
       {error && (
-        <div style={{ margin: '16px 0', padding: '16px', borderRadius: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#991b1b' }}>
+        <div className="std-error-banner">
+          <div className="std-error-msg">
             <AlertCircle size={20} />
-            <span style={{ fontSize: '14px' }}>{error}</span>
+            <span>{error}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleRetry}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', backgroundColor: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}
+            icon={RefreshCw}
           >
-            <RefreshCw size={14} /> Thử lại
-          </button>
+            Thử lại
+          </Button>
         </div>
       )}
 
       {/* Quick Metrics Grid */}
       <section className="std-dash-stats-grid">
-        <div className="std-dash-stat-card">
-          <div className="std-dash-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
-            <CheckCircle2 size={24} />
-          </div>
-          <div>
-            <div className="std-dash-stat-num">
-              {isLoading ? '...' : `${completedAssignmentsCount} / ${totalAssignments}`}
-            </div>
-            <div className="std-dash-stat-label">Bài tập đã hoàn thành</div>
-          </div>
-        </div>
-
-        <div className="std-dash-stat-card">
-          <div className="std-dash-stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-            <Award size={24} />
-          </div>
-          <div>
-            <div className="std-dash-stat-num">
-              {isLoading ? '...' : `Band ${averageBand}`}
-            </div>
-            <div className="std-dash-stat-label">Điểm TB 4 Kỹ năng</div>
-          </div>
-        </div>
-
-        <div className="std-dash-stat-card">
-          <div className="std-dash-stat-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
-            <Clock size={24} />
-          </div>
-          <div>
-            <div className="std-dash-stat-num">
-              {isLoading ? '...' : `${pendingGradingCount} bài`}
-            </div>
-            <div className="std-dash-stat-label">Đang chờ chấm điểm</div>
-          </div>
-        </div>
-
-        <div className="std-dash-stat-card">
-          <div className="std-dash-stat-icon" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>
-            <Flame size={24} />
-          </div>
-          <div>
-            <div className="std-dash-stat-num">7 Ngày 🔥</div>
-            <div className="std-dash-stat-label">Chuỗi học tập liên tục</div>
-          </div>
-        </div>
+        <MetricCard
+          title="Bài tập đã hoàn thành"
+          value={isLoading ? '...' : `${completedAssignmentsCount} / ${totalAssignments}`}
+        />
+        <MetricCard
+          title="Điểm TB 4 Kỹ năng"
+          value={isLoading ? '...' : (averageScore10 !== '--' ? `${averageScore10} / 10` : '--')}
+        />
+        <MetricCard
+          title="Đang chờ chấm điểm"
+          value={isLoading ? '...' : `${pendingGradingCount} bài`}
+        />
       </section>
 
-      {/* Main Two Column Layout */}
+      {/* Main Content: Upcoming Deadlines & My Classes */}
       <div className="std-dash-main-grid">
-        {/* Left Column: Upcoming Deadlines & My Classes */}
-        <div>
-          {/* Upcoming Deadlines */}
+        {/* Upcoming Deadlines */}
           <div className="std-dash-card">
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
-                <Clock size={18} color="var(--primary)" />
                 Bài Tập Sắp Đến Hạn (Deadlines)
               </h2>
               <button 
@@ -334,23 +262,23 @@ const StudentDashboard: React.FC = () => {
               </button>
             </div>
 
-            <div className="std-dash-card-body" style={{ padding: '16px' }}>
+            <div className="std-dash-card-body p-4">
               {isLoading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
-                  <div style={{ height: 48, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ height: 48, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
+                <div className="flex flex-col gap-3 p-3">
+                  <div className="h-12 rounded-lg bg-slate-100 animate-pulse" />
+                  <div className="h-12 rounded-lg bg-slate-100 animate-pulse" />
                 </div>
               ) : upcomingDeadlines.length === 0 ? (
-                <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                  <CheckCircle2 size={36} color="#16a34a" style={{ margin: '0 auto 8px auto' }} />
-                  <div style={{ fontWeight: 600, fontSize: '15px' }}>Không có bài tập nào sắp đến hạn!</div>
-                  <p style={{ fontSize: '13px', marginTop: 4 }}>Bạn đã hoàn thành tất cả các bài tập hiện có.</p>
-                </div>
+                <EmptyState
+                  icon={CheckCircle2}
+                  title="Không có bài tập nào sắp đến hạn!"
+                  description="Bạn đã hoàn thành tất cả các bài tập hiện có."
+                />
               ) : (
                 upcomingDeadlines.map((assignment) => (
                   <div key={assignment.id} className="std-deadline-item">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="std-deadline-icon">
                         {getAssignmentIcon(assignment.title)}
                       </div>
                       <div>
@@ -358,19 +286,18 @@ const StudentDashboard: React.FC = () => {
                         <div className="std-deadline-meta">
                           <span>{assignment.className || 'Lớp học'}</span>
                           <span>•</span>
-                          <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatDeadline(assignment.closeAt)}</span>
+                          <span className="std-deadline-tag">{formatDeadline(assignment.closeAt)}</span>
                         </div>
                       </div>
                     </div>
 
-                    <button 
-                      type="button"
-                      className="btn-primary"
-                      style={{ padding: '6px 14px', fontSize: '12px' }}
+                    <Button 
+                      variant="primary"
+                      size="sm"
                       onClick={() => navigate(`/student/assignments/${assignment.id}/overview`)}
                     >
                       Làm bài
-                    </button>
+                    </Button>
                   </div>
                 ))
               )}
@@ -378,10 +305,9 @@ const StudentDashboard: React.FC = () => {
           </div>
 
           {/* My Classes Snapshot */}
-          <div className="std-dash-card" style={{ marginTop: '24px' }}>
+          <div className="std-dash-card">
             <div className="std-dash-card-header">
               <h2 className="std-dash-card-title">
-                <BookOpen size={18} color="var(--primary)" />
                 Lớp Học Đang Diễn Ra
               </h2>
               <button 
@@ -393,35 +319,34 @@ const StudentDashboard: React.FC = () => {
               </button>
             </div>
 
-            <div className="std-dash-card-body" style={{ padding: '16px' }}>
+            <div className="std-dash-card-body p-4">
               {isLoading ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
-                  <div style={{ height: 100, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ height: 100, borderRadius: 8, backgroundColor: 'var(--surface-container-low)', animation: 'pulse 1.5s infinite' }} />
+                <div className="std-class-grid">
+                  <div className="h-24 rounded-lg bg-slate-100 animate-pulse" />
+                  <div className="h-24 rounded-lg bg-slate-100 animate-pulse" />
                 </div>
               ) : classes.length === 0 ? (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                  <BookOpen size={32} style={{ margin: '0 auto 8px auto', opacity: 0.5 }} />
-                  <div>Chưa tham gia lớp học nào.</div>
-                </div>
+                <EmptyState
+                  icon={BookOpen}
+                  title="Chưa tham gia lớp học nào"
+                  description="Liên hệ giảng viên hoặc quản trị viên để được ghi danh vào lớp."
+                />
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <div className="std-class-grid">
                   {classes.slice(0, 4).map((cls) => {
                     const classAssignments = assignments.filter((a) => a.classId === cls.id);
                     return (
                       <div 
                         key={cls.id}
                         onClick={() => navigate(`/student/classes/${cls.id}`)}
-                        style={{ padding: '16px', borderRadius: '10px', border: '1px solid var(--outline-variant)', backgroundColor: 'var(--surface-container-low)', cursor: 'pointer', transition: 'all 0.2s' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--outline-variant)'; }}
+                        className="std-class-card"
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', marginBottom: 4 }}>{cls.name}</div>
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--on-surface)', marginBottom: 6 }}>{cls.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--on-surface-variant)' }}>Trạng thái: {cls.status}</div>
-                        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                        <div className="std-class-badge">{cls.name}</div>
+                        <div className="std-class-name">{cls.name}</div>
+                        <div className="std-class-status">Trạng thái: {cls.status}</div>
+                        <div className="std-class-footer">
                           <span>{classAssignments.length} bài tập</span>
-                          <span style={{ color: '#16a34a', fontWeight: 600 }}>Chi tiết lớp →</span>
+                          <span className="std-class-link">Chi tiết lớp →</span>
                         </div>
                       </div>
                     );
@@ -430,94 +355,6 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
-
-        {/* Right Column: 4-Skill Progress & AI Recommendations */}
-        <div>
-          {/* 4-Skill Proficiency Bars */}
-          <div className="std-dash-card">
-            <div className="std-dash-card-header">
-              <h2 className="std-dash-card-title">
-                <TrendingUp size={18} color="var(--primary)" />
-                Năng Lực 4 Kỹ Năng
-              </h2>
-              <button
-                type="button"
-                className="speaking-btn-link"
-                onClick={() => navigate('/student/analytics')}
-              >
-                Phân tích chi tiết →
-              </button>
-            </div>
-
-            <div className="std-dash-card-body">
-              {skillScores.map((item) => {
-                const IconComponent = item.icon;
-                return (
-                  <div key={item.skill} className="skill-bar-row">
-                    <div className="skill-bar-info">
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <IconComponent size={15} color={item.color} /> {item.name}
-                      </span>
-                      <span>Band {item.band}</span>
-                    </div>
-                    <div className="skill-bar-track">
-                      <div className={`skill-bar-fill ${item.cls}`} style={{ width: `${item.percent}%` }}></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* AI Daily Recommendation */}
-          <div className="std-dash-card" style={{ marginTop: '24px' }}>
-            <div className="std-dash-card-header">
-              <h2 className="std-dash-card-title">
-                <Sparkles size={18} color="#16a34a" />
-                AI Đề Xuất Bổ Trợ Hôm Nay
-              </h2>
-            </div>
-
-            <div className="std-dash-card-body" style={{ padding: '16px' }}>
-              <div className="ai-recommend-box">
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#166534', marginBottom: 2 }}>
-                    Luyện tập Phát âm &amp; Ngữ điệu Speaking
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#15803d', lineHeight: 1.4 }}>
-                    Dựa trên đánh giá âm phổ gần nhất, cải thiện nối âm (linking sounds) và trọng âm từ sẽ giúp đẩy band Speaking lên 7.5+.
-                  </div>
-                  <button 
-                    type="button"
-                    style={{ marginTop: 8, padding: '4px 10px', fontSize: '11px', fontWeight: 700, backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                    onClick={() => navigate('/student/assignments')}
-                  >
-                    Xem bài tập Nói
-                  </button>
-                </div>
-              </div>
-
-              <div className="ai-recommend-box" style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', borderColor: '#bfdbfe' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', marginBottom: 2 }}>
-                    Cấu trúc câu phức &amp; Mạo từ Writing
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#1d4ed8', lineHeight: 1.4 }}>
-                    Luyện tập mệnh đề quan hệ rút gọn và câu điều kiện hỗn hợp để nâng cao chỉ số Grammatical Range.
-                  </div>
-                  <button 
-                    type="button"
-                    style={{ marginTop: 8, padding: '4px 10px', fontSize: '11px', fontWeight: 700, backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
-                    onClick={() => navigate('/student/assignments')}
-                  >
-                    Xem bài tập Viết
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

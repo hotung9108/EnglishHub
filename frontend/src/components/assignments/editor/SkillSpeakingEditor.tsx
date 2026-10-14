@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Mic, Play, Pause, Plus, Trash2, Clock, Volume2, 
-  Sparkles, CheckCircle, FileText, Music
+  Sparkles, FileText, Music
 } from 'lucide-react';
 import type { SpeakingConfig, SpeakingQuestionItem } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -18,16 +18,6 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
 
   const updateField = <K extends keyof SpeakingConfig>(key: K, value: SpeakingConfig[K]) => {
     onChange({ ...config, [key]: value });
-  };
-
-  const updateRubric = (key: keyof SpeakingConfig['rubrics'], val: number) => {
-    onChange({
-      ...config,
-      rubrics: {
-        ...config.rubrics,
-        [key]: val
-      }
-    });
   };
 
   const handleAddBullet = () => {
@@ -78,10 +68,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Cấu Hình Kỹ Năng Nói (Speaking Assignment)' : 'Speaking Mode & Parameters'}
+                {isVi ? 'Cấu Hình Kỹ Năng Nói' : 'Speaking Configuration'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Thiết lập phần thi Speaking, thời gian chuẩn bị và thời lượng ghi âm.' : 'Configure speaking parts, preparation time, and recording constraints.'}
+                {isVi ? 'Cấu hình thời lượng ghi âm bài nói.' : 'Configure maximum recording duration.'}
               </p>
             </div>
           </div>
@@ -93,22 +83,22 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             backgroundColor: '#faf5ff', 
             color: '#9333ea' 
           }}>
-            IELTS Speaking Part 1 / 2 / 3
+            Speaking
           </span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
           <div>
-            <label className="edit-form-label">{isVi ? 'Phần thi Speaking' : 'Speaking Part'}</label>
+            <label className="edit-form-label">{isVi ? 'Dạng bài Speaking' : 'Speaking Format'}</label>
             <select 
               className="edit-form-select"
               value={config.partType}
               onChange={(e) => updateField('partType', e.target.value as SpeakingConfig['partType'])}
             >
-              <option value="part2">IELTS Speaking Part 2 (Cue Card Monologue)</option>
-              <option value="part1">IELTS Speaking Part 1 (Short Q&A Interview)</option>
-              <option value="part3">IELTS Speaking Part 3 (In-depth Two-way Discussion)</option>
-              <option value="full">Full Speaking Mock Test (Part 1 + 2 + 3)</option>
+              <option value="part2">{isVi ? 'Nói theo chủ đề (Topic Presentation)' : 'Topic Presentation'}</option>
+              <option value="part1">{isVi ? 'Hỏi đáp phỏng vấn (Short Q&A)' : 'Short Q&A Interview'}</option>
+              <option value="part3">{isVi ? 'Thảo luận mở rộng (Discussion)' : 'Discussion Topic'}</option>
+              <option value="full">{isVi ? 'Bài nói tổng hợp (Full Test)' : 'Comprehensive Speaking Test'}</option>
             </select>
           </div>
 
@@ -123,7 +113,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
                 style={{ width: '100px' }}
               />
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                {isVi ? 'giây (Chuẩn IELTS: 60s)' : 'seconds (IELTS: 60s)'}
+                {isVi ? 'giây (Gợi ý: 60s)' : 'seconds (Suggested: 60s)'}
               </span>
             </div>
           </div>
@@ -139,7 +129,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
                 style={{ width: '100px' }}
               />
               <span style={{ fontSize: '13px', color: '#64748b' }}>
-                {isVi ? 'giây (Chuẩn IELTS: 120s)' : 'seconds (IELTS: 120s)'}
+                {isVi ? 'giây (Gợi ý: 120s)' : 'seconds (Suggested: 120s)'}
               </span>
             </div>
           </div>
@@ -158,12 +148,12 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
           </div>
         </div>
 
-        {/* IELTS Cue Card Container */}
+        {/* Cue Card Container */}
         {(config.partType === 'part2' || config.partType === 'full') && (
           <div className="cue-card-container">
             <div className="cue-card-header">
               <FileText size={18} />
-              <span>{isVi ? 'Thẻ Đề Bài IELTS Speaking Part 2 (Candidate Cue Card)' : 'Candidate Cue Card Topic'}</span>
+              <span>{isVi ? 'Chủ Đề Bài Nói (Speaking Topic)' : 'Speaking Topic'}</span>
             </div>
 
             <div className="edit-form-group">
@@ -232,10 +222,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Âm Thanh Phát Âm Mẫu / Câu Hỏi Của Giám Khảo' : 'Examiner Audio Prompt & Model Speech'}
+                {isVi ? 'Âm Thanh Phát Âm Mẫu / Câu Hỏi' : 'Audio Prompt & Model Pronunciation'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Tải lên giọng đọc mẫu chuẩn bản ngữ hoặc câu hỏi âm thanh để học viên nghe trước khi trả lời.' : 'Upload native speaker model pronunciation or question audio prompt.'}
+                {isVi ? 'Tệp âm thanh câu hỏi hoặc phát âm mẫu (nếu có).' : 'Optional prompt audio or pronunciation sample.'}
               </p>
             </div>
           </div>
@@ -311,10 +301,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Danh Sách Câu Hỏi Mở Rộng (Discussion Questions)' : 'Follow-up Questions List'}
+                {isVi ? 'Danh Sách Câu Hỏi Mở Rộng' : 'Discussion Questions'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Các câu hỏi tương tác mở rộng theo ngữ cảnh cho Part 1 hoặc Part 3.' : 'Interactive follow-up questions for Part 1/3 discussion.'}
+                {isVi ? 'Câu hỏi gợi ý mở rộng cho học viên.' : 'Follow-up discussion prompts.'}
               </p>
             </div>
           </div>
@@ -350,7 +340,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
               <div className="edit-form-group">
                 <input 
                   type="text" 
-                  className="edit-form-input"
+                  className="edit-form-input" 
                   value={q.question}
                   onChange={(e) => handleUpdateFollowUp(idx, 'question', e.target.value)}
                   placeholder="Enter question text..."
@@ -360,7 +350,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
               <div className="edit-form-group" style={{ marginBottom: 0 }}>
                 <input 
                   type="text" 
-                  className="edit-form-input"
+                  className="edit-form-input" 
                   style={{ fontSize: '13px', color: '#64748b', backgroundColor: '#f1f5f9' }}
                   value={q.hint || ''}
                   onChange={(e) => handleUpdateFollowUp(idx, 'hint', e.target.value)}
@@ -372,7 +362,7 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
         </div>
       </section>
 
-      {/* SECTION 4: AI Speech Diagnostics & 4 IELTS Rubrics */}
+      {/* SECTION 4: AI Speech Diagnostics */}
       <section className="edit-card">
         <div className="edit-card-header">
           <div className="edit-card-header-left">
@@ -381,10 +371,10 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             </div>
             <div>
               <h2 className="edit-card-title">
-                {isVi ? 'Chẩn Đoán Phát Âm AI & Rubric Nói (AI Speech Engine)' : 'AI Speech Diagnostics & Rubrics'}
+                {isVi ? 'Trợ Lý AI Nhận Xét Phát Âm' : 'AI Speech Diagnostics'}
               </h2>
               <p className="edit-card-desc">
-                {isVi ? 'Công nghệ nhận diện âm vị AI (Phonemes) và 4 tiêu chí chấm IELTS Speaking.' : 'Phoneme accuracy analytics and 4 IELTS speaking descriptor weights.'}
+                {isVi ? 'Nhận xét tự động phát âm và độ lưu loát.' : 'Automatic pronunciation and fluency evaluation.'}
               </p>
             </div>
           </div>
@@ -403,77 +393,9 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
 
         {config.enableAi && (
           <div className="ai-calibration-card" style={{ borderColor: '#e9d5ff' }}>
-            <div className="ai-header-row">
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#6b21a8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle size={16} color="#9333ea" />
-                {isVi ? 'Trọng số 4 tiêu chí chấm Speaking (FC, LR, GRA, PR)' : '4 Speaking Criteria (Total = 100%)'}
-              </span>
-              <span style={{ 
-                fontSize: '12px', 
-                fontWeight: 800, 
-                color: (config.rubrics.fc + config.rubrics.lr + config.rubrics.gra + config.rubrics.pr === 100) ? '#16a34a' : '#dc2626' 
-              }}>
-                Tổng: {config.rubrics.fc + config.rubrics.lr + config.rubrics.gra + config.rubrics.pr}%
-              </span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Fluency & Coherence</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.fc}
-                    onChange={(e) => updateRubric('fc', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Lexical Resource</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.lr}
-                    onChange={(e) => updateRubric('lr', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Grammar & Accuracy</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.gra}
-                    onChange={(e) => updateRubric('gra', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="edit-form-label" style={{ fontSize: '11px' }}>Pronunciation (PR)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input 
-                    type="number" 
-                    className="edit-form-input" 
-                    value={config.rubrics.pr}
-                    onChange={(e) => updateRubric('pr', parseInt(e.target.value) || 0)}
-                  />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>%</span>
-                </div>
-              </div>
-            </div>
-
             <div className="edit-form-group" style={{ marginBottom: 0 }}>
               <label className="edit-form-label">
-                {isVi ? 'Chỉ thị phát âm cho AI (Pronunciation Detection Focus)' : 'Pronunciation Focus for AI'}
+                {isVi ? 'Hướng dẫn riêng cho AI chấm phát âm' : 'Pronunciation Focus for AI'}
               </label>
               <textarea 
                 className="edit-form-textarea"

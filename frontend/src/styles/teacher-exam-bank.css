@@ -8,26 +8,14 @@
 
 /* Hero Header Banner */
 .exam-bank-hero {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a8a 100%);
+  background-color: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e7e5e4);
   border-radius: var(--radius-lg, 16px);
   padding: 32px 36px;
-  color: #ffffff;
+  color: var(--text-primary, #292524);
   margin-bottom: 28px;
   position: relative;
-  overflow: hidden;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
-}
-
-.exam-bank-hero::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -10%;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
+  box-shadow: var(--shadow-card);
 }
 
 .exam-hero-content {
@@ -49,16 +37,17 @@
 .exam-hero-title {
   font-size: 26px;
   font-weight: 800;
-  margin: 0 0 8px 0;
+  margin: 0;
   letter-spacing: -0.02em;
   display: flex;
   align-items: center;
   gap: 12px;
+  color: var(--text-primary, #292524);
 }
 
 .exam-hero-subtitle {
   font-size: 14px;
-  color: #94a3b8;
+  color: var(--text-secondary, #78716c);
   margin: 0;
   line-height: 1.6;
   max-width: 680px;
@@ -93,8 +82,8 @@
 
 .exam-stat-card:hover {
   transform: translateY(-2px);
-  border-color: #bfdbfe;
-  box-shadow: 0 6px 18px -4px rgba(37, 99, 235, 0.1);
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: 0 6px 18px -4px rgba(27, 77, 62, 0.1);
 }
 
 .exam-stat-icon {
@@ -161,16 +150,16 @@
 }
 
 .exam-skill-pill.active {
-  background-color: var(--primary, #2563eb);
+  background-color: var(--primary, #1b4d3e);
   color: #ffffff;
-  border-color: var(--primary, #2563eb);
-  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+  border-color: var(--primary, #1b4d3e);
+  box-shadow: 0 4px 12px -2px rgba(27, 77, 62, 0.25);
 }
 
 .exam-skill-pill.active-writing {
-  background-color: #2563eb;
+  background-color: var(--skill-writing, #8C5E14);
   color: #ffffff;
-  border-color: #2563eb;
+  border-color: var(--skill-writing, #8C5E14);
 }
 
 .exam-skill-pill.active-speaking {
@@ -231,8 +220,8 @@
 
 .exam-search-input:focus {
   background-color: #ffffff;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  border-color: var(--primary, #1b4d3e);
+  box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.12);
 }
 
 .exam-dropdown-group {
@@ -276,8 +265,8 @@
 
 .exam-card:hover {
   transform: translateY(-2px);
-  border-color: #bfdbfe;
-  box-shadow: 0 10px 24px -4px rgba(37, 99, 235, 0.1);
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: 0 10px 24px -4px rgba(27, 77, 62, 0.1);
 }
 
 .exam-card-top {
@@ -314,7 +303,7 @@
 }
 
 .exam-card-title:hover {
-  color: var(--primary, #2563eb);
+  color: var(--primary, #1b4d3e);
 }
 
 .exam-card-desc {
@@ -429,25 +418,30 @@
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 4px;
+  border: 1px solid transparent;
 }
 
 .exam-badge-skill.writing {
-  background-color: #eff6ff;
-  color: #2563eb;
+  background-color: var(--skill-writing-bg, #FAF3E5);
+  color: var(--skill-writing, #8C5E14);
+  border-color: var(--skill-writing-border, #ECD8B0);
 }
 
 .exam-badge-skill.speaking {
-  background-color: #faf5ff;
-  color: #9333ea;
+  background-color: var(--skill-speaking-bg, #F3EEFA);
+  color: var(--skill-speaking, #5B21B6);
+  border-color: var(--skill-speaking-border, #D8C7F0);
 }
 
 .exam-badge-skill.reading {
-  background-color: #f0fdf4;
-  color: #16a34a;
+  background-color: var(--skill-reading-bg, #E9F3ED);
+  color: var(--skill-reading, #16533D);
+  border-color: var(--skill-reading-border, #B9DBC5);
 }
 
 .exam-badge-skill.listening {
-  background-color: #f0fdfa;
-  color: #0d9488;
+  background-color: var(--skill-listening-bg, #EDF3FB);
+  color: var(--skill-listening, #1E3A8A);
+  border-color: var(--skill-listening-border, #C8DCF5);
 }
 

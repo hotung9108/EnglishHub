@@ -2,8 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Library, Search, PenTool, Mic, BookOpen, Headphones, 
-  Sparkles, CheckCircle2, Clock, Send, Eye, Star, 
-  Layers, UploadCloud, X
+  CheckCircle2, Clock, Star, 
+  Layers, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import type { 
@@ -477,7 +477,7 @@ export const TeacherExamBank: React.FC = () => {
           taskType: taskType,
           orderIndex: 0,
           instructions: instructions,
-          aiInstruction: assigningExam.details?.rubricsSummary || 'Chấm điểm chi tiết theo tiêu chuẩn Cambridge IELTS',
+          aiInstruction: assigningExam.details?.rubricsSummary || 'Chấm điểm chi tiết theo thang điểm 10',
           maxScore: 10,
         });
       }
@@ -535,14 +535,8 @@ export const TeacherExamBank: React.FC = () => {
         <div className="exam-hero-content">
           <div>
             <h1 className="exam-hero-title">
-              <Library size={30} color="#60a5fa" />
               {isVi ? 'Ngân Hàng Đề Thi & Bài Tập Mẫu' : 'Exam & Assessment Template Bank'}
             </h1>
-            <p className="exam-hero-subtitle">
-              {isVi
-                ? 'Thư viện đề thi chuẩn Cambridge IELTS, TOEIC và học liệu 4 kỹ năng được hiệu chuẩn sẵn rubric chấm điểm và AI diagnostics. Giao bài nhanh cho lớp chỉ với 1 cú click.'
-                : 'Curated repository of official Cambridge IELTS, TOEIC, and 4-skill exam modules with calibrated rubrics and AI assessment presets.'}
-            </p>
           </div>
 
           <div className="exam-hero-actions">
@@ -552,17 +546,15 @@ export const TeacherExamBank: React.FC = () => {
               onClick={() => navigate('/teacher/assignments/create')}
               style={{ fontWeight: 700, color: '#0f172a' }}
             >
-              <UploadCloud size={16} />
               <span>{isVi ? '+ Soạn đề mới' : '+ Create Custom'}</span>
             </button>
             <button 
               type="button" 
               className="btn btn-primary btn-sm"
-              style={{ backgroundColor: '#2563eb', borderColor: '#3b82f6', fontWeight: 700 }}
-              onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi Cambridge 20...' : 'Syncing Cambridge 20 Exam Bank...')}
+              style={{ fontWeight: 700 }}
+              onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi mẫu mới...' : 'Syncing Exam Bank...')}
             >
-              <Sparkles size={16} />
-              <span>{isVi ? 'Đồng bộ Cambridge' : 'Sync Cambridge'}</span>
+              <span>{isVi ? 'Đồng bộ đề thi' : 'Sync Bank'}</span>
             </button>
           </div>
         </div>
@@ -571,12 +563,12 @@ export const TeacherExamBank: React.FC = () => {
       {/* KPI Stats Grid */}
       <div className="exam-stats-grid">
         <div className="exam-stat-card">
-          <div className="exam-stat-icon" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>
+          <div className="exam-stat-icon" style={{ backgroundColor: 'var(--primary-light, #eaf0e8)', color: 'var(--primary, #1b4d3e)' }}>
             <Library size={22} />
           </div>
           <div>
             <div className="exam-stat-num">{examTemplates.length} {isVi ? 'Đề thi chuẩn' : 'Templates'}</div>
-            <div className="exam-stat-label">{isVi ? 'Toàn bộ 4 kỹ năng trong thư viện' : 'Curated 4-Skill Exams'}</div>
+            <div className="exam-stat-label">{isVi ? 'Đề thi 4 kỹ năng' : 'Curated Exams'}</div>
           </div>
         </div>
 
@@ -586,7 +578,7 @@ export const TeacherExamBank: React.FC = () => {
           </div>
           <div>
             <div className="exam-stat-num">100% {isVi ? 'Rubric Chuẩn' : 'Calibrated'}</div>
-            <div className="exam-stat-label">{isVi ? 'Tích hợp sẵn thang điểm AI' : 'Official IELTS Band Descriptors'}</div>
+            <div className="exam-stat-label">{isVi ? 'Rubric thang điểm 10' : 'Standard Rubrics'}</div>
           </div>
         </div>
 
@@ -596,7 +588,7 @@ export const TeacherExamBank: React.FC = () => {
           </div>
           <div>
             <div className="exam-stat-num">{totalDeploys}+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
-            <div className="exam-stat-label">{isVi ? 'Giáo viên đã sử dụng trong học kỳ' : 'Deployed across classrooms'}</div>
+            <div className="exam-stat-label">{isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
           </div>
         </div>
 
@@ -606,7 +598,7 @@ export const TeacherExamBank: React.FC = () => {
           </div>
           <div>
             <div className="exam-stat-num">{avgRating} / 5.0</div>
-            <div className="exam-stat-label">{isVi ? 'Đánh giá độ sát đề thi thật' : 'Exam Fidelity Rating'}</div>
+            <div className="exam-stat-label">{isVi ? 'Đánh giá chất lượng' : 'Fidelity Rating'}</div>
           </div>
         </div>
       </div>
@@ -796,21 +788,19 @@ export const TeacherExamBank: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary bg-white btn-sm"
-                  style={{ padding: '6px 10px', fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  style={{ padding: '6px 12px', fontSize: '12.5px' }}
                   onClick={() => setPreviewExam(exam)}
                   title={isVi ? 'Xem trước nội dung đề' : 'Preview Exam'}
                 >
-                  <Eye size={13} />
                   <span>{isVi ? 'Xem trước' : 'Preview'}</span>
                 </button>
 
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  style={{ padding: '6px 14px', fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  style={{ padding: '6px 14px', fontSize: '12.5px' }}
                   onClick={() => setAssigningExam(exam)}
                 >
-                  <Send size={13} />
                   <span>{isVi ? 'Giao cho lớp' : 'Assign'}</span>
                 </button>
               </div>

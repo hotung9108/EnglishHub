@@ -83,12 +83,13 @@
   border-radius: var(--radius-full, 9999px);
   font-size: 12px;
   font-weight: 700;
+  border: 1px solid transparent;
 }
 
-.overview-skill-badge.writing { background-color: #dbeafe; color: #1e40af; }
-.overview-skill-badge.speaking { background-color: #ede9fe; color: #5b21b6; }
-.overview-skill-badge.reading { background-color: #dcfce7; color: #166534; }
-.overview-skill-badge.listening { background-color: #ffedd5; color: #9a3412; }
+.overview-skill-badge.writing { background-color: var(--skill-writing-bg); color: var(--skill-writing); border-color: var(--skill-writing-border); }
+.overview-skill-badge.speaking { background-color: var(--skill-speaking-bg); color: var(--skill-speaking); border-color: var(--skill-speaking-border); }
+.overview-skill-badge.reading { background-color: var(--skill-reading-bg); color: var(--skill-reading); border-color: var(--skill-reading-border); }
+.overview-skill-badge.listening { background-color: var(--skill-listening-bg); color: var(--skill-listening); border-color: var(--skill-listening-border); }
 
 /* Rules Grid */
 .overview-rules-grid {
@@ -209,8 +210,8 @@
 
 /* CTA Action Box */
 .overview-cta-box {
-  background: linear-gradient(135deg, #f8faff 0%, #eff6ff 100%);
-  border: 1px solid #bfdbfe;
+  background-color: var(--surface-dim, #f5f5f4);
+  border: 1px solid var(--border-color, #e7e5e4);
   border-radius: var(--radius-md, 12px);
   padding: 24px;
   display: flex;
@@ -249,3 +250,80 @@
   background-color: #1d4ed8;
   transform: translateY(-1px);
 }
+
+/* Scoped Utility & State Badges */
+.overview-status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-secondary-container, #17523F);
+  background-color: var(--secondary-container, #E7F3EC);
+  border: 1px solid var(--secondary-fixed, #B7DEC8);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.overview-status-badge.closed {
+  color: var(--error, #8F2222);
+  background-color: var(--error-container, #FBEBEB);
+  border-color: var(--color-danger-border, #F3C5C5);
+}
+
+.overview-code-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.overview-best-score-label {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+.overview-best-score-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.overview-attempts-count {
+  font-size: 13px;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+.overview-best-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a34a;
+  background-color: #dcfce7;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.overview-score-cell {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.overview-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.overview-status-chip.graded { color: #059669; }
+.overview-status-chip.in-progress { color: #2563eb; }
+.overview-status-chip.pending { color: #d97706; }
+
+.overview-cta-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+.overview-cta-desc {
+  font-size: 13px;
+  color: #3b82f6;
+  margin-top: 2px;
+}
+
