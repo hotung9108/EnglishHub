@@ -3,8 +3,10 @@ try:
 except ImportError:
     pytest = None
 import base64
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
+from app.services.audio_processor import AudioProcessor
 
 client = TestClient(app)
 
@@ -20,7 +22,8 @@ def test_health_check():
     assert "openrouterModel" in data
 
 
-def test_analyze_speaking_qa21_benchmark():
+@patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+def test_analyze_speaking_qa21_benchmark(converter: AsyncMock):
     mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
 
     payload = {
@@ -33,6 +36,7 @@ def test_analyze_speaking_qa21_benchmark():
     }
 
     response = client.post("/api/v1/analyze/speaking", json=payload)
+    converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
     assert response.status_code == 200, f"Expected 200, got: {response.text}"
     
     data = response.json()
