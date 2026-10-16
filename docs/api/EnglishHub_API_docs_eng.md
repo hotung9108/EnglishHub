@@ -21,7 +21,8 @@
 10. [Grading](#10-grading)
 11. [Annotations](#11-annotations)
 12. [Student Evaluation](#12-student-evaluation)
-13. [DTO Objects](#13-dto-objects)
+13. [Reports](#13-reports)
+14. [DTO Objects](#14-dto-objects)
 
 ---
 
@@ -51,6 +52,24 @@ Log out and invalidate the refresh token.
 **Request Body:** `LogoutRequest`
 
 **Response:** `LogoutResponse`
+
+---
+
+### POST `/api/v1/auth/forgot-password`
+Request a password reset OTP for the specified email account.
+
+**Request Body:** `ForgotPasswordRequest`
+
+**Response:** `ForgotPasswordResponse`
+
+---
+
+### POST `/api/v1/auth/reset-password`
+Reset account password using the received OTP and verification token.
+
+**Request Body:** `ResetPasswordRequest`
+
+**Response:** `ResetPasswordResponse`
 
 ---
 
@@ -566,6 +585,15 @@ Trigger AI to automatically analyze and grade a submission module.
 
 ---
 
+### GET `/api/v1/submission-modules/{id}/grading/ai-suggestion`
+Retrieve AI grading suggestion and detailed rubric analysis for a submission module (UC25).
+
+**Path Params:** `id` (int64)
+
+**Response:** `AiGradingSuggestionResponse`
+
+---
+
 ### GET `/api/v1/answers/{id}/annotations`
 Retrieve the list of annotations (error highlights) for an answer.
 
@@ -671,9 +699,78 @@ Delete an evaluation.
 
 ---
 
+## 13. Reports
+
+### GET `/api/v1/reports/overview`
+Retrieve aggregated report metrics (class count, assigned assignment count, completion rate %, average score %, pending grading count and breakdown by grading status) for an optional date window, class, or teacher.
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `classId` | int64 | Optional class filter |
+| `teacherId` | int64 | Optional teacher filter |
+
+**Response:** `ReportOverviewResponse`
+
 ---
 
-## 13. DTO Objects
+### GET `/api/v1/reports/classes`
+Retrieve paginated list of classes with their assignment count, average score %, and completion rate %.
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `teacherId` | int64 | Optional teacher filter |
+| `page` | integer | Page number (default: `1`) |
+| `limit` | integer | Records per page (default: `20`) |
+
+**Response:** `ReportClassListResponse`
+
+---
+
+### GET `/api/v1/reports/classes/{id}/progress`
+Retrieve progress and scores for a specific class, including average score per assignment, lagging students, and unscored students based on a completion threshold.
+
+**Path Params:** `id` (int64)
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `threshold` | number (decimal) | Completion rate threshold % to identify lagging students (default: `50`) |
+
+**Response:** `ReportClassProgressResponse`
+
+---
+
+### GET `/api/v1/reports/students/{id}/progress`
+Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writing), and historical score timeline for a student.
+
+**Path Params:** `id` (int64)
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `classId` | int64 | Optional class filter |
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+
+**Response:** `ReportStudentProgressResponse`
+
+---
+
+---
+
+## 14. DTO Objects
 
 ### Request DTOs
 
@@ -698,6 +795,23 @@ Delete an evaluation.
 | Field | Type | Description |
 |-------|------|-------------|
 | `refreshToken` | string | Refresh token to invalidate |
+
+---
+
+#### `ForgotPasswordRequest`
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | string | User email address to request password reset OTP |
+
+---
+
+#### `ResetPasswordRequest`
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | string | User email address |
+| `otp` | string | 6-digit OTP code received |
+| `token` | string | Password reset token (optional/if supported) |
+| `newPassword` | string | New password |
 
 ---
 
@@ -963,6 +1077,22 @@ Delete an evaluation.
 | Field | Type | Description |
 |-------|------|-------------|
 | `message` | string | Message |
+
+---
+
+#### `ForgotPasswordResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Notification message |
+| `email` | string | Target email address |
+| `debugOtp` | string \| null | OTP code returned in non-prod/debug profile for testing |
+
+---
+
+#### `ResetPasswordResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Notification message confirming password reset |
 
 ---
 
@@ -1394,6 +1524,28 @@ Same structure as `AnswerResponse`.
 
 ---
 
+#### `AiGradingSuggestionResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `submissionModuleId` | int64 | Submission module ID |
+| `gradingId` | int64 | Grading record ID |
+| `skill` | string | Evaluated skill (`SPEAKING`, `WRITING`) |
+| `status` | string | Current AI processing status |
+| `suggestedScore` | number | Score suggested by AI |
+| `maxScore` | number | Maximum possible score |
+| `aiFeedback` | string | AI-generated comprehensive feedback |
+| `criteriaScores` | object (JSON) | Detailed score breakdown by criteria/rubric |
+| `metrics` | object (JSON) | Additional AI metrics (CEFR, readability, fluency, etc.) |
+| `annotations` | `AnswerAnnotationResponse[]` | Detected errors and inline annotations |
+| `transcript` | object (JSON) | Speech-to-text transcript data (for Speaking) |
+| `modelUsed` | string | AI model name utilized |
+| `providerUsed` | string | AI provider name (e.g., Gemini) |
+| `canTriggerAi` | boolean | Whether re-triggering AI evaluation is permitted |
+| `fallbackManualGradingAvailable` | boolean | Whether teacher can proceed with manual override |
+| `fallbackMessage` | string | Informational message when fallback is triggered |
+
+---
+
 #### `GradingMessageResponse`
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1489,6 +1641,112 @@ Same structure as `AnswerResponse`.
 | `page` | integer (int32) | Current page |
 | `limit` | integer (int32) | Records per page |
 | `total` | int64 | Total number of records |
+
+---
+
+#### `ReportOverviewResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `classCount` | int64 | Total active classes in reporting scope |
+| `assignedAssignmentCount` | int64 | Total assignments assigned across classes |
+| `completionRatePercent` | number | Overall submission completion percentage |
+| `averageScorePercent` | number | Overall class average score percentage |
+| `pendingGradingCount` | int64 | Total submissions awaiting grading |
+| `pendingByStatus` | object (Map<GradingStatus, Long>) | Breakdown of pending submissions grouped by grading status |
+
+---
+
+#### `ReportClassListResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `ClassSummary[]` | List of summarized class performance rows |
+| `pagination` | `ReportPaginationResponse` | Pagination metadata |
+
+---
+
+#### `ClassSummary` _(used in ReportClassListResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `classId` | int64 | Class ID |
+| `className` | string | Class name |
+| `status` | string | Class status (`ACTIVE`, `ARCHIVED`, etc.) |
+| `assignedAssignmentCount` | int64 | Total assignments assigned |
+| `averageScorePercent` | number | Average score across all completed submissions |
+| `completionRatePercent` | number | Submission completion percentage |
+
+---
+
+#### `ReportClassProgressResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `classId` | int64 | Class ID |
+| `completionRatePercent` | number | Overall class completion rate % |
+| `belowAverageRatePercent` | number | Percentage of students below threshold |
+| `totalStudentCount` | int64 | Total students enrolled |
+| `scoredStudentCount` | int64 | Students with scored submissions |
+| `belowAverageCount` | int64 | Count of students below threshold |
+| `assignmentScores` | `AssignmentScore[]` | Per-assignment score summary |
+| `laggingStudents` | `StudentProgress[]` | Students performing below threshold |
+| `unscoredStudents` | `StudentProgress[]` | Students with 0 completed/graded submissions |
+
+---
+
+#### `AssignmentScore` _(used in ReportClassProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `assignmentId` | int64 | Assignment ID |
+| `title` | string | Assignment title |
+| `averageScorePercent` | number | Average percentage score achieved |
+
+---
+
+#### `StudentProgress` _(used in ReportClassProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | int64 | Student ID |
+| `fullName` | string | Student full name |
+| `completedAssignments` | int64 | Number of completed assignments |
+| `totalAssignments` | int64 | Total assignments assigned |
+| `completionRatePercent` | number | Completion rate % |
+| `averageScorePercent` | number | Average score % |
+
+---
+
+#### `ReportStudentProgressResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | int64 | Student ID |
+| `studentName` | string | Student full name |
+| `classId` | int64 | Associated Class ID |
+| `skillAverages` | `SkillAverage[]` | Average performance broken down by skill |
+| `scoreTimeline` | `ScoreTimeline[]` | Chronological assignment scores |
+
+---
+
+#### `SkillAverage` _(used in ReportStudentProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `skill` | string | Skill module (`LISTENING`, `READING`, `WRITING`, `SPEAKING`) |
+| `averageScorePercent` | number | Average percentage score in this skill |
+
+---
+
+#### `ScoreTimeline` _(used in ReportStudentProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `assignmentId` | int64 | Assignment ID |
+| `title` | string | Assignment title |
+| `submittedAt` | string (date-time) | Submission timestamp |
+| `scorePercent` | number | Score percentage achieved |
+
+---
+
+#### `ReportPaginationResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `page` | integer (int32) | Current page |
+| `limit` | integer (int32) | Records per page |
+| `total` | int64 | Total records matching query |
 
 ---
 
