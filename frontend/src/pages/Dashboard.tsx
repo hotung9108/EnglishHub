@@ -1,21 +1,14 @@
-import { useState, useEffect } from 'react';
-import { 
-  Users, 
-  BookOpen, 
-  Plus, 
-  BarChart3, 
-  History, 
-  FileSpreadsheet, 
-  ShieldCheck
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { userService, classService, reportService } from '../api/services';
-import { Button, MetricCard } from '../components/common';
+import type { ReportClassSummary } from '../types/report.types';
+import { Button, MetricCard, EmptyState } from '../components/common';
 
-export const Dashboard = () => {
+export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
   const [stats, setStats] = useState({
@@ -23,10 +16,19 @@ export const Dashboard = () => {
     totalTeachers: 0,
     totalClasses: 0,
     totalAssignments: 0,
-    pendingGradings: 0
+    completionRate: 0,
+    averageScore: 0,
+    pendingGradings: 0,
   });
 
+  const [recentClasses, setRecentClasses] = useState<ReportClassSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const handleRetry = () => {
+    setReloadKey((prev) => prev + 1);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -34,18 +36,34 @@ export const Dashboard = () => {
     const fetchDashboardTelemetry = async () => {
       try {
         setLoading(true);
+        setError(null);
 
-        const [studentsRes, teachersRes, classesRes, overviewRes] = await Promise.allSettled([
+        const [studentsRes, teachersRes, classesRes, overviewRes, reportClassesRes] = await Promise.allSettled([
           userService.listUsers({ role: 'STUDENT', limit: 1 }),
           userService.listUsers({ role: 'TEACHER', limit: 1 }),
           classService.list({ limit: 1 }),
-          reportService.getOverview()
+          reportService.getOverview(),
+          reportService.listClasses({ limit: 5 }),
         ]);
+
+        const allFailed = [studentsRes, teachersRes, classesRes, overviewRes, reportClassesRes].every(
+          (res) => res.status === 'rejected'
+        );
+
+        if (allFailed) {
+          throw new Error(
+            isVi 
+              ? 'Không thể kết nối đến máy chủ. Vui lòng thử lại.' 
+              : 'Failed to connect to server. Please try again.'
+          );
+        }
 
         let totalStudents = 0;
         let totalTeachers = 0;
         let totalClasses = 0;
         let totalAssignments = 0;
+        let completionRate = 0;
+        let averageScore = 0;
         let pendingGradings = 0;
 
         if (studentsRes.status === 'fulfilled' && studentsRes.value) {
@@ -59,6 +77,8 @@ export const Dashboard = () => {
         }
         if (overviewRes.status === 'fulfilled' && overviewRes.value) {
           totalAssignments = overviewRes.value.assignedAssignmentCount || 0;
+          completionRate = overviewRes.value.completionRatePercent || 0;
+          averageScore = overviewRes.value.averageScorePercent || 0;
           pendingGradings = overviewRes.value.pendingGradingCount || 0;
         }
 
@@ -68,11 +88,20 @@ export const Dashboard = () => {
             totalTeachers,
             totalClasses,
             totalAssignments,
-            pendingGradings
+            completionRate,
+            averageScore,
+            pendingGradings,
           });
+
+          if (reportClassesRes.status === 'fulfilled' && reportClassesRes.value) {
+            setRecentClasses(reportClassesRes.value.data || []);
+          }
         }
-      } catch {
-        // fail gracefully
+      } catch (err: unknown) {
+        if (isMounted) {
+          const message = err instanceof Error ? err.message : (isVi ? 'Đã xảy ra lỗi khi tải dữ liệu' : 'An error occurred while loading data');
+          setError(message);
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -85,29 +114,27 @@ export const Dashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isVi, reloadKey]);
 
   return (
     <div className="adm-container">
-      {/* Minimal Header */}
+      {/* Header */}
       <div className="adm-header mb-6">
         <div className="adm-title-group">
           <h1 className="adm-title">
-            {isVi ? 'Bảng điều khiển quản trị' : 'Admin Dashboard'}
+            {t('adminDashboard.title') || (isVi ? 'Bảng điều khiển quản trị' : 'Admin Dashboard')}
           </h1>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
           <Button 
             variant="primary"
-            icon={<Plus size={16} />}
             onClick={() => navigate('/admin/classes/create')}
           >
             {isVi ? 'Tạo lớp học' : 'Create Class'}
           </Button>
           <Button 
             variant="secondary"
-            icon={<BarChart3 size={16} />}
             onClick={() => navigate('/admin/reports')}
           >
             {isVi ? 'Báo cáo thống kê' : 'Analytics Report'}
@@ -115,152 +142,130 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Error state */}
+      {error && (
+        <div className="adm-alert-error justify-between mb-6 flex items-center">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+          <Button 
+            variant="secondary"
+            size="sm"
+            onClick={handleRetry}
+          >
+            {isVi ? 'Thử lại' : 'Retry'}
+          </Button>
+        </div>
+      )}
+
       {/* 4 KPI Cards */}
       <div className="adm-kpi-grid mb-6">
         <MetricCard
           title={isVi ? 'TỔNG HỌC VIÊN' : 'TOTAL STUDENTS'}
           value={loading ? '...' : stats.totalStudents}
-          footerText={isVi ? 'Hồ sơ đã kích hoạt' : 'Registered accounts'}
           onClick={() => navigate('/admin/students')}
         />
 
         <MetricCard
           title={isVi ? 'GIẢNG VIÊN HOẠT ĐỘNG' : 'ACTIVE TEACHERS'}
           value={loading ? '...' : stats.totalTeachers}
-          footerText={isVi ? 'Giáo viên trong hệ thống' : 'Active faculty'}
           onClick={() => navigate('/admin/teachers')}
         />
 
         <MetricCard
           title={isVi ? 'LỚP HỌC ĐANG MỞ' : 'ACTIVE CLASSES'}
           value={loading ? '...' : stats.totalClasses}
-          footerText={isVi ? 'Theo dõi sĩ số và tiến độ' : 'Class cohorts'}
           onClick={() => navigate('/admin/classes')}
         />
 
         <MetricCard
           title={isVi ? 'BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}
           value={loading ? '...' : stats.totalAssignments}
-          footerText={stats.pendingGradings > 0 ? `${stats.pendingGradings} ${isVi ? 'chờ chấm' : 'pending'}` : (isVi ? 'Đã hoàn tất xử lý' : 'All graded')}
           onClick={() => navigate('/admin/reports')}
         />
       </div>
 
-      {/* Main 2-Column Bento Layout */}
-      <div className="grid grid-cols-1 gap-6">
-        <div className="adm-bento-grid">
-          
-          {/* Left Column: Live Activity Feed */}
-          <div className="eh-card p-6">
-            <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-              <div>
-                <h3 className="headline-md m-0">
-                  {isVi ? 'Hoạt Động Gần Đây' : 'Recent Activity'}
-                </h3>
-              </div>
-            </div>
+      {/* 3 Stats Cards on 1 row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <MetricCard
+          title={isVi ? 'Tỉ lệ nộp bài trung bình' : 'Average Completion Rate'}
+          value={loading ? '...' : `${stats.completionRate}%`}
+          onClick={() => navigate('/admin/reports')}
+        />
 
-            <div className="p-6 text-center text-muted bg-surface-low rounded-md border-subtle">
-              <ShieldCheck size={32} className="mx-auto mb-2 text-success inline-block" />
-              <div className="text-base font-semibold text-surface">
-                {isVi ? 'Hệ thống vận hành ổn định' : 'System running smoothly'}
-              </div>
-              <div className="text-sm mt-1">
-                {isVi 
-                  ? `${stats.totalClasses} lớp học và ${stats.totalStudents} học viên đang đồng bộ theo thời gian thực.` 
-                  : `${stats.totalClasses} classes and ${stats.totalStudents} students synced in real-time.`}
-              </div>
-            </div>
-          </div>
+        <MetricCard
+          title={isVi ? 'Điểm trung bình toàn khóa' : 'Average Score'}
+          value={loading ? '...' : `${stats.averageScore}%`}
+          onClick={() => navigate('/admin/reports')}
+        />
 
-          {/* Right Column: AI Engine Status & Quick Launch */}
-          <div className="flex flex-col gap-6">
-            
-            {/* Quick Action Commands */}
-            <div className="eh-card p-6">
-              <h3 className="headline-md mb-3">
-                {isVi ? 'Phím Tắt Điều Hành Nhanh' : 'Executive Command Launchers'}
-              </h3>
-              
-              <div className="flex flex-col gap-2">
-                <button 
-                  type="button"
-                  onClick={() => navigate('/admin/classes/create')}
-                  className="dashboard-quick-action-btn flex items-center justify-between p-3 rounded-md bg-surface border-subtle cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <BookOpen size={16} className="text-primary" />
-                    <span className="font-semibold text-sm">{isVi ? 'Tạo lớp học mới' : 'Add New Class'}</span>
-                  </div>
-                  <span className="adm-search-shortcut">⌘N</span>
-                </button>
+        <MetricCard
+          title={isVi ? 'Bài tập chờ chấm' : 'Pending Grading'}
+          value={loading ? '...' : stats.pendingGradings}
+          onClick={() => navigate('/admin/reports')}
+        />
+      </div>
 
-                <button 
-                  type="button"
-                  onClick={() => navigate('/admin/students/create')}
-                  className="dashboard-quick-action-btn flex items-center justify-between p-3 rounded-md bg-surface border-subtle cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <Users size={16} className="text-secondary" />
-                    <span className="font-semibold text-sm">{isVi ? 'Tiếp nhận học viên mới' : 'Enroll Student'}</span>
-                  </div>
-                  <span className="adm-search-shortcut">⌘S</span>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => navigate('/admin/audit/gradings')}
-                  className="dashboard-quick-action-btn flex items-center justify-between p-3 rounded-md bg-surface border-subtle cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <History size={16} className="text-primary" />
-                    <span className="font-semibold text-sm">{isVi ? 'Lịch sử chấm điểm' : 'Grading History'}</span>
-                  </div>
-                  <span className="adm-search-shortcut">⌘L</span>
-                </button>
-
-                <button 
-                  type="button"
-                  onClick={() => navigate('/admin/reports')}
-                  className="dashboard-quick-action-btn flex items-center justify-between p-3 rounded-md bg-surface border-subtle cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileSpreadsheet size={16} color="#7e22ce" />
-                    <span className="font-semibold text-sm">{isVi ? 'Báo cáo quản trị' : 'Export Reports'}</span>
-                  </div>
-                  <span className="adm-search-shortcut">⌘R</span>
-                </button>
-              </div>
-            </div>
-
-            {/* System Node Telemetry */}
-            <div className="eh-card p-5">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="m-0 text-sm font-bold">
-                  {isVi ? 'Trạng Thái Hạ Tầng & Dịch Vụ' : 'Core Infrastructure Health'}
-                </h4>
-                <span className="badge badge-active">{isVi ? 'Đang hoạt động' : 'Operational'}</span>
-              </div>
-
-              <div className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between pb-2 border-b-subtle">
-                  <span className="text-muted">AI Evaluation Pipeline</span>
-                  <span className="font-semibold text-success">Connected</span>
-                </div>
-                <div className="flex justify-between pb-2 border-b-subtle">
-                  <span className="text-muted">Speech Recognition & Audio Service</span>
-                  <span className="font-semibold text-success">Connected</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">Application Database</span>
-                  <span className="font-semibold text-success">Connected</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
+      {/* Recent Cohort Table */}
+      <div className="adm-table-card">
+        <div className="adm-table-header">
+          <h2 className="adm-table-title">
+            {isVi ? 'Tiến độ lớp học gần đây' : 'Recent Cohort Progress'}
+          </h2>
+          <Button 
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/admin/classes')}
+          >
+            {isVi ? 'Xem tất cả' : 'View all'}
+          </Button>
         </div>
+
+        {loading ? (
+          <div className="adm-loading-state">
+            <Loader2 size={24} className="animate-spin adm-loading-state-icon" />
+          </div>
+        ) : recentClasses.length === 0 ? (
+          <EmptyState
+            title={isVi ? 'Chưa có dữ liệu' : 'No data available'}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                  <th>{isVi ? 'TÊN LỚP' : 'CLASS NAME'}</th>
+                  <th>{isVi ? 'BÀI TẬP' : 'ASSIGNMENTS'}</th>
+                  <th>{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
+                  <th>{isVi ? 'HOÀN THÀNH' : 'COMPLETION'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTION'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentClasses.map((cls) => (
+                  <tr key={cls.classId}>
+                    <td className="font-semibold text-primary font-mono">ENG-{cls.classId}</td>
+                    <td className="font-medium">{cls.className}</td>
+                    <td>{cls.assignedAssignmentCount}</td>
+                    <td className="font-bold font-mono">{cls.averageScorePercent}%</td>
+                    <td className="font-bold font-mono">{cls.completionRatePercent}%</td>
+                    <td className="text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/admin/classes/${cls.classId}`)}
+                      >
+                        {isVi ? 'Chi tiết' : 'Details'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

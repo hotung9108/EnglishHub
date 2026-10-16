@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -36,8 +36,17 @@ export interface MenuSection {
 }
 
 const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
+  const navigate = useNavigate();
   const { t, language } = useLanguage();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
   
   // Default to admin if no user is found for some reason
   const role = user?.role || 'admin';
@@ -116,7 +125,6 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         title: t('sectionResults'),
         items: [
           { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
-          { path: '/student/analytics', label: t('menuStudentAnalytics'), icon: BarChart3 },
           { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
         ]
       }
@@ -196,10 +204,14 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
           <Settings size={18} strokeWidth={2} />
           <span>{t('menuSettings')}</span>
         </NavLink>
-        <NavLink to="/login" className="sidebar-link sidebar-link-logout text-error">
+        <button 
+          type="button" 
+          onClick={handleLogout} 
+          className="sidebar-link sidebar-link-logout text-error"
+        >
           <LogOut size={18} strokeWidth={2} />
           <span>{t('logout')}</span>
-        </NavLink>
+        </button>
       </div>
     </aside>
   );

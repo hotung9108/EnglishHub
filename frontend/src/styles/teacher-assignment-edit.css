@@ -136,36 +136,15 @@
   color: var(--on-surface, #111827);
 }
 
-.skill-tab-btn.active-writing {
-  background-color: var(--skill-writing-bg, #FAF3E5);
-  color: var(--skill-writing, #8C5E14);
-  border-color: var(--skill-writing-border, #ECD8B0);
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(140, 94, 20, 0.08);
-}
-
-.skill-tab-btn.active-speaking {
-  background-color: #faf5ff;
-  color: #7e22ce;
-  border-color: #e9d5ff;
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(126, 34, 206, 0.08);
-}
-
-.skill-tab-btn.active-reading {
-  background-color: #f0fdf4;
-  color: #15803d;
-  border-color: #bbf7d0;
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(21, 128, 61, 0.08);
-}
-
+.skill-tab-btn.active-writing,
+.skill-tab-btn.active-speaking,
+.skill-tab-btn.active-reading,
 .skill-tab-btn.active-listening {
-  background-color: #f0fdfa;
-  color: #0f766e;
-  border-color: #99f6e4;
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.08);
+  background-color: var(--primary, #1b4d3e);
+  color: #ffffff;
+  border-color: var(--primary, #1b4d3e);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(27, 77, 62, 0.25);
 }
 
 /* Main Grid Layout */
@@ -379,16 +358,18 @@
 }
 
 .question-index-pill {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background-color: var(--primary, #1b4d3e);
-  color: #ffffff;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
   font-size: 13px;
   font-weight: 700;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(27, 77, 62, 0.12);
 }
 
 .question-options-list {
@@ -476,10 +457,10 @@
 
 /* Cue Card Editor Box */
 .cue-card-container {
-  background-color: #fefce8;
-  border: 2px dashed #facc15;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 24px;
+  padding: 20px;
   margin-bottom: 20px;
 }
 
@@ -487,12 +468,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #854d0e;
-  font-weight: 800;
-  font-size: 15px;
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 14px;
 }
 
 /* Modal Overlay */
@@ -567,3 +546,71 @@
     transform: translateY(0);
   }
 }
+
+/* Audio Upload Dropzone */
+.audio-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 24px 16px;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.audio-dropzone.dragging {
+  border-color: var(--primary, #1b4d3e);
+  background-color: rgba(27, 77, 62, 0.05);
+}
+
+.audio-player-preview {
+  width: 100%;
+  max-width: 480px;
+}
+
+/* Question Badges & Inputs */
+.question-type-badge-mcq {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.question-type-badge-short {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.question-points-input {
+  width: 55px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.question-option-letter {
+  font-weight: 800;
+  font-size: 13px;
+  width: 20px;
+}
+
+.question-empty-state {
+  padding: 28px;
+  text-align: center;
+  background-color: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  color: #64748b;
+  font-size: 13.5px;
+}
+

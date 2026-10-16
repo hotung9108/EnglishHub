@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Play, Pause, Mic } from 'lucide-react';
+import { X, Mic } from 'lucide-react';
 import type { AssignmentEditorData } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -17,7 +17,6 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
   const [isRecording, setIsRecording] = useState(false);
   const [recordedSeconds, setRecordedSeconds] = useState(0);
   const [activeAnswers, setActiveAnswers] = useState<Record<string, string>>({});
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
   const wordCount = essayContent.trim() ? essayContent.trim().split(/\s+/).length : 0;
 
@@ -77,7 +76,7 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                  {data.writing.taskType === 'task2' ? (isVi ? 'Bài Luận (Essay)' : 'Essay Task') : (isVi ? 'Đoạn Văn (Paragraph)' : 'Paragraph Task')}
+                  {isVi ? 'Đề Bài Viết' : 'Writing Prompt'}
                 </h4>
                 <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6, color: '#334155' }}>
                   {data.writing.promptText}
@@ -127,42 +126,16 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                   <Mic size={18} />
                   <span>{isVi ? 'ĐỀ BÀI SPEAKING' : 'SPEAKING PROMPT'}</span>
                 </div>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>
-                  {data.speaking.cueCardTopic}
-                </h3>
-                <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#713f12' }}>
-                  You should say:
-                </p>
-                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px', color: '#334155', lineHeight: 1.6 }}>
-                  {data.speaking.cueCardBullets.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Examiner Audio Prompt Preview */}
-              {data.speaking.examinerTranscript && (
-                <div style={{ padding: '16px', backgroundColor: '#f0fdfa', borderRadius: '10px', border: '1px solid #99f6e4' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <Play size={14} color="#0d9488" />
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f766e' }}>
-                      {isVi ? 'Lời dặn của Giám khảo:' : 'Examiner Speech:'}
-                    </span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '13.5px', color: '#134e4a', fontStyle: 'italic' }}>
-                    "{data.speaking.examinerTranscript}"
-                  </p>
+                <div style={{ margin: 0, fontSize: '15px', lineHeight: 1.6, color: '#1e293b', whiteSpace: 'pre-line' }}>
+                  {data.speaking.promptText || data.speaking.cueCardTopic || (isVi ? 'Chưa có nội dung đề bài...' : 'No prompt statement...')}
                 </div>
-              )}
+              </div>
 
               {/* Recording Mock Controls */}
               <div style={{ textAlign: 'center', padding: '24px', backgroundColor: '#faf5ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
                 <div style={{ marginBottom: '14px' }}>
                   <span style={{ fontSize: '28px', fontWeight: 800, color: isRecording ? '#dc2626' : '#7e22ce' }}>
                     {isRecording ? `00:${recordedSeconds.toString().padStart(2, '0')}` : '00:00'}
-                  </span>
-                  <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                    {isVi ? `Thời lượng tối đa: ${data.speaking.speakingTimeSeconds}s` : `Max duration: ${data.speaking.speakingTimeSeconds}s`}
                   </span>
                 </div>
 
@@ -191,21 +164,13 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {/* Left Column: Passage */}
               <div style={{ padding: '18px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', maxHeight: '420px', overflowY: 'auto' }}>
-                <h3 style={{ margin: '0 0 6px 0', fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-                  {data.reading.passageTitle}
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
+                  {data.reading.passageTitle || (isVi ? 'Bài đọc chưa có tiêu đề' : 'Untitled Passage')}
                 </h3>
-                <p style={{ margin: '0 0 16px 0', fontSize: '12px', fontStyle: 'italic', color: '#64748b' }}>
-                  {data.reading.passageSource}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {data.reading.paragraphs.map(p => (
-                    <div key={p.id}>
-                      <span className="paragraph-badge" style={{ marginBottom: '4px' }}>PARAGRAPH {p.label}</span>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '13.5px', lineHeight: 1.6, color: '#334155' }}>
-                        {p.content}
-                      </p>
-                    </div>
-                  ))}
+                <div style={{ fontSize: '13.5px', lineHeight: 1.7, color: '#334155', whiteSpace: 'pre-line' }}>
+                  {data.reading.passageContent 
+                    || data.reading.paragraphs?.map(p => p.content).join('\n\n') 
+                    || (isVi ? 'Chưa có nội dung văn bản bài đọc...' : 'No passage content...')}
                 </div>
               </div>
 
@@ -238,6 +203,19 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                         </div>
                       )}
 
+                      {(q.type === 'short_answer' || q.type === 'gap_fill') && (
+                        <div style={{ marginTop: '6px' }}>
+                          <input 
+                            type="text" 
+                            className="edit-form-input" 
+                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                            placeholder={isVi ? "Nhập câu trả lời tại đây..." : "Type answer here..."}
+                            value={activeAnswers[q.id] || ''}
+                            onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
+                          />
+                        </div>
+                      )}
+
                       {q.type === 'true_false_not_given' && (
                         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                           {['TRUE', 'FALSE', 'NOT GIVEN'].map((ans) => (
@@ -258,19 +236,6 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                           ))}
                         </div>
                       )}
-
-                      {q.type === 'gap_fill' && (
-                        <div style={{ marginTop: '6px' }}>
-                          <input 
-                            type="text" 
-                            className="edit-form-input" 
-                            style={{ padding: '4px 10px', fontSize: '12px' }}
-                            placeholder="Type answer here..."
-                            value={activeAnswers[q.id] || ''}
-                            onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
-                          />
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -281,55 +246,65 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
           {/* LISTENING PREVIEW */}
           {data.skill === 'listening' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="audio-player-mock">
-                <div className="audio-player-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button 
-                      type="button" 
-                      className="audio-play-btn"
-                      style={{ backgroundColor: '#0d9488' }}
-                      onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                    >
-                      {isPlayingAudio ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: 2 }} />}
-                    </button>
-                    <div>
-                      <span style={{ fontSize: '14px', fontWeight: 700, display: 'block' }}>
-                        {data.listening.audioTitle}
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        {isPlayingAudio ? 'Audio playing... • 01:25 / 30:00' : 'Audio paused • 30:00'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="audio-waveform-bar">
-                  <div className="audio-waveform-fill" style={{ width: isPlayingAudio ? '45%' : '10%', background: '#2dd4bf' }}></div>
-                </div>
+              <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 700, display: 'block', marginBottom: '8px', color: '#0f172a' }}>
+                  {isVi ? 'Tệp âm thanh bài nghe:' : 'Audio Track:'}
+                </span>
+                {(data.listening.audioPreviewUrl || data.listening.audioUrl) ? (
+                  <audio controls src={data.listening.audioPreviewUrl || data.listening.audioUrl} style={{ width: '100%' }} />
+                ) : (
+                  <span style={{ fontSize: '12.5px', color: '#64748b' }}>
+                    {isVi ? 'Chưa có tệp âm thanh đính kèm' : 'No audio file attached'}
+                  </span>
+                )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {data.listening.transcript && (
+                <div style={{ padding: '14px 16px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+                    {isVi ? 'Lời thoại / Hướng dẫn:' : 'Transcript / Instructions:'}
+                  </span>
+                  <p style={{ margin: 0, fontSize: '13.5px', lineHeight: 1.6, color: '#334155', whiteSpace: 'pre-line' }}>
+                    {data.listening.transcript}
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                  {isVi ? 'Câu hỏi điền từ & trắc nghiệm:' : 'Questions:'}
+                  {isVi ? `Danh sách câu hỏi (${data.listening.questions.length} câu):` : `Questions (${data.listening.questions.length}):`}
                 </h4>
                 {data.listening.questions.map(q => (
-                  <div key={q.id} style={{ padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <div key={q.id} style={{ padding: '14px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 800, color: '#0d9488' }}>Q{q.order}.</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600 }}>{q.prompt}</span>
-                      {q.timestampClue && (
-                        <span style={{ fontSize: '11px', color: '#0d9488', backgroundColor: '#f0fdfa', padding: '1px 6px', borderRadius: '4px' }}>
-                          [{q.timestampClue}]
-                        </span>
-                      )}
+                      <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#0f172a' }}>{q.prompt}</span>
                     </div>
-                    <input 
-                      type="text" 
-                      className="edit-form-input" 
-                      style={{ padding: '5px 10px', fontSize: '13px', maxWidth: '300px' }}
-                      placeholder="Student enters answer..."
-                      value={activeAnswers[q.id] || ''}
-                      onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
-                    />
+
+                    {q.type === 'multiple_choice' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                        {(q.options || []).map((opt, i) => (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer' }}>
+                            <input 
+                              type="radio" 
+                              name={`prev-list-${q.id}`} 
+                              checked={activeAnswers[q.id] === opt}
+                              onChange={() => handleSelectAnswer(q.id, opt)}
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <input 
+                        type="text" 
+                        className="edit-form-input" 
+                        style={{ padding: '6px 10px', fontSize: '13px', maxWidth: '340px' }}
+                        placeholder={isVi ? "Nhập câu trả lời..." : "Enter your answer..."}
+                        value={activeAnswers[q.id] || ''}
+                        onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

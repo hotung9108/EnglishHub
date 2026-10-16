@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, CheckCircle2, Clock, AlertCircle, RotateCcw, FileText } from 'lucide-react';
 import { classService, type ClassDetail } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import { Button, EmptyState, Skeleton } from '../components/common';
 import '../styles/student-ecosystem.css';
 
@@ -81,7 +81,7 @@ const StudentClassDetails: React.FC = () => {
             const sub = rawSubmissions.find(s => String(s.assignmentId) === String(a.id) || String(s.id) === String(a.id));
             let status: 'not_started' | 'pending' | 'graded' = 'not_started';
             if (sub) {
-              status = sub.status === 'GRADED' ? 'graded' : 'pending';
+              status = isSubmissionGraded(sub) ? 'graded' : 'pending';
             }
 
             let skill = 'Writing';
@@ -90,7 +90,8 @@ const StudentClassDetails: React.FC = () => {
             else if (titleLower.includes('read')) skill = 'Reading';
             else if (titleLower.includes('listen')) skill = 'Listening';
 
-            const scoreVal = sub?.modules?.[0]?.grading?.finalScore ?? undefined;
+            const finalSc = sub ? getSubmissionFinalScore(sub) : null;
+            const scoreVal = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
 
             return {
               id: String(a.id),

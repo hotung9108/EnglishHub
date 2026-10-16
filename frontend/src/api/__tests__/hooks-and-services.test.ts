@@ -44,6 +44,28 @@ test('AuthService - login sets tokens and session, logout clears session', async
   assert.strictEqual(auth.isAuthenticated(), false);
 });
 
+test('AuthService - logout clears session even if backend call fails', async () => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+
+  storage.setAccessToken('access-test');
+  storage.setRefreshToken('refresh-test');
+  assert.strictEqual(auth.isAuthenticated(), true);
+
+  // Simulate network/backend 500 error
+  mockHttp.mockError = new Error('500 Internal Server Error');
+
+  await assert.rejects(async () => {
+    await auth.logout();
+  });
+
+  // Local tokens must still be completely wiped
+  assert.strictEqual(storage.getAccessToken(), null);
+  assert.strictEqual(storage.getRefreshToken(), null);
+  assert.strictEqual(auth.isAuthenticated(), false);
+});
+
 test('AuthService - forgotPassword and resetPassword call correct public endpoints', async () => {
   const mockHttp = new MockHttpClient();
   const storage = new MemoryTokenStorage();

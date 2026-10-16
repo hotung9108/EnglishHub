@@ -8,6 +8,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import { assignmentService } from '../api/services/assignment.service';
+import { Pagination } from '../components/common';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
 import type { ClassDetail, ClassMember } from '../api/services/class.service';
 import type { AssignmentSummary } from '../api/services/assignment.service';
@@ -26,6 +27,10 @@ export const ClassDetails: React.FC = () => {
   const [studentsRoster, setStudentsRoster] = useState<ClassMember[]>([]);
   const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
   const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
+
+  // Pagination for students roster
+  const [rosterPage, setRosterPage] = useState<number>(1);
+  const [rosterPageSize, setRosterPageSize] = useState<number>(10);
 
   // Settings tab form state
   const [settingsForm, setSettingsForm] = useState({
@@ -319,54 +324,87 @@ export const ClassDetails: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      <th>{isVi ? 'MÃ HV' : 'STUDENT ID'}</th>
-                      <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
-                      <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentsRoster.map(st => {
-                      const studentCode = st.studentCode || `HV-${st.studentId}`;
-                      const initials = st.fullName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
+                <>
+                  {(() => {
+                    const totalRosterPages = Math.ceil(studentsRoster.length / rosterPageSize) || 1;
+                    const safeRosterPage = Math.min(Math.max(rosterPage, 1), totalRosterPages);
+                    const paginatedRoster = studentsRoster.slice(
+                      (safeRosterPage - 1) * rosterPageSize,
+                      safeRosterPage * rosterPageSize
+                    );
 
-                      return (
-                        <tr key={st.memberId}>
-                          <td className="font-mono font-semibold text-primary">{studentCode}</td>
-                          <td>
-                            <div className="adm-cell-user">
-                              <div className="adm-avatar" style={{ backgroundColor: '#2563eb' }}>
-                                {initials}
-                              </div>
-                              <div className="adm-avatar-info">
-                                <div className="adm-avatar-name">{st.fullName}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '8px' }}>
-                              <button 
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => navigate(`/admin/students/${st.studentId}`)}
-                              >
-                                {isVi ? 'Hồ sơ' : 'Profile'}
-                              </button>
-                              <button 
-                                className="btn btn-secondary btn-sm text-error"
-                                onClick={() => handleRemoveMember(st.memberId, st.fullName)}
-                                title={isVi ? 'Xóa khỏi lớp' : 'Remove from class'}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                    return (
+                      <>
+                        <table className="adm-table">
+                          <thead>
+                            <tr>
+                              <th>{isVi ? 'MÃ HV' : 'STUDENT ID'}</th>
+                              <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
+                              <th style={{ textAlign: 'right' }}>{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paginatedRoster.map(st => {
+                              const studentCode = st.studentCode || `HV-${st.studentId}`;
+                              const initials = st.fullName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
+
+                              return (
+                                <tr key={st.memberId}>
+                                  <td className="font-mono font-semibold text-primary">{studentCode}</td>
+                                  <td>
+                                    <div className="adm-cell-user">
+                                      <div className="adm-avatar" style={{ backgroundColor: '#2563eb' }}>
+                                        {initials}
+                                      </div>
+                                      <div className="adm-avatar-info">
+                                        <div className="adm-avatar-name">{st.fullName}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                      <button 
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => navigate(`/admin/students/${st.studentId}`)}
+                                      >
+                                        {isVi ? 'Hồ sơ' : 'Profile'}
+                                      </button>
+                                      <button 
+                                        className="btn btn-secondary btn-sm text-error"
+                                        onClick={() => handleRemoveMember(st.memberId, st.fullName)}
+                                        title={isVi ? 'Xóa khỏi lớp' : 'Remove from class'}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+
+                        {studentsRoster.length > 0 && (
+                          <Pagination
+                            currentPage={safeRosterPage}
+                            totalPages={totalRosterPages}
+                            totalItems={studentsRoster.length}
+                            itemLabel={isVi ? 'học viên' : 'students'}
+                            isVi={isVi}
+                            onPageChange={setRosterPage}
+                            pageSize={rosterPageSize}
+                            onPageSizeChange={(newSize) => {
+                              setRosterPageSize(newSize);
+                              setRosterPage(1);
+                            }}
+                            pageSizeOptions={[5, 10, 20]}
+                            variant="table"
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
               )}
             </div>
           )}

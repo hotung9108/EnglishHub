@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Calendar, Eye, Save, Send, CheckCircle2, RefreshCw
+  Eye, Save, Send, CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -73,6 +73,8 @@ export const TeacherCreateAssignment: React.FC = () => {
       attachments: []
     },
     speaking: {
+      promptText: '',
+      aiInstruction: '',
       partType: 'part2',
       cueCardTopic: '',
       cueCardBullets: [],
@@ -84,29 +86,16 @@ export const TeacherCreateAssignment: React.FC = () => {
       followUpQuestions: [],
       rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
       enableAi: true,
-      aiModel: 'Whisper V3 Large',
-      aiInstruction: ''
+      aiModel: 'Whisper V3 Large'
     },
     reading: {
       passageTitle: '',
-      passageSubtitle: '',
-      passageSource: '',
-      timeLimitMinutes: 20,
-      enableAiExplanation: true,
-      aiInstruction: '',
-      paragraphs: [],
+      passageContent: '',
       questions: []
     },
     listening: {
-      audioTitle: '',
       audioUrl: '',
-      audioDurationSeconds: 1200,
-      playbackLimit: 'single',
       transcript: '',
-      hideTranscriptUntilGraded: true,
-      activeSection: 'section1',
-      enableAiDistractorCheck: true,
-      aiInstruction: '',
       questions: []
     }
   }));
@@ -148,18 +137,48 @@ export const TeacherCreateAssignment: React.FC = () => {
     }
   };
 
-  const getInstructionsForSkill = (): string => {
-    switch (assignmentData.skill) {
+  const getInstructionsFor = (skill: AssignmentSkill): string => {
+    switch (skill) {
       case 'writing':
-        return assignmentData.writing.promptText;
+        return assignmentData.writing.promptText.trim();
       case 'speaking':
-        return `${assignmentData.speaking.cueCardTopic}\n${assignmentData.speaking.cueCardBullets.join('\n')}`;
-      case 'reading':
-        return `${assignmentData.reading.passageTitle}\n${assignmentData.reading.paragraphs.map(p => p.content).join('\n')}`;
+        return (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
+      case 'reading': {
+        const pTitle = assignmentData.reading.passageTitle.trim();
+        const pContent = (assignmentData.reading.passageContent 
+          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
+          || '').trim();
+        return pTitle ? `${pTitle}\n\n${pContent}` : pContent;
+      }
       case 'listening':
-        return `${assignmentData.listening.audioTitle}\n${assignmentData.listening.transcript}`;
+        return (assignmentData.listening.transcript || assignmentData.listening.audioTitle || '').trim();
       default:
-        return 'Complete assignment according to prompt.';
+        return '';
+    }
+  };
+
+  const isSkillConfigured = (skill: AssignmentSkill): boolean => {
+    switch (skill) {
+      case 'writing':
+        return Boolean(assignmentData.writing.promptText.trim());
+      case 'speaking':
+        return Boolean((assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim());
+      case 'reading':
+        return Boolean(
+          assignmentData.reading.passageTitle.trim() ||
+          assignmentData.reading.passageContent?.trim() ||
+          assignmentData.reading.paragraphs?.some(p => p.content.trim()) ||
+          assignmentData.reading.questions.length > 0
+        );
+      case 'listening':
+        return Boolean(
+          assignmentData.listening.audioFile ||
+          assignmentData.listening.audioUrl?.trim() ||
+          assignmentData.listening.transcript?.trim() ||
+          assignmentData.listening.questions.length > 0
+        );
+      default:
+        return false;
     }
   };
 
@@ -174,29 +193,80 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
-    // Validation for Reading/Listening questions
-    if (assignmentData.skill === 'reading') {
-      const qList = assignmentData.reading.questions;
-      if (qList.length === 0) {
-        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
-        return;
-      }
-      for (let i = 0; i < qList.length; i++) {
-        if (!qList[i].prompt.trim()) {
-          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+    const allSkills: AssignmentSkill[] = ['writing', 'speaking', 'reading', 'listening'];
+    const configuredSkills = allSkills.filter(isSkillConfigured);
+    const targetSkills = configuredSkills.length > 0 ? configuredSkills : [assignmentData.skill];
+
+    // Validation for each target skill
+    for (const skill of targetSkills) {
+      if (skill === 'writing') {
+        if (!assignmentData.writing.promptText.trim()) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'writing' }));
+          showToast(isVi ? 'Nội dung đề bài Writing không được để trống!' : 'Writing prompt cannot be empty!');
           return;
         }
-      }
-    } else if (assignmentData.skill === 'listening') {
-      const qList = assignmentData.listening.questions;
-      if (qList.length === 0) {
-        showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
-        return;
-      }
-      for (let i = 0; i < qList.length; i++) {
-        if (!qList[i].prompt.trim()) {
-          showToast(isVi ? `Nội dung câu hỏi #${i + 1} không được để trống!` : `Question #${i + 1} statement cannot be empty!`);
+      } else if (skill === 'speaking') {
+        const spPrompt = (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
+        if (!spPrompt) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'speaking' }));
+          showToast(isVi ? 'Nội dung đề bài Speaking không được để trống!' : 'Speaking prompt cannot be empty!');
           return;
+        }
+      } else if (skill === 'reading') {
+        if (!assignmentData.reading.passageTitle.trim()) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
+          showToast(isVi ? 'Tiêu đề bài đọc không được để trống!' : 'Passage title cannot be empty!');
+          return;
+        }
+        const pContent = (assignmentData.reading.passageContent 
+          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
+          || '').trim();
+        if (!pContent) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
+          showToast(isVi ? 'Nội dung văn bản bài đọc không được để trống!' : 'Passage content cannot be empty!');
+          return;
+        }
+        const qList = assignmentData.reading.questions;
+        if (qList.length === 0) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
+          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
+          return;
+        }
+        for (let i = 0; i < qList.length; i++) {
+          if (!qList[i].prompt.trim()) {
+            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
+            showToast(isVi ? `Nội dung câu hỏi Reading #${i + 1} không được để trống!` : `Reading question #${i + 1} statement cannot be empty!`);
+            return;
+          }
+          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
+            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
+            showToast(isVi ? `Đáp án chính xác cho câu hỏi Reading #${i + 1} không được để trống!` : `Correct answer for reading question #${i + 1} cannot be empty!`);
+            return;
+          }
+        }
+      } else if (skill === 'listening') {
+        if (!assignmentData.listening.audioFile && !assignmentData.listening.audioUrl?.trim()) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
+          showToast(isVi ? 'Vui lòng chọn tệp âm thanh cho bài nghe!' : 'Please select an audio file for the listening assignment!');
+          return;
+        }
+        const qList = assignmentData.listening.questions;
+        if (qList.length === 0) {
+          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
+          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
+          return;
+        }
+        for (let i = 0; i < qList.length; i++) {
+          if (!qList[i].prompt.trim()) {
+            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
+            showToast(isVi ? `Nội dung câu hỏi Listening #${i + 1} không được để trống!` : `Listening question #${i + 1} statement cannot be empty!`);
+            return;
+          }
+          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
+            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
+            showToast(isVi ? `Đáp án chính xác cho câu hỏi Listening #${i + 1} không được để trống!` : `Correct answer for listening question #${i + 1} cannot be empty!`);
+            return;
+          }
         }
       }
     }
@@ -210,18 +280,22 @@ export const TeacherCreateAssignment: React.FC = () => {
         ? new Date(assignmentData.dueDate).toISOString() 
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+      const mainDescription = targetSkills.length === 1
+        ? getInstructionsFor(targetSkills[0])
+        : targetSkills.map((s) => `[${s.toUpperCase()}]: ${getInstructionsFor(s)}`).join('\n\n');
+
       // 1. Create assignment on backend
       const res = await assignmentService.createAssignment(selectedClassId, {
         title: assignmentData.title,
-        description: getInstructionsForSkill(),
+        description: mainDescription,
         openAt: openDate,
         closeAt: closeDate,
-        maxSubmissions: assignmentData.maxSubmissions || 3
+        maxSubmissions: assignmentData.maxSubmissions ?? 1
       });
 
       const newAssignmentId = res.id;
 
-      // 2. Create corresponding module for the selected skill
+      // 2. Create corresponding modules sequentially
       const apiSkillMap: Record<AssignmentSkill, ApiSkill> = {
         writing: 'WRITING',
         speaking: 'SPEAKING',
@@ -236,62 +310,84 @@ export const TeacherCreateAssignment: React.FC = () => {
         listening: 'QUIZ'
       };
 
-      let createdModuleId: number | null = null;
-      try {
-        const modRes = await moduleService.createModule(newAssignmentId, {
-          skill: apiSkillMap[assignmentData.skill],
-          taskType: taskTypeMap[assignmentData.skill],
-          orderIndex: 1,
-          instructions: getInstructionsForSkill(),
-          aiInstruction: assignmentData.writing.aiInstruction || undefined,
-          maxScore: 10
-        });
-        createdModuleId = modRes.id;
-      } catch (modErr) {
-        console.warn('Module creation fallback:', modErr);
-      }
+      for (let sIdx = 0; sIdx < targetSkills.length; sIdx++) {
+        const skill = targetSkills[sIdx];
+        const orderIndex = sIdx + 1;
+        const instructions = getInstructionsFor(skill);
+        const aiInstruction = skill === 'writing'
+          ? (assignmentData.writing.aiInstruction || undefined)
+          : skill === 'speaking'
+          ? (assignmentData.speaking.aiInstruction || undefined)
+          : undefined;
 
-      // 3. Sequentially create questions in DB to prevent 409 Lock Contention
-      if (createdModuleId) {
-        if (assignmentData.skill === 'reading') {
-          const readingQuestions = assignmentData.reading.questions;
-          for (let i = 0; i < readingQuestions.length; i++) {
-            const q = readingQuestions[i];
-            const payload = q.type === 'multiple_choice'
-              ? buildMcqPayload({
-                  content: q.prompt,
-                  options: q.options,
-                  correctOptionIndexOrText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                })
-              : buildShortAnswerPayload({
-                  content: q.prompt,
-                  answerText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                });
-            await questionService.createQuestion(createdModuleId, payload);
+        let createdModuleId: number | null = null;
+        try {
+          const modRes = await moduleService.createModule(newAssignmentId, {
+            skill: apiSkillMap[skill],
+            taskType: taskTypeMap[skill],
+            orderIndex,
+            instructions,
+            aiInstruction,
+            maxScore: 10
+          });
+          createdModuleId = modRes.id;
+        } catch (modErr) {
+          console.warn(`Module creation fallback for ${skill}:`, modErr);
+        }
+
+        // Upload audio file if skill is listening
+        if (createdModuleId && skill === 'listening' && assignmentData.listening.audioFile) {
+          try {
+            await moduleService.uploadAudio(createdModuleId, assignmentData.listening.audioFile);
+          } catch (audioErr) {
+            console.error('Failed to upload audio file:', audioErr);
+            showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe. Vui lòng thử lại!' : 'Failed to upload audio file!');
+            throw audioErr;
           }
-        } else if (assignmentData.skill === 'listening') {
-          const listeningQuestions = assignmentData.listening.questions;
-          for (let i = 0; i < listeningQuestions.length; i++) {
-            const q = listeningQuestions[i];
-            const payload = q.type === 'multiple_choice'
-              ? buildMcqPayload({
-                  content: q.prompt,
-                  options: q.options,
-                  correctOptionIndexOrText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                })
-              : buildShortAnswerPayload({
-                  content: q.prompt,
-                  answerText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                });
-            await questionService.createQuestion(createdModuleId, payload);
+        }
+
+        // Create questions for reading / listening
+        if (createdModuleId) {
+          if (skill === 'reading') {
+            const readingQuestions = assignmentData.reading.questions;
+            for (let i = 0; i < readingQuestions.length; i++) {
+              const q = readingQuestions[i];
+              const payload = q.type === 'multiple_choice'
+                ? buildMcqPayload({
+                    content: q.prompt,
+                    options: q.options,
+                    correctOptionIndexOrText: q.correctAnswer,
+                    score: q.points,
+                    orderIndex: i + 1,
+                  })
+                : buildShortAnswerPayload({
+                    content: q.prompt,
+                    answerText: q.correctAnswer,
+                    score: q.points,
+                    orderIndex: i + 1,
+                  });
+              await questionService.createQuestion(createdModuleId, payload);
+            }
+          } else if (skill === 'listening') {
+            const listeningQuestions = assignmentData.listening.questions;
+            for (let i = 0; i < listeningQuestions.length; i++) {
+              const q = listeningQuestions[i];
+              const payload = q.type === 'multiple_choice'
+                ? buildMcqPayload({
+                    content: q.prompt,
+                    options: q.options,
+                    correctOptionIndexOrText: q.correctAnswer,
+                    score: q.points,
+                    orderIndex: i + 1,
+                  })
+                : buildShortAnswerPayload({
+                    content: q.prompt,
+                    answerText: q.correctAnswer,
+                    score: q.points,
+                    orderIndex: i + 1,
+                  });
+              await questionService.createQuestion(createdModuleId, payload);
+            }
           }
         }
       }
@@ -350,38 +446,25 @@ export const TeacherCreateAssignment: React.FC = () => {
 
       {/* Header */}
       <div className="assignment-edit-header">
-        <div className="assignment-edit-title-wrap">
-          <div className="assignment-edit-title-row">
-            <input 
-              type="text" 
-              className="assignment-edit-title-input"
-              value={assignmentData.title}
-              onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
-              placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
-            />
-          </div>
-        </div>
+        <input 
+          type="text" 
+          className="assignment-edit-title-input"
+          value={assignmentData.title}
+          onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
+          placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
+        />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <select 
-            value={selectedClassId ? String(selectedClassId) : ''}
-            onChange={(e) => handleClassSelectionChange(Number(e.target.value))}
-            style={{ 
-              padding: '8px 14px', 
-              fontSize: '13px', 
-              borderRadius: '8px', 
-              border: '1px solid #cbd5e1', 
-              backgroundColor: '#ffffff',
-              fontWeight: 600
-            }}
-          >
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                Lớp: {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select 
+          value={selectedClassId ? String(selectedClassId) : ''}
+          onChange={(e) => handleClassSelectionChange(Number(e.target.value))}
+          className="select-input font-semibold text-sm"
+        >
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {isVi ? `Lớp: ${c.name}` : `Class: ${c.name}`}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Skill Tabs Navigation */}
@@ -461,13 +544,9 @@ export const TeacherCreateAssignment: React.FC = () => {
           {/* Schedule */}
           <section className="edit-card">
             <div className="edit-card-header">
-              <div className="edit-card-header-left">
-                <div className="edit-card-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                </div>
+              <div>
+                <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
+                <p className="edit-card-desc">{isVi ? 'Thời gian mở đề và hạn nộp.' : 'Open time and due date.'}</p>
               </div>
             </div>
 
@@ -501,61 +580,10 @@ export const TeacherCreateAssignment: React.FC = () => {
                 min={1}
                 max={10}
                 className="edit-form-input" 
-                value={assignmentData.maxSubmissions || 3}
+                value={assignmentData.maxSubmissions ?? 1}
                 onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: parseInt(e.target.value) || 1 })}
                 style={{ width: '90px' }}
               />
-            </div>
-          </section>
-
-          {/* Visibility & Status */}
-          <section className="edit-card">
-            <div className="edit-card-header">
-              <div className="edit-card-header-left">
-                <div className="edit-card-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-                  <Eye size={18} />
-                </div>
-                <div>
-                  <h3 className="edit-card-title">{isVi ? 'Trạng Thái Bài Tập' : 'Publish Status'}</h3>
-                </div>
-              </div>
-            </div>
-
-            <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <button
-                  type="button"
-                  style={{ 
-                    padding: '8px 10px', 
-                    borderRadius: '8px', 
-                    border: assignmentData.status === 'active' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
-                    backgroundColor: assignmentData.status === 'active' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
-                    color: assignmentData.status === 'active' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setAssignmentData({ ...assignmentData, status: 'active' })}
-                >
-                  {isVi ? 'Công khai' : 'Published'}
-                </button>
-                <button
-                  type="button"
-                  style={{ 
-                    padding: '8px 10px', 
-                    borderRadius: '8px', 
-                    border: assignmentData.status === 'draft' ? '2px solid var(--primary, #1b4d3e)' : '1px solid var(--outline-variant, #e6dfd5)',
-                    backgroundColor: assignmentData.status === 'draft' ? 'var(--primary-light, #eaf0e8)' : 'var(--surface, #ffffff)',
-                    color: assignmentData.status === 'draft' ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
-                    fontSize: '12.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setAssignmentData({ ...assignmentData, status: 'draft' })}
-                >
-                  {isVi ? 'Bản nháp' : 'Draft'}
-                </button>
-              </div>
             </div>
           </section>
         </div>

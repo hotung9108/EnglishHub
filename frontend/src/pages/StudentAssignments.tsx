@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import { 
   PenTool, 
   Mic, 
@@ -23,7 +23,7 @@ import {
   ChevronDown,
   X
 } from 'lucide-react';
-import { Button, MetricCard, EmptyState, Skeleton } from '../components/common';
+import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
 import '../styles/student-ecosystem.css';
 
 type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
@@ -48,7 +48,8 @@ interface StudentAssignmentDisplay {
 
 const StudentAssignments: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -58,6 +59,25 @@ const StudentAssignments: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeStatusFilter, setActiveStatusFilter] = useState<'all' | 'not_started' | 'grading' | 'graded'>('all');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handleStatusFilterChange = (status: 'all' | 'not_started' | 'grading' | 'graded') => {
+    setActiveStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleClassFilterChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => setReloadKey((k) => k + 1);
@@ -101,9 +121,10 @@ const StudentAssignments: React.FC = () => {
                 let score: number | undefined = undefined;
 
                 if (matchedSub) {
-                  if (matchedSub.status === 'GRADED') {
+                  if (isSubmissionGraded(matchedSub)) {
                     displayStatus = 'graded';
-                    score = matchedSub.modules?.[0]?.grading?.finalScore ?? undefined;
+                    const finalSc = getSubmissionFinalScore(matchedSub);
+                    score = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
                   } else if (matchedSub.status === 'SUBMITTED') {
                     displayStatus = 'pending';
                   } else if (matchedSub.status === 'IN_PROGRESS') {
@@ -226,6 +247,14 @@ const StudentAssignments: React.FC = () => {
     });
   }, [rawAssignments, selectedClassId, searchQuery, activeStatusFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedAssignments = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredAssignments.slice(start, start + pageSize);
+  }, [filteredAssignments, safeCurrentPage, pageSize]);
+
   // Overall counts for stats cards based on class filter
   const classAssignments = useMemo(() => {
     return selectedClassId === 'all' 
@@ -335,7 +364,7 @@ const StudentAssignments: React.FC = () => {
         <div className="std-eco-pills">
           <button
             type="button"
-            onClick={() => setActiveStatusFilter('all')}
+            onClick={() => handleStatusFilterChange('all')}
             className={`std-eco-pill ${activeStatusFilter === 'all' ? 'active' : ''}`}
           >
             {t('studentAssignments.tabAll')} <span className="std-eco-pill-badge">{classAssignments.length}</span>
@@ -343,7 +372,7 @@ const StudentAssignments: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveStatusFilter('not_started')}
+            onClick={() => handleStatusFilterChange('not_started')}
             className={`std-eco-pill ${activeStatusFilter === 'not_started' ? 'active' : ''}`}
           >
             {t('studentAssignments.tabNotStarted')} <span className="std-eco-pill-badge">{stats.notStarted}</span>
@@ -351,7 +380,7 @@ const StudentAssignments: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveStatusFilter('grading')}
+            onClick={() => handleStatusFilterChange('grading')}
             className={`std-eco-pill ${activeStatusFilter === 'grading' ? 'active' : ''}`}
           >
             {t('studentAssignments.tabGrading')} <span className="std-eco-pill-badge">{stats.grading}</span>
@@ -359,7 +388,7 @@ const StudentAssignments: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setActiveStatusFilter('graded')}
+            onClick={() => handleStatusFilterChange('graded')}
             className={`std-eco-pill ${activeStatusFilter === 'graded' ? 'active' : ''}`}
           >
             {t('studentAssignments.tabGraded')} <span className="std-eco-pill-badge">{stats.graded}</span>
@@ -373,7 +402,7 @@ const StudentAssignments: React.FC = () => {
             <select
               id="student-class-select"
               value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
+              onChange={(e) => handleClassFilterChange(e.target.value)}
               className={`std-asg-select ${selectedClassId !== 'all' ? 'has-value' : ''}`}
               aria-label={t('studentAssignments.filterClassLabel')}
             >
@@ -393,7 +422,7 @@ const StudentAssignments: React.FC = () => {
               type="text"
               placeholder={t('studentAssignments.searchPlaceholder')}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="std-eco-search-input"
             />
           </div>
@@ -408,7 +437,7 @@ const StudentAssignments: React.FC = () => {
             <span>{t('studentAssignments.viewingClassPrefix')}<strong>{selectedClass.name}</strong></span>
             <button 
               type="button"
-              onClick={() => setSelectedClassId('all')}
+              onClick={() => handleClassFilterChange('all')}
               className="std-asg-clear-class-btn"
               title="Xem tất cả lớp"
               aria-label="Xóa bộ lọc lớp"
@@ -434,7 +463,7 @@ const StudentAssignments: React.FC = () => {
             description={t('studentAssignments.emptyDesc')}
           />
         ) : (
-          filteredAssignments.map((assignment) => {
+          paginatedAssignments.map((assignment) => {
             const badge = getTypeBadge(assignment.type);
             const handleAction = () => {
               if (assignment.status === 'graded') {
@@ -556,12 +585,24 @@ const StudentAssignments: React.FC = () => {
         )}
       </div>
 
-      {/* 5. Footer */}
-      <div className="std-asg-footer">
-        <div className="std-asg-count-text">
-          {t('studentAssignments.paginationPrefix')}<strong>{filteredAssignments.length}</strong>{t('studentAssignments.paginationMid')}<strong>{classAssignments.length}</strong>{t('studentAssignments.unitAssignments')}
-        </div>
-      </div>
+      {/* 5. Pagination */}
+      {!isLoading && filteredAssignments.length > 0 && (
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredAssignments.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel={isVi ? 'bài tập' : 'assignments'}
+          isVi={isVi}
+          variant="standalone"
+        />
+      )}
     </div>
   );
 };

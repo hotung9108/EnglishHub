@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, UserPlus, Search, 
   Loader2, AlertCircle
@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
-import { Button, MetricCard, EmptyState } from '../components/common';
+import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
 
 export const Students: React.FC = () => {
   const { t, language } = useLanguage();
@@ -16,6 +16,10 @@ export const Students: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [studentsData, setStudentsData] = useState<Array<{
     id: number;
@@ -65,18 +69,44 @@ export const Students: React.FC = () => {
     };
   }, [isVi]);
 
-  const filtered = studentsData.filter(st => {
-    if (statusFilter !== 'All' && st.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        st.name.toLowerCase().includes(q) ||
-        st.code.toLowerCase().includes(q) ||
-        st.email.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return studentsData.filter(st => {
+      if (statusFilter !== 'All' && st.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          st.name.toLowerCase().includes(q) ||
+          st.code.toLowerCase().includes(q) ||
+          st.email.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [studentsData, statusFilter, searchQuery]);
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
+
+  const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const totalEnrolled = studentsData.length;
   const activeCount = studentsData.filter(s => s.status === 'ACTIVE').length;
@@ -137,7 +167,7 @@ export const Students: React.FC = () => {
             <button
               key={st}
               type="button"
-              onClick={() => setStatusFilter(st)}
+              onClick={() => handleStatusFilterChange(st)}
               className={`adm-pill ${statusFilter === st ? 'active' : ''}`}
             >
               <span>{st === 'All' ? (isVi ? 'Tất cả trạng thái' : 'All') : st === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}</span>
@@ -152,7 +182,7 @@ export const Students: React.FC = () => {
             className="adm-search-input"
             placeholder={t('students.searchPlaceholder')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -183,67 +213,82 @@ export const Students: React.FC = () => {
             }
           />
         ) : (
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>{t('students.colId')}</th>
-                <th>{t('students.colName')}</th>
-                <th>Email</th>
-                <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(st => (
-                <tr 
-                  key={st.id} 
-                  className="adm-table-row-clickable cursor-pointer"
-                  onClick={() => navigate(`/admin/students/${st.id}`)}
-                >
-                  <td className="font-mono font-semibold text-primary">{st.code}</td>
-                  <td>
-                    <div className="font-semibold text-surface">{st.name}</div>
-                  </td>
-                  <td className="font-mono text-muted">{st.email}</td>
-                  <td>
-                    <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
-                      {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <div className="inline-flex gap-2 justify-end">
-                      <Button 
-                        variant="secondary"
-                        size="sm"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const nextStatus = st.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
-                          try {
-                            await userService.updateStatus(st.id, nextStatus);
-                            setStudentsData(prev => prev.map(item => item.id === st.id ? { ...item, status: nextStatus } : item));
-                          } catch {
-                            alert(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
-                          }
-                        }}
-                      >
-                        {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
-                      </Button>
-                      <Button 
-                        variant="secondary"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/admin/students/${st.id}`);
-                        }}
-                      >
-                        {t('students.actionViewDetails')}
-                      </Button>
-                    </div>
-                  </td>
+          <>
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{t('students.colId')}</th>
+                  <th>{t('students.colName')}</th>
+                  <th>Email</th>
+                  <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedStudents.map(st => (
+                  <tr 
+                    key={st.id} 
+                    className="adm-table-row-clickable cursor-pointer"
+                    onClick={() => navigate(`/admin/students/${st.id}`)}
+                  >
+                    <td className="font-mono font-semibold text-primary">{st.code}</td>
+                    <td>
+                      <div className="font-semibold text-surface">{st.name}</div>
+                    </td>
+                    <td className="font-mono text-muted">{st.email}</td>
+                    <td>
+                      <span className={`badge ${st.status === 'ACTIVE' ? 'badge-active' : 'badge-onleave'}`}>
+                        {st.status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <div className="inline-flex gap-2 justify-end">
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const nextStatus = st.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+                            try {
+                              await userService.updateStatus(st.id, nextStatus);
+                              setStudentsData(prev => prev.map(item => item.id === st.id ? { ...item, status: nextStatus } : item));
+                            } catch {
+                              alert(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
+                            }
+                          }}
+                        >
+                          {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
+                        </Button>
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/admin/students/${st.id}`);
+                          }}
+                        >
+                          {t('students.actionViewDetails')}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={(page) => setCurrentPage(page)}
+              onPageSizeChange={handlePageSizeChange}
+              itemLabel={isVi ? 'học viên' : 'students'}
+              isVi={isVi}
+              variant="table"
+            />
+          </>
         )}
       </div>
     </div>

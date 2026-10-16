@@ -1,23 +1,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ChevronRight, 
-  Calendar, 
-  Clock, 
-  RotateCcw, 
-  Award, 
-  CheckCircle2, 
-  Play, 
-  FileText,
-  AlertCircle,
-  RefreshCw
-} from 'lucide-react';
+import { ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem, getRemainingAttempts, findInProgressAttempt } from '../api/services/submission.service';
+import {
+  submissionService,
+  type SubmissionListItem,
+  getRemainingAttempts,
+  findInProgressAttempt,
+  isSubmissionGraded,
+  getSubmissionFinalScore
+} from '../api/services/submission.service';
 import '../styles/student-overview.css';
 
 interface AttemptRecord {
@@ -90,13 +85,13 @@ const StudentAssignmentOverview: React.FC = () => {
             // Find best score
             let maxVal = -1;
             list.forEach((item) => {
-              const sc = item.modules?.[0]?.grading?.finalScore ?? 0;
+              const sc = getSubmissionFinalScore(item) ?? 0;
               if (sc > maxVal) maxVal = sc;
             });
 
             const records: AttemptRecord[] = list.map((item) => {
-              const rawScore = item.modules?.[0]?.grading?.finalScore ?? null;
-              const isGraded = item.status === 'GRADED';
+              const rawScore = getSubmissionFinalScore(item);
+              const isGraded = isSubmissionGraded(item);
               const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
               return {
                 id: item.id,
@@ -133,8 +128,83 @@ const StudentAssignmentOverview: React.FC = () => {
     };
   }, [numericAssignmentId, id, user?.id, reloadKey]);
 
-  const maxSubmissions = 3;
-  const remainingAttempts = getRemainingAttempts(maxSubmissions, attempts.filter(a => a.status !== 'in_progress').length) ?? 3;
+  const isUnlimited = assignment?.maxSubmissions === null;
+  const maxSubmissions = assignment?.maxSubmissions !== undefined && assignment?.maxSubmissions !== null
+    ? assignment.maxSubmissions
+    : 1;
+  const completedAttemptsCount = attempts.filter((a) => a.status !== 'in_progress').length;
+  const remainingAttempts = isUnlimited
+    ? null
+    : (getRemainingAttempts(maxSubmissions, completedAttemptsCount) ?? Math.max(0, maxSubmissions - completedAttemptsCount));
+
+  const modules = assignment?.modules;
+  const skillsListText = useMemo(() => {
+    if (!modules || modules.length === 0) {
+      return 'Writing';
+    }
+    return modules
+      .map((m) => {
+        if (!m.skill) return '';
+        const s = m.skill.toUpperCase();
+        if (s === 'WRITING') return 'Writing';
+        if (s === 'SPEAKING') return 'Speaking';
+        if (s === 'READING') return 'Reading';
+        if (s === 'LISTENING') return 'Listening';
+        return m.skill;
+      })
+      .filter(Boolean)
+      .join(', ');
+  }, [modules]);
+
+  const handleStartSkill = async (targetSkill: string) => {
+    if (isStarting) return;
+    setIsStarting(true);
+    setError(null);
+    try {
+      let submissionId = inProgressSub?.id;
+      if (!submissionId) {
+        try {
+          const startRes = await submissionService.startAttempt(numericAssignmentId);
+          submissionId = startRes.id;
+        } catch {
+          submissionId = undefined;
+        }
+      }
+
+      const sLower = targetSkill.toLowerCase();
+      const idParam = id || '1';
+      const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
+
+      if (sLower === 'speaking') {
+        navigate(`/student/assignments/speaking/${idParam}${queryStr}`);
+      } else if (sLower === 'reading') {
+        navigate(`/student/assignments/reading/${idParam}${queryStr}`);
+      } else if (sLower === 'listening') {
+        navigate(`/student/assignments/listening/${idParam}${queryStr}`);
+      } else {
+        navigate(`/student/assignments/${idParam}${queryStr}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
+      setError(msg);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const handleFinalizeSubmission = async () => {
+    if (!inProgressSub) return;
+    setIsStarting(true);
+    try {
+      await submissionService.submitSubmission(inProgressSub.id);
+      navigate(`/student/submissions/${inProgressSub.id}`);
+    } catch (err) {
+      console.warn('Failed to finalize submission:', err);
+      navigate(`/student/submissions/${inProgressSub.id}`);
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
   const handleStartAttempt = async () => {
     if (isStarting) return;
@@ -152,17 +222,29 @@ const StudentAssignmentOverview: React.FC = () => {
         }
       }
 
-      // Determine skill from module or id or title
-      const skill = assignment?.modules?.[0]?.skill?.toLowerCase() || '';
+      // Find first uncompleted module or first module
+      let targetSkill = assignment?.modules?.[0]?.skill?.toLowerCase() || '';
+      if (inProgressSub && inProgressSub.modules && assignment?.modules) {
+        const uncompleted = assignment.modules.find((m) => {
+          const sm = inProgressSub.modules?.find(
+            (subM) => subM.skill?.toUpperCase() === m.skill?.toUpperCase() || subM.moduleId === m.id
+          );
+          return !sm || (sm.status !== 'SUBMITTED' && sm.status !== 'GRADED');
+        });
+        if (uncompleted) {
+          targetSkill = uncompleted.skill.toLowerCase();
+        }
+      }
+
       const titleLower = (assignment?.title || id || '').toLowerCase();
       const idParam = id || '1';
       const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
 
-      if (skill === 'speaking' || titleLower.includes('spk') || titleLower.includes('speaking') || titleLower.includes('nói')) {
+      if (targetSkill === 'speaking' || titleLower.includes('spk') || titleLower.includes('speaking') || titleLower.includes('nói')) {
         navigate(`/student/assignments/speaking/${idParam}${queryStr}`);
-      } else if (skill === 'reading' || titleLower.includes('rd') || titleLower.includes('reading') || titleLower.includes('đọc')) {
+      } else if (targetSkill === 'reading' || titleLower.includes('rd') || titleLower.includes('reading') || titleLower.includes('đọc')) {
         navigate(`/student/assignments/reading/${idParam}${queryStr}`);
-      } else if (skill === 'listening' || titleLower.includes('ls') || titleLower.includes('listening') || titleLower.includes('nghe')) {
+      } else if (targetSkill === 'listening' || titleLower.includes('ls') || titleLower.includes('listening') || titleLower.includes('nghe')) {
         navigate(`/student/assignments/listening/${idParam}${queryStr}`);
       } else {
         navigate(`/student/assignments/${idParam}${queryStr}`);
@@ -175,7 +257,14 @@ const StudentAssignmentOverview: React.FC = () => {
     }
   };
 
-  const bestAttempt = attempts.find(a => a.isBest);
+  const isAllSubModulesCompleted = Boolean(
+    inProgressSub &&
+    inProgressSub.modules &&
+    inProgressSub.modules.length > 0 &&
+    inProgressSub.modules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED')
+  );
+
+  const bestAttempt = attempts.find((a) => a.isBest);
 
   return (
     <div className="overview-container">
@@ -189,22 +278,9 @@ const StudentAssignmentOverview: React.FC = () => {
           <ArrowLeft size={14} />
           <span>{t('studentSpeaking.backToList') || 'Quay lại danh sách bài tập'}</span>
         </button>
-        <span className="text-slate-300">/</span>
-        <span>Hệ thống</span>
-        <ChevronRight size={12} className="text-slate-300" />
-        <span 
-          className="text-primary font-medium cursor-pointer"
-          onClick={() => navigate('/student/classes')}
-          role="button"
-          tabIndex={0}
-        >
-          Lớp học của tôi
-        </span>
-        <ChevronRight size={12} className="text-slate-300" />
-        <span className="text-primary font-medium">Lớp học</span>
-        <ChevronRight size={12} className="text-slate-300" />
-        <span className="font-semibold text-slate-900">
-          Tổng quan bài tập ({assignment?.title || id || 'HW-01'})
+        <span className="overview-breadcrumb-sep">/</span>
+        <span className="overview-breadcrumb-current">
+          {assignment?.title || (id ? `Bài tập #${id}` : 'Tổng quan bài tập')}
         </span>
       </div>
 
@@ -229,91 +305,143 @@ const StudentAssignmentOverview: React.FC = () => {
       <div className="overview-card">
         {/* Header */}
         <div className="overview-header">
-          <div>
-            <div className="overview-badge-row mb-2">
-              <span className={`overview-skill-badge ${assignment?.modules?.[0]?.skill?.toLowerCase() || 'writing'}`}>
-                {assignment?.modules?.[0]?.skill ? `${assignment.modules[0].skill} Practice` : 'Skill Practice'}
+          <div className="overview-header-main">
+            <h1 className="overview-title">
+              {isLoading ? 'Đang tải bài tập...' : (assignment?.title || `Bài tập #${numericAssignmentId}`)}
+            </h1>
+            <div className="overview-meta-line">
+              <span className="overview-meta-item">
+                Mã bài tập: <strong>#{numericAssignmentId}</strong>
               </span>
-              <span className={`overview-status-badge ${assignment?.status === 'PUBLISHED' ? '' : 'closed'}`}>
-                ● {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}
+              <span className="overview-meta-divider">•</span>
+              <span className="overview-meta-item">
+                Kỹ năng: <strong>{skillsListText}</strong>
+              </span>
+              <span className="overview-meta-divider">•</span>
+              <span className={`overview-meta-status ${assignment?.status === 'PUBLISHED' ? 'open' : 'closed'}`}>
+                {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}
               </span>
             </div>
-            <h1 className="overview-title">
-              {isLoading ? 'Đang tải bài tập...' : (assignment?.title || `Bài tập ${id || 'HW-01'}`)}
-            </h1>
-            <p className="overview-code-text">
-              Mã bài tập: <strong>#{numericAssignmentId}</strong>
-            </p>
           </div>
 
-          <div className="text-right">
-            <span className="overview-best-score-label">Điểm cao nhất hiện tại</span>
+          <div className="overview-header-score">
+            <span className="overview-best-score-label">Điểm cao nhất</span>
             <div className="overview-best-score-val">
-              {bestAttempt ? `${bestAttempt.score10} / 10` : 'Chưa có điểm'}
+              {bestAttempt ? (
+                <>
+                  {bestAttempt.score10}
+                  <span className="overview-best-score-scale">/10</span>
+                </>
+              ) : (
+                <span className="overview-best-score-none">Chưa có điểm</span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Rules Grid */}
         <div className="overview-rules-grid">
-          <div className="overview-rule-item">
-            <div className="overview-rule-icon">
-              <Clock size={20} />
-            </div>
-            <div>
-              <div className="overview-rule-label">Thời lượng làm bài</div>
-              <div className="overview-rule-val">40 Phút</div>
+          <div className="overview-rule-card">
+            <div className="overview-rule-label">Thời lượng làm bài</div>
+            <div className="overview-rule-val">40 Phút</div>
+          </div>
+
+          <div className="overview-rule-card">
+            <div className="overview-rule-label">Số lượt nộp cho phép</div>
+            <div className="overview-rule-val">
+              {isUnlimited 
+                ? `Không giới hạn (Đã làm ${attempts.length} lần)` 
+                : `Tối đa ${maxSubmissions} lần (Đã nộp ${attempts.length}/${maxSubmissions})`}
             </div>
           </div>
 
-          <div className="overview-rule-item">
-            <div className="overview-rule-icon">
-              <RotateCcw size={20} />
-            </div>
-            <div>
-              <div className="overview-rule-label">Số lượt nộp cho phép</div>
-              <div className="overview-rule-val">{attempts.length} / {maxSubmissions} lần (Còn {remainingAttempts} lượt)</div>
+          <div className="overview-rule-card">
+            <div className="overview-rule-label">Thời hạn nộp</div>
+            <div className="overview-rule-val">
+              {assignment?.closeAt ? new Date(assignment.closeAt).toLocaleDateString('vi-VN') : 'Mở trực tuyến'}
             </div>
           </div>
 
-          <div className="overview-rule-item">
-            <div className="overview-rule-icon">
-              <Calendar size={20} />
-            </div>
-            <div>
-              <div className="overview-rule-label">Thời hạn nộp</div>
-              <div className="overview-rule-val">Mở trực tuyến</div>
-            </div>
-          </div>
-
-          <div className="overview-rule-item">
-            <div className="overview-rule-icon">
-              <Award size={20} />
-            </div>
-            <div>
-              <div className="overview-rule-label">Phương thức tính điểm</div>
-              <div className="overview-rule-val">Lấy điểm cao nhất (Best)</div>
-            </div>
+          <div className="overview-rule-card">
+            <div className="overview-rule-label">Phương thức tính điểm</div>
+            <div className="overview-rule-val">Lấy điểm cao nhất (Best)</div>
           </div>
         </div>
+
+        {/* Multi-skill Sections / Modules List */}
+        {assignment?.modules && assignment.modules.length > 1 && (
+          <div className="overview-sections-container">
+            <div className="overview-sections-header">
+              <h2 className="overview-section-title">
+                Các phần thi trong bài tập ({assignment.modules.length} kỹ năng)
+              </h2>
+              <span className="overview-section-subtitle">
+                Học viên có thể hoàn thành từng phần kỹ năng trước khi nộp toàn bộ bài tập
+              </span>
+            </div>
+
+            <div className="overview-sections-grid">
+              {assignment.modules.map((m, idx) => {
+                const subMod = inProgressSub?.modules?.find(
+                  (sm) => sm.skill?.toUpperCase() === m.skill?.toUpperCase() || sm.moduleId === m.id
+                );
+                const isCompleted = subMod?.status === 'SUBMITTED' || subMod?.status === 'GRADED';
+                const skillName =
+                  m.skill === 'WRITING'
+                    ? 'Writing'
+                    : m.skill === 'SPEAKING'
+                    ? 'Speaking'
+                    : m.skill === 'READING'
+                    ? 'Reading'
+                    : m.skill === 'LISTENING'
+                    ? 'Listening'
+                    : m.skill;
+
+                return (
+                  <div key={m.id || idx} className="overview-module-card">
+                    <div className="overview-module-info">
+                      <div className="overview-module-title">
+                        Phần {idx + 1}: {skillName}
+                      </div>
+                      <div className={`overview-module-status ${isCompleted ? 'completed' : inProgressSub ? 'in-progress' : 'not-started'}`}>
+                        {isCompleted ? 'Đã hoàn thành' : inProgressSub ? 'Chưa hoàn thành' : 'Chưa bắt đầu'}
+                      </div>
+                    </div>
+
+                    <Button
+                      variant={isCompleted ? 'secondary' : 'primary'}
+                      size="sm"
+                      onClick={() => handleStartSkill(m.skill)}
+                      disabled={isStarting}
+                    >
+                      {isCompleted ? 'Xem lại' : inProgressSub ? 'Làm phần này' : 'Bắt đầu'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Instructions */}
         <div className="overview-instructions-box">
           <h3 className="overview-instructions-title">
-            Hướng dẫn &amp; Yêu cầu bài làm:
+            Hướng dẫn &amp; Yêu cầu bài làm
           </h3>
-          <p className="overview-instructions-content">
-            1. Đọc kỹ yêu cầu từng phần câu hỏi và hoàn thành tất cả các mục trước khi nhấn Nộp bài.<br />
-            2. Trả lời đầy đủ, hệ thống sẽ tự động lưu bài nháp (Draft) định kỳ để bảo vệ dữ liệu khi làm.<br />
-            3. Sau khi nộp bài, hệ thống AI và Giảng viên sẽ tiến hành phân tích, chấm điểm và highlight nhận xét chi tiết.<br />
-            4. Bạn có thể xem lại kết quả bài làm và feedback bất kỳ lúc nào trong danh sách Lịch sử các lần làm bài.
-          </p>
+          <div className="overview-instructions-content">
+            <p>1. Đọc kỹ yêu cầu từng phần câu hỏi và hoàn thành tất cả các mục trước khi nhấn Nộp bài.</p>
+            <p>2. Trả lời đầy đủ, hệ thống sẽ tự động lưu bài nháp (Draft) định kỳ để bảo vệ dữ liệu khi làm.</p>
+            <p>3. Sau khi nộp bài, hệ thống AI và Giảng viên sẽ tiến hành phân tích, chấm điểm và highlight nhận xét chi tiết.</p>
+            <p>4. Bạn có thể xem lại kết quả bài làm và feedback bất kỳ lúc nào trong danh sách Lịch sử các lần làm bài.</p>
+          </div>
         </div>
 
         {/* Attempts Table */}
         <div className="overview-attempts-section">
-          <div className="overview-attempts-title">
-            <span>Lịch sử các lần làm bài (Attempts History)</span>
+          <div className="overview-attempts-header">
+            <h3 className="overview-attempts-title">
+              Lịch sử các lần làm bài
+            </h3>
             <span className="overview-attempts-count">
               Đã làm {attempts.length} lần
             </span>
@@ -333,51 +461,39 @@ const StudentAssignmentOverview: React.FC = () => {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} className="text-center p-6 text-slate-500">
+                    <td colSpan={5} className="overview-table-empty">
                       Đang tải lịch sử các lần nộp bài...
                     </td>
                   </tr>
                 ) : attempts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center p-6 text-slate-500">
+                    <td colSpan={5} className="overview-table-empty">
                       Chưa có lần nộp bài nào. Nhấn &quot;Bắt đầu làm bài&quot; bên dưới để làm lần đầu tiên.
                     </td>
                   </tr>
                 ) : (
                   attempts.map((att) => (
                     <tr key={att.id}>
-                      <td className="font-bold">
-                        Lần {att.attemptNumber}
+                      <td className="overview-cell-attempt">
+                        <span>Lần {att.attemptNumber}</span>
                         {att.isBest && (
-                          <span className="overview-best-tag">
-                            <Award size={12} className="inline mr-1" />
-                            Điểm cao nhất
+                          <span className="overview-best-indicator">
+                            (Điểm cao nhất)
                           </span>
                         )}
                       </td>
-                      <td className="text-slate-500">{att.submittedAt}</td>
+                      <td className="overview-cell-time">{att.submittedAt}</td>
+                      <td className="overview-cell-score">
+                        {att.score10 !== '--' ? `${att.score10} / 10` : '--'}
+                      </td>
                       <td>
-                        <span className="overview-score-cell">
-                          {att.score10 !== '--' ? `${att.score10} / 10` : '--'}
+                        <span className={`overview-status-text ${att.status}`}>
+                          {att.status === 'graded' 
+                            ? 'Đã có điểm' 
+                            : att.status === 'in_progress' 
+                              ? 'Đang làm dở' 
+                              : 'Chờ chấm điểm'}
                         </span>
-                      </td>
-                      <td>
-                        {att.status === 'graded' ? (
-                          <span className="overview-status-chip graded">
-                            <CheckCircle2 size={13} />
-                            Đã có điểm
-                          </span>
-                        ) : att.status === 'in_progress' ? (
-                          <span className="overview-status-chip in-progress">
-                            <Clock size={13} />
-                            Đang làm dở
-                          </span>
-                        ) : (
-                          <span className="overview-status-chip pending">
-                            <Clock size={13} />
-                            Chờ chấm điểm
-                          </span>
-                        )}
                       </td>
                       <td className="text-right">
                         {att.status === 'graded' || att.status === 'pending' ? (
@@ -408,56 +524,70 @@ const StudentAssignmentOverview: React.FC = () => {
 
         {/* CTA Start Attempt */}
         <div className="overview-cta-box">
-          <div>
+          <div className="overview-cta-info">
             <div className="overview-cta-title">
               {inProgressSub
-                ? `Bạn đang có bài làm dở (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
-                : remainingAttempts > 0 
-                  ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
-                  : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
+                ? isAllSubModulesCompleted
+                  ? `Bạn đã hoàn thành tất cả các phần thi (Lần ${inProgressSub.attemptNumber}). Bạn có thể nộp toàn bộ bài tập ngay bây giờ.`
+                  : `Bạn đang có bài làm dở (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
+                : isUnlimited
+                  ? `Bắt đầu làm bài (Lần ${attempts.length + 1}).`
+                  : remainingAttempts !== null && remainingAttempts > 0 
+                    ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
+                    : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
             </div>
             <div className="overview-cta-desc">
               Điểm số tổng kết môn học sẽ ghi nhận lần làm bài có kết quả tốt nhất của bạn.
             </div>
           </div>
 
-          {inProgressSub ? (
-            <button 
-              className="overview-cta-btn" 
-              onClick={handleStartAttempt}
-              disabled={isStarting}
-              type="button"
-            >
-              <Play size={16} />
-              {isStarting ? 'Đang mở bài làm...' : `Tiếp tục làm bài (Lần ${inProgressSub.attemptNumber})`}
-            </button>
-          ) : remainingAttempts > 0 ? (
-            <button 
-              className="overview-cta-btn" 
-              onClick={handleStartAttempt}
-              disabled={isStarting}
-              type="button"
-            >
-              <Play size={16} />
-              {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${attempts.length + 1})`}
-            </button>
-          ) : (
-            <button 
-              className="overview-cta-btn" 
-              onClick={() => {
-                const targetSub = bestAttempt ? bestAttempt.id : attempts[0]?.id;
-                if (targetSub) {
-                  navigate(`/student/submissions/${targetSub}`);
-                } else {
-                  navigate(`/student/assignments/${id || 'HW-01'}/result`);
-                }
-              }}
-              type="button"
-            >
-              <FileText size={16} />
-              Xem kết quả bài nộp tốt nhất
-            </button>
-          )}
+          <div className="overview-cta-action">
+            {inProgressSub ? (
+              isAllSubModulesCompleted ? (
+                <button 
+                  className="overview-cta-btn" 
+                  onClick={handleFinalizeSubmission}
+                  disabled={isStarting}
+                  type="button"
+                >
+                  {isStarting ? 'Đang nộp toàn bộ bài tập...' : `Nộp toàn bộ bài tập (Lần ${inProgressSub.attemptNumber})`}
+                </button>
+              ) : (
+                <button 
+                  className="overview-cta-btn" 
+                  onClick={handleStartAttempt}
+                  disabled={isStarting}
+                  type="button"
+                >
+                  {isStarting ? 'Đang mở bài làm...' : `Tiếp tục làm bài (Lần ${inProgressSub.attemptNumber})`}
+                </button>
+              )
+            ) : isUnlimited || (remainingAttempts !== null && remainingAttempts > 0) ? (
+              <button 
+                className="overview-cta-btn" 
+                onClick={handleStartAttempt}
+                disabled={isStarting}
+                type="button"
+              >
+                {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${attempts.length + 1})`}
+              </button>
+            ) : (
+              <button 
+                className="overview-cta-btn" 
+                onClick={() => {
+                  const targetSub = bestAttempt ? bestAttempt.id : attempts[0]?.id;
+                  if (targetSub) {
+                    navigate(`/student/submissions/${targetSub}`);
+                  } else {
+                    navigate(`/student/assignments/${id || 'HW-01'}/result`);
+                  }
+                }}
+                type="button"
+              >
+                Xem kết quả bài nộp tốt nhất
+              </button>
+            )}
+          </div>
         </div>
 
       </div>

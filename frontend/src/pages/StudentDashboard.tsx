@@ -13,7 +13,7 @@ import { MetricCard, Button, EmptyState } from '../components/common';
 import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import { reportService } from '../api/services/report.service';
 import type { ReportStudentProgressResponse } from '../types/report.types';
 import '../styles/student-dashboard.css';
@@ -99,7 +99,7 @@ const StudentDashboard: React.FC = () => {
                   className: cls.name,
                   classId: cls.id,
                   submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
-                  score: matchedSub?.modules?.[0]?.grading?.finalScore ?? null,
+                  score: getSubmissionFinalScore(matchedSub),
                 };
               })
             );
@@ -135,7 +135,7 @@ const StudentDashboard: React.FC = () => {
   }, [assignments]);
 
   const pendingGradingCount = useMemo(() => {
-    return submissions.filter((s) => s.status === 'SUBMITTED').length;
+    return submissions.filter((s) => s.status === 'SUBMITTED' && !isSubmissionGraded(s)).length;
   }, [submissions]);
 
   // Upcoming deadlines (unsubmitted assignments sorted by deadline)
@@ -192,23 +192,7 @@ const StudentDashboard: React.FC = () => {
     <div className="std-dashboard-container">
       {/* Greeting Hero Banner */}
       <section className="std-dash-hero">
-        <div className="std-dash-hero-content">
-          <div>
-            <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}!</h1>
-          </div>
-
-          <div className="std-dash-target-pill">
-            <div>
-              <div className="std-dash-target-title">Mục tiêu học tập</div>
-              <div className="std-dash-target-sub">Tiếng Anh Tổng Quát</div>
-            </div>
-            <div className="std-dash-target-divider"></div>
-            <div>
-              <div className="std-dash-target-val">8.5</div>
-              <div className="std-dash-target-unit">Thang 10</div>
-            </div>
-          </div>
-        </div>
+        <h1 className="std-dash-greeting">Chào mừng trở lại, {studentDisplayName}!</h1>
       </section>
 
       {/* Error state alert */}

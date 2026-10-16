@@ -31,7 +31,12 @@ const LoginForm: React.FC = () => {
       const loggedUser = await login({ email, password });
       const actualRole = loggedUser?.role || authService.getSavedUser()?.role || 'student';
       const from = location.state?.from?.pathname || '/';
-      if (from === '/') {
+      const isAuthorizedDestination =
+        (actualRole === 'admin' && from.startsWith('/admin')) ||
+        (actualRole === 'teacher' && from.startsWith('/teacher')) ||
+        (actualRole === 'student' && from.startsWith('/student'));
+
+      if (from === '/' || !isAuthorizedDestination) {
         if (actualRole === 'admin') navigate('/admin', { replace: true });
         else if (actualRole === 'teacher') navigate('/teacher', { replace: true });
         else navigate('/student', { replace: true });

@@ -66,20 +66,21 @@ export interface SpeakingRubricWeights {
 }
 
 export interface SpeakingConfig {
-  partType: SpeakingPartType;
-  cueCardTopic: string;
-  cueCardBullets: string[];
-  prepTimeSeconds: number;
-  speakingTimeSeconds: number;
-  maxRetries: number;
+  promptText: string;
+  aiInstruction?: string;
+  partType?: SpeakingPartType;
+  cueCardTopic?: string;
+  cueCardBullets?: string[];
+  prepTimeSeconds?: number;
+  speakingTimeSeconds?: number;
+  maxRetries?: number;
   audioPromptUrl?: string;
   examinerSampleAudioUrl?: string;
   examinerTranscript?: string;
-  followUpQuestions: SpeakingQuestionItem[];
-  rubrics: SpeakingRubricWeights;
-  enableAi: boolean;
-  aiModel: string;
-  aiInstruction: string;
+  followUpQuestions?: SpeakingQuestionItem[];
+  rubrics?: SpeakingRubricWeights;
+  enableAi?: boolean;
+  aiModel?: string;
 }
 
 // ---------------- READING TYPES ----------------
@@ -90,7 +91,7 @@ export interface ReadingParagraph {
   content: string;
 }
 
-export type ReadingQuestionType = 'multiple_choice' | 'true_false_not_given' | 'matching_headings' | 'gap_fill';
+export type ReadingQuestionType = 'multiple_choice' | 'short_answer' | 'true_false_not_given' | 'matching_headings' | 'gap_fill';
 
 export interface ReadingQuestionItem {
   id: string;
@@ -107,13 +108,14 @@ export interface ReadingQuestionItem {
 
 export interface ReadingConfig {
   passageTitle: string;
-  passageSubtitle: string;
-  passageSource: string;
-  paragraphs: ReadingParagraph[];
+  passageContent?: string;
   questions: ReadingQuestionItem[];
-  timeLimitMinutes: number;
-  enableAiExplanation: boolean;
-  aiInstruction: string;
+  paragraphs?: ReadingParagraph[];
+  passageSubtitle?: string;
+  passageSource?: string;
+  timeLimitMinutes?: number;
+  enableAiExplanation?: boolean;
+  aiInstruction?: string;
 }
 
 // ---------------- LISTENING TYPES ----------------
@@ -122,27 +124,29 @@ export type ListeningSectionType = 'section1' | 'section2' | 'section3' | 'secti
 export interface ListeningQuestionItem {
   id: string;
   order: number;
-  section: ListeningSectionType;
-  type: 'form_completion' | 'multiple_choice' | 'map_labeling' | 'short_answer';
+  type: 'multiple_choice' | 'short_answer' | 'form_completion' | 'map_labeling';
   prompt: string;
   options?: string[];
   correctAnswer: string;
-  acceptableAnswers?: string[];
-  timestampClue?: string; // e.g. "01:45"
   points: number;
+  section?: ListeningSectionType;
+  acceptableAnswers?: string[];
+  timestampClue?: string;
 }
 
 export interface ListeningConfig {
-  audioTitle: string;
   audioUrl: string;
-  audioDurationSeconds: number;
-  playbackLimit: 'single' | 'double' | 'unlimited';
+  audioFile?: File | null;
+  audioPreviewUrl?: string;
   transcript: string;
-  hideTranscriptUntilGraded: boolean;
-  activeSection: ListeningSectionType;
   questions: ListeningQuestionItem[];
-  enableAiDistractorCheck: boolean;
-  aiInstruction: string;
+  audioTitle?: string;
+  audioDurationSeconds?: number;
+  playbackLimit?: 'single' | 'double' | 'unlimited';
+  hideTranscriptUntilGraded?: boolean;
+  activeSection?: ListeningSectionType;
+  enableAiDistractorCheck?: boolean;
+  aiInstruction?: string;
 }
 
 // Combined Assignment Editor State

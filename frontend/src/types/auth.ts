@@ -12,7 +12,6 @@ export interface User {
   department?: string;
   bio?: string;
   meetingUrl?: string;
-  targetBand?: string;
   currentClass?: string;
   dateOfBirth?: string;
   school?: string;

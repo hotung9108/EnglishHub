@@ -5,10 +5,10 @@ import {
   PenTool, Mic, BookOpen, Headphones, AlertCircle, FileText,
   RotateCcw
 } from 'lucide-react';
-import { MetricCard, Button, EmptyState, Skeleton, StatusBadge } from '../components/common';
+import { MetricCard, Button, EmptyState, Skeleton, StatusBadge, Pagination } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { reportService } from '../api/services/report.service';
@@ -48,6 +48,25 @@ export const StudentGrades: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const handleSkillChange = (skill: string) => {
+    setSelectedSkill(skill);
+    setCurrentPage(1);
+  };
+
+  const handleClassChange = (cls: string) => {
+    setSelectedClass(cls);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleReload = () => setReloadKey((k) => k + 1);
@@ -102,8 +121,8 @@ export const StudentGrades: React.FC = () => {
         else if (titleLower.includes('read')) detectedSkill = 'Reading';
         else if (titleLower.includes('listen')) detectedSkill = 'Listening';
 
-        const isGraded = sub.status === 'GRADED';
-        const rawScoreVal = sub.modules?.[0]?.grading?.finalScore ?? null;
+        const isGraded = isSubmissionGraded(sub);
+        const rawScoreVal = getSubmissionFinalScore(sub);
         const score10 = rawScoreVal !== null ? convertTo10Scale(rawScoreVal) : 7.0;
 
         return {
@@ -187,6 +206,13 @@ export const StudentGrades: React.FC = () => {
       return true;
     });
   }, [grades, selectedClass, selectedSkill, searchQuery]);
+
+  const totalPages = Math.ceil(filteredGrades.length / pageSize) || 1;
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedGrades = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredGrades.slice(start, start + pageSize);
+  }, [filteredGrades, safeCurrentPage, pageSize]);
 
   const gradedCount = grades.filter(g => g.status === 'graded').length;
   const pendingCount = grades.filter(g => g.status === 'pending').length;
@@ -289,7 +315,7 @@ export const StudentGrades: React.FC = () => {
           {/* Skill Filter Dropdown */}
           <select 
             value={selectedSkill}
-            onChange={(e) => setSelectedSkill(e.target.value)}
+            onChange={(e) => handleSkillChange(e.target.value)}
             className="select-input min-w-40"
           >
             <option value="all">{isVi ? `Tất cả kỹ năng (${grades.length})` : `All Skills (${grades.length})`}</option>
@@ -302,7 +328,7 @@ export const StudentGrades: React.FC = () => {
           {/* Class Filter */}
           <select 
             value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
+            onChange={(e) => handleClassChange(e.target.value)}
             className="select-input min-w-48"
           >
             <option value="all">{isVi ? 'Tất cả các lớp' : 'All Enrolled Classes'}</option>
@@ -320,7 +346,7 @@ export const StudentGrades: React.FC = () => {
             className="std-eco-search-input"
             placeholder={isVi ? 'Tìm kiếm bài tập...' : 'Search assignment...'}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -353,7 +379,7 @@ export const StudentGrades: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredGrades.map((row) => (
+              {paginatedGrades.map((row) => (
                 <tr key={row.id}>
                   <td className="text-left">
                     <div className="font-semibold text-slate-900 text-sm mb-0.5">
@@ -393,7 +419,7 @@ export const StudentGrades: React.FC = () => {
                   </td>
                   <td className="text-center">
                     <StatusBadge
-                      status={row.status === 'graded' ? 'success' : 'warning'}
+                       status={row.status === 'graded' ? 'success' : 'warning'}
                       label={row.status === 'graded' ? (isVi ? 'Đã chấm' : 'Graded') : (isVi ? 'Đang chấm' : 'Pending')}
                     />
                   </td>
@@ -435,6 +461,24 @@ export const StudentGrades: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {filteredGrades.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={filteredGrades.length}
+            itemLabel={isVi ? 'kết quả' : 'entries'}
+            isVi={isVi}
+            onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20, 50]}
+            variant="table"
+          />
+        )}
       </div>
     </div>
   );
