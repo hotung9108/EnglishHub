@@ -480,7 +480,7 @@ const StudentAssignmentReading: React.FC = () => {
                       {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
                         const isSelected = selectedAnswers[activeQuestion] === optKey;
                         const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
-                        const questionWithOptions = currentQuestionItem as QuestionResponse & {
+                        const questionWithOptions = currentQuestionItem as {
                           options?: Array<{ id?: string | number; key?: string; text?: string; content?: string }>;
                         };
                         const matchedOption = questionWithOptions.options?.find(

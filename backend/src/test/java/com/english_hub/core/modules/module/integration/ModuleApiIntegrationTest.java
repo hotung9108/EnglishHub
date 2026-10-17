@@ -5,12 +5,14 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.persistence.entity.Assignment;
@@ -30,6 +32,7 @@ import com.english_hub.core.infrastructure.persistence.repository.QuestionReposi
 import com.english_hub.core.infrastructure.persistence.repository.SubmissionModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.SubmissionRepository;
 import com.english_hub.core.infrastructure.security.JwtTokenService;
+import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
@@ -42,9 +45,14 @@ import com.english_hub.core.infrastructure.persistence.repository.StudentProfile
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,52 +62,70 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.mock.web.MockMultipartFile;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import org.junit.jupiter.api.AfterAll;
 
+@Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
 class ModuleApiIntegrationTest {
 
 	/**
-	 * {@code LocalAudioStorageAdapter} defaults to {@code ./.local/backend-storage}, so an
-	 * unaudited audio upload would drop real files into the repository. Point the adapter at a
-	 * throwaway temp directory and delete it once the class finishes.
+	 * Module listening audio is stored in S3-compatible object storage
+	 * (presigned direct upload, see ModuleService#requestAudioUpload). A
+	 * localstack S3 endpoint replaces the real provider so the tests can
+	 * PUT directly to the presigned URL and assert on the stored object.
 	 */
-	private static final Path LOCAL_STORAGE_ROOT = createLocalStorageRoot();
+	private static final String S3_BUCKET = "englishhub-module-audio-test";
+	private static final String S3_ACCESS_KEY = "minioadmin";
+	private static final String S3_SECRET_KEY = "minioadmin";
+	private static final byte[] AUDIO_BYTES = new byte[] {'I', 'D', '3', 1, 2, 3};
 
-	private static Path createLocalStorageRoot() {
-		try {
-			return Files.createTempDirectory("englishhub-module-test-storage");
-		} catch (IOException exception) {
-			throw new IllegalStateException("Could not create a temp audio storage root", exception);
-		}
-	}
+	@Container
+	static final GenericContainer<?> S3 = new GenericContainer<>("localstack/localstack:3")
+			.withEnv("SERVICES", "s3")
+			.withEnv("AWS_DEFAULT_REGION", "us-east-1")
+			.withEnv("AWS_ACCESS_KEY_ID", S3_ACCESS_KEY)
+			.withEnv("AWS_SECRET_ACCESS_KEY", S3_SECRET_KEY)
+			.withExposedPorts(4566)
+			.waitingFor(Wait.forHttp("/_localstack/health")
+					.forStatusCode(200)
+					.withStartupTimeout(java.time.Duration.ofMinutes(3)));
 
 	@DynamicPropertySource
-	static void registerLocalAudioStorage(DynamicPropertyRegistry registry) {
-		registry.add("app.storage.local-root", () -> LOCAL_STORAGE_ROOT.toAbsolutePath().toString());
+	static void registerStorageProperties(DynamicPropertyRegistry registry) {
+		registry.add("app.storage.s3.enabled", () -> "true");
+		registry.add("app.storage.s3.endpoint", () -> "http://localhost:" + S3.getMappedPort(4566));
+		registry.add("app.storage.s3.region", () -> "us-east-1");
+		registry.add("app.storage.s3.access-key-id", () -> S3_ACCESS_KEY);
+		registry.add("app.storage.s3.secret-access-key", () -> S3_SECRET_KEY);
+		registry.add("app.storage.s3.bucket", () -> S3_BUCKET);
+		registry.add("app.storage.s3.path-style", () -> "true");
 	}
 
-	@AfterAll
-	static void deleteLocalAudioStorage() throws IOException {
-		if (Files.exists(LOCAL_STORAGE_ROOT)) {
-			try (java.util.stream.Stream<Path> paths = Files.walk(LOCAL_STORAGE_ROOT)) {
-				paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
-					try {
-						Files.deleteIfExists(path);
-					} catch (IOException exception) {
-						throw new IllegalStateException("Could not delete " + path, exception);
-					}
-				});
-			}
+	@BeforeAll
+	static void createBucket() {
+		try (S3Client client = S3Client.builder()
+				.endpointOverride(URI.create("http://localhost:" + S3.getMappedPort(4566)))
+				.region(Region.US_EAST_1)
+				.credentialsProvider(StaticCredentialsProvider.create(
+						AwsBasicCredentials.create(S3_ACCESS_KEY, S3_SECRET_KEY)))
+				.serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+				.build()) {
+			client.createBucket(bucket -> bucket.bucket(S3_BUCKET));
 		}
 	}
 
@@ -138,6 +164,12 @@ class ModuleApiIntegrationTest {
 
 	@Autowired
 	private JwtTokenService jwtTokenService;
+
+	/** Local instance: the application context does not expose a Jackson mapper bean. */
+	private final ObjectMapper objectMapper = new ObjectMapper();
+
+	@Autowired
+	private StorageService storageService;
 
 	@PersistenceContext
 	private EntityManager entityManager;
@@ -451,45 +483,230 @@ class ModuleApiIntegrationTest {
 	}
 
 	@Test
-	void listeningAudioUploadReturnsReadyAndNonListeningIsRejected() throws Exception {
-		MockMultipartFile audio = new MockMultipartFile(
-				"file", "source.mp3", "audio/mpeg", new byte[] {'I', 'D', '3', 1, 2, 3});
-
-		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
-					.file(audio)
-					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+	void listeningAudioPresignedUploadConfirmAndStreamRoundTrip() throws Exception {
+		String uploadUrlResponse = mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/mpeg\"}"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.message").value("Upload audio thành công."))
-				.andExpect(jsonPath("$.sourceAudioStorageKey").value(startsWith("modules/")))
+				.andExpect(jsonPath("$.message").value("Lấy link upload audio thành công."))
+				.andExpect(jsonPath("$.storageKey")
+						.value(startsWith("modules/" + listeningModuleId + "/audio/")))
+				.andExpect(jsonPath("$.uploadUrl").isNotEmpty())
+				.andExpect(jsonPath("$.expiresAt").isNotEmpty())
+				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("UPLOADING"))
+				.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+		JsonNode uploadUrlBody = objectMapper.readTree(uploadUrlResponse);
+		String storageKey = uploadUrlBody.get("storageKey").asText();
+
+		moduleRepository.flush();
+		entityManager.clear();
+		AssignmentModule pendingAudio = moduleRepository.findById(listeningModuleId).orElseThrow();
+		assertThat(pendingAudio.getSourceAudioStorageKey()).isEqualTo(storageKey);
+		assertThat(pendingAudio.getSourceAudioMimeType()).isEqualTo("audio/mpeg");
+		assertThat(pendingAudio.getSourceAudioUploadStatus()).isEqualTo(UploadStatus.UPLOADING);
+
+		byte[] audioBytes = new byte[] {'I', 'D', '3', 1, 2, 3};
+		putToPresignedUrl(uploadUrlBody.get("uploadUrl").asText(), audioBytes);
+
+		mockMvc.perform(post("/api/v1/modules/{id}/audio/confirm", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"storageKey\":\"" + storageKey + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Xác nhận upload audio thành công."))
+				.andExpect(jsonPath("$.sourceAudioStorageKey").value(storageKey))
 				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("READY"));
 		moduleRepository.flush();
 		entityManager.clear();
-		AssignmentModule persistedAudio = moduleRepository.findById(listeningModuleId).orElseThrow();
-		assertThat(persistedAudio.getSourceAudioStorageKey()).startsWith("modules/");
-		assertThat(persistedAudio.getSourceAudioMimeType()).isEqualTo("audio/mpeg");
-		assertThat(persistedAudio.getSourceAudioUploadStatus()).isEqualTo(UploadStatus.READY);
+		assertThat(moduleRepository.findById(listeningModuleId).orElseThrow().getSourceAudioUploadStatus())
+				.isEqualTo(UploadStatus.READY);
 
-		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
-					.file(audio)
-					.header("Authorization", bearer(otherTeacherId, UserRole.TEACHER)))
-				.andExpect(status().isForbidden());
-
-		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
-					.file(audio)
-					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
-				.andExpect(status().isForbidden());
-
-		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", listeningModuleId)
-					.file(audio)
-					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
-				.andExpect(status().isForbidden());
-
-		mockMvc.perform(multipart("/api/v1/modules/{id}/audio", readingModuleId)
-					.file(audio)
+		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(content().contentType("audio/mpeg"))
+				.andExpect(content().bytes(audioBytes));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(content().bytes(audioBytes));
+
+		for (UserRole blockedRole : new UserRole[] {UserRole.ADMIN, UserRole.TEACHER, UserRole.STUDENT}) {
+			Long blockedUser = blockedRole == UserRole.ADMIN ? adminId
+					: blockedRole == UserRole.TEACHER ? otherTeacherId : otherStudentId;
+			mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+						.header("Authorization", bearer(blockedUser, blockedRole)))
+					.andExpect(status().isForbidden());
+		}
+	}
+
+	@Test
+	void confirmWithoutDirectUploadMarksFailedAndGuardsMatchUploadUrlStep() throws Exception {
+		String uploadUrlResponse = mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/mpeg\"}"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+		String storageKey = objectMapper.readTree(uploadUrlResponse).get("storageKey").asText();
+
+		mockMvc.perform(post("/api/v1/modules/{id}/audio/confirm", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"storageKey\":\"" + storageKey + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("File audio chưa được tải lên kho lưu trữ."))
+				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("FAILED"));
+		moduleRepository.flush();
+		entityManager.clear();
+		assertThat(moduleRepository.findById(listeningModuleId).orElseThrow().getSourceAudioUploadStatus())
+				.isEqualTo(UploadStatus.FAILED);
+
+		mockMvc.perform(post("/api/v1/modules/{id}/audio/confirm", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"storageKey\":\"modules/999/audio/hack.mp3\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("storageKey không khớp với module."));
+
+		mockMvc.perform(post("/api/v1/modules/{id}/audio", readingModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/mpeg\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Module này không hỗ trợ upload audio."));
-}
+
+		mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/ogg\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Định dạng file audio không được hỗ trợ."));
+
+		for (UserRole blockedRole : new UserRole[] {UserRole.ADMIN, UserRole.TEACHER, UserRole.STUDENT}) {
+			Long blockedUser = blockedRole == UserRole.ADMIN ? adminId
+					: blockedRole == UserRole.TEACHER ? otherTeacherId : studentId;
+			mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
+						.header("Authorization", bearer(blockedUser, blockedRole))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"audio/mpeg\"}"))
+					.andExpect(status().isForbidden());
+		}
+	}
+
+	@Test
+	void audioStreamReturnsNotFoundForMissingAudioOrObject() throws Exception {
+		mockMvc.perform(get("/api/v1/modules/{id}/audio", readingModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Module chưa có file audio."));
+
+		AssignmentModule listeningModule = moduleRepository.findById(listeningModuleId).orElseThrow();
+		listeningModule.updateAudioMetadata("modules/" + listeningModuleId + "/audio/gone.mp3", null,
+				"audio/mpeg", UploadStatus.READY);
+		moduleRepository.flush();
+
+		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Module chưa có file audio."));
+	}
+
+	/**
+	 * Exercises the after-commit storage cleanup, so the fixtures must really
+	 * commit: the service requests run in their own transactions
+	 * (NOT_SUPPORTED suspends the test transaction), the after-commit hooks
+	 * fire per request, and everything created is deleted again at the end.
+	 */
+	@Test
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	void reuploadAndModuleDeletionCleanUpStoredAudioObjects() throws Exception {
+		try {
+			UploadUrl first = requestAudioUploadUrl(listeningModuleId);
+			putToPresignedUrl(first.uploadUrl(), AUDIO_BYTES);
+			confirmAudioUpload(listeningModuleId, first.storageKey());
+			assertThat(storageService.objectExists(first.storageKey())).isTrue();
+
+			UploadUrl second = requestAudioUploadUrl(listeningModuleId);
+			assertThat(storageService.objectExists(first.storageKey()))
+					.as("previous audio object must be deleted after the re-upload request commits")
+					.isFalse();
+			putToPresignedUrl(second.uploadUrl(), AUDIO_BYTES);
+			confirmAudioUpload(listeningModuleId, second.storageKey());
+			assertThat(storageService.objectExists(second.storageKey())).isTrue();
+
+			mockMvc.perform(delete("/api/v1/modules/{id}", listeningModuleId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+					.andExpect(status().isOk());
+			assertThat(storageService.objectExists(second.storageKey()))
+					.as("audio object must be deleted after the module delete commits")
+					.isFalse();
+		} finally {
+			deleteCommittedFixtures();
+		}
+	}
+
+	private record UploadUrl(String storageKey, String uploadUrl) {
+	}
+
+	private UploadUrl requestAudioUploadUrl(long moduleId) throws Exception {
+		String response = mockMvc.perform(post("/api/v1/modules/{id}/audio", moduleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"mimeType\":\"audio/mpeg\"}"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+		JsonNode body = objectMapper.readTree(response);
+		return new UploadUrl(body.get("storageKey").asText(), body.get("uploadUrl").asText());
+	}
+
+	private void putToPresignedUrl(String uploadUrl, byte[] audioBytes) throws Exception {
+		HttpResponse<Void> putResponse = HttpClient.newHttpClient()
+				.send(HttpRequest.newBuilder()
+						.uri(URI.create(uploadUrl))
+						.header("Content-Type", "audio/mpeg")
+						.PUT(HttpRequest.BodyPublishers.ofByteArray(audioBytes))
+						.build(),
+						HttpResponse.BodyHandlers.discarding());
+		assertThat(putResponse.statusCode() / 100)
+				.as("direct PUT to the presigned URL must succeed")
+				.isEqualTo(2);
+	}
+
+	private void confirmAudioUpload(long moduleId, String storageKey) throws Exception {
+		mockMvc.perform(post("/api/v1/modules/{id}/audio/confirm", moduleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"storageKey\":\"" + storageKey + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sourceAudioUploadStatus").value("READY"));
+	}
+
+	private void deleteCommittedFixtures() {
+		classMemberRepository.findAll().stream()
+				.filter(member -> classId.equals(member.getClassId()))
+				.forEach(classMemberRepository::delete);
+		questionRepository.findAll().stream()
+				.filter(question -> readingModuleId.equals(question.getModuleId())
+						|| listeningModuleId.equals(question.getModuleId()))
+				.forEach(questionRepository::delete);
+		moduleRepository.findAll().stream()
+				.filter(module -> assignmentId.equals(module.getAssignmentId()))
+				.forEach(moduleRepository::delete);
+		assignmentRepository.deleteById(assignmentId);
+		classRepository.deleteById(classId);
+		teacherProfileRepository.deleteById(teacherId);
+		teacherProfileRepository.deleteById(otherTeacherId);
+		studentProfileRepository.deleteById(studentId);
+		studentProfileRepository.deleteById(otherStudentId);
+		userRepository.deleteById(adminId);
+		userRepository.deleteById(teacherId);
+		userRepository.deleteById(otherTeacherId);
+		userRepository.deleteById(studentId);
+		userRepository.deleteById(otherStudentId);
+	}
 
 	private Long createUser(UserRole role, String name) {
 		User user = new User(

@@ -9,28 +9,30 @@ import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepos
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
-import com.english_hub.core.modules.module.application.port.AudioStorageException;
-import com.english_hub.core.modules.module.application.port.AudioStoragePort;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.module.domain.model.ModuleTaskType;
 import com.english_hub.core.modules.module.domain.model.ModuleUploadStatus;
 import com.english_hub.core.modules.module.domain.repository.ModuleRepository;
+import com.english_hub.core.modules.submission.application.port.StorageService;
+import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
-import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ModuleService {
@@ -48,27 +50,33 @@ public class ModuleService {
 	private static final String SUBMISSION_REFERENCE_MESSAGE = "Không thể xoá module đã có bài nộp.";
 	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final String AUDIO_NOT_SUPPORTED_MESSAGE = "Module này không hỗ trợ upload audio.";
-	private static final String INVALID_AUDIO_MESSAGE = "File audio không hợp lệ.";
-	private static final long MAX_AUDIO_BYTES = 25L * 1024 * 1024;
+	private static final String UNSUPPORTED_AUDIO_MIME_MESSAGE = "Định dạng file audio không được hỗ trợ.";
+	private static final String AUDIO_CONFIRM_MISMATCH_MESSAGE = "storageKey không khớp với module.";
+	private static final String AUDIO_NOT_AVAILABLE_MESSAGE = "Module chưa có file audio.";
+	private static final String DEFAULT_AUDIO_MIME_TYPE = "audio/mpeg";
 	private static final BigDecimal DEFAULT_MAX_SCORE = BigDecimal.TEN;
-	private static final Set<String> AUDIO_CONTENT_TYPES = Set.of(
-			"audio/mpeg",
-			"audio/mp3",
-			"audio/wav",
-			"audio/x-wav",
-			"audio/wave",
-			"audio/mp4",
-			"audio/m4a",
-			"audio/x-m4a",
-			"video/mp4",
-			"application/octet-stream");
+	/**
+	 * Allowed listening-audio mime types mapped to their storage extension.
+	 * The extension of the generated storage key is derived from the declared
+	 * mime type because the backend never receives the file bytes: clients
+	 * upload directly to the object store through a presigned URL.
+	 */
+	private static final Map<String, String> AUDIO_EXTENSION_BY_MIME_TYPE = Map.of(
+			"audio/mpeg", "mp3",
+			"audio/mp3", "mp3",
+			"audio/wav", "wav",
+			"audio/x-wav", "wav",
+			"audio/wave", "wav",
+			"audio/mp4", "m4a",
+			"audio/m4a", "m4a",
+			"audio/x-m4a", "m4a");
 
 	private final ModuleRepository moduleRepository;
 	private final AssignmentRepository assignmentRepository;
 	private final ClassRepository classRepository;
 	private final ClassMemberRepository classMemberRepository;
 	private final CurrentUserProvider currentUserProvider;
-	private final AudioStoragePort audioStoragePort;
+	private final StorageService storageService;
 
 	public ModuleService(
 			ModuleRepository moduleRepository,
@@ -76,13 +84,13 @@ public class ModuleService {
 			ClassRepository classRepository,
 			ClassMemberRepository classMemberRepository,
 			CurrentUserProvider currentUserProvider,
-			AudioStoragePort audioStoragePort) {
+			StorageService storageService) {
 		this.moduleRepository = moduleRepository;
 		this.assignmentRepository = assignmentRepository;
 		this.classRepository = classRepository;
 		this.classMemberRepository = classMemberRepository;
 		this.currentUserProvider = currentUserProvider;
-		this.audioStoragePort = audioStoragePort;
+		this.storageService = storageService;
 	}
 
 	@Transactional(readOnly = true)
@@ -169,10 +177,19 @@ public class ModuleService {
 			throw ApiException.badRequest(SUBMISSION_REFERENCE_MESSAGE);
 		}
 		moduleRepository.deleteById(moduleId);
+		deleteStoredAudioAfterCommit(module.sourceAudioStorageKey());
 	}
 
+	/**
+	 * Step 1 of the presigned listening-audio upload (mirrors the submission
+	 * module upload flow): generates a presigned PUT URL so the client uploads
+	 * the file directly to object storage, then persists the pending metadata
+	 * with status {@code UPLOADING}. A previous audio object is deleted once
+	 * the transaction commits. Call
+	 * {@link #confirmAudioUpload(long, String)} after the direct PUT finishes.
+	 */
 	@Transactional
-	public AudioUploadResult uploadAudio(long moduleId, MultipartFile file) {
+	public AudioUploadUrlResult requestAudioUpload(long moduleId, String mimeType) {
 		User caller = requireTeacher();
 		Module module = requireModule(moduleId);
 		Assignment assignment = requireAssignment(module.assignmentId());
@@ -180,58 +197,107 @@ public class ModuleService {
 		if (module.skill() != ModuleSkill.LISTENING) {
 			throw ApiException.badRequest(AUDIO_NOT_SUPPORTED_MESSAGE);
 		}
-		validateAudioFile(file);
-
-		AudioStoragePort.StoredAudio storedAudio;
-		try {
-			storedAudio = audioStoragePort.store(moduleId, file);
-		} catch (AudioStorageException exception) {
-			markAudioUploadFailed(module, exception);
-			if (INVALID_AUDIO_MESSAGE.equals(exception.getMessage())) {
-				throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-			}
-			throw exception;
+		String normalizedMimeType = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT);
+		String extension = AUDIO_EXTENSION_BY_MIME_TYPE.get(normalizedMimeType);
+		if (extension == null) {
+			throw ApiException.badRequest(UNSUPPORTED_AUDIO_MIME_MESSAGE);
 		}
+		String previousStorageKey = module.sourceAudioStorageKey();
+		String storageKey = "modules/" + moduleId + "/audio/" + UUID.randomUUID() + "." + extension;
+		PresignedUpload presigned = storageService.generatePresignedPutUrl(storageKey, normalizedMimeType);
 		Module updated = module.withAudio(
-				storedAudio.storageKey(),
-				storedAudio.durationSeconds(),
-				storedAudio.mimeType() == null ? file.getContentType() : storedAudio.mimeType(),
-				ModuleUploadStatus.READY);
-		try {
-			moduleRepository.save(updated);
-		} catch (RuntimeException databaseException) {
-			markAudioUploadFailed(module, databaseException);
-			cleanupStoredAudio(storedAudio.storageKey(), databaseException);
-			throw databaseException;
-		}
-		return new AudioUploadResult(storedAudio.storageKey(), ModuleUploadStatus.READY.name());
+				storageKey,
+				null,
+				normalizedMimeType,
+				ModuleUploadStatus.UPLOADING);
+		moduleRepository.save(updated);
+		deleteStoredAudioAfterCommit(previousStorageKey);
+		return new AudioUploadUrlResult(
+				presigned.uploadUrl(),
+				storageKey,
+				presigned.expiresAt(),
+				ModuleUploadStatus.UPLOADING.name());
 	}
 
-	private void markAudioUploadFailed(Module module, RuntimeException originalException) {
-		try {
-			moduleRepository.save(module.withAudio(
-					module.sourceAudioStorageKey(),
-					module.sourceAudioDurationSeconds(),
-					module.sourceAudioMimeType(),
-					ModuleUploadStatus.FAILED));
-		} catch (RuntimeException failureSaveException) {
-			LOGGER.error("Không thể cập nhật trạng thái FAILED cho module audio.", failureSaveException);
-			addSuppressedIfDifferent(originalException, failureSaveException);
+	/**
+	 * Step 2 of the presigned upload: probes object storage for the file the
+	 * client was asked to PUT and flips the status to {@code READY}, or to
+	 * {@code FAILED} when nothing was uploaded. Returns the resulting status
+	 * in the response body instead of failing with 4xx/5xx so the FAILED
+	 * status is committed by the same transaction.
+	 */
+	@Transactional
+	public AudioUploadConfirmResult confirmAudioUpload(long moduleId, String storageKey) {
+		User caller = requireTeacher();
+		Module module = requireModule(moduleId);
+		Assignment assignment = requireAssignment(module.assignmentId());
+		requireTeacherOwnsAssignment(assignment, caller);
+		if (storageKey == null || storageKey.isBlank() || !storageKey.equals(module.sourceAudioStorageKey())) {
+			throw ApiException.badRequest(AUDIO_CONFIRM_MISMATCH_MESSAGE);
 		}
+		ModuleUploadStatus status = storageService.objectExists(storageKey)
+				? ModuleUploadStatus.READY
+				: ModuleUploadStatus.FAILED;
+		moduleRepository.save(module.withAudio(
+				module.sourceAudioStorageKey(),
+				module.sourceAudioDurationSeconds(),
+				module.sourceAudioMimeType(),
+				status));
+		return new AudioUploadConfirmResult(storageKey, status.name());
 	}
 
-	private void cleanupStoredAudio(String storageKey, RuntimeException originalException) {
-		try {
-			audioStoragePort.delete(storageKey);
-		} catch (RuntimeException cleanupException) {
-			LOGGER.error("Không thể cleanup file audio sau khi lưu metadata thất bại: {}", storageKey, cleanupException);
-			addSuppressedIfDifferent(originalException, cleanupException);
+	/**
+	 * Streams the listening-audio bytes of a module. Read access mirrors
+	 * {@link #getModule(long)}: the owning teacher and class-member students
+	 * only.
+	 */
+	@Transactional(readOnly = true)
+	public ModuleAudioResult getModuleAudio(long moduleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		Module module = requireModule(moduleId);
+		Assignment assignment = requireAssignment(module.assignmentId());
+		requireReadAccess(assignment, caller);
+		String storageKey = module.sourceAudioStorageKey();
+		if (storageKey == null || storageKey.isBlank()) {
+			throw ApiException.notFound(AUDIO_NOT_AVAILABLE_MESSAGE);
 		}
+		byte[] bytes = storageService.getObjectBytes(storageKey);
+		if (bytes == null || bytes.length == 0) {
+			throw ApiException.notFound(AUDIO_NOT_AVAILABLE_MESSAGE);
+		}
+		String mimeType = module.sourceAudioMimeType() == null
+				? DEFAULT_AUDIO_MIME_TYPE
+				: module.sourceAudioMimeType();
+		return new ModuleAudioResult(bytes, mimeType);
 	}
 
-	private void addSuppressedIfDifferent(RuntimeException originalException, RuntimeException secondaryException) {
-		if (originalException != secondaryException) {
-			originalException.addSuppressed(secondaryException);
+	/**
+	 * Best-effort deletion of a stored audio object after the current
+	 * transaction commits, so a rolled-back save never leaves the database
+	 * pointing at an already-deleted file. Outside a transaction (unit tests)
+	 * the deletion runs synchronously.
+	 */
+	private void deleteStoredAudioAfterCommit(String storageKey) {
+		if (storageKey == null || storageKey.isBlank()) {
+			return;
+		}
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			deleteStoredAudio(storageKey);
+			return;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				deleteStoredAudio(storageKey);
+			}
+		});
+	}
+
+	private void deleteStoredAudio(String storageKey) {
+		try {
+			storageService.deleteObject(storageKey);
+		} catch (RuntimeException exception) {
+			LOGGER.error("Không thể xoá file audio khỏi kho lưu trữ: {}", storageKey, exception);
 		}
 	}
 
@@ -324,66 +390,16 @@ public class ModuleService {
 				&& command.orderIndex() == null;
 	}
 
-	private void validateAudioFile(MultipartFile file) {
-		if (file == null || file.isEmpty() || file.getSize() > MAX_AUDIO_BYTES) {
-			throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-		}
-		String extension = extensionOf(file.getOriginalFilename());
-		if (extension == null) {
-			throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-		}
-		String contentType = file.getContentType();
-		if (contentType != null && !AUDIO_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
-			throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-		}
-		try (InputStream input = file.getInputStream()) {
-			byte[] header = input.readNBytes(12);
-			if (!matchesAudioSignature(extension, header)) {
-				throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-			}
-		} catch (IOException exception) {
-			throw ApiException.badRequest(INVALID_AUDIO_MESSAGE);
-		}
+	public record AudioUploadUrlResult(
+			String uploadUrl,
+			String storageKey,
+			OffsetDateTime expiresAt,
+			String uploadStatus) {
 	}
 
-	private String extensionOf(String originalFilename) {
-		if (originalFilename == null) {
-			return null;
-		}
-		String normalized = originalFilename.toLowerCase(Locale.ROOT);
-		int dotIndex = normalized.lastIndexOf('.');
-		if (dotIndex < 0) {
-			return null;
-		}
-		String extension = normalized.substring(dotIndex);
-		return Set.of(".mp3", ".wav", ".m4a").contains(extension) ? extension : null;
+	public record AudioUploadConfirmResult(String storageKey, String uploadStatus) {
 	}
 
-	private boolean matchesAudioSignature(String extension, byte[] header) {
-		if (".wav".equals(extension)) {
-			return header.length >= 12
-					&& header[0] == 'R'
-					&& header[1] == 'I'
-					&& header[2] == 'F'
-					&& header[3] == 'F'
-					&& header[8] == 'W'
-					&& header[9] == 'A'
-					&& header[10] == 'V'
-					&& header[11] == 'E';
-		}
-		if (".m4a".equals(extension)) {
-			return header.length >= 8
-					&& header[4] == 'f'
-					&& header[5] == 't'
-					&& header[6] == 'y'
-					&& header[7] == 'p';
-		}
-		return header.length >= 3 && header[0] == 'I' && header[1] == 'D' && header[2] == '3'
-				|| header.length >= 2
-						&& (header[0] & 0xFF) == 0xFF
-						&& (header[1] & 0xE0) == 0xE0;
-	}
-
-	public record AudioUploadResult(String storageKey, String uploadStatus) {
+	public record ModuleAudioResult(byte[] bytes, String mimeType) {
 	}
 }

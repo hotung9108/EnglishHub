@@ -6,10 +6,15 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-# Doi ten user cho dung voi SERVER_USER da cau hinh trong startup-deploy.sh
-User=REPLACE_WITH_SERVER_USER
-ExecStart=/home/REPLACE_WITH_SERVER_USER/scripts/startup-deploy.sh
-TimeoutStartSec=600
+# User/duong dan phai khop SERVER_USER va noi dat script trong startup-deploy.sh
+User=pmtuan
+ExecStart=/home/pmtuan/scripts/startup-deploy.sh
+# Khong gioi han thoi gian chay: 1 lan boot co the phai cho healthcheck + rollback
+# (HEALTH_CHECK_TIMEOUT x so service), 600s mac dinh se bi systemd kill giua chung.
+TimeoutStartSec=infinity
+# Loi ghi log cho systemd (script da tu ghi log rieng ra LOG_FILE)
+StandardOutput=journal
+StandardError=journal
 RemainAfterExit=yes
 
 [Install]

@@ -370,17 +370,47 @@ Xoá module.
 ---
 
 ### POST `/api/v1/modules/{moduleId}/audio`
-Upload file audio cho module (multipart/form-data).
+Lấy presigned PUT URL để upload audio bài nghe cho module `LISTENING` (chỉ giáo viên sở hữu).
+Client sau đó PUT bytes thô trực tiếp lên `uploadUrl` với `Content-Type` trùng khớp, rồi gọi
+`POST /api/v1/modules/{moduleId}/audio/confirm`.
 
 **Path Params:** `moduleId` (int64)
 
-**Request Body:** `multipart/form-data`
+**Request Body:** `application/json`
 
 | Field | Kiểu | Mô tả |
-|-------|------|--------|
-| `file` | binary | File audio cần upload |
+|-------|------|-------|
+| `mimeType` | string | Một trong `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`, `audio/wave`, `audio/mp4`, `audio/m4a`, `audio/x-m4a` |
 
-**Response:** `AudioUploadResponse`
+**Response:** `AudioUploadUrlResponse` (`{ message, uploadUrl, storageKey, expiresAt, sourceAudioUploadStatus }`, trạng thái `UPLOADING`)
+
+---
+
+### POST `/api/v1/modules/{moduleId}/audio/confirm`
+Kiểm tra object trong kho lưu trữ và cập nhật trạng thái module (chỉ giáo viên sở hữu).
+
+**Path Params:** `moduleId` (int64)
+
+**Request Body:** `application/json`
+
+| Field | Kiểu | Mô tả |
+|-------|------|-------|
+| `storageKey` | string | `storageKey` trả về từ bước upload-url |
+
+**Response:** `AudioUploadConfirmResponse` (`sourceAudioUploadStatus` = `READY` nếu đã upload, `FAILED` nếu chưa; HTTP `200` trong cả hai trường hợp)
+
+---
+
+### GET `/api/v1/modules/{moduleId}/audio`
+Stream bytes audio bài nghe. Giáo viên sở hữu và học sinh thành viên lớp được phép; `ADMIN` và
+user ngoài lớp nhận `403`. Trả `404` khi module chưa có audio.
+
+**Path Params:** `moduleId` (int64)
+
+**Response:** bytes audio với `Content-Type` đã lưu và `Cache-Control: private, max-age=3600`
+
+> Luồng đầy đủ (kèm ví dụ client và upload file bài nộp): xem
+> [`docs/api/file-upload-guide-module-audio-and-submission-files.md`](./file-upload-guide-module-audio-and-submission-files.md).
 
 ---
 
@@ -1349,12 +1379,23 @@ Tiến bộ của một học viên.
 
 ---
 
-#### `AudioUploadResponse`
+#### `AudioUploadUrlResponse`
+| Field | Kiểu | Mô tả |
+|-------|------|--------|
+| `message` | string | Thông báo |
+| `uploadUrl` | string | Presigned PUT URL để upload trực tiếp |
+| `storageKey` | string | Storage key dùng cho bước confirm |
+| `expiresAt` | string (date-time) | Thời điểm presigned URL hết hạn |
+| `sourceAudioUploadStatus` | string | Trạng thái upload (`UPLOADING`) |
+
+---
+
+#### `AudioUploadConfirmResponse`
 | Field | Kiểu | Mô tả |
 |-------|------|--------|
 | `message` | string | Thông báo |
 | `sourceAudioStorageKey` | string | Key lưu trữ file audio |
-| `sourceAudioUploadStatus` | string | Trạng thái upload |
+| `sourceAudioUploadStatus` | string | `READY` hoặc `FAILED` |
 
 ---
 

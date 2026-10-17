@@ -118,6 +118,14 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.PUT, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.POST, "/api/v1/modules/{moduleId}/audio", List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.POST,
+					"/api/v1/modules/{moduleId}/audio/confirm",
+					List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/modules/{moduleId}/audio",
+					List.of("TEACHER", "STUDENT")),
 
 			// Submission
 			new RouteRule(

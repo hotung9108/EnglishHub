@@ -129,6 +129,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
   - `LocalAudioStorageAdapter` lưu file audio nghe của bài tập vào thư mục local `./.local/backend-storage`.
   - Nhưng trong `docker-compose.prod.yml`, service `backend` **không hề mount volume nào** (chỉ có mạng `englishhub_network` và `englishhub_shared`).
 - **Hệ quả**: Toàn bộ file âm thanh bài nghe do giáo viên upload nằm trong tầng ghi tạm (ephemeral write layer) của Docker container. Khi container restart hoặc CI/CD deploy image mới, **toàn bộ file audio nghe bị xóa sạch vĩnh viễn**, dẫn đến lỗi 404 cho học sinh.
+- ✅ **ĐÃ KHẮC PHỤC (task `BE-41`)**: `LocalAudioStorageAdapter`, `AudioStoragePort`, `AudioStorageException` và property `app.storage.local-root` đã bị xóa hoàn toàn. Audio bài nghe nay được lưu trên kho lưu trữ tương thích S3 (`S3StorageService`) qua luồng **presigned direct upload**; có dọn file khi upload lại và khi xóa module (best-effort, sau khi transaction commit). Khi `app.storage.s3.enabled=false`, API trả lỗi `"Lưu trữ chưa được cấu hình."`. Chi tiết: `docs/api/file-upload-guide-module-audio-and-submission-files.md`.
 
 #### BUG-03: AI Microservice mở Port 8001 ra ngoài Internet không có Authentication (No Auth AI Proxy)
 - **Tệp tin**:
@@ -163,6 +164,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
   - `ModuleController` chỉ có `POST /modules/{id}/audio` để upload.
   - Hoàn toàn **không có `GET /modules/{id}/audio`**, không có API streaming hỗ trợ header `Range: bytes=...`, và cũng không cấp Presigned GET URL.
 - **Hệ quả**: Kể cả khi giáo viên upload audio thành công, học sinh và giáo viên không có bất kỳ endpoint nào để phát hoặc tải file nghe về trình duyệt.
+- ✅ **ĐÃ KHẮC PHỤC (task `BE-41`)**: `GET /api/v1/modules/{moduleId}/audio` đã được bổ sung, stream bytes audio với `Content-Type` đúng và `Cache-Control: private, max-age=3600`. Giáo viên sở hữu và học sinh thành viên lớp được phép; `ADMIN` và user ngoài lớp nhận `403`; `404` khi chưa có audio. (Chưa hỗ trợ header `Range: bytes=...` — học sinh tải toàn bộ file; có thể bổ sung sau nếu cần.)
 
 #### BUG-07: Mất toàn bộ nội dung lựa chọn trắc nghiệm (MCQ Options Blackout) đối với Học sinh
 - **Tệp tin**:
@@ -369,10 +371,10 @@ flowchart TD
 | Vai trò phụ trách | Mã công việc | Hành động khắc phục chi tiết | Mức độ ưu tiên |
 | :--- | :--- | :--- | :--- |
 | **@pm** | `PM-FIX-01` | Mở lại task `PM-TASK-2`, viết đầy đủ mô tả luồng chính/phụ và điều kiện cho 36 UCs trong `01.SRS.md`. | **P0** |
-| **@be-primary** | `BE-SEC-01` | ~~Xóa `debugOtp` trong `ForgotPasswordResponse`. Cấu hình `spring-boot-starter-mail` để gửi email thật.~~ ✅ **DONE** (`@be-secondary`): `debugOtp` đã xóa, email gửi qua EmailJS (`EmailService` port). | ~~**P0 (Critical)**~~ |
-| **@be-primary** | `BE-STO-01` | Chuyển `LocalAudioStorageAdapter` sang lưu trữ trên S3, xóa bỏ lưu disk local không volume. | **P0 (Data Loss)** |
+| **@be-primary** | `BE-SEC-01` | Xóa `debugOtp` trong `ForgotPasswordResponse`. Cấu hình `spring-boot-starter-mail` để gửi email thật. | **P0 (Critical)** |
+| **@be-primary** | `BE-STO-01` | Chuyển `LocalAudioStorageAdapter` sang lưu trữ trên S3, xóa bỏ lưu disk local không volume. — ✅ **Đã hoàn thành** (task `BE-41`, `@be-secondary`). | **P0 (Data Loss)** |
 | **@be-primary** | `BE-API-01` | Cập nhật `QuestionResponse`: Trả về mảng `options: [{id, content}]` đã ẩn trường `isCorrect` cho học sinh. | **P0 (Blocker)** |
-| **@be-primary** | `BE-AUD-01` | Bổ sung endpoint `GET /api/v1/modules/{id}/audio` hỗ trợ streaming cho học sinh làm bài nghe. | **P0 (Blocker)** |
+| **@be-primary** | `BE-AUD-01` | Bổ sung endpoint `GET /api/v1/modules/{id}/audio` hỗ trợ streaming cho học sinh làm bài nghe. — ✅ **Đã hoàn thành** (task `BE-41`, `@be-secondary`). | **P0 (Blocker)** |
 | **@be-primary** | `BE-AI-01` | Bọc lệnh gọi Google SDK bằng `asyncio.to_thread` trong `gemini_service.py` để giải phóng Event Loop. | **P0 (Blocker)** |
 | **@devops-primary**| `DO-SEC-01` | Đóng port 8001 của AI service khỏi host, thêm `X-Internal-Token` bảo vệ giữa Spring Boot và FastAPI. | **P0 (Critical)** |
 | **@fe-primary** | `FE-SPK-01` | Viết hook `useAudioRecorder` với Web Audio API và `MediaRecorder`, upload blob lên S3 và gửi `audioStorageKey`. | **P0 (Blocker)** |
