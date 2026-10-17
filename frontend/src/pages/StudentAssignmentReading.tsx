@@ -8,7 +8,7 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { questionService, extractMcqOptions, type QuestionResponse } from '../api/services/question.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, type SubmissionDetail, type SubmitModuleAnswerPayload } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
@@ -64,13 +64,16 @@ const StudentAssignmentReading: React.FC = () => {
           if (isMounted) setAssignment(currentAssignment);
         }
 
-        // 2. Fetch module and questions
-        let moduleId = currentAssignment?.modules?.[0]?.id;
+        // 2. Fetch reading module and questions
+        const readingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'READING');
+        let moduleId = readingMod?.id;
         if (!moduleId) {
           try {
             const modRes = await moduleService.listModules(numericId);
-            if (modRes.modules && modRes.modules.length > 0) {
-              moduleId = modRes.modules[0].id;
+            const mList = modRes.modules || modRes.data || [];
+            const matched = mList.find((m) => m.skill?.toUpperCase() === 'READING') || mList[0];
+            if (matched) {
+              moduleId = matched.id;
             }
           } catch {
             // Fallback
@@ -146,7 +149,12 @@ const StudentAssignmentReading: React.FC = () => {
   }, [numericId, id, searchParams, user?.id, reloadKey]);
 
   const totalQuestions = questions.length;
-  const answeredCount = Object.keys(selectedAnswers).length;
+  const answeredCount = useMemo(() => {
+    return questions.filter((q, idx) => {
+      const val = selectedAnswers[idx + 1] ?? selectedAnswers[q.id];
+      return val !== undefined && val !== null && String(val).trim().length > 0;
+    }).length;
+  }, [questions, selectedAnswers]);
 
   const handleSelectAnswer = (qId: number, answer: string) => {
     setSelectedAnswers(prev => ({ ...prev, [qId]: answer }));
@@ -167,40 +175,54 @@ const StudentAssignmentReading: React.FC = () => {
     setError(null);
     try {
       const subId = submission?.id;
-      const subModuleId = submission?.modules?.[0]?.id;
+      const readingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'READING');
+      const subModuleId = readingSubMod?.id || submission?.modules?.[0]?.id;
 
       if (subModuleId) {
         const optionKeyToId: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
-        const answersPayload = questions
-          .map((q, idx) => {
-            const qIndex = idx + 1;
-            const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
-            if (!chosenVal) return null;
+        const answersPayload: SubmitModuleAnswerPayload[] = [];
 
-            let optId: number;
-            if (typeof chosenVal === 'number') {
-              optId = chosenVal;
-            } else {
-              const upper = String(chosenVal).trim().toUpperCase();
-              optId = optionKeyToId[upper] ?? parseInt(upper, 10);
-              if (isNaN(optId) || optId < 1 || optId > 4) {
-                optId = 1;
-              }
-            }
+        questions.forEach((q, idx) => {
+          const qIndex = idx + 1;
+          const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
+          if (chosenVal === undefined || chosenVal === null || !String(chosenVal).trim()) return;
 
-            return {
+          const qType = (q.questionType || '').toUpperCase();
+          if (qType === 'SHORT_ANSWER') {
+            answersPayload.push({
               questionId: q.id,
-              content: { selectedOptionIds: [optId] },
-            };
-          })
-          .filter((item): item is { questionId: number; content: { selectedOptionIds: number[] } } => item !== null);
+              content: { text: String(chosenVal).trim() },
+            });
+            return;
+          }
+
+          let optId: number;
+          if (typeof chosenVal === 'number') {
+            optId = chosenVal;
+          } else {
+            const upper = String(chosenVal).trim().toUpperCase();
+            optId = optionKeyToId[upper] ?? parseInt(upper, 10);
+            if (isNaN(optId) || optId < 1 || optId > 4) {
+              optId = 1;
+            }
+          }
+
+          answersPayload.push({
+            questionId: q.id,
+            content: { selectedOptionIds: [optId] },
+          });
+        });
 
         if (answersPayload.length > 0) {
           await submissionService.submitModule(subModuleId, { answers: answersPayload });
         }
       }
 
-      if (subId) {
+      // Check if all modules in this submission are now completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+
+      if (subId && allOthersDone) {
         try {
           await submissionService.submitSubmission(subId);
         } catch (subErr) {
@@ -208,14 +230,21 @@ const StudentAssignmentReading: React.FC = () => {
         }
       }
 
-      setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
-      setTimeout(() => {
-        if (subId) {
-          navigate(`/student/submissions/${subId}`);
-        } else {
-          navigate(`/student/assignments/${id}/result`);
-        }
-      }, 1200);
+      if (allOthersDone) {
+        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+        setTimeout(() => {
+          if (subId) {
+            navigate(`/student/submissions/${subId}`);
+          } else {
+            navigate(`/student/assignments/${id}/result`);
+          }
+        }, 1200);
+      } else {
+        setSuccessMessage('Đã hoàn thành phần thi Reading! Đang quay lại trang tổng quan bài tập...');
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`);
+        }, 1200);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
       setError(msg);
@@ -359,9 +388,10 @@ const StudentAssignmentReading: React.FC = () => {
             {/* Question Navigator */}
             {totalQuestions > 0 && (
               <div className="exam-nav-grid">
-                {questions.map((_, i) => {
+                {questions.map((q, i) => {
                   const qId = i + 1;
-                  const isAnswered = !!selectedAnswers[qId];
+                  const rawAns = selectedAnswers[qId] ?? selectedAnswers[q.id];
+                  const isAnswered = Boolean(rawAns !== undefined && rawAns !== null && String(rawAns).trim().length > 0);
                   const isBookmarked = bookmarkedQuestions[qId];
                   const isActive = activeQuestion === qId;
                   
@@ -399,61 +429,84 @@ const StudentAssignmentReading: React.FC = () => {
                 <p className="exam-empty-title">Chưa có câu hỏi cho bài đọc này</p>
                 <span className="exam-empty-desc">Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
               </div>
-            ) : currentQuestionItem ? (
-              <div className="exam-question-card">
-                <div className="exam-question-top">
-                  <div className="exam-question-type-wrap">
-                    <span className="exam-question-number-badge">
-                      {activeQuestion}
-                    </span>
-                    <span className="exam-question-type-badge">
-                      {currentQuestionItem.questionType}
-                    </span>
+            ) : currentQuestionItem ? (() => {
+              const isShortAnswer = (currentQuestionItem.questionType || '').toUpperCase() === 'SHORT_ANSWER';
+              return (
+                <div className="exam-question-card">
+                  <div className="exam-question-top">
+                    <div className="exam-question-type-wrap">
+                      <span className="exam-question-number-badge">
+                        {activeQuestion}
+                      </span>
+                      <span className="exam-question-type-badge">
+                        {isShortAnswer ? 'Trả lời ngắn' : 'Trắc nghiệm'}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => toggleBookmark(activeQuestion)}
+                      className={`exam-bookmark-btn ${bookmarkedQuestions[activeQuestion] ? 'is-active' : ''}`}
+                      aria-label="Đánh dấu câu hỏi"
+                    >
+                      <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
+                    </button>
                   </div>
-                  <button 
-                    type="button"
-                    onClick={() => toggleBookmark(activeQuestion)}
-                    className={`exam-bookmark-btn ${bookmarkedQuestions[activeQuestion] ? 'is-active' : ''}`}
-                    aria-label="Đánh dấu câu hỏi"
-                  >
-                    <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
-                  </button>
-                </div>
 
-                <p className="exam-question-prompt">
-                  {currentQuestionItem.content}
-                </p>
+                  <p className="exam-question-prompt">
+                    {currentQuestionItem.content}
+                  </p>
 
-                {/* Options */}
-                <div className="exam-options-group">
-                  {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
-                    const isSelected = selectedAnswers[activeQuestion] === optKey;
-                    const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
-                    const questionWithOptions = currentQuestionItem as QuestionResponse & {
-                      options?: Array<{ id?: string | number; key?: string; text?: string; content?: string }>;
-                    };
-                    const matchedOption = questionWithOptions.options?.find(
-                      (o) => o.id === optKey || o.key === optKey || o.id === optIdx + 1
-                    );
-                    const optText = (extracted && extracted.options[optIdx]) || matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
-                    return (
+                  {isShortAnswer ? (
+                    <div className="exam-short-answer-group">
                       <label 
-                        key={optKey}
-                        onClick={() => handleSelectAnswer(activeQuestion, optKey)}
-                        className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
+                        htmlFor={`short-answer-${currentQuestionItem.id || activeQuestion}`} 
+                        className="exam-short-answer-label"
                       >
-                        <div className="exam-radio-indicator">
-                          {isSelected && <div className="exam-radio-dot" />}
-                        </div>
-                        <div className="exam-option-content">
-                          <strong className="exam-option-key">{optKey}.</strong> {optText}
-                        </div>
+                        Câu trả lời của bạn:
                       </label>
-                    );
-                  })}
+                      <input
+                        id={`short-answer-${currentQuestionItem.id || activeQuestion}`}
+                        type="text"
+                        className="exam-short-answer-input"
+                        placeholder="Nhập câu trả lời ngắn của bạn tại đây..."
+                        value={selectedAnswers[activeQuestion] ?? selectedAnswers[currentQuestionItem.id] ?? ''}
+                        onChange={(e) => handleSelectAnswer(activeQuestion, e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : (
+                    /* Options */
+                    <div className="exam-options-group">
+                      {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
+                        const isSelected = selectedAnswers[activeQuestion] === optKey;
+                        const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
+                        const questionWithOptions = currentQuestionItem as QuestionResponse & {
+                          options?: Array<{ id?: string | number; key?: string; text?: string; content?: string }>;
+                        };
+                        const matchedOption = questionWithOptions.options?.find(
+                          (o) => o.id === optKey || o.key === optKey || o.id === optIdx + 1
+                        );
+                        const optText = (extracted && extracted.options[optIdx]) || matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
+                        return (
+                          <label 
+                            key={optKey}
+                            onClick={() => handleSelectAnswer(activeQuestion, optKey)}
+                            className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
+                          >
+                            <div className="exam-radio-indicator">
+                              {isSelected && <div className="exam-radio-dot" />}
+                            </div>
+                            <div className="exam-option-content">
+                              <strong className="exam-option-key">{optKey}.</strong> {optText}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ) : null}
+              );
+            })() : null}
           </div>
 
           {/* Right Column Footer */}

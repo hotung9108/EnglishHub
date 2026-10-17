@@ -10,6 +10,7 @@ export interface SubmissionModuleGradingResponse {
   method: GradingMethod;
   status: GradingStatus;
   finalScore: number | null;
+  finalFeedback?: string | null;
 }
 
 export interface GradingDetailResponse {

@@ -12,60 +12,17 @@
   color: var(--text-primary, #292524);
   border: 1px solid var(--border-color, #e7e5e4);
   border-radius: var(--radius-lg, 16px);
-  padding: 28px 32px;
-  margin-bottom: 28px;
-  position: relative;
+  padding: 24px 28px;
+  margin-bottom: 24px;
   box-shadow: var(--shadow-card);
 }
 
-.std-dash-hero-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-@media (min-width: 900px) {
-  .std-dash-hero-content {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-}
-
 .std-dash-greeting {
-  font-size: 26px;
-  font-weight: 800;
-  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
   letter-spacing: -0.02em;
   color: var(--text-primary, #292524);
-}
-
-.std-dash-subgreeting {
-  font-size: 14px;
-  color: var(--text-secondary, #78716c);
-  margin: 0;
-  max-width: 540px;
-  line-height: 1.5;
-}
-
-.std-dash-target-pill {
-  background-color: var(--surface-dim, #f5f5f4);
-  border: 1px solid var(--border-color, #e7e5e4);
-  border-radius: var(--radius-lg, 12px);
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.std-dash-target-val {
-  font-family: var(--font-heading, serif);
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--primary-gold, #c5a880);
-  line-height: 1;
 }
 
 /* Stat Cards */
@@ -278,28 +235,6 @@
   background-color: var(--accent, #4f46e5);
 }
 
-/* Scoped Dashboard Elements */
-.std-dash-target-title {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary, #78716c);
-}
-.std-dash-target-sub {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary, #292524);
-}
-.std-dash-target-divider {
-  width: 1px;
-  height: 32px;
-  background-color: var(--border-color, #e7e5e4);
-}
-.std-dash-target-unit {
-  font-size: 10px;
-  color: var(--text-secondary, #78716c);
-  text-align: center;
-}
 
 .std-error-banner {
   margin: 16px 0;

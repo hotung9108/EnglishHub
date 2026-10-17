@@ -4,13 +4,16 @@ import type { ApiRequestOptions, IHttpClient } from '../../interfaces/http.inter
 export class MockHttpClient implements IHttpClient {
   calls: Array<{ method: string; url: string; data?: unknown; options?: ApiRequestOptions }> = [];
   mockResponse: unknown = null;
+  mockError: Error | null = null;
 
   async get<T>(url: string, options?: ApiRequestOptions): Promise<T> {
     this.calls.push({ method: 'GET', url, options });
+    if (this.mockError) throw this.mockError;
     return (this.mockResponse ?? {}) as T;
   }
   async post<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {
     this.calls.push({ method: 'POST', url, data, options });
+    if (this.mockError) throw this.mockError;
     return (this.mockResponse ?? {}) as T;
   }
   async put<T>(url: string, data?: unknown, options?: ApiRequestOptions): Promise<T> {

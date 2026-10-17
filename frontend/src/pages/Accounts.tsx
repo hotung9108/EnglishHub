@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
-  Users, UserPlus, Search, 
+  Users, Search, 
   X, Check, Lock, Unlock,
-  Shield, Mail, Phone, Edit3, Loader2, AlertCircle
+  Mail, Phone, Edit3, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateFullName } from '../utils/nameValidation';
 import { useUsers } from '../hooks/useUsers';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
-import { Button, EmptyState } from '../components/common';
+import { Button, EmptyState, Pagination } from '../components/common';
 
 export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
@@ -19,11 +19,14 @@ export const Accounts: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
   const {
     users,
     isLoading,
     error,
-    createUser,
     updateUser,
     refetch
   } = useUsers({
@@ -37,7 +40,6 @@ export const Accounts: React.FC = () => {
     name: '',
     email: '',
     phone: '',
-    password: '',
     role: 'STUDENT' as 'STUDENT' | 'TEACHER' | 'ADMIN',
     status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
@@ -45,20 +47,51 @@ export const Accounts: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
-  const filteredUsers = users.filter(user => {
-    if (roleFilter !== 'All' && user.role !== roleFilter) return false;
-    if (statusFilter !== 'All' && user.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const code = formatUserCode(user.id, user.role).toLowerCase();
-      return (
-        user.fullName.toLowerCase().includes(q) ||
-        user.email.toLowerCase().includes(q) ||
-        code.includes(q)
-      );
-    }
-    return true;
-  });
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      if (roleFilter !== 'All' && user.role !== roleFilter) return false;
+      if (statusFilter !== 'All' && user.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const code = formatUserCode(user.id, user.role).toLowerCase();
+        return (
+          user.fullName.toLowerCase().includes(q) ||
+          user.email.toLowerCase().includes(q) ||
+          code.includes(q)
+        );
+      }
+      return true;
+    });
+  }, [users, roleFilter, statusFilter, searchQuery]);
+
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredUsers.slice(start, start + pageSize);
+  }, [filteredUsers, safeCurrentPage, pageSize]);
+
+  const handleRoleFilterChange = (role: 'All' | 'STUDENT' | 'TEACHER' | 'ADMIN') => {
+    setRoleFilter(role);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   function formatUserCode(id: number, role: string) {
     const pad = String(id).padStart(4, '0');
@@ -73,21 +106,6 @@ export const Accounts: React.FC = () => {
     return parts.map(p => p[0]).slice(-2).join('').toUpperCase();
   }
 
-  const handleOpenCreateDrawer = () => {
-    setEditingUser(null);
-    setNameError('');
-    setActionError('');
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      role: 'STUDENT',
-      status: 'ACTIVE'
-    });
-    setIsDrawerOpen(true);
-  };
-
   const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
@@ -96,7 +114,6 @@ export const Accounts: React.FC = () => {
       name: user.fullName,
       email: user.email,
       phone: '',
-      password: '',
       role: user.role,
       status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE'
     });
@@ -105,7 +122,7 @@ export const Accounts: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim()) return;
+    if (!editingUser || !formData.name.trim()) return;
 
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -118,31 +135,12 @@ export const Accounts: React.FC = () => {
 
     try {
       setActionLoading(true);
-      if (editingUser) {
-        await updateUser(editingUser.id, {
-          fullName: cleanName,
-          phone: formData.phone || undefined
-        });
-        if (editingUser.status !== formData.status) {
-          await userService.updateStatus(editingUser.id, formData.status);
-        }
-      } else {
-        if (formData.role === 'TEACHER') {
-          await createUser({
-            role: 'TEACHER',
-            fullName: cleanName,
-            email: formData.email,
-            password: formData.password || 'Teacher123!'
-          });
-        } else {
-          await createUser({
-            role: 'STUDENT',
-            fullName: cleanName,
-            email: formData.email,
-            password: formData.password || 'Student123!',
-            parentPhone: formData.phone || undefined
-          });
-        }
+      await updateUser(editingUser.id, {
+        fullName: cleanName,
+        phone: formData.phone || undefined
+      });
+      if (editingUser.status !== formData.status) {
+        await userService.updateStatus(editingUser.id, formData.status);
       }
       await refetch();
       setIsDrawerOpen(false);
@@ -181,14 +179,6 @@ export const Accounts: React.FC = () => {
             {t('accounts.title')}
           </h1>
         </div>
-
-        <Button 
-          variant="primary"
-          icon={<UserPlus size={16} />}
-          onClick={handleOpenCreateDrawer}
-        >
-          {t('accounts.addAccount')}
-        </Button>
       </div>
 
       {/* Filter Bar */}
@@ -200,7 +190,7 @@ export const Accounts: React.FC = () => {
               <button
                 key={role}
                 type="button"
-                onClick={() => setRoleFilter(role)}
+                onClick={() => handleRoleFilterChange(role)}
                 className={`adm-pill ${roleFilter === role ? 'active' : ''}`}
               >
                 <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role === 'STUDENT' ? 'Student' : role === 'TEACHER' ? 'Teacher' : 'Admin'}</span>
@@ -216,7 +206,7 @@ export const Accounts: React.FC = () => {
               <button
                 key={status}
                 type="button"
-                onClick={() => setStatusFilter(status)}
+                onClick={() => handleStatusFilterChange(status)}
                 className={`adm-pill ${statusFilter === status ? 'active' : ''}`}
               >
                 <span>{status === 'All' ? (isVi ? 'Trạng thái' : 'All Status') : status === 'ACTIVE' ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Khóa' : 'Blocked')}</span>
@@ -233,7 +223,7 @@ export const Accounts: React.FC = () => {
             className="adm-search-input"
             placeholder={t('accounts.searchPlaceholder')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -262,87 +252,100 @@ export const Accounts: React.FC = () => {
               : (isVi ? 'Hệ thống hiện chưa có tài khoản nào trong danh mục này' : 'No accounts currently exist in this category')}
           />
         ) : (
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>{t('accounts.colIdAvatar')}</th>
-                <th>{t('accounts.colEmailPhone')}</th>
-                <th>{t('accounts.colRole')}</th>
-                <th>{t('accounts.colStatus')}</th>
-                <th className="text-right">{t('accounts.colActions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map(user => {
-                const code = formatUserCode(user.id, user.role);
-                const initials = getAvatarInitials(user.fullName);
-                const isActive = user.status === 'ACTIVE';
+          <>
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{t('accounts.colIdAvatar')}</th>
+                  <th>{t('accounts.colEmailPhone')}</th>
+                  <th>{t('accounts.colRole')}</th>
+                  <th>{t('accounts.colStatus')}</th>
+                  <th className="text-right">{t('accounts.colActions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUsers.map(user => {
+                  const code = formatUserCode(user.id, user.role);
+                  const initials = getAvatarInitials(user.fullName);
+                  const isActive = user.status === 'ACTIVE';
 
-                return (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="adm-cell-user">
-                        <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
-                          {initials}
-                          <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
+                  return (
+                    <tr key={user.id}>
+                      <td>
+                        <div className="adm-cell-user">
+                          <div className={`adm-avatar ${getRoleClass(user.role)} relative`}>
+                            {initials}
+                            <span className={`adm-avatar-status ${isActive ? 'active' : 'blocked'}`} />
+                          </div>
+                          <div className="adm-avatar-info">
+                            <div className="adm-avatar-name">{user.fullName}</div>
+                            <div className="adm-avatar-meta font-mono">{code}</div>
+                          </div>
                         </div>
-                        <div className="adm-avatar-info">
-                          <div className="adm-avatar-name">{user.fullName}</div>
-                          <div className="adm-avatar-meta font-mono">{code}</div>
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-0">
+                          <span className="text-sm text-surface">{user.email}</span>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex flex-col gap-0">
-                        <span className="text-sm text-surface">{user.email}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
-                        {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <div className="inline-flex gap-2">
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleOpenEditDrawer(user)}
-                          title={t('accounts.actionEdit')}
-                          icon={<Edit3 size={14} />}
-                        />
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleToggleStatus(user)}
-                          title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
-                          className={isActive ? 'text-error' : 'text-success'}
-                          icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <span className={`badge ${user.role === 'ADMIN' ? 'badge-role-admin' : user.role === 'TEACHER' ? 'badge-role-teacher' : 'badge-role-student'}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
+                          {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Blocked')}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <div className="inline-flex gap-2">
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenEditDrawer(user)}
+                            title={t('accounts.actionEdit')}
+                            icon={<Edit3 size={14} />}
+                          />
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleToggleStatus(user)}
+                            title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
+                            className={isActive ? 'text-error' : 'text-success'}
+                            icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={pageSize}
+              pageSizeOptions={[10, 20, 50, 100]}
+              onPageChange={(page) => setCurrentPage(page)}
+              onPageSizeChange={handlePageSizeChange}
+              itemLabel={isVi ? 'tài khoản' : 'accounts'}
+              isVi={isVi}
+              variant="table"
+            />
+          </>
         )}
       </div>
 
-      {/* Slide-over Drawer for Create / Edit */}
-      {isDrawerOpen && (
+      {/* Slide-over Drawer for Edit */}
+      {isDrawerOpen && editingUser && (
         <div className="adm-drawer-backdrop" onClick={() => setIsDrawerOpen(false)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="adm-drawer-header">
               <h2 className="adm-drawer-title">
-                {editingUser 
-                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`)
-                  : (isVi ? 'Khởi Tạo Tài Khoản Người Dùng Mới' : 'Create New User Account')}
+                {isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`}
               </h2>
               <button 
                 type="button"
@@ -397,36 +400,18 @@ export const Accounts: React.FC = () => {
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    Email <span className="text-error">*</span>
+                    Email
                   </label>
                   <div className="adm-input-icon-wrap">
                     <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className="input adm-input-with-icon"
-                      placeholder="user@center.edu.vn"
+                      className="input adm-input-with-icon opacity-80 cursor-not-allowed"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      disabled={!!editingUser}
-                      required
+                      disabled
                     />
                   </div>
                 </div>
-
-                {!editingUser && (
-                  <div className="adm-form-group">
-                    <label className="adm-form-label">
-                      {isVi ? 'Mật khẩu ban đầu' : 'Initial Password'}
-                    </label>
-                    <input 
-                      type="password" 
-                      className="input"
-                      placeholder={isVi ? 'Để trống dùng mặc định' : 'Leave empty for default'}
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    />
-                  </div>
-                )}
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
@@ -448,10 +433,9 @@ export const Accounts: React.FC = () => {
                   <div className="adm-form-group">
                     <label className="adm-form-label">{t('accounts.colRole')}</label>
                     <select 
-                      className="input"
+                      className="input opacity-80 cursor-not-allowed"
                       value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
-                      disabled={!!editingUser}
+                      disabled
                     >
                       <option value="STUDENT">Student (Học viên)</option>
                       <option value="TEACHER">Teacher (Giáo viên)</option>
@@ -471,16 +455,6 @@ export const Accounts: React.FC = () => {
                     </select>
                   </div>
                 </div>
-
-                <div className="p-3 rounded-md bg-surface-low text-xs text-muted leading-relaxed">
-                  <div className="font-semibold text-surface mb-1 flex items-center gap-2">
-                    <Shield size={15} className="text-primary" />
-                    {isVi ? 'Chính sách bảo mật tài khoản' : 'Security Credential Policy'}
-                  </div>
-                  {isVi 
-                    ? 'Tài khoản mới sẽ có hiệu lực trực tiếp trên cơ sở dữ liệu hệ thống.' 
-                    : 'Created user credentials will sync directly with the production authentication service.'}
-                </div>
               </div>
 
               <div className="adm-drawer-footer">
@@ -498,7 +472,7 @@ export const Accounts: React.FC = () => {
                   loading={actionLoading}
                   icon={<Check size={16} />}
                 >
-                  {isVi ? 'Lưu tài khoản' : 'Save User'}
+                  {isVi ? 'Lưu thay đổi' : 'Save Changes'}
                 </Button>
               </div>
             </form>

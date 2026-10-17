@@ -481,6 +481,15 @@
   margin-top: 2px;
 }
 
+button.sidebar-link {
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
 .sidebar-link-logout {
   color: var(--color-danger, #DC2626);
 }

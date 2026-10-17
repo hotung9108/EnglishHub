@@ -2,8 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Search, 
-  Bell, 
-  HelpCircle, 
   Menu, 
   Globe, 
   User as UserIcon, 
@@ -52,9 +50,12 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
     };
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
   };
 
   const getInitials = (name?: string) => {
@@ -99,25 +100,6 @@ const TopBar = ({ toggleSidebar }: { toggleSidebar: () => void }) => {
         >
           <Globe size={14} />
           <span>{language === 'vi' ? 'VI' : 'EN'}</span>
-        </button>
-
-        {/* Notification Bell */}
-        <button 
-          type="button" 
-          className="topbar-icon-btn relative" 
-          title="Thông báo"
-        >
-          <Bell size={18} />
-          <span className="topbar-action-dot"></span>
-        </button>
-
-        {/* Help Circle */}
-        <button 
-          type="button" 
-          className="topbar-icon-btn" 
-          title="Trợ giúp & Tài liệu"
-        >
-          <HelpCircle size={18} />
         </button>
 
         {/* Interactive User Profile Chip & Dropdown */}

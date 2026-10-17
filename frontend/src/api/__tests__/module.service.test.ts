@@ -92,3 +92,22 @@ test('ModuleService - getModule, createModule, updateModule, and deleteModule', 
   assert.strictEqual(mockHttp.calls[3].url, '/modules/131');
   assert.strictEqual(deleted.message, 'Module deleted successfully');
 });
+
+test('ModuleService - uploadAudio sends FormData to /modules/:moduleId/audio', async () => {
+  const mockHttp = new MockHttpClient();
+  const service = new ModuleService(mockHttp);
+
+  mockHttp.mockResponse = {
+    message: 'Upload audio thành công.',
+    sourceAudioStorageKey: 'modules/131/audio/sample.mp3',
+    sourceAudioUploadStatus: 'READY',
+  };
+
+  const fakeFile = new File(['fake-audio-bytes'], 'test.mp3', { type: 'audio/mp3' });
+  const uploadRes = await service.uploadAudio(131, fakeFile);
+
+  assert.strictEqual(mockHttp.calls[0].url, '/modules/131/audio');
+  assert.strictEqual(mockHttp.calls[0].method, 'POST');
+  assert.strictEqual(uploadRes.sourceAudioStorageKey, 'modules/131/audio/sample.mp3');
+  assert.strictEqual(uploadRes.sourceAudioUploadStatus, 'READY');
+});

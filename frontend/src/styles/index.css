@@ -566,6 +566,7 @@ h3,
 .mb-8 { margin-bottom: 8px; }
 .mb-12 { margin-bottom: 12px; }
 .mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
 .mb-24 { margin-bottom: 24px; }
 .mb-32 { margin-bottom: 32px; }
 .mb-40 { margin-bottom: 40px; }
@@ -609,6 +610,7 @@ h3,
 .w-full { width: 100%; }
 .w-auto { width: auto; }
 .min-w-0 { min-width: 0; }
+.hidden { display: none !important; }
 
 /* === Overflow === */
 .overflow-hidden { overflow: hidden; }
@@ -820,4 +822,13 @@ h3,
 .border-subtle { border: 1px solid var(--outline-variant); }
 .border-b-subtle { border-bottom: 1px solid var(--outline-variant); }
 .border-t-subtle { border-top: 1px solid var(--outline-variant); }
+.border-dashed { border-style: dashed; }
+
+.text-danger { color: var(--color-danger, #8F2222); }
+.text-main { color: var(--on-surface); }
+.break-all { word-break: break-all; }
+.max-w-md { max-width: 480px; }
+.max-w-lg { max-width: 640px; }
+.resize-y { resize: vertical; }
+
 

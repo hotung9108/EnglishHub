@@ -168,31 +168,165 @@
 .writing-dropzone {
   border: 2px dashed var(--outline-variant);
   border-radius: var(--radius-lg, 12px);
-  padding: 32px 24px;
+  padding: 28px 20px;
   text-align: center;
   background-color: var(--surface-container-low);
   cursor: pointer;
-  transition: all 0.2s;
-}
-
-.writing-dropzone.dragging {
-  border-color: var(--primary);
-  background-color: rgba(79, 70, 229, 0.04);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
 }
 
 .writing-dropzone:hover {
   border-color: var(--primary);
+  background-color: var(--surface-hover, #f7f4ee);
+}
+
+.writing-dropzone.dragging {
+  border-color: var(--primary);
+  background-color: var(--primary-light, #eaf0e8);
+}
+
+.writing-dropzone-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  transition: transform 0.2s ease;
+}
+
+.writing-dropzone:hover .writing-dropzone-icon {
+  transform: translateY(-2px);
+}
+
+.writing-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.writing-dropzone-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface);
+  line-height: 1.4;
+}
+
+.writing-dropzone-highlight {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.writing-dropzone-hint {
+  font-size: 12.5px;
+  color: var(--on-surface-variant);
 }
 
 .writing-uploaded-file {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: 12px;
+  padding: 14px 16px;
   background-color: var(--surface);
   border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+}
+
+.writing-uploaded-file:hover {
+  border-color: var(--border-hover, #c2a882);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.writing-submission-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.writing-card-title {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.writing-file-icon {
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
-  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  flex-shrink: 0;
+}
+
+.writing-file-icon.pdf {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.writing-file-icon.docx {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.writing-file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.writing-file-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.writing-file-size {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+  margin-top: 2px;
+}
+
+.writing-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.writing-file-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #78716c);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.writing-file-remove-btn:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
 }
 
 /* Sidebar Info Rows */

@@ -603,6 +603,38 @@
   margin-right: 4px;
 }
 
+/* Short Answer Input */
+.exam-short-answer-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exam-short-answer-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #262320);
+}
+
+.exam-short-answer-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--on-surface, #262320);
+  background-color: var(--surface, #FFFFFF);
+  border: 1px solid var(--border-subtle, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.exam-short-answer-input:focus {
+  border-color: var(--primary, #1B4D3E);
+  box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.12);
+}
+
 /* Empty question state */
 .exam-empty-box {
   text-align: center;

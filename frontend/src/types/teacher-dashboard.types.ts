@@ -31,7 +31,6 @@ export interface TeacherSkillPerformance {
   skill: TeacherSkill;
   skillName: string;
   avgScore: number;
-  benchmark: number;
   submissionRate: number;
   needsReviewCount: number;
 }

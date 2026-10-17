@@ -7,8 +7,8 @@ import StudentClassCard from '../components/classes/StudentClassCard';
 import type { StudentClassInfo } from '../components/classes/StudentClassCard';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
-import { Button, MetricCard, EmptyState, Skeleton } from '../components/common';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
+import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
 import '../styles/student-classes.css';
 import '../styles/student-ecosystem.css';
 
@@ -23,6 +23,20 @@ const StudentClasses: React.FC = () => {
   const [classesList, setClassesList] = useState<StudentClassInfo[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+
+  const handleFilterChange = (f: 'all' | 'active' | 'completed') => {
+    setFilter(f);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearchTerm(val);
+    setCurrentPage(1);
+  };
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleReload = () => setReloadKey((k) => k + 1);
@@ -70,9 +84,9 @@ const StudentClasses: React.FC = () => {
               return classAssignments.some(a => a.id === s.assignmentId || a.id === s.id);
             });
 
-            const graded = classSubmissions.filter(s => s.status === 'GRADED');
+            const graded = classSubmissions.filter(s => isSubmissionGraded(s));
             const avgScore = graded.length > 0 
-              ? parseFloat((graded.reduce((acc, curr) => acc + (curr.modules?.[0]?.grading?.finalScore || 0), 0) / (graded.length * 10)).toFixed(1))
+              ? parseFloat((graded.reduce((acc, curr) => acc + (getSubmissionFinalScore(curr) || 0), 0) / (graded.length * 10)).toFixed(1))
               : undefined;
 
             const isCompleted = c.status === 'COMPLETED';
@@ -140,6 +154,14 @@ const StudentClasses: React.FC = () => {
       return a.name.localeCompare(b.name);
     });
   }, [classesList, searchTerm, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClasses.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredClasses.slice(start, start + pageSize);
+  }, [filteredClasses, safeCurrentPage, pageSize]);
 
   const handleViewClass = (id: string) => {
     navigate(`/student/classes/${id}`);
@@ -224,19 +246,19 @@ const StudentClasses: React.FC = () => {
         <div className="student-classes-segmented-tabs">
           <button 
             className={`student-classes-tab-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
           >
             Tất cả ({counts.all})
           </button>
           <button 
             className={`student-classes-tab-btn ${filter === 'active' ? 'active' : ''}`}
-            onClick={() => setFilter('active')}
+            onClick={() => handleFilterChange('active')}
           >
             {t('studentClasses.filterActive')} ({counts.active})
           </button>
           <button 
             className={`student-classes-tab-btn ${filter === 'completed' ? 'active' : ''}`}
-            onClick={() => setFilter('completed')}
+            onClick={() => handleFilterChange('completed')}
           >
             {t('studentClasses.filterCompleted')} ({counts.completed})
           </button>
@@ -249,7 +271,7 @@ const StudentClasses: React.FC = () => {
             type="text" 
             placeholder={t('studentClasses.searchPlaceholder')}
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
           {searchTerm && (
             <button 
@@ -281,16 +303,34 @@ const StudentClasses: React.FC = () => {
           ) : undefined}
         />
       ) : (
-        <div className="student-classes-grid">
-          {filteredClasses.map(classInfo => (
-            <StudentClassCard 
-              key={classInfo.id} 
-              classInfo={classInfo} 
-              onViewClass={handleViewClass}
-              onViewMaterials={handleViewMaterials}
-            />
-          ))}
-        </div>
+        <>
+          <div className="student-classes-grid">
+            {paginatedClasses.map(classInfo => (
+              <StudentClassCard 
+                key={classInfo.id} 
+                classInfo={classInfo} 
+                onViewClass={handleViewClass}
+                onViewMaterials={handleViewMaterials}
+              />
+            ))}
+          </div>
+
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredClasses.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[6, 9, 12, 18]}
+            itemLabel={isVi ? 'lớp học' : 'classes'}
+            isVi={isVi}
+            variant="standalone"
+          />
+        </>
       )}
     </div>
   );

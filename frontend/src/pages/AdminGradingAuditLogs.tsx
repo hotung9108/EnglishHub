@@ -15,6 +15,7 @@ import type {
   GradingDetailResponse 
 } from '../api/services/grading.service';
 import type { GradingChangeLog } from '../api/services/grading-change-log.service';
+import { Pagination } from '../components/common';
 
 export const AdminGradingAuditLogs: React.FC = () => {
   const { t, language } = useLanguage();
@@ -26,6 +27,25 @@ export const AdminGradingAuditLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | GradingStatus>('ALL');
   const [scoreFilter, setScoreFilter] = useState<'ALL' | 'SCORED' | 'UNSCORED'>('ALL');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (status: 'ALL' | 'COMPLETED' | 'AI_GRADED' | 'PENDING' | 'FAILED') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleScoreFilterChange = (score: 'ALL' | 'SCORED' | 'UNSCORED') => {
+    setScoreFilter(score);
+    setCurrentPage(1);
+  };
 
   // Drawer / Inspection
   const [selectedGradingId, setSelectedGradingId] = useState<number | null>(null);
@@ -164,6 +184,14 @@ export const AdminGradingAuditLogs: React.FC = () => {
     });
   }, [gradings, statusFilter, scoreFilter, searchQuery]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredGradings.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedGradings = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredGradings.slice(start, start + pageSize);
+  }, [filteredGradings, safeCurrentPage, pageSize]);
+
   const handleExportCsv = () => {
     alert(isVi ? 'Đang trích xuất nhật ký kiểm toán chấm điểm ra tập tin CSV...' : 'Exporting grading audit records to CSV...');
   };
@@ -228,7 +256,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
           <button
             type="button"
             className={`adm-pill ${statusFilter === 'ALL' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('ALL')}
+            onClick={() => handleStatusFilterChange('ALL')}
           >
             <span>{isVi ? 'Tất cả bài chấm' : 'All Gradings'}</span>
             <span className="adm-pill-badge">{gradings.length}</span>
@@ -236,7 +264,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
           <button
             type="button"
             className={`adm-pill ${statusFilter === 'COMPLETED' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('COMPLETED')}
+            onClick={() => handleStatusFilterChange('COMPLETED')}
           >
             <span>{isVi ? 'Đã hoàn tất' : 'Completed'}</span>
             <span className="adm-pill-badge">{countCompleted}</span>
@@ -244,7 +272,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
           <button
             type="button"
             className={`adm-pill ${statusFilter === 'AI_GRADED' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('AI_GRADED')}
+            onClick={() => handleStatusFilterChange('AI_GRADED')}
           >
             <span>{isVi ? 'AI Đã chấm' : 'AI Graded'}</span>
             <span className="adm-pill-badge">{countAiGraded}</span>
@@ -252,7 +280,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
           <button
             type="button"
             className={`adm-pill ${statusFilter === 'PENDING' ? 'active' : ''}`}
-            onClick={() => setStatusFilter('PENDING')}
+            onClick={() => handleStatusFilterChange('PENDING')}
           >
             <span>{isVi ? 'Chờ duyệt' : 'Pending'}</span>
             <span className="adm-pill-badge">{countPending}</span>
@@ -261,7 +289,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
             <button
               type="button"
               className={`adm-pill ${statusFilter === 'FAILED' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('FAILED')}
+              onClick={() => handleStatusFilterChange('FAILED')}
             >
               <span>{isVi ? 'Thất bại' : 'Failed'}</span>
               <span className="adm-pill-badge">{countFailed}</span>
@@ -276,7 +304,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
             <select
               className={`adm-gh-select ${scoreFilter !== 'ALL' ? 'has-value' : ''}`}
               value={scoreFilter}
-              onChange={(e) => setScoreFilter(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
+              onChange={(e) => handleScoreFilterChange(e.target.value as 'ALL' | 'SCORED' | 'UNSCORED')}
               aria-label={isVi ? 'Lọc theo mức điểm' : 'Filter by score'}
             >
               <option value="ALL">{isVi ? 'Tất cả mức điểm' : 'All Scores'}</option>
@@ -294,7 +322,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
               className="adm-search-input"
               placeholder={isVi ? 'Tìm mã GR-..., điểm, trạng thái...' : 'Search GR-... ID, score, status...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
             {searchQuery && (
               <button 
@@ -355,7 +383,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredGradings.map((item) => (
+                {paginatedGradings.map((item) => (
                   <tr 
                     key={item.id}
                     onClick={() => handleOpenDetail(item.id)}
@@ -385,6 +413,25 @@ export const AdminGradingAuditLogs: React.FC = () => {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && filteredGradings.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filteredGradings.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+            itemLabel={isVi ? 'lượt chấm' : 'audit logs'}
+            isVi={isVi}
+            variant="table"
+          />
         )}
       </div>
 

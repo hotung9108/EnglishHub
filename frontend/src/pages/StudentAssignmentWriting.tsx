@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ChevronRight, Paperclip, FileText, Download, 
+  ChevronRight, FileText, 
   UploadCloud, Send, Save, CheckCircle, 
   Bold, Italic, Underline, List, ListOrdered, 
   AlignLeft, AlignCenter, Undo, Redo, Info,
-  AlertCircle, RefreshCw, Loader2
+  AlertCircle, RefreshCw, Loader2, X
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
@@ -32,6 +32,7 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorText, setEditorText] = useState(() => {
     return localStorage.getItem(`eh_draft_writing_${id}`) || '';
   });
@@ -57,20 +58,23 @@ const StudentAssignmentWriting: React.FC = () => {
           currentAssignment = await assignmentService.getAssignment(numericId);
           if (isMounted) setAssignment(currentAssignment);
 
-          // If this assignment is actually READING, LISTENING, or SPEAKING, redirect to appropriate skill route
-          const targetSkill = currentAssignment?.modules?.[0]?.skill?.toLowerCase();
-          const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
-          if (targetSkill === 'reading') {
-            navigate(`/student/assignments/reading/${numericId}${queryStr}`, { replace: true });
-            return;
-          }
-          if (targetSkill === 'listening') {
-            navigate(`/student/assignments/listening/${numericId}${queryStr}`, { replace: true });
-            return;
-          }
-          if (targetSkill === 'speaking') {
-            navigate(`/student/assignments/speaking/${numericId}${queryStr}`, { replace: true });
-            return;
+          // If this assignment does NOT contain WRITING, redirect to appropriate skill route
+          const hasWriting = currentAssignment?.modules?.some((m) => m.skill?.toUpperCase() === 'WRITING');
+          if (!hasWriting && currentAssignment?.modules && currentAssignment.modules.length > 0) {
+            const targetSkill = currentAssignment.modules[0].skill?.toLowerCase();
+            const queryStr = searchParams.toString() ? `?${searchParams.toString()}` : '';
+            if (targetSkill === 'reading') {
+              navigate(`/student/assignments/reading/${numericId}${queryStr}`, { replace: true });
+              return;
+            }
+            if (targetSkill === 'listening') {
+              navigate(`/student/assignments/listening/${numericId}${queryStr}`, { replace: true });
+              return;
+            }
+            if (targetSkill === 'speaking') {
+              navigate(`/student/assignments/speaking/${numericId}${queryStr}`, { replace: true });
+              return;
+            }
           }
         } catch {
           currentAssignment = {
@@ -82,8 +86,9 @@ const StudentAssignmentWriting: React.FC = () => {
           if (isMounted) setAssignment(currentAssignment);
         }
 
-        // 2. Fetch module details if available
-        const moduleId = currentAssignment?.modules?.[0]?.id;
+        // 2. Fetch writing module details if available
+        const writingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+        const moduleId = writingMod?.id || currentAssignment?.modules?.[0]?.id;
         if (moduleId) {
           try {
             const mod = await moduleService.getModule(moduleId);
@@ -142,24 +147,66 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
+  };
+
+  const validateAndSetFile = (file: File) => {
+    setError(null);
+    const validExtensions = ['.pdf', '.docx'];
+    const fileName = file.name.toLowerCase();
+    const hasValidExt = validExtensions.some((ext) => fileName.endsWith(ext));
+    const validMimes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword'
+    ];
+    const hasValidMime = file.type ? validMimes.includes(file.type) : true;
+
+    if (!hasValidExt && !hasValidMime) {
+      setError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF hoặc DOCX.');
+      return;
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setError('Kích thước tệp vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.');
+      return;
+    }
+
+    setUploadedFile(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setUploadedFile(e.dataTransfer.files[0]);
+      validateAndSetFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setUploadedFile(e.target.files[0]);
+      validateAndSetFile(e.target.files[0]);
+    }
+    e.target.value = '';
+  };
+
+  const handleRemoveFile = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setUploadedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -181,7 +228,29 @@ const StudentAssignmentWriting: React.FC = () => {
     setError(null);
     try {
       const subId = submission?.id;
-      const subModuleId = submission?.modules?.[0]?.id;
+      const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+      const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+
+      // 1. Upload document file if selected
+      if (uploadedFile && subModuleId) {
+        try {
+          const { uploadUrl } = await submissionService.getDocumentUploadUrl(
+            subModuleId,
+            uploadedFile.type || 'application/pdf'
+          );
+          if (uploadUrl) {
+            await fetch(uploadUrl, {
+              method: 'PUT',
+              body: uploadedFile,
+              headers: {
+                'Content-Type': uploadedFile.type || 'application/octet-stream',
+              },
+            });
+          }
+        } catch (uploadErr) {
+          console.warn('Document storage upload skipped or failed, proceeding with module submission:', uploadErr);
+        }
+      }
 
       if (subModuleId) {
         try {
@@ -193,12 +262,17 @@ const StudentAssignmentWriting: React.FC = () => {
               }
             ]
           });
-        } catch {
+        } catch (err) {
           // Continue if already submitted
+          console.warn('Writing submit module notice:', err);
         }
       }
 
-      if (subId) {
+      // Check if all modules in this submission are now completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+
+      if (subId && allOthersDone) {
         try {
           await submissionService.submitSubmission(subId);
         } catch {
@@ -208,15 +282,22 @@ const StudentAssignmentWriting: React.FC = () => {
 
       // Clear draft
       localStorage.removeItem(`eh_draft_writing_${id}`);
-      setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
 
-      setTimeout(() => {
-        if (subId) {
-          navigate(`/student/submissions/${subId}`);
-        } else {
-          navigate(`/student/assignments/${id}/result`);
-        }
-      }, 1200);
+      if (allOthersDone) {
+        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+        setTimeout(() => {
+          if (subId) {
+            navigate(`/student/submissions/${subId}`);
+          } else {
+            navigate(`/student/assignments/${id}/result`);
+          }
+        }, 1200);
+      } else {
+        setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`);
+        }, 1200);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
       setError(msg);
@@ -276,42 +357,6 @@ const StudentAssignmentWriting: React.FC = () => {
               <p className="writing-prompt-text">
                 {isLoading ? 'Đang tải yêu cầu đề bài...' : instructionsText}
               </p>
-            </div>
-          </div>
-
-          {/* Attachments */}
-          <div className="writing-card">
-            <div className="flex justify-between items-center mb-20">
-              <div className="flex items-center gap-12">
-                <div className="p-8 bg-slate-100 rounded-full text-slate-500">
-                  <Paperclip size={18} />
-                </div>
-                <h2 className="text-lg font-semibold text-slate-800 m-0">Tài liệu đính kèm &amp; Đề bài mẫu</h2>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-16">
-              <div className="flex justify-between items-center p-16 border border-slate-200 rounded-xl bg-white">
-                <div className="flex items-center gap-16">
-                  <div className="p-12 bg-blue-50 rounded-lg text-blue-600">
-                    <FileText size={24} />
-                  </div>
-                  <div>
-                    <h4 className="m-0 mb-4 text-sm font-semibold text-slate-800">writing-instructions.docx</h4>
-                    <div className="text-xs text-slate-500">
-                      Hướng dẫn làm bài và tiêu chí đánh giá Writing
-                    </div>
-                  </div>
-                </div>
-                <Button 
-                  variant="secondary"
-                  size="sm"
-                  icon={<Download size={16} />}
-                  onClick={() => alert('Đang chuẩn bị file tải về...')}
-                >
-                  Tải xuống
-                </Button>
-              </div>
             </div>
           </div>
 
@@ -375,65 +420,102 @@ const StudentAssignmentWriting: React.FC = () => {
         <div className="writing-side-col">
           {/* Your Submission */}
           <div className="writing-card">
-            {/* Dropzone */}
-            <label 
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`writing-dropzone mb-20 block ${isDragging ? 'dragging' : ''}`}
-            >
-              <input type="file" className="hidden" onChange={handleFileChange} />
-              
-              <div className="p-16 bg-blue-50 rounded-full text-blue-600 inline-flex mb-16">
-                <UploadCloud size={28} />
-              </div>
+            {/* File Upload / Dropzone */}
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              style={{ display: 'none' }}
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+              onChange={handleFileChange} 
+            />
 
-              {uploadedFile ? (
-                <div className="text-center">
-                  <div className="text-sm font-semibold text-slate-800 mb-4">{uploadedFile.name}</div>
-                  <div className="text-xs text-slate-500">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</div>
+            {!uploadedFile ? (
+              <div 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`writing-dropzone ${isDragging ? 'dragging' : ''}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
+                <div className="writing-dropzone-icon">
+                  <UploadCloud size={26} />
                 </div>
-              ) : (
-                <div className="text-center">
-                  <div className="text-sm font-semibold text-slate-800 mb-4">Kéo thả tệp hoặc<br/> <span className="text-primary">chọn từ máy tính</span></div>
-                  <div className="text-xs text-slate-400">Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
+
+                <div className="writing-dropzone-content">
+                  <div className="writing-dropzone-title">
+                    Kéo thả tệp hoặc <span className="writing-dropzone-highlight">chọn từ máy tính</span>
+                  </div>
+                  <div className="writing-dropzone-hint">Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
                 </div>
-              )}
-            </label>
-
-            <Button 
-              variant="primary"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full mb-12"
-              icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-            >
-              {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Assignment)'}
-            </Button>
-
-            <Button 
-              variant="secondary"
-              onClick={handleSaveDraft}
-              className="w-full mb-20"
-              icon={<Save size={18} />}
-            >
-              Lưu bản nháp (Save Draft)
-            </Button>
-
-            {/* Alert info */}
-            <div className="flex gap-12 p-16 bg-emerald-50 rounded-lg border border-emerald-200">
-              <div className="text-emerald-600 shrink-0 mt-2">
-                <CheckCircle size={18} />
               </div>
-              <p className="m-0 text-xs leading-relaxed text-emerald-800">
-                Bài làm sẽ được phân tích tự động qua Writing AI Grading Pipeline và gửi đến giảng viên chấm chi tiết.
-              </p>
+            ) : (
+              <div className="writing-uploaded-file">
+                <div className={`writing-file-icon ${uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'}`}>
+                  <FileText size={20} />
+                </div>
+                <div className="writing-file-info">
+                  <div className="writing-file-name" title={uploadedFile.name}>
+                    {uploadedFile.name}
+                  </div>
+                  <div className="writing-file-size">
+                    {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB • {uploadedFile.name.toLowerCase().endsWith('.pdf') ? 'Tệp PDF' : 'Tệp Word (DOCX)'}
+                  </div>
+                </div>
+                <div className="writing-file-actions">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-semibold text-primary hover:underline bg-transparent border-none cursor-pointer"
+                    title="Chọn tệp khác"
+                  >
+                    Đổi tệp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    className="writing-file-remove-btn"
+                    title="Xóa tệp"
+                    aria-label="Xóa tệp đã chọn"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="writing-submission-actions">
+              <Button 
+                variant="primary"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full"
+                icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              >
+                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Assignment)'}
+              </Button>
+
+              <Button 
+                variant="secondary"
+                onClick={handleSaveDraft}
+                className="w-full"
+                icon={<Save size={18} />}
+              >
+                Lưu bản nháp (Save Draft)
+              </Button>
             </div>
           </div>
 
           {/* Grading Card */}
           <div className="writing-card">
-            <h3 className="m-0 mb-16 text-base font-bold text-slate-800">Thông tin chấm điểm</h3>
+            <h3 className="writing-card-title">Thông tin chấm điểm</h3>
             
             <div>
               <div className="writing-info-row">

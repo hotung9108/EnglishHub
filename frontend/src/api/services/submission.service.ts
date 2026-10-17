@@ -206,6 +206,39 @@ export function findInProgressAttempt(items: SubmissionListItem[]): SubmissionLi
   return newestAttempt;
 }
 
+export interface SubmissionGradedCheckInput {
+  status?: string | null;
+  modules?: Array<{
+    status?: string | null;
+    grading?: {
+      status?: string | null;
+      finalScore?: number | null;
+    } | null;
+  }> | null;
+}
+
+export function isSubmissionGraded(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub) return false;
+  if (sub.status === 'GRADED') return true;
+  if (!sub.modules || sub.modules.length === 0) return false;
+  return sub.modules.some(
+    (m) =>
+      m.status === 'GRADED' ||
+      m.grading?.status === 'COMPLETED' ||
+      (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined)
+  );
+}
+
+export function getSubmissionFinalScore(sub?: SubmissionGradedCheckInput | null): number | null {
+  if (!sub?.modules || sub.modules.length === 0) return null;
+  for (const m of sub.modules) {
+    if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
+      return m.grading.finalScore;
+    }
+  }
+  return null;
+}
+
 export class SubmissionService {
   private readonly http: IHttpClient;
 

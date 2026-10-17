@@ -11,7 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, type SubmissionModuleSummary, isSubmissionGraded } from '../api/services/submission.service';
 import type { 
   TeacherSkill, 
   TeacherPendingSubmission, 
@@ -347,7 +347,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'writing',
         skillName: 'Writing',
         avgScore: calcAvg(skillScores.writing),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('writing'),
         needsReviewCount: queueCounts.writing
       },
@@ -355,7 +354,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'speaking',
         skillName: 'Speaking',
         avgScore: calcAvg(skillScores.speaking),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('speaking'),
         needsReviewCount: queueCounts.speaking
       },
@@ -363,7 +361,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'reading',
         skillName: 'Reading',
         avgScore: calcAvg(skillScores.reading),
-        benchmark: 7.5,
         submissionRate: calcSkillSubmissionRate('reading'),
         needsReviewCount: queueCounts.reading
       },
@@ -371,7 +368,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'listening',
         skillName: 'Listening',
         avgScore: calcAvg(skillScores.listening),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('listening'),
         needsReviewCount: queueCounts.listening
       }
@@ -431,7 +427,7 @@ export const TeacherDashboard: React.FC = () => {
         const assignInfo = sub.assignmentId ? assignmentMap.get(sub.assignmentId) : undefined;
         const studentName = studentInfo?.name || (isVi ? 'Học viên' : 'Student');
 
-        if (sub.status === 'GRADED') {
+        if (isSubmissionGraded(sub)) {
           activities.push({
             id: `act-grad-${sub.id}`,
             type: 'ai_graded',
@@ -758,10 +754,6 @@ export const TeacherDashboard: React.FC = () => {
                       <span className="teacher-dash-skill-score">
                         {item.avgScore > 0 ? item.avgScore : '—'}
                       </span>
-                    </div>
-
-                    <div className="teacher-dash-skill-benchmark">
-                      {isVi ? `Mục tiêu chuẩn: ${item.benchmark}` : `Benchmark: ${item.benchmark}`}
                     </div>
 
                     <div className="teacher-dash-progress-track">

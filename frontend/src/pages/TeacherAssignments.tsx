@@ -7,9 +7,9 @@ import { submissionService, type SubmissionListItem } from '../api/services/subm
 import { 
   Plus, Mic, BookOpen, Headphones, PenTool, 
   Search, AlertCircle, FileText, 
-  UploadCloud, X, Edit2, RefreshCw
+  X, Edit2, RefreshCw
 } from 'lucide-react';
-import { Button, EmptyState, MetricCard } from '../components/common';
+import { Button, EmptyState, MetricCard, Pagination } from '../components/common';
 
 interface AssignmentDisplayItem {
   id: string;
@@ -45,6 +45,25 @@ export const TeacherAssignments: React.FC = () => {
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handleSkillFilterChange = (skill: string) => {
+    setSkillFilter(skill);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleClassFilterChange = (classId: string) => {
+    setSelectedClassId(classId);
+    setCurrentPage(1);
+  };
 
   const [currentTimestamp] = useState(() => Date.now());
 
@@ -231,18 +250,26 @@ export const TeacherAssignments: React.FC = () => {
     });
   }, [assignments, skillFilter, searchQuery]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedAssignments = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredAssignments.slice(start, start + pageSize);
+  }, [filteredAssignments, safeCurrentPage, pageSize]);
+
   const stats = useMemo(() => {
     const total = assignments.length;
     const openCount = assignments.filter((a) => a.status === 'open').length;
     const pendingTotal = assignments.reduce((sum, a) => sum + a.pendingGradingCount, 0);
     const avgSubmission = total > 0
-      ? Math.round((assignments.reduce((sum, a) => sum + (a.submittedCount / a.totalStudents), 0) / total) * 100)
+      ? Math.round((assignments.reduce((sum, a) => sum + (a.totalStudents > 0 ? a.submittedCount / a.totalStudents : 0), 0) / total) * 100)
       : 0;
     return {
       total,
       openCount,
       pendingTotal,
-      avgSubmission: Math.min(100, avgSubmission)
+      avgSubmission: Math.min(100, Math.max(0, avgSubmission || 0))
     };
   }, [assignments]);
 
@@ -299,7 +326,7 @@ export const TeacherAssignments: React.FC = () => {
           {/* Class Select Dropdown */}
           <select
             value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
+            onChange={(e) => handleClassFilterChange(e.target.value)}
             className="select-input font-semibold text-sm"
           >
             <option value="all">{isVi ? 'Tất cả các lớp' : 'All Classes'}</option>
@@ -309,15 +336,6 @@ export const TeacherAssignments: React.FC = () => {
               </option>
             ))}
           </select>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={UploadCloud}
-            onClick={() => navigate('/teacher/exam-bank')}
-          >
-            {isVi ? 'Ngân hàng đề thi' : 'Exam Bank'}
-          </Button>
 
           <Button
             variant="primary"
@@ -363,22 +381,27 @@ export const TeacherAssignments: React.FC = () => {
 
       {/* KPI Stats Grid */}
       {!isLoading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="teacher-stats-grid mb-6">
           <MetricCard
-            title={isVi ? 'Tổng bài tập trong học kỳ' : 'Total Course Assignments'}
-            value={`${stats.total} ${isVi ? 'Bài tập' : 'Items'}`}
+            title={isVi ? 'Tổng bài tập' : 'Total Assignments'}
+            value={stats.total}
+            className="h-full"
           />
           <MetricCard
-            title={isVi ? 'Học viên đang làm & nộp bài' : 'Currently Open for Submissions'}
-            value={`${stats.openCount} ${isVi ? 'Bài đang mở' : 'Active'}`}
+            title={isVi ? 'Đang mở' : 'Active'}
+            value={stats.openCount}
+            className="h-full"
           />
           <MetricCard
-            title={isVi ? 'Chờ giáo viên nhận xét & chấm điểm' : 'Pending Teacher Evaluation'}
-            value={`${stats.pendingTotal} ${isVi ? 'Bài cần chấm' : 'To Grade'}`}
+            title={isVi ? 'Chờ chấm điểm' : 'Needs Grading'}
+            value={stats.pendingTotal}
+            className="h-full"
           />
           <MetricCard
-            title={isVi ? 'Tỷ lệ nộp bài trung bình' : 'Avg Submission Turnout'}
-            value={`${stats.avgSubmission}%`}
+            title={isVi ? 'Tỷ lệ nộp bài' : 'Turnout Rate'}
+            value={stats.avgSubmission}
+            suffix="%"
+            className="h-full"
           />
         </div>
       )}
@@ -390,7 +413,7 @@ export const TeacherAssignments: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${skillFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setSkillFilter('all')}
+              onClick={() => handleSkillFilterChange('all')}
             >
               {isVi ? 'Tất cả kỹ năng' : 'All Skills'}
               <span className="teacher-pill-badge">{assignments.length}</span>
@@ -398,7 +421,7 @@ export const TeacherAssignments: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${skillFilter === 'writing' ? 'active' : ''}`}
-              onClick={() => setSkillFilter('writing')}
+              onClick={() => handleSkillFilterChange('writing')}
             >
               <PenTool size={13} />
               Writing
@@ -406,7 +429,7 @@ export const TeacherAssignments: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${skillFilter === 'speaking' ? 'active' : ''}`}
-              onClick={() => setSkillFilter('speaking')}
+              onClick={() => handleSkillFilterChange('speaking')}
             >
               <Mic size={13} />
               Speaking
@@ -414,7 +437,7 @@ export const TeacherAssignments: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${skillFilter === 'reading' ? 'active' : ''}`}
-              onClick={() => setSkillFilter('reading')}
+              onClick={() => handleSkillFilterChange('reading')}
             >
               <BookOpen size={13} />
               Reading
@@ -422,7 +445,7 @@ export const TeacherAssignments: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${skillFilter === 'listening' ? 'active' : ''}`}
-              onClick={() => setSkillFilter('listening')}
+              onClick={() => handleSkillFilterChange('listening')}
             >
               <Headphones size={13} />
               Listening
@@ -436,7 +459,7 @@ export const TeacherAssignments: React.FC = () => {
               className="teacher-search-input"
               placeholder={isVi ? 'Tìm bài tập theo tên hoặc mã HW...' : 'Search assignment or HW code...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
         </div>
@@ -445,7 +468,7 @@ export const TeacherAssignments: React.FC = () => {
       {/* Assignments List */}
       {!isLoading && !error && (
         <div className="teacher-assignments-list">
-          {filteredAssignments.map((item) => {
+          {paginatedAssignments.map((item) => {
             const submissionPercent = item.totalStudents > 0 
               ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100)) 
               : 0;
@@ -556,6 +579,25 @@ export const TeacherAssignments: React.FC = () => {
             />
           )}
         </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && !error && filteredAssignments.length > 0 && (
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredAssignments.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[5, 10, 20, 50]}
+          itemLabel={isVi ? 'bài tập' : 'assignments'}
+          isVi={isVi}
+          variant="standalone"
+        />
       )}
 
       {/* Skill Picker Modal */}

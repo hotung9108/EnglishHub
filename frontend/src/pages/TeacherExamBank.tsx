@@ -13,6 +13,7 @@ import { ExamDetailModal } from '../components/exam-bank/ExamDetailModal';
 import { QuickAssignModal } from '../components/exam-bank/QuickAssignModal';
 import { assignmentService, type AssignmentSkill } from '../api/services/assignment.service';
 import { moduleService, type ModuleTaskType } from '../api/services/module.service';
+import { Pagination } from '../components/common';
 import '../styles/teacher-exam-bank.css';
 
 export const TeacherExamBank: React.FC = () => {
@@ -26,6 +27,35 @@ export const TeacherExamBank: React.FC = () => {
   const [selectedFormat, setSelectedFormat] = useState<string>('all');
   const [selectedBand, setSelectedBand] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+
+  const handleSkillChange = (skill: string) => {
+    setSelectedSkill(skill);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleFormatChange = (format: string) => {
+    setSelectedFormat(format);
+    setCurrentPage(1);
+  };
+
+  const handleBandChange = (band: string) => {
+    setSelectedBand(band);
+    setCurrentPage(1);
+  };
+
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+    setCurrentPage(1);
+  };
 
   // Modals state
   const [previewExam, setPreviewExam] = useState<ExamTemplateItem | null>(null);
@@ -408,6 +438,14 @@ export const TeacherExamBank: React.FC = () => {
     });
   }, [examTemplates, selectedSkill, selectedFormat, selectedBand, selectedTag, searchQuery]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredExams.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedExams = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredExams.slice(start, start + pageSize);
+  }, [filteredExams, safeCurrentPage, pageSize]);
+
   // Skill counts for pills
   const skillCounts = useMemo(() => {
     return {
@@ -542,16 +580,14 @@ export const TeacherExamBank: React.FC = () => {
           <div className="exam-hero-actions">
             <button 
               type="button" 
-              className="btn btn-secondary bg-white btn-sm"
+              className="btn btn-secondary bg-white btn-sm font-bold text-main"
               onClick={() => navigate('/teacher/assignments/create')}
-              style={{ fontWeight: 700, color: '#0f172a' }}
             >
-              <span>{isVi ? '+ Soạn đề mới' : '+ Create Custom'}</span>
+              <span>{isVi ? 'Soạn đề mới' : 'Create Custom'}</span>
             </button>
             <button 
               type="button" 
-              className="btn btn-primary btn-sm"
-              style={{ fontWeight: 700 }}
+              className="btn btn-primary btn-sm font-bold"
               onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi mẫu mới...' : 'Syncing Exam Bank...')}
             >
               <span>{isVi ? 'Đồng bộ đề thi' : 'Sync Bank'}</span>
@@ -563,7 +599,7 @@ export const TeacherExamBank: React.FC = () => {
       {/* KPI Stats Grid */}
       <div className="exam-stats-grid">
         <div className="exam-stat-card">
-          <div className="exam-stat-icon" style={{ backgroundColor: 'var(--primary-light, #eaf0e8)', color: 'var(--primary, #1b4d3e)' }}>
+          <div className="exam-stat-icon exam-stat-icon-primary">
             <Library size={22} />
           </div>
           <div>
@@ -573,7 +609,7 @@ export const TeacherExamBank: React.FC = () => {
         </div>
 
         <div className="exam-stat-card">
-          <div className="exam-stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
+          <div className="exam-stat-icon exam-stat-icon-success">
             <CheckCircle2 size={22} />
           </div>
           <div>
@@ -583,7 +619,7 @@ export const TeacherExamBank: React.FC = () => {
         </div>
 
         <div className="exam-stat-card">
-          <div className="exam-stat-icon" style={{ backgroundColor: '#faf5ff', color: '#9333ea' }}>
+          <div className="exam-stat-icon exam-stat-icon-purple">
             <Layers size={22} />
           </div>
           <div>
@@ -593,7 +629,7 @@ export const TeacherExamBank: React.FC = () => {
         </div>
 
         <div className="exam-stat-card">
-          <div className="exam-stat-icon" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>
+          <div className="exam-stat-icon exam-stat-icon-amber">
             <Star size={22} />
           </div>
           <div>
@@ -610,50 +646,50 @@ export const TeacherExamBank: React.FC = () => {
           <button
             type="button"
             className={`exam-skill-pill ${selectedSkill === 'all' ? 'active' : ''}`}
-            onClick={() => setSelectedSkill('all')}
+            onClick={() => handleSkillChange('all')}
           >
             {isVi ? 'Tất cả kỹ năng' : 'All Skills'}
-            <span style={{ fontSize: '11px', opacity: 0.8, marginLeft: 2 }}>({skillCounts.all})</span>
+            <span className="exam-pill-count">({skillCounts.all})</span>
           </button>
 
           <button
             type="button"
             className={`exam-skill-pill ${selectedSkill === 'writing' ? 'active-writing' : ''}`}
-            onClick={() => setSelectedSkill('writing')}
+            onClick={() => handleSkillChange('writing')}
           >
             <PenTool size={13} />
             <span>Writing (Kỹ năng Viết)</span>
-            <span style={{ fontSize: '11px', opacity: 0.8, marginLeft: 2 }}>({skillCounts.writing})</span>
+            <span className="exam-pill-count">({skillCounts.writing})</span>
           </button>
 
           <button
             type="button"
             className={`exam-skill-pill ${selectedSkill === 'speaking' ? 'active-speaking' : ''}`}
-            onClick={() => setSelectedSkill('speaking')}
+            onClick={() => handleSkillChange('speaking')}
           >
             <Mic size={13} />
             <span>Speaking (Kỹ năng Nói)</span>
-            <span style={{ fontSize: '11px', opacity: 0.8, marginLeft: 2 }}>({skillCounts.speaking})</span>
+            <span className="exam-pill-count">({skillCounts.speaking})</span>
           </button>
 
           <button
             type="button"
             className={`exam-skill-pill ${selectedSkill === 'reading' ? 'active-reading' : ''}`}
-            onClick={() => setSelectedSkill('reading')}
+            onClick={() => handleSkillChange('reading')}
           >
             <BookOpen size={13} />
             <span>Reading (Kỹ năng Đọc)</span>
-            <span style={{ fontSize: '11px', opacity: 0.8, marginLeft: 2 }}>({skillCounts.reading})</span>
+            <span className="exam-pill-count">({skillCounts.reading})</span>
           </button>
 
           <button
             type="button"
             className={`exam-skill-pill ${selectedSkill === 'listening' ? 'active-listening' : ''}`}
-            onClick={() => setSelectedSkill('listening')}
+            onClick={() => handleSkillChange('listening')}
           >
             <Headphones size={13} />
             <span>Listening (Kỹ năng Nghe)</span>
-            <span style={{ fontSize: '11px', opacity: 0.8, marginLeft: 2 }}>({skillCounts.listening})</span>
+            <span className="exam-pill-count">({skillCounts.listening})</span>
           </button>
         </div>
 
@@ -666,13 +702,13 @@ export const TeacherExamBank: React.FC = () => {
               className="exam-search-input"
               placeholder={isVi ? 'Tìm đề theo tên, mã đề EB, chủ đề (AI, Environment...)' : 'Search exam code, topic, or title...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
             {searchQuery && (
               <button 
                 type="button" 
-                onClick={() => setSearchQuery('')}
-                style={{ position: 'absolute', right: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                onClick={() => handleSearchChange('')}
+                className="exam-search-clear"
               >
                 <X size={14} />
               </button>
@@ -684,7 +720,7 @@ export const TeacherExamBank: React.FC = () => {
             <select 
               className="exam-filter-select"
               value={selectedFormat}
-              onChange={(e) => setSelectedFormat(e.target.value)}
+              onChange={(e) => handleFormatChange(e.target.value)}
             >
               <option value="all">{isVi ? 'Tất cả nguồn đề' : 'All Exam Sources'}</option>
               <option value="Cambridge 15-19">Cambridge IELTS 15-19</option>
@@ -698,7 +734,7 @@ export const TeacherExamBank: React.FC = () => {
             <select 
               className="exam-filter-select"
               value={selectedBand}
-              onChange={(e) => setSelectedBand(e.target.value)}
+              onChange={(e) => handleBandChange(e.target.value)}
             >
               <option value="all">{isVi ? 'Tất cả Target Band' : 'All Target Bands'}</option>
               <option value="Band 5.5 - 6.5">Band 5.5 - 6.5</option>
@@ -710,7 +746,7 @@ export const TeacherExamBank: React.FC = () => {
             <select 
               className="exam-filter-select"
               value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
+              onChange={(e) => handleTagChange(e.target.value)}
             >
               <option value="all">{isVi ? 'Tất cả chủ đề' : 'All Topic Tags'}</option>
               <option value="Environment">Environment & Ecology</option>
@@ -725,12 +761,12 @@ export const TeacherExamBank: React.FC = () => {
 
       {/* Exam Grid */}
       <div className="exam-grid">
-        {filteredExams.map((exam) => (
+        {paginatedExams.map((exam) => (
           <div key={exam.id} className="exam-card">
             <div>
               {/* Card Top: Code, Skill, Source */}
               <div className="exam-card-top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="flex items-center gap-2">
                   <span className="exam-card-code">{exam.code}</span>
                   {getSkillBadge(exam.skill)}
                 </div>
@@ -753,23 +789,17 @@ export const TeacherExamBank: React.FC = () => {
 
               {/* Meta tags strip */}
               <div className="exam-card-meta-strip">
-                <span><Clock size={12} style={{ display: 'inline', marginRight: 3 }} />{exam.durationMinutes}p</span>
+                <span className="inline-flex items-center gap-1"><Clock size={12} />{exam.durationMinutes}p</span>
                 <span>•</span>
-                <span style={{ fontWeight: 600, color: '#0f172a' }}>{exam.questionCount}</span>
+                <span className="font-semibold text-main">{exam.questionCount}</span>
                 <span>•</span>
-                <span style={{ 
-                  color: '#15803d', 
-                  backgroundColor: '#f0fdf4', 
-                  padding: '1px 6px', 
-                  borderRadius: '4px', 
-                  fontWeight: 700 
-                }}>
+                <span className="exam-target-band-badge">
                   {exam.targetBand}
                 </span>
               </div>
 
               {/* Tags */}
-              <div className="exam-card-tags" style={{ marginTop: '10px' }}>
+              <div className="exam-card-tags mt-2">
                 {exam.tags.slice(0, 3).map((tag, idx) => (
                   <span key={idx} className="exam-tag-pill">#{tag}</span>
                 ))}
@@ -778,9 +808,9 @@ export const TeacherExamBank: React.FC = () => {
 
             {/* Footer with actions */}
             <div className="exam-card-footer">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
+              <div className="flex items-center gap-1 text-xs text-muted">
                 <Star size={13} fill="#d97706" color="#d97706" />
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>{exam.rating}</span>
+                <span className="font-bold text-main">{exam.rating}</span>
                 <span>({exam.usageCount})</span>
               </div>
 
@@ -788,7 +818,6 @@ export const TeacherExamBank: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-secondary bg-white btn-sm"
-                  style={{ padding: '6px 12px', fontSize: '12.5px' }}
                   onClick={() => setPreviewExam(exam)}
                   title={isVi ? 'Xem trước nội dung đề' : 'Preview Exam'}
                 >
@@ -798,7 +827,6 @@ export const TeacherExamBank: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  style={{ padding: '6px 14px', fontSize: '12.5px' }}
                   onClick={() => setAssigningExam(exam)}
                 >
                   <span>{isVi ? 'Giao cho lớp' : 'Assign'}</span>
@@ -809,14 +837,33 @@ export const TeacherExamBank: React.FC = () => {
         ))}
       </div>
 
+      {/* Pagination */}
+      {filteredExams.length > 0 && (
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredExams.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[6, 12, 18, 24]}
+          itemLabel={isVi ? 'đề thi' : 'exams'}
+          isVi={isVi}
+          variant="standalone"
+        />
+      )}
+
       {/* Empty State */}
       {filteredExams.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', marginTop: '20px' }}>
-          <Library size={44} color="#94a3b8" style={{ margin: '0 auto 12px auto', display: 'block', opacity: 0.5 }} />
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+        <div className="exam-empty-card">
+          <Library size={44} className="exam-empty-icon" />
+          <h3 className="exam-empty-title">
             {isVi ? 'Không tìm thấy đề thi phù hợp' : 'No matching exam templates found'}
           </h3>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+          <p className="exam-empty-desc">
             {isVi ? 'Hãy thử điều chỉnh từ khóa tìm kiếm hoặc bỏ bớt các bộ lọc kỹ năng/thang điểm.' : 'Try adjusting your search query or reset the skill filters.'}
           </p>
         </div>

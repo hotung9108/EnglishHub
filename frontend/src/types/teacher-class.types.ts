@@ -2,21 +2,14 @@ export type ClassSkill = 'writing' | 'speaking' | 'reading' | 'listening';
 
 export interface ClassDetailItem {
   id: string;
-  code: string;
   name: string;
-  teacher: string;
-  room: string;
-  schedule: string;
+  teacher?: string;
+  level?: string;
   status: 'active' | 'completed';
-  targetBand: string;
-  currentLesson: number;
-  totalLessons: number;
   enrolledStudents: number;
   stats: {
     completionRate: number;
-    onTimeRate: number;
     avgScore: number;
-    targetAttainment: number;
     assignedCount: number;
     pendingGrading: number;
   };
@@ -27,8 +20,6 @@ export interface StudentGradeRow {
   code: string;
   name: string;
   avatar: string;
-  email: string;
-  attendance: number;
   assignmentsCompleted: number;
   totalAssignments: number;
   scores: {
@@ -46,7 +37,6 @@ export interface StudentGradeRow {
 
 export interface ClassAssignmentItem {
   id: string;
-  code: string;
   title: string;
   skill: ClassSkill;
   dueDate: string;
@@ -62,19 +52,7 @@ export interface SkillAnalyticsItem {
   skill: ClassSkill;
   name: string;
   avgScore: number;
-  targetScore: number;
   completionRate: number;
-  strengths: string[];
-  weaknesses: string[];
-  aiRecommendation: string;
-}
-
-export interface SyllabusLessonItem {
-  session: number;
-  title: string;
-  date: string;
-  focusSkill: ClassSkill | 'grammar' | 'mock_test';
-  status: 'completed' | 'current' | 'upcoming';
-  materialsCount: number;
-  homeworkAttached?: string;
+  assignmentCount: number;
+  gradedCount: number;
 }

@@ -445,3 +445,76 @@
   border-color: var(--skill-listening-border, #C8DCF5);
 }
 
+.exam-pill-count {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+
+.exam-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.exam-target-band-badge {
+  color: #15803d;
+  background-color: #f0fdf4;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.exam-empty-card {
+  text-align: center;
+  padding: 60px 20px;
+  background-color: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  margin-top: 20px;
+}
+
+.exam-empty-icon {
+  margin: 0 auto 12px auto;
+  display: block;
+  opacity: 0.5;
+  color: #94a3b8;
+}
+
+.exam-empty-title {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface, #0f172a);
+}
+
+.exam-empty-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--on-surface-variant, #64748b);
+}
+
+.exam-stat-icon-primary {
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+}
+
+.exam-stat-icon-success {
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.exam-stat-icon-purple {
+  background-color: #faf5ff;
+  color: #9333ea;
+}
+
+.exam-stat-icon-amber {
+  background-color: #fffbeb;
+  color: #d97706;
+}
+
+

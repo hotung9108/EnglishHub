@@ -172,6 +172,9 @@ docker compose -f docker-compose.staging.yml up -d
 3. **Thêm 2 bản ghi trên Cloudflare DNS** ([dash.cloudflare.com](https://dash.cloudflare.com/) ➔ `hotung9108.me` ➔ **DNS** ➔ **Records**):
    - Bản ghi 1: Type `CNAME` | Name `app` | Target `cname.vercel-dns.com` | Proxy status: **DNS Only** (icon đám mây màu xám)
    - Bản ghi 2: Type `CNAME` | Name `staging` | Target `cname.vercel-dns.com` | Proxy status: **DNS Only** (icon đám mây màu xám)
+4. **Cấu hình SPA Routing Fallback (`vercel.json`)**:
+   - Thư mục `frontend/` có file `vercel.json` định nghĩa quy tắc rewrite `/(.*)` về `/index.html`.
+   - Đảm bảo khi người dùng Refresh (F5/Ctrl+R) hoặc mở trực tiếp các đường dẫn con (như `/teacher/profile`, `/teacher/classes/:id/progress`), Vercel Edge sẽ phục vụ entry point `index.html` của React SPA thay vì trả lỗi hosting `404 NOT_FOUND`.
 
 ---
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   GraduationCap, UserPlus, Search, 
   ArrowRight, Loader2, AlertCircle
@@ -9,7 +9,7 @@ import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
 import type { UserListItem } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
-import { Button, MetricCard, EmptyState } from '../components/common';
+import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
 
 export const Teachers: React.FC = () => {
   const { t, language } = useLanguage();
@@ -18,6 +18,10 @@ export const Teachers: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterExpertise, setFilterExpertise] = useState<'All' | 'TESOL' | 'Writing' | 'Speaking'>('All');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
 
   const [teachers, setTeachers] = useState<Array<{
     id: number;
@@ -103,18 +107,44 @@ export const Teachers: React.FC = () => {
     };
   }, [isVi]);
 
-  const filtered = teachers.filter(tc => {
-    if (filterExpertise !== 'All' && !tc.qualifications.includes(filterExpertise)) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        tc.name.toLowerCase().includes(q) ||
-        tc.code.toLowerCase().includes(q) ||
-        tc.email.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return teachers.filter(tc => {
+      if (filterExpertise !== 'All' && !tc.qualifications.includes(filterExpertise)) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          tc.name.toLowerCase().includes(q) ||
+          tc.code.toLowerCase().includes(q) ||
+          tc.email.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [teachers, filterExpertise, searchQuery]);
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedTeachers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
+
+  const handleFilterChange = (exp: 'All' | 'TESOL' | 'Writing' | 'Speaking') => {
+    setFilterExpertise(exp);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const activeTeachersCount = teachers.filter(t => t.status === 'Active').length;
 
@@ -172,7 +202,7 @@ export const Teachers: React.FC = () => {
             <button
               key={exp}
               type="button"
-              onClick={() => setFilterExpertise(exp)}
+              onClick={() => handleFilterChange(exp)}
               className={`adm-pill ${filterExpertise === exp ? 'active' : ''}`}
             >
               <span>{exp === 'All' ? (isVi ? 'Tất cả chuyên môn' : 'All Qualifications') : exp}</span>
@@ -187,7 +217,7 @@ export const Teachers: React.FC = () => {
             className="adm-search-input"
             placeholder={isVi ? 'Tìm tên giáo viên, mã GV, email...' : 'Search teachers...'}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
       </div>
@@ -217,59 +247,74 @@ export const Teachers: React.FC = () => {
           }
         />
       ) : (
-        <div className="adm-cards-grid">
-          {filtered.map(tc => (
-            <div 
-              key={tc.id} 
-              className="eh-card p-6 flex flex-col justify-between gap-4"
-            >
-              <div>
-                {/* Header with Avatar and Status */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="adm-avatar role-teacher w-12 h-12 text-lg">
-                      {tc.avatar}
+        <div className="flex flex-col gap-6">
+          <div className="adm-cards-grid">
+            {paginatedTeachers.map(tc => (
+              <div 
+                key={tc.id} 
+                className="eh-card p-6 flex flex-col justify-between gap-4"
+              >
+                <div>
+                  {/* Header with Avatar and Status */}
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="adm-avatar role-teacher w-12 h-12 text-lg">
+                        {tc.avatar}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold m-0 mb-1 text-surface">{tc.name}</h3>
+                        <span className="font-mono text-primary font-semibold text-xs">{tc.code}</span>
+                      </div>
                     </div>
+
+                    <span className={`badge ${tc.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
+                      {tc.status === 'Active' 
+                        ? (isVi ? 'Đang hoạt động' : 'Active') 
+                        : (isVi ? 'Nghỉ phép' : 'On Leave')}
+                    </span>
+                  </div>
+
+                  {/* Email */}
+                  <div className="text-sm text-muted mb-3">
+                    {tc.email}
+                  </div>
+
+                  {/* Workload Stats */}
+                  <div className="p-3 rounded-md bg-surface-low border-subtle text-xs">
                     <div>
-                      <h3 className="text-base font-bold m-0 mb-1 text-surface">{tc.name}</h3>
-                      <span className="font-mono text-primary font-semibold text-xs">{tc.code}</span>
+                      <span className="text-muted">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
+                      <strong className="text-surface">{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
                     </div>
                   </div>
-
-                  <span className={`badge ${tc.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
-                    {tc.status === 'Active' 
-                      ? (isVi ? 'Đang hoạt động' : 'Active') 
-                      : (isVi ? 'Nghỉ phép' : 'On Leave')}
-                  </span>
                 </div>
 
-                {/* Email */}
-                <div className="text-sm text-muted mb-3">
-                  {tc.email}
-                </div>
-
-                {/* Workload Stats */}
-                <div className="p-3 rounded-md bg-surface-low border-subtle text-xs">
-                  <div>
-                    <span className="text-muted">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
-                    <strong className="text-surface">{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
-                  </div>
+                {/* Footer Action */}
+                <div className="pt-3 border-t-subtle flex gap-2">
+                  <Button 
+                    variant="secondary"
+                    className="flex-1 text-sm justify-between"
+                    onClick={() => navigate(`/admin/teachers/${tc.id}`)}
+                  >
+                    <span>{t('teachers.viewProfile')}</span>
+                    <ArrowRight size={14} />
+                  </Button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Footer Action */}
-              <div className="pt-3 border-t-subtle flex gap-2">
-                <Button 
-                  variant="secondary"
-                  className="flex-1 text-sm justify-between"
-                  onClick={() => navigate(`/admin/teachers/${tc.id}`)}
-                >
-                  <span>{t('teachers.viewProfile')}</span>
-                  <ArrowRight size={14} />
-                </Button>
-              </div>
-            </div>
-          ))}
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            pageSizeOptions={[9, 18, 27, 45]}
+            onPageChange={(page) => setCurrentPage(page)}
+            onPageSizeChange={handlePageSizeChange}
+            itemLabel={isVi ? 'giảng viên' : 'teachers'}
+            isVi={isVi}
+            variant="standalone"
+          />
         </div>
       )}
     </div>
