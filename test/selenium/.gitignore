@@ -2,3 +2,6 @@ node_modules/
 .env
 .cache/
 reports/
+fixtures/staging.json
+fixtures/cleanup-state.json
+*.local.postman_environment.json

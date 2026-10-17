@@ -10,6 +10,7 @@ export async function createDriver(config) {
   const module = config.browser === 'edge' ? edge : chrome;
   const options = new module.Options();
   options.addArguments('--window-size=1440,1000');
+  if (config.downloadDir) options.setUserPreferences({ 'download.default_directory': config.downloadDir, 'download.prompt_for_download': false });
   if (config.headless) options.addArguments('--headless=new');
   if (config.binary) {
     if (config.browser === 'edge') options.setEdgeChromiumBinaryPath(config.binary);
