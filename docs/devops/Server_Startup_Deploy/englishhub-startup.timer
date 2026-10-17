@@ -1,0 +1,11 @@
+[Unit]
+Description=Chay lai englishhub-startup.service dinh ky de tu phuc hoi
+
+[Timer]
+# Chay lan dau 5 phut sau khi boot, sau do moi 30 phut 1 lan
+OnBootSec=5min
+OnUnitActiveSec=30min
+Unit=englishhub-startup.service
+
+[Install]
+WantedBy=timers.target
