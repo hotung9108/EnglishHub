@@ -1,0 +1,22 @@
+id: QA-29
+title: "Kiểm thử Selenium luồng Giáo viên và bàn giao issue"
+assignee: "@tester"
+status: "Done"
+updated_at: "2026-10-17"
+branch: "feature/qa-29-teacher-selenium"
+description: "Tích hợp bộ QA29 đã chạy và bàn giao vào framework Selenium dùng chung."
+completed_scope:
+  - "51 case Giáo viên; fixture staging, cleanup, khóa run, report và evidence."
+  - "Lượt staging 15/10/2026: 41 Passed / 7 Failed / 3 Blocked."
+  - "Issue GitHub #149 và #151–#159; tester xác nhận đã comment bàn giao Trello."
+  - "Source, Page Object, config và launcher tích hợp trong test/selenium."
+validation:
+  staging_evidence: "qa29-2026-10-15T14-39-05-249Z; historical standalone run"
+  integration: "31/31 npm run check passed; 28 JS modules syntax/import checks; PowerShell parsed; no staging/browser rerun"
+  coverage: "Not measured; no claim of greater than 80 percent coverage."
+artifacts:
+  - "test/selenium/QA29-README.md"
+  - "test/selenium/QA29-TEST-CASES.md"
+  - "test/selenium/run-teacher.js"
+  - "production_artifacts/test_reports/QA-29/README.md"
+  - "production_artifacts/test_reports/QA-29/execution-summary.json"

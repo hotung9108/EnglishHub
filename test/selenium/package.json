@@ -11,7 +11,13 @@
     "test:login": "node run.js --role=teacher",
     "test:roles": "node run.js --roles",
     "test:self": "node run.js --self-test",
-    "check": "node --test tests/framework/*.test.js"
+    "check": "node --test tests/framework/*.test.js",
+    "test:teacher": "node run-teacher.js",
+    "test:teacher:watch": "node run-teacher.js --watch",
+    "prepare:teacher": "node support/teacher/prepare-fixtures.js",
+    "cleanup:teacher": "node support/teacher/cleanup-fixtures.js",
+    "docs:teacher": "node tools/document-teacher-cases.mjs",
+    "postman:teacher-access": "node tools/build-039-postman.mjs"
   },
   "dependencies": {
     "selenium-webdriver": "4.35.0"
