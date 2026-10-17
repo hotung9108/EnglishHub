@@ -36,6 +36,12 @@ public interface StorageService {
 	 */
 	boolean objectExists(String storageKey);
 
+	/**
+	 * Deletes the object at {@code storageKey}. Idempotent: deleting a missing
+	 * key is a no-op.
+	 */
+	void deleteObject(String storageKey);
+
 	record PresignedUpload(String uploadUrl, String storageKey, OffsetDateTime expiresAt) {
 	}
 }
