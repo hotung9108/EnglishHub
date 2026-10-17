@@ -64,6 +64,8 @@ public class SubmissionService {
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
 	private static final String CANNOT_START_MESSAGE = "Không thể bắt đầu làm bài tập này lúc này.";
+	private static final String SUBMISSION_DEADLINE_PASSED_MESSAGE =
+			"Không thể nộp phần làm bài này vì đã quá hạn nộp bài.";
 	private static final String SUBMISSION_NOT_FOUND_MESSAGE = "Không tìm thấy lượt làm bài.";
 	private static final String INVALID_PARAM_MESSAGE = "Dữ liệu không hợp lệ.";
 	private static final String INVALID_STATUS_MESSAGE = "status không hợp lệ.";
@@ -248,6 +250,14 @@ public class SubmissionService {
 		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
+
+		AssignmentWindow window = assignmentWindowRepository
+				.findWindowById(submission.getAssignmentId())
+				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		OffsetDateTime now = OffsetDateTime.now();
+		if (now.isAfter(window.closeAt())) {
+			throw ApiException.conflict(SUBMISSION_DEADLINE_PASSED_MESSAGE);
 		}
 
 		ModuleInfo moduleInfo = modulesOf(submission.getAssignmentId()).get(submissionModule.getModuleId());

@@ -126,6 +126,8 @@
 
 **Mô tả:** Học viên nộp tất cả câu trả lời cho 1 module trong một request. Chỉ được gọi khi `submission_module.status = IN_PROGRESS` **và `submission` cha cũng còn `IN_PROGRESS`** — mỗi module chỉ submit được 1 lần duy nhất. Sau khi submit, server đổi `submission_module.status → SUBMITTED`.
 
+Server kiểm tra `closeAt` hiện tại của assignment trước khi ghi answers hoặc chốt module. Khi `now > closeAt`, request bị từ chối dù module và submission cha vẫn `IN_PROGRESS`. Tại `now == closeAt`, request tiếp tục các kiểm tra hiện có. Quy tắc áp dụng cho Quiz/Rewrite và Essay/Recording.
+
 Với **Quiz / Short Answer**: truyền mảng `answers` kèm `questionId` và `content`.
 
 Với **Essay / Writing**: không truyền `answers` trong body — server tạo 1 `answer` record trống và kiểm tra R2 xem file đã upload chưa (dựa trên key quy ước). Nếu file chưa có trên R2, vẫn tạo answer với `doc_upload_status = UPLOADING`.
@@ -211,6 +213,8 @@ nộp bài (request đó đã commit).
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Submit thành công. | `200` | `{ "message": "Đã nộp phần làm bài.", "submissionModuleId": 150, "status": "SUBMITTED", "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
+| Đã quá hạn nộp bài (`now > closeAt`). | `409` | `{ "error": "Không thể nộp phần làm bài này vì đã quá hạn nộp bài." }` |
+| Không tìm thấy assignment khi kiểm tra hạn. | `404` | `{ "error": "Không tìm thấy bài tập." }` |
 | Module đã được submit trước đó. | `400` | `{ "error": "Phần làm bài này đã được nộp." }` |
 | `submission` cha đã được nộp (`SUBMITTED`/`GRADED`) trong khi module vẫn `IN_PROGRESS`. | `400` | `{ "error": "Bài làm này đã được nộp." }` |
 | Thiếu answers. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |
