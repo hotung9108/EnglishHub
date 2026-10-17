@@ -364,17 +364,47 @@ Delete a module.
 ---
 
 ### POST `/api/v1/modules/{moduleId}/audio`
-Upload an audio file for a module (multipart/form-data).
+Request a presigned PUT URL to upload the listening audio of a `LISTENING` module
+(teacher owner only). The client then PUTs the raw bytes directly to `uploadUrl` with a
+matching `Content-Type`, and calls `POST /api/v1/modules/{moduleId}/audio/confirm`.
 
 **Path Params:** `moduleId` (int64)
 
-**Request Body:** `multipart/form-data`
+**Request Body:** `application/json`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `file` | binary | Audio file to upload |
+| `mimeType` | string | One of `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`, `audio/wave`, `audio/mp4`, `audio/m4a`, `audio/x-m4a` |
 
-**Response:** `AudioUploadResponse`
+**Response:** `AudioUploadUrlResponse` (`{ message, uploadUrl, storageKey, expiresAt, sourceAudioUploadStatus }`, status `UPLOADING`)
+
+---
+
+### POST `/api/v1/modules/{moduleId}/audio/confirm`
+Probe object storage for the uploaded file and update the module status (teacher owner only).
+
+**Path Params:** `moduleId` (int64)
+
+**Request Body:** `application/json`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `storageKey` | string | The `storageKey` returned by the upload-url step |
+
+**Response:** `AudioUploadConfirmResponse` (`sourceAudioUploadStatus` = `READY` if uploaded, `FAILED` otherwise, HTTP `200` in both cases)
+
+---
+
+### GET `/api/v1/modules/{moduleId}/audio`
+Stream the raw listening-audio bytes. Allowed for the owning teacher and class-member students;
+`ADMIN` and non-member users get `403`. Returns `404` when the module has no audio.
+
+**Path Params:** `moduleId` (int64)
+
+**Response:** binary audio with the stored `Content-Type` and `Cache-Control: private, max-age=3600`
+
+> Full flow (including client examples and the submission-file uploads): see
+> [`docs/api/file-upload-guide-module-audio-and-submission-files.md`](./file-upload-guide-module-audio-and-submission-files.md).
 
 ---
 
@@ -1332,12 +1362,23 @@ Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writi
 
 ---
 
-#### `AudioUploadResponse`
+#### `AudioUploadUrlResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Message |
+| `uploadUrl` | string | Presigned PUT URL for the direct upload |
+| `storageKey` | string | Storage key to send to the confirm step |
+| `expiresAt` | string (date-time) | Expiry of the presigned URL |
+| `sourceAudioUploadStatus` | string | Upload status (`UPLOADING`) |
+
+---
+
+#### `AudioUploadConfirmResponse`
 | Field | Type | Description |
 |-------|------|-------------|
 | `message` | string | Message |
 | `sourceAudioStorageKey` | string | Audio file storage key |
-| `sourceAudioUploadStatus` | string | Upload status |
+| `sourceAudioUploadStatus` | string | `READY` or `FAILED` |
 
 ---
 

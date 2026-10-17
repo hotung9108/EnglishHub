@@ -210,6 +210,7 @@ Khác với các bản báo cáo checklist tĩnh trên task board cũ, kết qu�
 ---
 
 ### 🔴 TASK-BE-21 (P0 - Blocker): Bổ Sung Endpoint Stream / Tải File Âm Thanh Module Listening
+- **Trạng thái**: ✅ **ĐÃ HOÀN THÀNH** (task `BE-41`, `@be-secondary`).
 - **Mức độ ưu tiên**: **P0 (Chặn tính năng nghe bài Listening)**
 - **Role giao việc**: `@be-secondary` (`tuanpham21105`)
 - **Tệp liên quan**:
@@ -221,6 +222,11 @@ Khác với các bản báo cáo checklist tĩnh trên task board cũ, kết qu�
 - **Yêu cầu kỹ thuật (Acceptance Criteria)**:
   1. Thêm endpoint: `GET /api/v1/modules/{moduleId}/audio-url` (hoặc `GET /api/v1/modules/{moduleId}/audio/stream`).
   2. Trả về Presigned URL tải file audio đề bài hoặc hỗ trợ HTTP Range Request để phát nhạc mượt mà trên trình duyệt của học sinh.
+- **Kết quả thực tế**: `GET /api/v1/modules/{moduleId}/audio` đã được bổ sung — stream trực tiếp bytes audio
+  (giáo viên sở hữu + học sinh thành viên lớp; `ADMIN`/ngoài lớp nhận `403`; `404` khi chưa có audio).
+  Song song, `POST .../audio` đã chuyển từ `multipart/form-data` sang **presigned direct upload** (3 bước:
+  request URL → PUT trực tiếp → confirm), và lưu trữ disk local đã được thay bằng S3 (`BE-STO-01`).
+  *(Chưa hỗ trợ `Range: bytes=...`.)* Chi tiết: `docs/api/file-upload-guide-module-audio-and-submission-files.md`.
 
 ---
 

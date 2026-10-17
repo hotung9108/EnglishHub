@@ -32,4 +32,9 @@ public class UnavailableStorageService implements StorageService {
 	public boolean objectExists(String storageKey) {
 		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
 	}
+
+	@Override
+	public void deleteObject(String storageKey) {
+		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
+	}
 }
