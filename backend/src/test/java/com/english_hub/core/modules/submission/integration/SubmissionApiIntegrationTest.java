@@ -36,6 +36,8 @@ import com.english_hub.core.modules.user.infrastructure.persistence.entity.Stude
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 
+import jakarta.persistence.EntityManager;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -69,6 +71,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class SubmissionApiIntegrationTest {
+
+	private final EntityManager entityManager;
+
+	@Autowired
+	SubmissionApiIntegrationTest(EntityManager entityManager) {
+		this.entityManager = entityManager;
+	}
 
 	@Container
 	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -593,6 +602,37 @@ class SubmissionApiIntegrationTest {
 				.containsExactlyInAnyOrder(quizQuestionOne, quizQuestionTwo);
 		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
 				.isEqualTo(SubmissionStatus.SUBMITTED);
+	}
+
+	@Test
+	void submitModuleRejectsAnAttemptStartedBeforeTheDeadlineAfterItCloses() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		Assignment assignment = assignmentRepository.findById(publishedAssignmentId).orElseThrow();
+		assignment.updateFrom(
+				assignment.getClassId(),
+				assignment.getTitle(),
+				assignment.getDescription(),
+				assignment.getOpenAt(),
+				OffsetDateTime.now().minusMinutes(5),
+				assignment.getMaxSubmissions(),
+				assignment.isDeleted(),
+				assignment.getStatus());
+		assignmentRepository.saveAndFlush(assignment);
+		entityManager.clear();
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error").value("Không thể nộp phần làm bài này vì đã quá hạn nộp bài."));
+
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
 	}
 
 	@Test
