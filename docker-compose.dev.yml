@@ -43,6 +43,19 @@ services:
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
       AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      # ===== Outbound Email (EmailJS REST) - khớp với application.properties =====
+      # Gửi OTP/mã đặt lại mật khẩu qua email. Cần EMAILJS_* bên dưới, nếu không
+      # /auth/forgot-password sẽ trả lỗi (502 khi gửi thất bại).
+      # LƯU Ý: bật "Allow non-browser applications" trong EmailJS Dashboard (Account -> Security).
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+      EMAILJS_BASE_URL: ${EMAILJS_BASE_URL:-https://api.emailjs.com}
+      EMAILJS_SERVICE_ID: ${EMAILJS_SERVICE_ID:-}
+      EMAILJS_PASSWORD_RESET_TEMPLATE_ID: ${EMAILJS_PASSWORD_RESET_TEMPLATE_ID:-}
+      EMAILJS_PUBLIC_KEY: ${EMAILJS_PUBLIC_KEY:-}
+      EMAILJS_PRIVATE_KEY: ${EMAILJS_PRIVATE_KEY:-}
+      EMAILJS_TIMEOUT_SECONDS: ${EMAILJS_TIMEOUT_SECONDS:-10}
+      # Link đặt lại mật khẩu nhúng trong email (browser người dùng mở -> localhost:5173)
+      FRONTEND_RESET_PASSWORD_URL: ${FRONTEND_RESET_PASSWORD_URL:-http://localhost:5173/reset-password}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
