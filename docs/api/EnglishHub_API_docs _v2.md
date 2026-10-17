@@ -65,7 +65,8 @@ Yêu cầu quên mật khẩu: hệ thống gửi mã OTP tới email của ngư
 
 **Response:** `ForgotPasswordResponse`
 
-> ⚠️ `ForgotPasswordResponse.debugOtp` là field phục vụ debug, chỉ nên xuất hiện ở môi trường dev/staging. Client không được phụ thuộc vào field này.
+> 📧 Mã OTP được gửi tới email của người dùng qua EmailJS; response **không** còn trả về mã OTP.
+> Nếu dịch vụ email không cấu hình hoặc gửi thất bại, API trả `502 Bad Gateway`.
 
 ---
 
@@ -1141,7 +1142,6 @@ Tiến bộ của một học viên.
 |-------|------|--------|
 | `message` | string | Thông báo |
 | `email` | string | Email nhận OTP |
-| `debugOtp` | string | OTP trả về để debug (chỉ dev/staging, không dùng ở production) |
 
 ---
 

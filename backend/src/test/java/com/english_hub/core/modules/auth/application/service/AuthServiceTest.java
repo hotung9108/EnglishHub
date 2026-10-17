@@ -3,16 +3,21 @@ package com.english_hub.core.modules.auth.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.common.email.EmailService;
 import com.english_hub.core.modules.auth.application.command.LoginCommand;
+import com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand;
 import com.english_hub.core.modules.auth.application.command.LogoutCommand;
 import com.english_hub.core.modules.auth.application.command.RefreshCommand;
+import com.english_hub.core.modules.auth.application.command.ResetPasswordCommand;
 import com.english_hub.core.modules.auth.domain.model.AuthUser;
 import com.english_hub.core.modules.auth.domain.model.RefreshToken;
 import com.english_hub.core.modules.auth.domain.repository.AuthUserRepository;
@@ -51,6 +56,9 @@ class AuthServiceTest {
 	@Mock
 	private JwtTokenService jwtTokenService;
 
+	@Mock
+	private EmailService emailService;
+
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 	private final com.english_hub.core.modules.auth.domain.service.PasswordResetStore passwordResetStore =
 			new com.english_hub.core.modules.auth.domain.service.PasswordResetStore();
@@ -64,7 +72,9 @@ class AuthServiceTest {
 				passwordEncoder,
 				jwtTokenService,
 				passwordResetStore,
-				604800L);
+				emailService,
+				604800L,
+				"http://localhost:5173/reset-password");
 	}
 
 	@Test
@@ -261,14 +271,32 @@ class AuthServiceTest {
 	}
 
 	@Test
-	void forgotPasswordGeneratesOtpForExistingUser() {
+	void forgotPasswordSendsOtpEmailForExistingUser() {
 		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeTeacher(PASSWORD)));
 
-		var response = authService.forgotPassword(
-				new com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand(EMAIL));
+		var response = authService.forgotPassword(new ForgotPasswordCommand(EMAIL));
 
 		assertThat(response.email()).isEqualTo(EMAIL);
-		assertThat(response.debugOtp()).isNotNull().hasSize(6);
+		assertThat(response.message()).contains("gửi");
+
+		ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+		ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
+		verify(emailService).sendPasswordResetOtp(eq(EMAIL), otpCaptor.capture(), urlCaptor.capture(), eq(15));
+		assertThat(otpCaptor.getValue()).hasSize(6).containsOnlyDigits();
+		assertThat(urlCaptor.getValue()).startsWith("http://localhost:5173/reset-password")
+				.contains("email=" + EMAIL)
+				.contains("token=");
+	}
+
+	@Test
+	void forgotPasswordRejectsUnknownEmail() {
+		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> authService.forgotPassword(new ForgotPasswordCommand(EMAIL)))
+				.isInstanceOf(ApiException.class)
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
+						.isEqualTo(HttpStatus.NOT_FOUND));
+		verify(emailService, never()).sendPasswordResetOtp(any(), any(), any(), anyInt());
 	}
 
 	@Test
@@ -276,16 +304,50 @@ class AuthServiceTest {
 		AuthUser user = activeTeacher(PASSWORD);
 		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
 
-		var forgotResp = authService.forgotPassword(
-				new com.english_hub.core.modules.auth.application.command.ForgotPasswordCommand(EMAIL));
+		String otp = requestOtp();
 
 		var resetResp = authService.resetPassword(
-				new com.english_hub.core.modules.auth.application.command.ResetPasswordCommand(
-						EMAIL, forgotResp.debugOtp(), null, "BrandNewPassword123!"));
+				new ResetPasswordCommand(EMAIL, otp, null, "BrandNewPassword123!"));
 
 		assertThat(resetResp.message()).contains("thành công");
 		verify(authUserRepository).save(user);
+		verify(refreshTokenRepository).revokeAllByUserId(USER_ID);
 		assertThat(passwordEncoder.matches("BrandNewPassword123!", user.getPasswordHash())).isTrue();
+	}
+
+	@Test
+	void resetPasswordRevokesEveryActiveSession() {
+		AuthUser user = activeTeacher(PASSWORD);
+		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
+		when(refreshTokenRepository.revokeAllByUserId(USER_ID)).thenReturn(2);
+
+		String otp = requestOtp();
+
+		var resetResp = authService.resetPassword(
+				new ResetPasswordCommand(EMAIL, otp, null, "BrandNewPassword123!"));
+
+		assertThat(resetResp.message()).contains("thành công");
+		verify(refreshTokenRepository).revokeAllByUserId(USER_ID);
+	}
+
+	@Test
+	void resetPasswordDoesNotRevokeSessionsWhenChallengeIsInvalid() {
+		assertThatThrownBy(() -> authService.resetPassword(
+				new ResetPasswordCommand(EMAIL, "000000", null, "BrandNewPassword123!")))
+				.isInstanceOf(ApiException.class)
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
+						.isEqualTo(HttpStatus.BAD_REQUEST));
+
+		verify(authUserRepository, never()).save(any());
+		verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+	}
+
+	/** Runs the forgot-password flow and returns the OTP that was emailed out. */
+	private String requestOtp() {
+		authService.forgotPassword(new ForgotPasswordCommand(EMAIL));
+		ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+		verify(emailService).sendPasswordResetOtp(eq(EMAIL), otpCaptor.capture(), any(), eq(15));
+		return otpCaptor.getValue();
 	}
 
 	private RefreshCommand refreshCommand() {

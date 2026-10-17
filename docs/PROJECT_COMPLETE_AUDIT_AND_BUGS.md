@@ -108,6 +108,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
 ### 4.1. NHÓM P0 - LỖ HỔNG BẢO MẬT & RỦI RO DỮ LIỆU NGHIÊM TRỌNG (CRITICAL SECURITY & DATA LOSS)
 
 #### BUG-01: Lộ mã OTP quên mật khẩu trong HTTP Response Body (Account Takeover)
+- **Trạng thái**: ✅ **ĐÃ KHẮC PHỤC** (bởi `@be-secondary`) — `debugOtp` đã bị xóa khỏi `ForgotPasswordResponse`; OTP bây giờ chỉ được gửi qua email (EmailJS) và không còn xuất hiện trong log.
 - **Tệp tin**: `backend/src/main/java/com/english_hub/core/modules/auth/application/service/AuthService.java`
 - **Vị trí**: Dòng 231–245
 - **Mã lỗi**:
@@ -118,6 +119,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
   ```
 - **Tác động**: Bất kỳ ai cũng có thể gửi request quên mật khẩu cho email của Quản trị viên (`admin@englishhub.com`) và nhận ngay mã OTP trong phản hồi HTTP để đổi mật khẩu và chiếm quyền quản trị.
 - **Hệ thống thiếu hụt**: Không cấu hình dịch vụ gửi mail SMTP thực tế.
+  - ➜ Đã bổ sung port `EmailService` (common) + implementation `EmailJsEmailService` (infrastructure).
 
 #### BUG-02: Nguy cơ mất trắng toàn bộ file Audio bài nghe khi container restart hoặc redeploy (Ephemeral Container Storage)
 - **Tệp tin**:

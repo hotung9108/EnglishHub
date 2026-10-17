@@ -62,6 +62,9 @@ Request a password reset OTP for the specified email account.
 
 **Response:** `ForgotPasswordResponse`
 
+> 📧 The OTP is emailed to the user through EmailJS; the response **no longer** returns the OTP.
+> If email is not configured or delivery fails, the endpoint returns `502 Bad Gateway`.
+
 ---
 
 ### POST `/api/v1/auth/reset-password`
@@ -1115,7 +1118,6 @@ Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writi
 |-------|------|-------------|
 | `message` | string | Notification message |
 | `email` | string | Target email address |
-| `debugOtp` | string \| null | OTP code returned in non-prod/debug profile for testing |
 
 ---
 
