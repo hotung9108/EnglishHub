@@ -6,7 +6,8 @@ import {
   buildShortAnswerPayload, 
   extractMcqOptions, 
   extractShortAnswerText,
-  type MultipleChoiceOptionDto
+  type MultipleChoiceOptionDto,
+  type QuestionResponse
 } from '../services/question.service';
 import { MockHttpClient } from './helpers/mock-http-client';
 
@@ -160,4 +161,106 @@ test('QuestionService - updateQuestion and deleteQuestion call correct endpoints
   await service.deleteQuestion(20);
   assert.strictEqual(mockHttp.calls[1].method, 'DELETE');
   assert.strictEqual(mockHttp.calls[1].url, '/questions/20');
+});
+
+// Questions 81 and 83 from local-dev/db-snapshot/questions.csv.
+function createMcqQuestion(includeOptions = true): QuestionResponse {
+  const question: QuestionResponse = {
+    id: 81,
+    content: 'Where can you try on clothes in a shop?',
+    questionType: 'MULTIPLE_CHOICE',
+    score: 1,
+    orderIndex: 1,
+    options: [
+      { id: 1, content: 'At the post office' },
+      { id: 2, content: 'In a fitting room' },
+      { id: 3, content: 'In a parking meter' },
+      { id: 4, content: 'At a bus station' },
+    ],
+  };
+  if (!includeOptions) {
+    delete question.options;
+  }
+  return question;
+}
+
+function createShortAnswerQuestion(): QuestionResponse {
+  return {
+    id: 83,
+    content: 'What should you show at an airport before an international flight?',
+    questionType: 'SHORT_ANSWER',
+    score: 1,
+    orderIndex: 3,
+  };
+}
+
+test('QuestionService - listQuestions preserves standalone options in every supported response shape', async () => {
+  for (const shape of ['data', 'questions', 'array']) {
+    const questions = [createMcqQuestion(), createShortAnswerQuestion()];
+    const response = shape === 'array' ? questions : { [shape]: questions };
+    const expectedQuestions = structuredClone(questions);
+    const expectedResponse = structuredClone(response);
+    const mockHttp = new MockHttpClient();
+    const service = new QuestionService(mockHttp);
+    mockHttp.mockResponse = response;
+
+    const result = await service.listQuestions(21);
+
+    assert.deepStrictEqual(result.questions, expectedQuestions);
+    assert.deepStrictEqual(result.data, expectedQuestions);
+    assert.deepStrictEqual(mockHttp.mockResponse, expectedResponse);
+    assert.strictEqual(Object.hasOwn(result.questions[1], 'options'), false);
+  }
+});
+
+test('QuestionService - listQuestions supports MCQ and SHORT_ANSWER without options', async () => {
+  for (const includeOptions of [false, true]) {
+    const questions = [createMcqQuestion(includeOptions), createShortAnswerQuestion()];
+    const response = { data: questions };
+    const expectedQuestions = structuredClone(questions);
+    const expectedResponse = structuredClone(response);
+    const mockHttp = new MockHttpClient();
+    const service = new QuestionService(mockHttp);
+    mockHttp.mockResponse = response;
+
+    const result = await service.listQuestions(21);
+
+    assert.deepStrictEqual(result.questions, expectedQuestions);
+    assert.deepStrictEqual(result.data, expectedQuestions);
+    assert.deepStrictEqual(mockHttp.mockResponse, expectedResponse);
+    assert.strictEqual(Object.hasOwn(result.questions[0], 'options'), includeOptions);
+    assert.strictEqual(Object.hasOwn(result.questions[1], 'options'), false);
+  }
+});
+
+test('QuestionService - getQuestion preserves standalone options without normalization changes', async () => {
+  const question = createMcqQuestion();
+  const expected = structuredClone(question);
+  const mockHttp = new MockHttpClient();
+  const service = new QuestionService(mockHttp);
+  mockHttp.mockResponse = question;
+
+  const result = await service.getQuestion(expected.id);
+
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, `/questions/${expected.id}`);
+  assert.deepStrictEqual(result, expected);
+  assert.deepStrictEqual(mockHttp.mockResponse, expected);
+});
+
+test('QuestionService - getQuestion supports MCQ and SHORT_ANSWER without options', async () => {
+  const factories = [() => createMcqQuestion(false), createShortAnswerQuestion, createMcqQuestion];
+  for (const createQuestion of factories) {
+    const question = createQuestion();
+    const expected = structuredClone(question);
+    const mockHttp = new MockHttpClient();
+    const service = new QuestionService(mockHttp);
+    mockHttp.mockResponse = question;
+
+    const result = await service.getQuestion(expected.id);
+
+    assert.deepStrictEqual(result, expected);
+    assert.deepStrictEqual(mockHttp.mockResponse, expected);
+    assert.strictEqual(Object.hasOwn(result, 'options'), Object.hasOwn(expected, 'options'));
+  }
 });

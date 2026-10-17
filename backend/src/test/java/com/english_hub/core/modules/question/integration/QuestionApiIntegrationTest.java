@@ -43,6 +43,7 @@ import com.english_hub.core.infrastructure.persistence.repository.UserRepository
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers
 @SpringBootTest
@@ -482,6 +485,92 @@ class QuestionApiIntegrationTest {
 				.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Không thể xoá câu hỏi đã có câu trả lời."));
+	}
+
+	@Test
+	void publicOptionsAreAvailableToBothRolesWithoutChangingStoredAnswer() throws Exception {
+		String storedAnswer = questionRepository.findById(questionId).orElseThrow().getCorrectAnswer();
+		for (UserRole role : List.of(UserRole.TEACHER, UserRole.STUDENT)) {
+			Long userId = role == UserRole.TEACHER ? teacherId : studentId;
+			var listResult = mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+					.header("Authorization", bearer(userId, role)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.data[0].options", hasSize(4)))
+					.andReturn();
+			var detailResult = mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+					.header("Authorization", bearer(userId, role)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.options", hasSize(4)))
+					.andReturn();
+
+			JsonMapper mapper = JsonMapper.builder().build();
+			var listQuestion = mapper.readTree(listResult.getResponse().getContentAsString()).get("data").get(0);
+			var detailQuestion = mapper.readTree(detailResult.getResponse().getContentAsString());
+			assertPublicOptions(listQuestion, role);
+			assertPublicOptions(detailQuestion, role);
+		}
+		questionRepository.flush();
+		assertThat(questionRepository.findById(questionId).orElseThrow().getCorrectAnswer()).isEqualTo(storedAnswer);
+		assertThat(storedAnswer).contains("is_correct").doesNotContain("isCorrect");
+	}
+
+	@Test
+	void shortAnswerOptionsAreOmittedInJsonForBothRoles() throws Exception {
+		Question shortAnswer = questionRepository.save(new Question(
+				moduleId,
+				"What should you show at an airport before an international flight?",
+				QuestionType.SHORT_ANSWER,
+				"{\"correct_answer\":\"passport\"}",
+				BigDecimal.ONE,
+				2));
+		for (UserRole role : List.of(UserRole.TEACHER, UserRole.STUDENT)) {
+			Long userId = role == UserRole.TEACHER ? teacherId : studentId;
+			mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+					.header("Authorization", bearer(userId, role)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.data", hasSize(2)))
+					.andExpect(jsonPath("$.data[1].options").doesNotExist());
+			mockMvc.perform(get("/api/v1/questions/{id}", shortAnswer.getId())
+					.header("Authorization", bearer(userId, role)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.options").doesNotExist());
+		}
+	}
+
+	@Test
+	void studentWithoutClassMembershipCannotReadEitherQuestionEndpoint() throws Exception {
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+				.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden());
+	}
+
+	private void assertPublicOptions(JsonNode response, UserRole role) {
+		JsonNode options = response.get("options");
+		for (int i = 0; i < 4; i++) {
+			JsonNode option = options.get(i);
+			assertThat(option.size()).isEqualTo(2);
+			assertThat(option.get("id").asInt()).isEqualTo(i + 1);
+			assertThat(option.get("content").asString()).isEqualTo(List.of("A", "B", "C", "D").get(i));
+			assertThat(option.has("isCorrect")).isFalse();
+			assertThat(option.has("is_correct")).isFalse();
+		}
+		if (role == UserRole.TEACHER) {
+			assertTeacherAnswer(response.get("correctAnswer").get("options"), options);
+		} else {
+			assertThat(response.has("correctAnswer")).isFalse();
+		}
+	}
+
+	private void assertTeacherAnswer(JsonNode answer, JsonNode publicOptions) {
+		assertThat(answer.size()).isEqualTo(4);
+		for (int i = 0; i < 4; i++) {
+			assertThat(answer.get(i).get("id")).isEqualTo(publicOptions.get(i).get("id"));
+			assertThat(answer.get(i).get("content")).isEqualTo(publicOptions.get(i).get("content"));
+			assertThat(answer.get(i).get("isCorrect").asBoolean()).isEqualTo(i == 0);
+		}
 	}
 
 	private Long createUser(UserRole role, String name) {
