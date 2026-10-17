@@ -1,0 +1,27 @@
+id: BE-TASK-33
+title: "Harden Forgot/Reset Password: real email delivery (EmailJS) + remove OTP leak + revoke sessions on reset"
+assignee: "@be-secondary"
+status: "Done"
+priority: "Critical"
+description: "Fix P0 audit item BE-SEC-01 / BUG-01 (OTP leaked in HTTP response body, enabling account takeover). (1) Add a provider-agnostic EmailService port in common and an EmailJS-backed implementation in infrastructure, wiring real email delivery into the forgot-password flow. (2) Remove the debugOtp field from ForgotPasswordResponse so the OTP is delivered only by email, and stop logging the OTP/token. (3) Revoke all active refresh sessions for the user when the password is reset. Fail fast (502) when email delivery fails instead of reporting a false success."
+progress: "DONE. Verified with ./gradlew test => BUILD SUCCESSFUL (2026-10-17).
+1. Email service (hexagonal, mirrors the existing StorageService port/adapter pattern):
+   - Added port com.english_hub.core.common.email.EmailService with sendPasswordResetOtp(toEmail, otp, resetUrl, ttlMinutes).
+   - Added infrastructure implementation com.english_hub.core.infrastructure.email.EmailJsEmailService (Spring RestClient, POST https://api.emailjs.com/api/v1.0/email/send, payload service_id/template_id/user_id/accessToken/template_params).
+   - Added EmailJsProperties (@ConfigurationProperties 'app.email.emailjs'), EmailConfiguration (@ConditionalOnProperty app.email.enabled + @ConditionalOnMissingBean fallback), and UnavailableEmailService (fail-fast fallback when unconfigured).
+   - Added ApiException.badGateway(...) factory; provider rejection/unreachable => 502 Bad Gateway.
+2. OTP leak removed (BE-SEC-01 / BUG-01):
+   - ForgotPasswordResponse is now (message, email) — debugOtp field deleted.
+   - AuthService.forgotPassword now builds the deep link (app.frontend.reset-password-url + email + token), sends it via EmailService, and logs only 'Password reset email dispatched for [email]' (no OTP/token). Removed @Transactional(readOnly=true) so the external email call does not hold a JDBC connection.
+3. Session revocation on reset:
+   - Added RefreshTokenRepository.revokeAllByUserId(Long) to the domain port; implemented in RefreshTokenJpaAdapter via a single bulk @Modifying JPQL update (revokeAllActiveByUserId) guarded by @Transactional.
+   - AuthService.resetPassword now revokes all active sessions after saving the new password and logs the revoked count.
+   - Accepted residual risk: stateless access tokens remain valid up to app.security.access-token-ttl-seconds (15 min); tracked as follow-up.
+4. Config: added app.email.* and app.frontend.reset-password-url to application.properties / application-dev.properties. Docs updated (docs/api/EnglishHub_API_docs _v2.md, docs/api/EnglishHub_API_docs_eng.md, docs/PROJECT_COMPLETE_AUDIT_AND_BUGS.md marked BE-SEC-01 DONE).
+5. Tests: updated AuthServiceTest (email dispatch, revocation, no-revoke-on-invalid-challenge) and added EmailJsEmailServiceTest (payload shape, 502 on rejection, 502 on unreachable). Full backend suite green."
+artifacts:
+  - "production_artifacts/be_to_tester/auth-forgot-password-emailjs-testing.md"
+notes:
+  - "BREAKING for FE: debugOtp removed. ForgotPassword.tsx:83-84,141-142 and hooks-and-services.test.ts:76 must stop reading debugOtp/otpPreview."
+  - "EmailJS prerequisite: Account -> Security -> 'Allow non-browser applications' must be ON; rate limit 1 req/sec."
+  - "Follow-ups (not in scope): rate limiting, hashing OTP/token at rest, revoking sessions on the other two password-change paths, access-token invalidation, anti-enumeration."

@@ -108,6 +108,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
 ### 4.1. NHÓM P0 - LỖ HỔNG BẢO MẬT & RỦI RO DỮ LIỆU NGHIÊM TRỌNG (CRITICAL SECURITY & DATA LOSS)
 
 #### BUG-01: Lộ mã OTP quên mật khẩu trong HTTP Response Body (Account Takeover)
+- **Trạng thái**: ✅ **ĐÃ KHẮC PHỤC** (bởi `@be-secondary`) — `debugOtp` đã bị xóa khỏi `ForgotPasswordResponse`; OTP bây giờ chỉ được gửi qua email (EmailJS) và không còn xuất hiện trong log.
 - **Tệp tin**: `backend/src/main/java/com/english_hub/core/modules/auth/application/service/AuthService.java`
 - **Vị trí**: Dòng 231–245
 - **Mã lỗi**:
@@ -118,6 +119,7 @@ pie title Thực trạng hoàn thiện tính năng EnglishHub
   ```
 - **Tác động**: Bất kỳ ai cũng có thể gửi request quên mật khẩu cho email của Quản trị viên (`admin@englishhub.com`) và nhận ngay mã OTP trong phản hồi HTTP để đổi mật khẩu và chiếm quyền quản trị.
 - **Hệ thống thiếu hụt**: Không cấu hình dịch vụ gửi mail SMTP thực tế.
+  - ➜ Đã bổ sung port `EmailService` (common) + implementation `EmailJsEmailService` (infrastructure).
 
 #### BUG-02: Nguy cơ mất trắng toàn bộ file Audio bài nghe khi container restart hoặc redeploy (Ephemeral Container Storage)
 - **Tệp tin**:
@@ -367,7 +369,7 @@ flowchart TD
 | Vai trò phụ trách | Mã công việc | Hành động khắc phục chi tiết | Mức độ ưu tiên |
 | :--- | :--- | :--- | :--- |
 | **@pm** | `PM-FIX-01` | Mở lại task `PM-TASK-2`, viết đầy đủ mô tả luồng chính/phụ và điều kiện cho 36 UCs trong `01.SRS.md`. | **P0** |
-| **@be-primary** | `BE-SEC-01` | Xóa `debugOtp` trong `ForgotPasswordResponse`. Cấu hình `spring-boot-starter-mail` để gửi email thật. | **P0 (Critical)** |
+| **@be-primary** | `BE-SEC-01` | ~~Xóa `debugOtp` trong `ForgotPasswordResponse`. Cấu hình `spring-boot-starter-mail` để gửi email thật.~~ ✅ **DONE** (`@be-secondary`): `debugOtp` đã xóa, email gửi qua EmailJS (`EmailService` port). | ~~**P0 (Critical)**~~ |
 | **@be-primary** | `BE-STO-01` | Chuyển `LocalAudioStorageAdapter` sang lưu trữ trên S3, xóa bỏ lưu disk local không volume. | **P0 (Data Loss)** |
 | **@be-primary** | `BE-API-01` | Cập nhật `QuestionResponse`: Trả về mảng `options: [{id, content}]` đã ẩn trường `isCorrect` cho học sinh. | **P0 (Blocker)** |
 | **@be-primary** | `BE-AUD-01` | Bổ sung endpoint `GET /api/v1/modules/{id}/audio` hỗ trợ streaming cho học sinh làm bài nghe. | **P0 (Blocker)** |
