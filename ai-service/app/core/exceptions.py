@@ -79,6 +79,8 @@ def register_exception_handlers(app: FastAPI):
             code = "BAD_REQUEST"
         elif exc.status_code == status.HTTP_404_NOT_FOUND:
             code = "NOT_FOUND"
+        elif exc.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+            code = "UNPROCESSABLE_ENTITY"
         elif exc.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             code = "INTERNAL_SERVER_ERROR"
 
@@ -86,7 +88,8 @@ def register_exception_handlers(app: FastAPI):
         payload = ErrorResponse(
             success=False,
             code=code,
-            message=detail_msg
+            message=detail_msg,
+            detail=detail_msg
         )
         return JSONResponse(
             status_code=exc.status_code,
@@ -105,6 +108,7 @@ def register_exception_handlers(app: FastAPI):
             success=False,
             code="VALIDATION_ERROR",
             message="Dữ liệu yêu cầu không hợp lệ.",
+            detail=exc.errors(),
             errors=field_errors
         )
         return JSONResponse(

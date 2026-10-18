@@ -104,7 +104,9 @@ def test_analyze_writing_too_short_rejects_422():
     }
     response = client.post("/api/v1/analyze/writing", json=payload)
     assert response.status_code == 422
-    assert "quá ngắn" in response.json()["detail"]
+    data = response.json()
+    assert "quá ngắn" in (data.get("detail") or data.get("message") or "")
+
 
 
 def test_analyze_writing_empty_content_rejects_422():
