@@ -2,20 +2,27 @@ try:
     import pytest
 except ImportError:
     pytest = None
+from pathlib import Path
 from fastapi.testclient import TestClient
+from app.core.config import settings
 from app.main import app
 
+settings.MOCK_MODE = True
 client = TestClient(app)
 
-QA21_ESSAY = (
-    "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
-    "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"
-    "First of all, engaging in voluntary activities allows teenagers to acquire practical experience. "
-    "Community service help teenagers understand social responsibilities and learn how to work effectively in a team. "
-    "Furthermore, participating in social work can make a big benefit for their future university applications because admissions officers always appreciate well-rounded candidates.\n"
-    "However they should not be overloaded with too many working hours, as academic study must remain their top priority. "
-    "In conclusion, mandatory community service is highly beneficial for high school students as long as it is reasonably arranged."
-)
+_benchmark_file = Path(__file__).parent / "benchmark_data" / "writing_qa21_essay.txt"
+if _benchmark_file.exists():
+    QA21_ESSAY = _benchmark_file.read_text(encoding="utf-8").strip()
+else:
+    QA21_ESSAY = (
+        "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
+        "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"
+        "First of all, engaging in voluntary activities allows teenagers to acquire practical experience. "
+        "Community service help teenagers understand social responsibilities and learn how to work effectively in a team. "
+        "Furthermore, participating in social work can make a big benefit for their future university applications because admissions officers always appreciate well-rounded candidates.\n"
+        "However they should not be overloaded with too many working hours, as academic study must remain their top priority. "
+        "In conclusion, mandatory community service is highly beneficial for high school students as long as it is reasonably arranged."
+    )
 
 
 def test_analyze_writing_qa21_benchmark():

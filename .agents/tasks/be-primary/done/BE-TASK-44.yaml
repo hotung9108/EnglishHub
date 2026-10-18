@@ -1,0 +1,16 @@
+id: BE-TASK-44
+title: "Fix block Event Loop FastAPI do gọi đồng bộ Gemini SDK (BUG-08)"
+assignee: "@be-primary"
+status: "Done"
+priority: "Critical"
+description: >-
+  Wrap synchronous Gemini SDK calls (model.generate_content) in asyncio.to_thread
+  within gemini_service.py to unblock FastAPI event loop during Speaking and Writing
+  evaluations. Solves Docker healthcheck timeouts and mass 504 Gateway Timeout errors.
+  Full refactoring completed adhering to convention-ai.md (prompts separation,
+  CamelModel base, lifespan manager, structured exceptions). Testing instructions
+  provided in production_artifacts/be_to_tester/BE-44-ai-service-event-loop-testing.md.
+verification:
+  concurrency_test: "PASSED (10/10 healthchecks < 30ms during active AI inference)"
+  container_status: "Healthy (0 restarts)"
+  unit_tests: "11/11 tests passing"

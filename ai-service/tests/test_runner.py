@@ -10,6 +10,12 @@ os.environ["MOCK_MODE"] = "true"
 os.environ["GEMINI_API_KEY"] = ""
 
 from fastapi.testclient import TestClient
+from app.core.config import settings
+
+settings.MOCK_MODE = True
+settings.GEMINI_API_KEY = ""
+settings.OPENROUTER_API_KEY = ""
+
 from app.main import app
 from app.services.audio_processor import AudioProcessor
 
