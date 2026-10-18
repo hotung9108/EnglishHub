@@ -19,6 +19,7 @@ import com.english_hub.core.modules.user.domain.model.User;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +79,7 @@ public class ClassService {
 		User caller = currentUserProvider.requireActiveUser();
 		EnglishClass englishClass = classRepository.findById(classId)
 				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		requireTeacherOwnership(caller, englishClass);
 		requireStudentMembership(caller, classId);
 		TeacherInfo teacher = englishClass.getTeacherId() == null
 				? null
@@ -177,13 +179,16 @@ public class ClassService {
 	@Transactional(readOnly = true)
 	public List<ClassMemberDetail> listClassMembers(long classId) {
 		User caller = currentUserProvider.requireActiveUser();
-		requireClassExists(classId);
+		EnglishClass englishClass = classRepository.findById(classId)
+				.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+		requireTeacherOwnership(caller, englishClass);
 		requireStudentMembership(caller, classId);
 		return classMemberRepository.findMembersWithStudentInfo(classId);
 	}
 
 	@Transactional
 	public long addClassMember(long classId, AddClassMemberCommand command) {
+		requireMemberWriteAccess(classId);
 		if (command == null || command.studentId() == null) {
 			throw ApiException.badRequest(MISSING_STUDENT_ID_MESSAGE);
 		}
@@ -198,14 +203,38 @@ public class ClassService {
 
 	@Transactional
 	public void removeClassMember(long classId, long memberId) {
+		requireMemberWriteAccess(classId);
 		ClassMember member = classMemberRepository.findByClassIdAndId(classId, memberId)
 				.orElseThrow(() -> ApiException.notFound(MEMBER_NOT_FOUND_MESSAGE));
 		classMemberRepository.deleteById(member.getId());
 	}
 
-	private void requireClassExists(long classId) {
-		if (!classRepository.existsById(classId)) {
-			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
+	private void requireMemberWriteAccess(long classId) {
+		CurrentUserProvider.AuthenticatedIdentity identity = currentUserProvider.requireAuthenticatedIdentity();
+		if (identity.role() == UserRole.ADMIN) {
+			return;
+		}
+		if (identity.role() == UserRole.TEACHER) {
+			User teacher = currentUserProvider.requireActiveUser();
+			if (teacher.role() != UserRole.TEACHER || teacher.id() == null) {
+				throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+			}
+			EnglishClass englishClass = classRepository.findById(classId)
+					.orElseThrow(() -> ApiException.notFound(CLASS_NOT_FOUND_MESSAGE));
+			if (!Objects.equals(englishClass.getTeacherId(), teacher.id())) {
+				throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+			}
+			return;
+		}
+		throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+	}
+
+	private void requireTeacherOwnership(User caller, EnglishClass englishClass) {
+		if (caller.role() != UserRole.TEACHER) {
+			return;
+		}
+		if (englishClass.getTeacherId() == null || !Objects.equals(englishClass.getTeacherId(), caller.id())) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 	}
 

@@ -4,6 +4,7 @@ import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.security.JwtPrincipal;
+import com.english_hub.core.modules.user.application.port.CurrentUserProvider.AuthenticatedIdentity;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
 import com.english_hub.core.modules.user.infrastructure.security.AuthenticatedUserProvider;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -21,8 +23,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +38,68 @@ class AuthenticatedUserProviderTest {
 	@AfterEach
 	void clearAuthentication() {
 		SecurityContextHolder.clearContext();
+	}
+
+	@Test
+	void returnsAdminIdentityWithoutQueryingTheRepository() {
+		authenticate(new JwtPrincipal(1L,
+				com.english_hub.core.modules.user.domain.model.UserRole.ADMIN));
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+
+		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
+
+		assertThat(identity.userId()).isEqualTo(1L);
+		assertThat(identity.role()).isEqualTo(UserRole.ADMIN);
+		verifyNoInteractions(userRepository);
+	}
+
+	@Test
+	void returnsTeacherIdentityWithoutQueryingTheRepository() {
+		authenticate(new JwtPrincipal(4L,
+				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+
+		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
+
+		assertThat(identity.userId()).isEqualTo(4L);
+		assertThat(identity.role()).isEqualTo(UserRole.TEACHER);
+		verifyNoInteractions(userRepository);
+	}
+
+	@Test
+	void returnsStudentIdentityWithoutQueryingTheRepository() {
+		authenticate(new JwtPrincipal(13L,
+				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+
+		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
+
+		assertThat(identity.userId()).isEqualTo(13L);
+		assertThat(identity.role()).isEqualTo(UserRole.STUDENT);
+		verifyNoInteractions(userRepository);
+	}
+
+	@Test
+	void rejectsIdentityWithoutAuthenticationWithoutQueryingTheRepository() {
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+
+		ApiException exception = assertThrows(ApiException.class, provider::requireAuthenticatedIdentity);
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+		assertThat(exception).hasMessage("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
+		verifyNoInteractions(userRepository);
+	}
+
+	@Test
+	void rejectsIdentityWithANonJwtPrincipalWithoutQueryingTheRepository() {
+		authenticate("not-a-jwt-principal");
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+
+		ApiException exception = assertThrows(ApiException.class, provider::requireAuthenticatedIdentity);
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+		assertThat(exception).hasMessage("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
+		verifyNoInteractions(userRepository);
 	}
 
 	@Test

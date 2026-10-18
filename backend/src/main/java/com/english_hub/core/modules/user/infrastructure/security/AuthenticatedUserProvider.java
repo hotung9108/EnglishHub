@@ -24,6 +24,17 @@ public class AuthenticatedUserProvider implements CurrentUserProvider {
 		this.userRepository = userRepository;
 	}
 
+	/** Reads JWT identity only; does not query the database or check locked/deleted user state. */
+	@Override
+	public AuthenticatedIdentity requireAuthenticatedIdentity() {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		if (authentication == null || !(authentication.getPrincipal() instanceof JwtPrincipal principal)) {
+			throw ApiException.unauthorized(UNAUTHENTICATED_MESSAGE);
+		}
+		UserRole role = UserRole.valueOf(principal.role().name());
+		return new AuthenticatedIdentity(principal.userId(), role);
+	}
+
 	@Override
 	public User requireActiveUser() {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
