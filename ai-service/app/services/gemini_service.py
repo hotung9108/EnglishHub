@@ -1,3 +1,4 @@
+import asyncio
 import json
 import base64
 import logging
@@ -19,6 +20,13 @@ from app.schemas.writing import (
 )
 from app.services.fluency_analyzer import FluencyAnalyzer
 from app.services.text_analyzer import TextAnalyzer
+from app.prompts import (
+    SPEAKING_SYSTEM_PROMPT,
+    SPEAKING_PROMPT_VERSION,
+    WRITING_SYSTEM_TEMPLATE,
+    WRITING_PROMPT_VERSION,
+)
+from app.prompts.base import sanitize_and_parse_llm_json
 
 logger = logging.getLogger("ai_service.gemini")
 
@@ -27,118 +35,13 @@ class GeminiService:
     """Orchestrates Gemini Flash Multimodal evaluation and fallback handlers for Speaking & Writing."""
 
     # =========================================================================
-    # SPEAKING EXAMINER SYSTEM PROMPT (UC26)
+    # SYSTEM PROMPTS & RUBRICS (Managed in app.prompts per convention-ai.md Mục 4)
     # =========================================================================
-    SPEAKING_SYSTEM_PROMPT = """You are an expert IELTS and CEFR Certified Speaking Examiner.
-Your task is to listen to the provided student audio recording, perform speech-to-text with word-level timestamps, and evaluate the speaking performance.
-
-Rubric criteria to score from 0.0 to 9.0:
-1. Fluency & Coherence (FC): Speech rate, smoothness, pauses, and discourse markers.
-2. Lexical Resource (LR): Vocabulary variety, collocations, idiomatic phrasing.
-3. Grammatical Range & Accuracy (GRA): Sentence complexity, tenses, structural errors.
-4. Pronunciation (PR): Phoneme accuracy, word stress, ending sounds (/s/, /z/, /ed/), intonation.
-
-You MUST respond strictly with a valid JSON object matching the following schema:
-{
-  "fullTranscript": "string containing the full spoken text",
-  "words": [
-    { "word": "word1", "start": 0.0, "end": 0.3, "confidence": 0.98 },
-    { "word": "word2", "start": 0.3, "end": 0.7, "confidence": 0.95 }
-  ],
-  "criteriaScores": {
-    "fluencyAndCoherence": 7.0,
-    "lexicalResource": 6.5,
-    "grammaticalRangeAndAccuracy": 7.0,
-    "pronunciation": 7.5,
-    "overallScore": 7.0
-  },
-  "feedbackMarkdown": "### Đánh giá Tổng quan Kỹ năng Nói...",
-  "annotations": [
-    {
-      "word": "problem_word",
-      "errorType": "PRONUNCIATION",
-      "comment": "Missing final /s/ sound",
-      "suggestedFix": "/ˈhæb.ɪts/"
-    }
-  ]
-}
-"""
-    # Backward compatibility alias
+    SPEAKING_SYSTEM_PROMPT = SPEAKING_SYSTEM_PROMPT
     SYSTEM_PROMPT = SPEAKING_SYSTEM_PROMPT
-
-    # =========================================================================
-    # WRITING EXAMINER SYSTEM TEMPLATE (UC27)
-    # =========================================================================
-    WRITING_SYSTEM_TEMPLATE = """You are a strict, veteran IELTS Senior Examiner and CEFR C2 English Assessment Specialist with 15+ years of academic assessment experience.
-Your evaluation must be impartial, rigorous, evidence-based, and calibrated strictly against the 9.0 IELTS band scale (or max score {max_score}).
-
-================================================================================
-ASSIGNMENT PROMPT & INSTRUCTIONS
-================================================================================
-Topic / Task:
-\"\"\"{instructions}\"\"\"{extra}
-
-================================================================================
-IELTS 4-CRITERIA SCORING RUBRIC & CALIBRATION (0.0 to {max_score})
-================================================================================
-To eliminate CENTRAL TENDENCY BIAS, you MUST utilize the FULL band spectrum. Do NOT default to safe 6.0-6.5 scores:
-- Band 8.5-9.0 (Expert): Flawless syntactic control, highly sophisticated collocations, nuanced development, zero impeding errors.
-- Band 7.5-8.0 (Very Good): Natural control of complex grammar, wide lexical repertoire with rare slips, well-developed arguments.
-- Band 6.5-7.0 (Competent to Good): Clear stance, frequent complex sentences, good vocabulary range with occasional awkward collocations or minor grammatical slips.
-- Band 5.5-6.0 (Modest to Competent): Mix of simple and complex structures; noticeable grammatical/lexical errors that occasionally reduce clarity.
-- Band 4.5-5.0 (Modest): Frequent basic grammatical errors (subject-verb agreement, basic tenses, singular/plural); repetitive or informal vocabulary; limited sentence variety.
-- Band 3.5-4.0 (Limited): Severe structural distortion, extremely limited vocabulary, major difficulty communicating coherent ideas.
-
-================================================================================
-STRICT PENALTY & CEILING RULES
-================================================================================
-1. [GRA Ceiling 5.5]: If the essay contains frequent elementary grammar errors (e.g., subject-verb agreement "people thinks", tense inconsistency, missing plural "s", wrong basic prepositions), the GRA score MUST NOT exceed 5.5.
-2. [GRA Punctuation Penalty]: Comma splices, run-on sentences, or missing commas after transitional adverbs (e.g., "However they...") must be penalized under GRA.
-3. [LR Ceiling 5.5]: If vocabulary is repetitive, overly informal/conversational, or directly translated from Vietnamese (e.g., "same same", "bad impact", "make benefit"), the LR score MUST NOT exceed 5.5.
-4. [TR/CC Ceiling 5.0]: If the essay is written as one single undivided block of text (no paragraphs) or completely misses the central question of the prompt, TR and CC MUST NOT exceed 5.0.
-5. [Excellence Award >= 8.0]: If the essay displays effortless academic style, varied syntactic subordination, sophisticated collocations, and virtually zero errors, you MUST confidently award 8.0 or above.
-
-================================================================================
-VERBATIM SUBSTRING ANNOTATION RULES (CRITICAL FOR UI HIGHLIGHTING)
-================================================================================
-1. "exactText" MUST be copied 100% VERBATIM (character-for-character, case-sensitive) directly from the student's text.
-   - NEVER alter, fix, or paraphrase words inside "exactText".
-   - If the student wrote "Community service help teenagers", "exactText" MUST be "Community service help teenagers", NOT "Community service helps teenagers".
-2. Select between 3 to 8 of the most significant, high-impact errors across the essay.
-3. Categorize each errorType into: "GRAMMAR", "VOCABULARY", "COHESION", "PUNCTUATION", or "SPELLING".
-4. Provide a clear, polite explanation in Vietnamese in "comment" explaining WHY it is incorrect.
-5. Provide the exact replacement phrase in "suggestedFix".
-
-================================================================================
-RESPONSE FORMAT ENFORCEMENT
-================================================================================
-You MUST respond strictly with a valid JSON object matching the following schema.
-Include the "deliberation" block first to perform Chain-of-Thought reasoning before finalizing scores:
-{{
-  "deliberation": {{
-    "taskResponseAssessment": "Brief evidence-based rationale evaluating prompt coverage and argument depth...",
-    "coherenceAssessment": "Brief rationale evaluating paragraph progression and linking device variety...",
-    "lexicalAssessment": "Brief rationale evaluating vocabulary range, collocations, and word formation...",
-    "grammarAssessment": "Brief rationale evaluating sentence variety, complexity, and error density..."
-  }},
-  "criteriaScores": {{
-    "taskResponse": 7.0,
-    "coherenceAndCohesion": 6.5,
-    "lexicalResource": 6.0,
-    "grammaticalRangeAndAccuracy": 5.5,
-    "overallScore": 6.0
-  }},
-  "feedbackMarkdown": "### Đánh giá Tổng quan Kỹ năng Viết (IELTS Writing)...\\n\\n#### Điểm mạnh nổi bật:\\n- ...\\n\\n#### Điểm yếu cần khắc phục:\\n- ...\\n\\n#### Kế hoạch hành động 3 bước nâng band điểm:\\n1. ...\\n2. ...\\n3. ...",
-  "annotations": [
-    {{
-      "exactText": "verbatim substring from the student essay",
-      "errorType": "GRAMMAR",
-      "comment": "giải thích chi tiết bằng tiếng Việt lý do sai ngữ pháp/từ vựng/dấu câu",
-      "suggestedFix": "cụm từ sửa lại chính xác"
-    }}
-  ]
-}}
-"""
+    SPEAKING_PROMPT_VERSION = SPEAKING_PROMPT_VERSION
+    WRITING_SYSTEM_TEMPLATE = WRITING_SYSTEM_TEMPLATE
+    WRITING_PROMPT_VERSION = WRITING_PROMPT_VERSION
 
     @classmethod
     def _build_static_system_prompt(
@@ -411,19 +314,7 @@ Include the "deliberation" block first to perform Chain-of-Thought reasoning bef
                 raise RuntimeError(f"No choices in OpenRouter response: {res_json}")
 
             raw_content = choices[0].get("message", {}).get("content", "")
-            clean_json_str = raw_content.strip()
-            if clean_json_str.startswith("```json"):
-                clean_json_str = clean_json_str[7:]
-            if clean_json_str.startswith("```"):
-                clean_json_str = clean_json_str[3:]
-            if clean_json_str.endswith("```"):
-                clean_json_str = clean_json_str[:-3]
-            try:
-                parsed_data = json.loads(clean_json_str, strict=False)
-            except json.JSONDecodeError:
-                import re
-                sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda m: '\n' if m.group() == '\n' else ('\t' if m.group() == '\t' else ' '), clean_json_str)
-                parsed_data = json.loads(sanitized, strict=False)
+            parsed_data = sanitize_and_parse_llm_json(raw_content)
             return cls._build_response_from_json(
                 submission_module_id,
                 parsed_data,
@@ -469,14 +360,9 @@ Include the "deliberation" block first to perform Chain-of-Thought reasoning bef
 
         # Prompt Caching optimization (Tier 1):
         # Static prompt prefix goes first, dynamic per-student audio goes last.
-        response = model.generate_content([user_prompt, audio_part])
+        response = await asyncio.to_thread(model.generate_content, [user_prompt, audio_part])
         raw_text = response.text
-        try:
-            parsed_json = json.loads(raw_text, strict=False)
-        except json.JSONDecodeError:
-            import re
-            sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda m: '\n' if m.group() == '\n' else ('\t' if m.group() == '\t' else ' '), raw_text)
-            parsed_json = json.loads(sanitized, strict=False)
+        parsed_json = sanitize_and_parse_llm_json(raw_text)
 
         return cls._build_response_from_json(
             submission_module_id,
@@ -851,29 +737,7 @@ Include the "deliberation" block first to perform Chain-of-Thought reasoning bef
                 raise RuntimeError(f"OpenRouter API error (HTTP {resp.status_code}): {resp.text}")
             data = resp.json()
             raw_text = data["choices"][0]["message"]["content"]
-            clean_json_str = raw_text.strip()
-            if clean_json_str.startswith("```json"):
-                clean_json_str = clean_json_str[7:]
-            if clean_json_str.startswith("```"):
-                clean_json_str = clean_json_str[3:]
-            if clean_json_str.endswith("```"):
-                clean_json_str = clean_json_str[:-3]
-            clean_json_str = clean_json_str.strip()
-            parsed_data = None
-            try:
-                parsed_data = json.loads(clean_json_str, strict=False)
-            except Exception:
-                try:
-                    import dirtyjson
-                    parsed_data = dict(dirtyjson.loads(clean_json_str))
-                except Exception:
-                    import re
-                    sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda m: '\n' if m.group() == '\n' else ('\t' if m.group() == '\t' else ' '), clean_json_str)
-                    try:
-                        parsed_data = json.loads(sanitized, strict=False)
-                    except Exception:
-                        import dirtyjson
-                        parsed_data = dict(dirtyjson.loads(sanitized))
+            parsed_data = sanitize_and_parse_llm_json(raw_text)
             return cls._build_writing_response_from_json(
                 submission_module_id,
                 content,
@@ -901,23 +765,9 @@ Include the "deliberation" block first to perform Chain-of-Thought reasoning bef
             system_instruction=static_system_prompt,
             generation_config={"response_mime_type": "application/json", "temperature": 0.2}
         )
-        response = model.generate_content([user_prompt])
+        response = await asyncio.to_thread(model.generate_content, [user_prompt])
         raw_text = response.text.strip()
-        parsed_data = None
-        try:
-            parsed_data = json.loads(raw_text, strict=False)
-        except Exception:
-            try:
-                import dirtyjson
-                parsed_data = dict(dirtyjson.loads(raw_text))
-            except Exception:
-                import re
-                sanitized = re.sub(r'[\x00-\x1f\x7f-\x9f]', lambda m: '\n' if m.group() == '\n' else ('\t' if m.group() == '\t' else ' '), raw_text)
-                try:
-                    parsed_data = json.loads(sanitized, strict=False)
-                except Exception:
-                    import dirtyjson
-                    parsed_data = dict(dirtyjson.loads(sanitized))
+        parsed_data = sanitize_and_parse_llm_json(raw_text)
         return cls._build_writing_response_from_json(
             submission_module_id,
             content,

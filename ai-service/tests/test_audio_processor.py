@@ -7,7 +7,11 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import httpx
-import pytest
+try:
+    import pytest
+except ImportError:
+    import unittest
+    raise unittest.SkipTest("pytest is not installed; run these tests in the Docker/CI environment with pytest.")
 from fastapi import HTTPException
 
 from app.services import audio_processor as audio_module

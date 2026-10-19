@@ -2,12 +2,16 @@ try:
     import pytest
 except ImportError:
     pytest = None
+import os
+os.environ["MOCK_MODE"] = "true"
 import base64
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
+from app.core.config import settings
 from app.main import app
 from app.services.audio_processor import AudioProcessor
 
+settings.MOCK_MODE = True
 client = TestClient(app)
 
 
@@ -32,7 +36,8 @@ def test_analyze_speaking_qa21_benchmark(converter: AsyncMock):
         "audioStorageKey": "submissions/speaking_14.mp3",
         "moduleInstructions": "Describe a book you enjoyed reading recently.",
         "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
-        "maxScore": 9.0
+        "maxScore": 9.0,
+        "aiProvider": "mock"
     }
 
     response = client.post("/api/v1/analyze/speaking", json=payload)
