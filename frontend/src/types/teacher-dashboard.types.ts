@@ -6,6 +6,8 @@ export interface TeacherPendingSubmission {
   assignmentTitle: string;
   studentId: string;
   studentName: string;
+  studentEmail?: string;
+  studentCode?: string;
   studentAvatar: string;
   className: string;
   skill: TeacherSkill;

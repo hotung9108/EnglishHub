@@ -25,7 +25,6 @@ interface EnrolledStudentSubmissionRow {
   studentId: number;
   code: string;
   name: string;
-  email: string;
   initials: string;
   avatarBg: string;
   avatarColor: string;
@@ -272,7 +271,6 @@ export const TeacherAssignmentDetails: React.FC = () => {
           studentId: member.studentId,
           code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
           name: member.fullName,
-          email: `${member.studentCode?.toLowerCase() || `student${member.studentId}`}@englishhub.edu.vn`,
           initials,
           avatarBg: bgColors[colorIndex],
           avatarColor: textColors[colorIndex],
@@ -347,7 +345,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+        return s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q);
       }
 
       return true;
@@ -780,7 +778,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-semibold text-main text-sm">{student.name}</div>
-                        <div className="text-muted text-xs">{student.email}</div>
+                        <div className="text-muted text-xs">{student.code}</div>
                       </div>
                     </div>
                   </td>
@@ -817,7 +815,12 @@ export const TeacherAssignmentDetails: React.FC = () => {
                       <Button 
                         variant="secondary"
                         size="sm"
-                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`)}
+                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`, {
+                          state: {
+                            studentName: student.name,
+                            studentCode: student.code
+                          }
+                        })}
                       >
                         {t('assignmentDetails.btnView')}
                       </Button>
@@ -826,7 +829,12 @@ export const TeacherAssignmentDetails: React.FC = () => {
                       <Button 
                         variant="primary"
                         size="sm"
-                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`)}
+                        onClick={() => navigate(`/teacher/assignments/${id}/submissions/${student.studentId}`, {
+                          state: {
+                            studentName: student.name,
+                            studentCode: student.code
+                          }
+                        })}
                       >
                         {t('assignmentDetails.btnGradeNow')}
                       </Button>

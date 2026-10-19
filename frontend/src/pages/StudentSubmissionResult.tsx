@@ -2,27 +2,20 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  ChevronRight, 
   Sparkles, 
-  Download, 
   RotateCcw, 
-  MessageSquare, 
   FileText, 
   Award, 
   UserCheck, 
   AlertCircle, 
   RefreshCw, 
   Clock, 
-  Play, 
-  Pause, 
-  Volume2, 
   CheckCircle2, 
   XCircle, 
   BookOpen, 
   Headphones, 
   Mic, 
   FileEdit, 
-  Send, 
   HelpCircle, 
   TrendingUp, 
   File
@@ -40,7 +33,16 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { gradingService, type AiGradingSuggestionResponse, type GradingDetailResponse } from '../api/services/grading.service';
+import { MarkdownView } from '../components/common';
 import '../styles/student-result.css';
+
+const resolveAudioUrl = (storageKey?: string | null): string => {
+  if (!storageKey) return '';
+  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
+    return storageKey;
+  }
+  return `/s3-upload/${storageKey}`;
+};
 
 interface DisplayAnnotation {
   id: number;
@@ -80,20 +82,7 @@ function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
   return '';
 }
 
-function extractTranscriptText(transcript: unknown): string {
-  if (!transcript) return '';
-  if (typeof transcript === 'string') return transcript;
-  if (typeof transcript === 'object') {
-    const obj = transcript as Record<string, unknown>;
-    if (typeof obj.text === 'string') return obj.text;
-    if (typeof obj.transcript === 'string') return obj.transcript;
-    if (Array.isArray(obj.words)) {
-      return (obj.words as { word?: string }[]).map(w => w.word || '').join(' ');
-    }
-    return JSON.stringify(transcript);
-  }
-  return '';
-}
+
 
 export const StudentSubmissionResult: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -117,20 +106,11 @@ export const StudentSubmissionResult: React.FC = () => {
   const [noSubmissionFound, setNoSubmissionFound] = useState<boolean>(false);
 
   // Tab & skill selection
-  const [activeTab, setActiveTab] = useState<'review' | 'rubrics' | 'feedback'>('review');
+  const [activeTab, setActiveTab] = useState<'review' | 'rubrics'>('review');
   const [selectedSkill, setSelectedSkill] = useState<SubmissionSkill>('WRITING');
   const [activeFilter, setActiveFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'positive' | 'cohesion'>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
-
-  // Speaking playback state
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-
-  // Inquiry form
-  const [inquiryText, setInquiryText] = useState<string>('');
-  const [inquirySent, setInquirySent] = useState<boolean>(false);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -358,22 +338,22 @@ export const StudentSubmissionResult: React.FC = () => {
   }, [gradingDetail, activeSubModule, moduleDetail, aiSuggestion]);
 
   const maxScore = useMemo<number>(() => {
-    if (gradingDetail?.maxScoreSnapshot != null) return gradingDetail.maxScoreSnapshot;
-    if (activeSubModule?.grading?.maxScoreSnapshot != null) return activeSubModule.grading.maxScoreSnapshot;
-    if (moduleDetail?.grading?.maxScoreSnapshot != null) return moduleDetail.grading.maxScoreSnapshot;
-    if (aiSuggestion?.maxScore != null) return aiSuggestion.maxScore;
+    if (gradingDetail?.maxScoreSnapshot != null && gradingDetail.maxScoreSnapshot > 0) return gradingDetail.maxScoreSnapshot;
+    if (activeSubModule?.grading?.maxScoreSnapshot != null && activeSubModule.grading.maxScoreSnapshot > 0) return activeSubModule.grading.maxScoreSnapshot;
+    if (moduleDetail?.grading?.maxScoreSnapshot != null && moduleDetail.grading.maxScoreSnapshot > 0) return moduleDetail.grading.maxScoreSnapshot;
+    if (aiSuggestion?.maxScore != null && aiSuggestion.maxScore > 0) return aiSuggestion.maxScore;
     if (moduleDetail?.questions && moduleDetail.questions.length > 0) {
       const sum = moduleDetail.questions.reduce((acc, q) => acc + (q.score || 1), 0);
       if (sum > 0) return sum;
     }
-    return 100;
+    return 10;
   }, [gradingDetail, activeSubModule, moduleDetail, aiSuggestion]);
 
-  const standardScore10 = useMemo<string>(() => {
-    if (rawScore == null) return '--';
-    if (maxScore === 10) return rawScore.toFixed(1);
-    const computed = (rawScore / maxScore) * 10;
-    return computed.toFixed(1);
+  const displayScore = useMemo<string>(() => {
+    if (rawScore == null) return '--/10';
+    const scoreVal = Number(rawScore.toFixed(2)).toString();
+    const maxVal = Number(maxScore.toFixed(2)).toString();
+    return `${scoreVal}/${maxVal}`;
   }, [rawScore, maxScore]);
 
   const isGraded = useMemo<boolean>(() => {
@@ -520,19 +500,6 @@ export const StudentSubmissionResult: React.FC = () => {
     return questionsList;
   }, [questionsList, questionFilter]);
 
-  // Audio timer ticker
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-    if (isPlaying) {
-      timer = setInterval(() => {
-        setCurrentTime((prev) => (prev >= 120 ? 0 : prev + 1));
-      }, 1000 / playbackSpeed);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isPlaying, playbackSpeed]);
-
   // Extracted student contents
   const studentEssay = useMemo(() => {
     return extractAnswerText(moduleDetail?.answers);
@@ -546,9 +513,11 @@ export const StudentSubmissionResult: React.FC = () => {
     return moduleDetail?.answers?.find(a => a.audioStorageKey)?.audioStorageKey || null;
   }, [moduleDetail?.answers]);
 
-  const transcriptContent = useMemo(() => {
-    return extractTranscriptText(aiSuggestion?.transcript || gradingDetail?.aiTranscript);
-  }, [aiSuggestion?.transcript, gradingDetail?.aiTranscript]);
+  const audioUrl = useMemo(() => resolveAudioUrl(audioStorageKey), [audioStorageKey]);
+
+  const teacherFeedbackText = useMemo(() => {
+    return gradingDetail?.finalFeedback || gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback || '';
+  }, [gradingDetail, aiSuggestion]);
 
   // Real rubrics criteria from AI suggestion
   const criteriaScores = aiSuggestion?.criteriaScores;
@@ -610,15 +579,6 @@ export const StudentSubmissionResult: React.FC = () => {
     ];
   }, [selectedSkill, criteriaScores, isGraded]);
 
-  // Handle teacher question inquiry
-  const handleSendInquiry = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inquiryText.trim()) return;
-    setInquirySent(true);
-    setInquiryText('');
-    setTimeout(() => setInquirySent(false), 4000);
-  };
-
   // Available skills in submission
   const availableSkills: SubmissionSkill[] = useMemo(() => {
     const list: SubmissionSkill[] = [];
@@ -640,13 +600,13 @@ export const StudentSubmissionResult: React.FC = () => {
   if (noSubmissionFound) {
     return (
       <div className="student-result-page">
-        <div className="result-breadcrumb-bar">
+        <div className="result-breadcrumbs">
           <button 
             type="button" 
-            className="result-crumb-back-btn" 
+            className="result-back-btn" 
             onClick={() => navigate('/student/assignments')}
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={14} />
             <span>{t('studentResult.backToList')}</span>
           </button>
         </div>
@@ -684,28 +644,17 @@ export const StudentSubmissionResult: React.FC = () => {
 
   return (
     <div className="student-result-page">
-      {/* 1. Breadcrumb Bar */}
-      <div className="result-breadcrumb-bar">
+      {/* 1. Breadcrumbs */}
+      <div className="result-breadcrumbs">
         <button 
           type="button" 
-          className="result-crumb-back-btn" 
+          className="result-back-btn" 
           onClick={() => navigate('/student/assignments')}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={14} />
           <span>{t('studentResult.backToList')}</span>
         </button>
-        <span className="text-outline">/</span>
-        <span>{t('studentResult.system')}</span>
-        <ChevronRight size={12} className="text-outline" />
-        <span 
-          className="result-crumb-link"
-          onClick={() => navigate('/student/classes')}
-          role="button"
-          tabIndex={0}
-        >
-          {t('studentResult.backToClass')}
-        </span>
-        <ChevronRight size={12} className="text-outline" />
+        <span className="result-crumb-sep">/</span>
         <span 
           className="result-crumb-link"
           onClick={() => navigate(`/student/assignments/${assignment?.id || numericId}/overview`)}
@@ -714,9 +663,9 @@ export const StudentSubmissionResult: React.FC = () => {
         >
           {assignment?.title || t('studentResult.assignmentDetails')}
         </span>
-        <ChevronRight size={12} className="text-outline" />
-        <span className="font-semibold text-on-surface">
-          {t('studentResult.resultAndFeedback')} (#{submission?.id || numericId})
+        <span className="result-crumb-sep">/</span>
+        <span className="result-crumb-current">
+          {t('studentResult.resultAndFeedback')}
         </span>
       </div>
 
@@ -797,34 +746,9 @@ export const StudentSubmissionResult: React.FC = () => {
         <div className="flex items-center gap-20 flex-wrap">
           {/* Main Score Capsule */}
           <div className="result-hero-score-box">
-            <div className="result-score-main">
-              <span className="result-score-number">
-                {isLoading ? '...' : standardScore10}
-              </span>
-              <span className="result-score-label">{isVi ? 'Thang 10' : 'Scale 10'}</span>
-            </div>
-            <div className="result-score-divider" />
-            <div className="result-score-sub">
-              <span className="result-score-100">
-                {isLoading ? '...' : rawScore != null ? `${rawScore} / ${maxScore}` : `-- / ${maxScore}`}
-              </span>
-              <span className="result-score-sub-label">{isVi ? 'Điểm thô' : 'Raw Score'}</span>
-              <span className="result-score-status-pill">
-                {rawScore != null && (maxScore > 0 ? (rawScore / maxScore) >= 0.5 : rawScore >= 50) ? (
-                  <>
-                    <CheckCircle2 size={12} className="result-inline-icon" /> 
-                    {t('studentResult.meetsStandard')}
-                  </>
-                ) : rawScore != null ? (
-                  <>
-                    <XCircle size={12} className="result-inline-icon" /> 
-                    {t('studentResult.belowStandard')}
-                  </>
-                ) : (
-                  'Chờ hoàn tất chấm'
-                )}
-              </span>
-            </div>
+            <span className="result-score-number">
+              {isLoading ? '...' : displayScore}
+            </span>
           </div>
 
           {/* Quick Actions */}
@@ -836,22 +760,6 @@ export const StudentSubmissionResult: React.FC = () => {
             >
               <RotateCcw size={14} />
               {t('studentResult.btnRetake')}
-            </button>
-            <button 
-              className="result-btn-outline-white" 
-              onClick={() => window.print()}
-              type="button"
-            >
-              <Download size={14} />
-              {t('studentResult.btnDownloadPdf')}
-            </button>
-            <button 
-              className="result-btn-outline-white" 
-              onClick={() => navigate('/student/grades')}
-              type="button"
-            >
-              <TrendingUp size={14} />
-              {t('studentResult.btnViewGrades')}
             </button>
           </div>
         </div>
@@ -927,14 +835,6 @@ export const StudentSubmissionResult: React.FC = () => {
         >
           <Award size={16} />
           <span>{t('studentResult.tabRubricsAnalysis')}</span>
-        </button>
-        <button
-          type="button"
-          className={`result-nav-tab ${activeTab === 'feedback' ? 'active' : ''}`}
-          onClick={() => setActiveTab('feedback')}
-        >
-          <MessageSquare size={16} />
-          <span>{t('studentResult.tabTeacherFeedback')}</span>
         </button>
       </div>
 
@@ -1119,117 +1019,74 @@ export const StudentSubmissionResult: React.FC = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Teacher Feedback */}
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3 className="result-card-title">
+                      {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
+                    </h3>
+                  </div>
+                  <div className="result-card-body">
+                    {teacherFeedbackText ? (
+                      <div className="result-teacher-feedback-content">
+                        <MarkdownView content={teacherFeedbackText} />
+                      </div>
+                    ) : (
+                      <p className="result-teacher-feedback-empty">
+                        {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {/* SPEAKING SKILL VIEW */}
           {selectedSkill === 'SPEAKING' && (
-            <div className="result-workspace-grid">
-              <div className="flex-col gap-24">
-                {/* Audio Player Card */}
-                <div className="speaking-audio-player">
-                  <div className="audio-header-row">
-                    <span className="audio-title-pill">
-                      <Volume2 size={16} />
-                      {audioStorageKey ? audioStorageKey.split('/').pop() : `Speaking_Attempt_${submission?.attemptNumber ?? 1}`}
-                    </span>
-                    <span className="result-player-timestamp">
-                      {audioStorageKey ? 'File ghi âm bài nộp' : 'Chưa có file âm thanh'}
-                    </span>
-                  </div>
-
-                  {/* Simulated Waveform Visualizer */}
-                  <div className="waveform-container">
-                    {Array.from({ length: 48 }).map((_, i) => {
-                      const heights = [28, 42, 65, 80, 50, 30, 92, 75, 40, 85, 60, 45, 90, 70, 35, 55, 78, 62, 88, 48, 32, 68, 85, 95];
-                      const height = heights[i % heights.length];
-                      const isPassed = isPlaying && i < Math.floor((currentTime / 120) * 48);
-                      return (
-                        <div
-                          key={i}
-                          className={`waveform-bar ${isPassed ? 'passed' : ''}`}
-                          style={{ height: `${height}%` }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Player Controls */}
-                  <div className="audio-controls-row">
-                    <div className="flex items-center gap-14">
-                      <button
-                        type="button"
-                        className="audio-play-btn"
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        disabled={!audioStorageKey}
-                      >
-                        {isPlaying ? <Pause size={18} /> : <Play size={18} className="result-play-icon" />}
-                      </button>
-                      <span className="audio-time-label">
-                        00:{currentTime < 10 ? `0${currentTime}` : currentTime} / {audioStorageKey ? '02:00' : '00:00'}
-                      </span>
-                    </div>
-
-                    <div className="audio-speed-chips">
-                      <span className="result-player-speed-label">Tốc độ:</span>
-                      {[0.75, 1, 1.25].map((speed) => (
-                        <button
-                          key={speed}
-                          type="button"
-                          className={`audio-speed-btn ${playbackSpeed === speed ? 'active' : ''}`}
-                          onClick={() => setPlaybackSpeed(speed)}
-                        >
-                          {speed}x
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            <div className="flex-col gap-20">
+              {/* Student Audio Recording */}
+              <div className="result-card">
+                <div className="result-card-header">
+                  <h3 className="result-card-title">
+                    {isVi ? 'Bài nói của bạn' : 'Your Speaking Submission'}
+                  </h3>
                 </div>
 
-                {/* Real Speech to Text transcript */}
-                <div className="result-card">
-                  <div className="result-card-header">
-                    <h3 className="result-card-title">
-                      {t('studentResult.sttTranscript')}
-                    </h3>
-                  </div>
-
-                  <div className="result-card-body">
-                    <div className="stt-transcript-box">
-                      {transcriptContent ? (
-                        <p className="result-transcript-text">
-                          {transcriptContent}
-                        </p>
-                      ) : (
-                        <p className="result-transcript-empty">
-                          {isGraded 
-                            ? 'Bản gỡ băng tự động chưa được lưu lại trong kết quả này.' 
-                            : 'Đang chờ phân tích bản gỡ băng (transcript) từ AI...'}
-                        </p>
-                      )}
+                <div className="result-card-body">
+                  {audioUrl ? (
+                    <div className="result-audio-player-wrap">
+                      <audio controls src={audioUrl} className="result-audio-player">
+                        {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                      </audio>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="result-audio-empty">
+                      {isVi ? 'Chưa tìm thấy bản ghi âm của bài nộp này.' : 'No audio recording found for this submission.'}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Right Sidebar: Criteria for Speaking */}
-              <div className="flex-col gap-20">
-                <div className="result-card p-20">
-                  <h4 className="result-criteria-card-title">
-                    {isVi ? 'Tiêu chí đánh giá Speaking:' : 'Speaking Criteria:'}
-                  </h4>
-                  <div className="result-criteria-list">
-                    {criteriaList.map((crit) => (
-                      <div key={crit.key}>
-                        <div className="flex-between mb-4">
-                          <span className="text-on-surface-variant">{crit.title}:</span>
-                          <strong className="text-primary">{crit.score} / 10</strong>
-                        </div>
-                        <p className="result-criteria-desc">{crit.desc}</p>
-                      </div>
-                    ))}
-                  </div>
+              {/* Teacher Feedback */}
+              <div className="result-card">
+                <div className="result-card-header">
+                  <h3 className="result-card-title">
+                    {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
+                  </h3>
+                </div>
+
+                <div className="result-card-body">
+                  {teacherFeedbackText ? (
+                    <div className="result-teacher-feedback-content">
+                      <MarkdownView content={teacherFeedbackText} />
+                    </div>
+                  ) : (
+                    <p className="result-teacher-feedback-empty">
+                      {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1348,6 +1205,26 @@ export const StudentSubmissionResult: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Teacher Feedback */}
+              <div className="result-card">
+                <div className="result-card-header">
+                  <h3 className="result-card-title">
+                    {isVi ? 'Nhận xét của giáo viên' : 'Teacher Feedback'}
+                  </h3>
+                </div>
+                <div className="result-card-body">
+                  {teacherFeedbackText ? (
+                    <div className="result-teacher-feedback-content">
+                      <MarkdownView content={teacherFeedbackText} />
+                    </div>
+                  ) : (
+                    <p className="result-teacher-feedback-empty">
+                      {isVi ? 'Chưa có nhận xét từ giáo viên cho bài nộp này.' : 'No teacher feedback available for this submission yet.'}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </>
@@ -1402,9 +1279,7 @@ export const StudentSubmissionResult: React.FC = () => {
               <div className="flex-col gap-12">
                 {aiSuggestion?.aiFeedback ? (
                   <div className="p-14 rounded-lg bg-surface-container-low border">
-                    <p className="result-feedback-text">
-                      {aiSuggestion.aiFeedback}
-                    </p>
+                    <MarkdownView content={aiSuggestion.aiFeedback} className="result-feedback-text" />
                   </div>
                 ) : (
                   <div className="result-feedback-empty">
@@ -1440,93 +1315,6 @@ export const StudentSubmissionResult: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          TAB 3: TEACHER FEEDBACK & DISCUSSION
-          ========================================================================= */}
-      {activeTab === 'feedback' && (
-        <div className="teacher-discussion-card">
-          <div>
-            <h3 className="result-teacher-title">
-              {t('studentResult.teacherSummaryTitle')}
-            </h3>
-            <span className="result-teacher-sub">
-              Lời phê chính thức từ Giảng viên phụ trách chấm bài
-            </span>
-          </div>
-
-          <div className="teacher-profile-bubble">
-            <div className="teacher-avatar-circ">
-              GV
-            </div>
-            <div className="flex-1">
-              <div className="flex-between items-center mb-8 flex-wrap">
-                <div>
-                  <strong className="result-teacher-name">
-                    {gradingDetail?.reviewedBy ? `Giảng viên phụ trách (ID: #${gradingDetail.reviewedBy})` : 'Giảng viên chấm bài'}
-                  </strong>
-                  <span className="result-teacher-org">
-                    • Hệ thống đào tạo Anh ngữ EnglishHub
-                  </span>
-                </div>
-                <span className="result-teacher-date">
-                  {gradingDetail?.gradedAt ? new Date(gradingDetail.gradedAt).toLocaleDateString('vi-VN') : '--'}
-                </span>
-              </div>
-
-              <p className="result-teacher-feedback-p">
-                {gradingDetail?.finalFeedback ? (
-                  `"${gradingDetail.finalFeedback}"`
-                ) : gradingDetail?.aiFeedback ? (
-                  `"${gradingDetail.aiFeedback}"`
-                ) : aiSuggestion?.aiFeedback ? (
-                  `"${aiSuggestion.aiFeedback}"`
-                ) : (
-                  <span className="result-teacher-feedback-empty">
-                    Chưa có nhận xét bằng văn bản từ giảng viên cho bài nộp này.
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Inquiry / Student Question Form */}
-          <div className="inquiry-form-card">
-            <div className="result-inquiry-header">
-              <h4 className="result-inquiry-title">
-                {t('studentResult.askTeacherTitle')}
-              </h4>
-            </div>
-
-            <form onSubmit={handleSendInquiry}>
-              <textarea
-                className="inquiry-textarea"
-                placeholder={t('studentResult.askTeacherPlaceholder')}
-                value={inquiryText}
-                onChange={(e) => setInquiryText(e.target.value)}
-              />
-
-              <div className="result-inquiry-actions">
-                <button 
-                  type="submit" 
-                  className="btn btn-primary result-inquiry-btn-icon"
-                  disabled={!inquiryText.trim()}
-                >
-                  <Send size={14} />
-                  {t('studentResult.btnSendQuestion')}
-                </button>
-              </div>
-            </form>
-
-            {inquirySent && (
-              <div className="result-inquiry-sent-banner">
-                <CheckCircle2 size={16} />
-                <span>{t('studentResult.questionSentSuccess')}</span>
-              </div>
-            )}
           </div>
         </div>
       )}

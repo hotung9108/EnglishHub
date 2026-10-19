@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, Download, Printer, FileText, ChevronLeft, ChevronRight,
-  User, Star, MessageSquare,
+  User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar, Button, EmptyState } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { parseApiError } from '../api';
 import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../api/services/submission.service';
@@ -16,7 +16,7 @@ import {
   type GradingDetailResponse 
 } from '../api/services/grading.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
-import { userService } from '../api/services/user.service';
+import { classService, type ClassMember } from '../api/services/class.service';
 
 const resolveAudioUrl = (storageKey?: string | null): string => {
   if (!storageKey) return '';
@@ -28,6 +28,8 @@ const resolveAudioUrl = (storageKey?: string | null): string => {
 
 export const TeacherSubmissionDetails: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = location.state as { studentName?: string; studentEmail?: string; studentCode?: string } | null;
   const { id, studentId } = useParams<{ id: string; studentId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
@@ -52,7 +54,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
-  const [studentInfo, setStudentInfo] = useState<{ name: string; email: string; code: string } | null>(null);
+  const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
+    if (routeState?.studentName) {
+      return {
+        name: routeState.studentName,
+        email: routeState.studentEmail,
+        code: routeState.studentCode || `HV-${String(studentId).padStart(4, '0')}`
+      };
+    }
+    return null;
+  });
 
   // Class student list for Prev / Next navigation
   const [classSubmissions, setClassSubmissions] = useState<Array<{ studentId: number; name?: string }>>([]);
@@ -141,32 +152,76 @@ export const TeacherSubmissionDetails: React.FC = () => {
         const assignRes = await assignmentService.getAssignment(assignmentIdNum);
         if (isMounted) setAssignment(assignRes);
 
-        // 2. Fetch student profile/name
+        // 2. Fetch student profile/name via class members
+        let resolvedMember: ClassMember | undefined;
         try {
-          const usersRes = await userService.listUsers({ role: 'STUDENT', limit: 100 });
-          const studentUser = usersRes.data.find(u => u.id === studentIdNum);
+          const classRes = await classService.list({ limit: 100 });
+          const classesList = classRes.data || [];
+
+          // 2a. Find class containing this assignment first
+          for (const cls of classesList) {
+            try {
+              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+              if (assignList.data?.some((a) => a.id === assignmentIdNum)) {
+                const members = await classService.listMembers(cls.id);
+                resolvedMember = members.find((m) => m.studentId === studentIdNum);
+                if (resolvedMember) break;
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          // 2b. If not found in assigned class, check all teacher's classes
+          if (!resolvedMember) {
+            for (const cls of classesList) {
+              try {
+                const members = await classService.listMembers(cls.id);
+                const found = members.find((m) => m.studentId === studentIdNum);
+                if (found) {
+                  resolvedMember = found;
+                  break;
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+
           if (isMounted) {
-            if (studentUser) {
+            if (resolvedMember) {
               setStudentInfo({
-                name: studentUser.fullName,
-                email: studentUser.email,
-                code: `HV-${studentUser.id.toString().padStart(4, '0')}`
+                name: resolvedMember.fullName,
+                email: resolvedMember.email || routeState?.studentEmail,
+                code: resolvedMember.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+              });
+            } else if (routeState?.studentName) {
+              setStudentInfo({
+                name: routeState.studentName,
+                email: routeState.studentEmail,
+                code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
               });
             } else {
               setStudentInfo({
                 name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
-                email: `student${studentIdNum}@englishhub.edu.vn`,
                 code: `HV-${studentIdNum.toString().padStart(4, '0')}`
               });
             }
           }
         } catch {
           if (isMounted) {
-            setStudentInfo({
-              name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
-              email: `student${studentIdNum}@englishhub.edu.vn`,
-              code: `HV-${studentIdNum.toString().padStart(4, '0')}`
-            });
+            if (routeState?.studentName) {
+              setStudentInfo({
+                name: routeState.studentName,
+                email: routeState.studentEmail,
+                code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+              });
+            } else {
+              setStudentInfo({
+                name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+                code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+              });
+            }
           }
         }
 
@@ -265,7 +320,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
       : (currentIndex + 1) % classSubmissions.length;
     const nextStudent = classSubmissions[targetIdx];
     if (nextStudent) {
-      navigate(`/teacher/assignments/${id}/submissions/${nextStudent.studentId}`);
+      navigate(`/teacher/assignments/${id}/submissions/${nextStudent.studentId}`, {
+        state: nextStudent.name ? { studentName: nextStudent.name } : undefined
+      });
     }
   };
 
@@ -343,21 +400,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const audioAnswer = moduleDetail?.answers?.find(a => !!a.audioStorageKey);
   const audioStorageKey = audioAnswer?.audioStorageKey;
   const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
-
-  // Format AI transcript if available
-  const formattedTranscript = useMemo(() => {
-    if (!gradingDetail?.aiTranscript) return null;
-    const tr = gradingDetail.aiTranscript;
-    if (typeof tr === 'string') return tr;
-    if (typeof tr === 'object' && tr !== null) {
-      const obj = tr as Record<string, unknown>;
-      if (typeof obj.full_transcript === 'string') return obj.full_transcript;
-      if (typeof obj.text === 'string') return obj.text;
-      if (typeof obj.transcript === 'string') return obj.transcript;
-      return JSON.stringify(obj, null, 2);
-    }
-    return String(tr);
-  }, [gradingDetail?.aiTranscript]);
 
   // Extract student text answer
   const studentAnswerText = useMemo(() => {
@@ -485,25 +527,27 @@ export const TeacherSubmissionDetails: React.FC = () => {
         </h1>
       </div>
 
-      {/* Quick Actions Bar */}
-      <div className="tsd-actions-bar">
-        <Button 
-          variant="secondary" 
-          size="sm"
-          onClick={() => showToast(isVi ? 'Đang chuẩn bị tải về bài nộp...' : 'Downloading submission...')}
-          icon={Download}
-        >
-          {t('submissionDetails.btnDownloadAll')}
-        </Button>
-        <Button 
-          variant="secondary" 
-          size="sm"
-          onClick={() => window.print()}
-          icon={Printer}
-        >
-          {t('submissionDetails.btnPrint')}
-        </Button>
-      </div>
+      {/* Quick Actions Bar (Only for non-speaking modules) */}
+      {!isSpeaking && (
+        <div className="tsd-actions-bar">
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={() => showToast(isVi ? 'Đang chuẩn bị tải về bài nộp...' : 'Downloading submission...')}
+            icon={Download}
+          >
+            {t('submissionDetails.btnDownloadAll')}
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="sm"
+            onClick={() => window.print()}
+            icon={Printer}
+          >
+            {t('submissionDetails.btnPrint')}
+          </Button>
+        </div>
+      )}
 
       {/* Student Banner */}
       <div className="tsd-student-card">
@@ -514,18 +558,22 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h2 className="tsd-student-name">
-                {studentInfo?.name || 'Học viên'}
+                {studentInfo?.name || (isVi ? `Học viên #${studentId}` : `Student #${studentId}`)}
               </h2>
-              <span className="tsd-status-chip">
-                {submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
-              </span>
+              {!isSpeaking && (
+                <span className="tsd-status-chip">
+                  {submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
+                </span>
+              )}
               <span className="tsd-student-code">
                 {studentInfo?.code || `HV-${studentId}`}
               </span>
             </div>
-            <div className="tsd-student-meta">
-              <span>{studentInfo?.email}</span>
-            </div>
+            {studentInfo?.email && (
+              <div className="tsd-student-meta">
+                <span>{studentInfo.email}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -536,11 +584,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
               {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'Vừa xong'}
             </div>
           </div>
-          <div className="tsd-time-divider"></div>
-          <div className="tsd-ontime-indicator">
-            <span className="tsd-ontime-dot"></span>
-            <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
-          </div>
+          {!isSpeaking && (
+            <>
+              <div className="tsd-time-divider"></div>
+              <div className="tsd-ontime-indicator">
+                <span className="tsd-ontime-dot"></span>
+                <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -564,40 +616,33 @@ export const TeacherSubmissionDetails: React.FC = () => {
         </div>
       )}
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <MetricCard 
-          title={isVi ? 'Điểm số đề xuất' : 'Suggested Score'}
-          value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
-            ? String(gradingDetail.finalScore) 
-            : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined 
-                ? String(aiSuggestion.suggestedScore) 
-                : (finalScoreInput || '--'))}
-          suffix="/ 10"
-          footerText={
-            <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
-              <Star size={14} /> 
-              {aiSuggestion?.suggestedScore ? `${isVi ? 'AI đề xuất:' : 'AI Suggestion:'} ${aiSuggestion.suggestedScore}` : (isVi ? 'Đã hiệu chuẩn AI' : 'AI Calibrated')}
-            </span>
-          }
-        />
+      {/* Metrics Row (Only for non-speaking modules) */}
+      {!isSpeaking && (
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <MetricCard 
+            title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
+            value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
+              ? String(gradingDetail.finalScore) 
+              : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined 
+                  ? String(aiSuggestion.suggestedScore) 
+                  : '--')}
+            suffix="/ 10"
+          />
 
-        <MetricCard 
-          title={isSpeaking ? (isVi ? 'Kỹ năng chấm' : 'Skill') : (isVi ? 'Độ dài bài nộp' : 'Word Count')}
-          value={isSpeaking ? 'Speaking' : String(wordCount)}
-          suffix={isSpeaking ? '' : (isVi ? 'từ' : 'words')}
-          footerText={isSpeaking 
-            ? (isVi ? 'Bản ghi âm trực tuyến' : 'Online recording') 
-            : (wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target'))}
-        />
-      </div>
+          <MetricCard 
+            title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
+            value={String(wordCount)}
+            suffix={isVi ? 'từ' : 'words'}
+          />
+        </div>
+      )}
 
-      {/* Submission Files & Attachments */}
-      {moduleDetail?.answers && moduleDetail.answers.some(a => a.docStorageKey || a.audioStorageKey) && (
+      {/* Submission Files & Attachments (Only for non-speaking document uploads) */}
+      {!isSpeaking && moduleDetail?.answers && moduleDetail.answers.some(a => a.docStorageKey) && (
         <div className="tsd-files-card">
           <div className="tsd-files-header">
             <h3 className="tsd-files-title">
-              <FileText size={16} /> {t('submissionDetails.filesTitle')}
+              {t('submissionDetails.filesTitle')}
             </h3>
           </div>
           
@@ -615,170 +660,229 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   />
                 );
               }
-              if (ans.audioStorageKey) {
-                return (
-                  <FileItem 
-                    key={ans.id}
-                    name={ans.audioStorageKey}
-                    extension="wav"
-                    size="Bản ghi âm bài nói"
-                    details={t('submissionDetails.submittedOn')}
-                    onDownload={() => showToast(isVi ? 'Đang mở audio phát âm...' : 'Opening audio...')}
-                  />
-                );
-              }
               return null;
             })}
           </div>
         </div>
       )}
 
-      {/* Two-Column Working Space */}
-      <div className="tsd-grading-grid">
-        {/* Left Column: Student Answer Viewer */}
-        <div className="tsd-answer-card">
-          <div className="tsd-answer-header">
-            <div className="tsd-answer-title">
-              <span className="tsd-answer-title-dot"></span>
-              <span>
-                {isSpeaking 
-                  ? (isVi ? 'Bài nói của học viên' : 'Student Speaking Submission')
-                  : (isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer')}
-              </span>
-            </div>
-            <div className="text-xs text-slate-500">
-              {isSpeaking ? 'Speaking' : `${wordCount} ${isVi ? 'từ' : 'words'}`}
-            </div>
-          </div>
-
-          <div className="tsd-answer-box">
-            <div className="tsd-prompt-label">
-              {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
+      {isSpeaking ? (
+        /* Speaking Optimized Layout: Audio Hero Top + Balanced 2-Column Feedback Workspace (50% AI / 50% Teacher) */
+        <div className="tsd-speaking-container">
+          {/* Top Section: Audio Hero Card */}
+          <div className="tsd-speaking-hero-card">
+            <div className="tsd-speaking-hero-header">
+              <h3 className="tsd-speaking-hero-title">
+                {isVi ? 'Bài nói của học viên' : 'Student Speaking Submission'}
+              </h3>
             </div>
 
-            {isSpeaking ? (
-              <div>
+            <div className="tsd-speaking-hero-body">
+              <div className="tsd-prompt-label">
+                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
+              </div>
+
+              <div className="tsd-speaking-audio-bar">
                 {audioUrl ? (
-                  <div className="tsd-audio-player-wrap">
-                    <div className="tsd-audio-label">
-                      {isVi ? 'Bản ghi âm bài nói' : 'Audio Recording'}
-                    </div>
+                  <div className="tsd-speaking-audio-wrap">
                     <audio controls src={audioUrl} className="tsd-audio-player">
                       {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
                     </audio>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-500 italic">
+                  <div className="tsd-audio-empty">
                     {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
-                  </p>
-                )}
-
-                {/* Clean AI grading button for Speaking: no badge, no icon, no subtitle, no redundant text */}
-                <div className="tsd-speaking-ai-action">
-                  <button
-                    type="button"
-                    className="tsd-btn-ai-speaking"
-                    disabled={isAnalyzingAi}
-                    onClick={handleTriggerAiAnalyze}
-                  >
-                    {isAnalyzingAi 
-                      ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
-                      : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI')}
-                  </button>
-                </div>
-
-                {formattedTranscript && (
-                  <div className="tsd-transcript-box">
-                    <div className="tsd-prompt-label">
-                      {isVi ? 'Văn bản chuyển đổi từ giọng nói (Transcript)' : 'Speech-to-text Transcript'}
-                    </div>
-                    <p className="tsd-transcript-text">{formattedTranscript}</p>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  className="tsd-btn-ai-speaking"
+                  disabled={isAnalyzingAi}
+                  onClick={handleTriggerAiAnalyze}
+                >
+                  {isAnalyzingAi 
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
+                    : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
+                        ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
+                        : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
+                </button>
               </div>
-            ) : (
+            </div>
+          </div>
+
+          {/* Main 2-Column Workspace: Left 50% AI Feedback, Right 50% Teacher Evaluation */}
+          <div className="tsd-speaking-workspace">
+            {/* Left Column: AI Feedback with wide space for readability */}
+            <div className="tsd-speaking-ai-panel">
+              <div className="tsd-speaking-panel-header">
+                <span className="tsd-speaking-panel-title">
+                  {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
+                </span>
+                {(gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined) ||
+                 (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined) ? (
+                  <span className="tsd-speaking-ai-score">
+                    {isVi ? 'Điểm đề xuất: ' : 'Suggested: '}
+                    <strong>
+                      {gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
+                        ? String(gradingDetail.finalScore) 
+                        : String(aiSuggestion?.suggestedScore)}
+                    </strong> / 10
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="tsd-speaking-ai-content">
+                <MarkdownView 
+                  content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
+                  fallbackText={isVi 
+                    ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.' 
+                    : 'No AI feedback available. Click "Grade with AI" to analyze the submission.'}
+                  className="tsd-speaking-ai-markdown"
+                />
+              </div>
+            </div>
+
+            {/* Right Column: Teacher Official Evaluation & Feedback Studio */}
+            <div className="tsd-speaking-teacher-panel">
+              <div className="tsd-speaking-panel-header">
+                <span className="tsd-speaking-panel-title">
+                  {isVi ? 'Đánh giá của giáo viên' : 'Teacher Evaluation'}
+                </span>
+              </div>
+
+              <div className="tsd-speaking-score-row">
+                <label className="tsd-card-label">
+                  {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
+                </label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <input 
+                    type="number" 
+                    step="0.5" 
+                    min="0" 
+                    max="10" 
+                    placeholder="0.0"
+                    value={finalScoreInput}
+                    onChange={(e) => setFinalScoreInput(e.target.value)}
+                    className="tsd-score-input"
+                  />
+                  <span className="text-sm font-semibold text-slate-500">/ 10</span>
+                </div>
+              </div>
+
+              <div className="tsd-speaking-feedback-wrap">
+                <label className="tsd-card-label mb-2">
+                  {t('submissionDetails.feedbackTitle')}
+                </label>
+                <textarea 
+                  className="tsd-feedback-textarea"
+                  placeholder={t('submissionDetails.feedbackPlaceholder')} 
+                  rows={9}
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Standard Two-Column Layout for Writing / Reading / Listening */
+        <div className="tsd-grading-grid">
+          {/* Left Column: Student Answer Viewer */}
+          <div className="tsd-answer-card">
+            <div className="tsd-answer-header">
+              <div className="tsd-answer-title">
+                <span>
+                  {isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}
+                </span>
+              </div>
+              <div className="text-xs text-slate-500">
+                {wordCount} {isVi ? 'từ' : 'words'}
+              </div>
+            </div>
+
+            <div className="tsd-answer-box">
+              <div className="tsd-prompt-label">
+                {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
+              </div>
+
               <p className="m-0 whitespace-pre-line">
                 {studentAnswerText}
               </p>
-            )}
-          </div>
+            </div>
 
-          <div className="tsd-answer-footer">
-            <div>
-              {isSpeaking ? (
-                <span>{isVi ? 'Kỹ năng: Nói (Speaking)' : 'Skill: Speaking'}</span>
-              ) : (
+            <div className="tsd-answer-footer">
+              <div>
                 <span>{t('submissionDetails.wordCountPrefix')}<strong>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong></span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: AI Insights & Feedback Studio */}
-        <div className="tsd-sidebar">
-          {/* AI Grading Insight */}
-          <div className="tsd-ai-box">
-            <div className="tsd-ai-box-header">
-              <span>{t('submissionDetails.aiSuggestionsTitle')}</span>
-            </div>
-            <p className="tsd-ai-desc">
-              {gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback || (isVi 
-                ? 'AI Engine đã sẵn sàng phân tích bài nộp.' 
-                : 'AI Engine is ready to diagnose submission.')}
-            </p>
-          </div>
-
-          {/* Teacher Score Input */}
-          <div className="tsd-score-card">
-            <label className="tsd-card-label">
-              {isVi ? 'Điểm Chấm Chính Thức (Thang 10)' : 'Official Final Score (Scale 10)'}
-            </label>
-            <div className="flex items-center gap-3">
-              <input 
-                type="number" 
-                step="0.5" 
-                min="0" 
-                max="10" 
-                placeholder="0.0"
-                value={finalScoreInput}
-                onChange={(e) => setFinalScoreInput(e.target.value)}
-                className="tsd-score-input"
-              />
-              <span className="text-xs text-slate-500">
-                {isVi ? 'Thang điểm 0 - 10' : 'Score Scale 0 - 10'}
-              </span>
+              </div>
             </div>
           </div>
 
-          {/* Feedback Editor */}
-          <div className="tsd-feedback-card">
-            <h3 className="tsd-card-title">
-              <MessageSquare size={16} /> {t('submissionDetails.feedbackTitle')}
-            </h3>
-
-            <textarea 
-              className="tsd-feedback-textarea"
-              placeholder={t('submissionDetails.feedbackPlaceholder')} 
-              rows={5}
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-            />
-
-            <div className="mt-3">
-              <label className="block text-xs font-semibold text-slate-500 mb-1">
-                {isVi ? 'Ghi chú nội bộ giáo viên (chỉ giảng viên xem được)' : 'Private Teacher Notes'}
+          {/* Right Column: AI Insights & Feedback Studio */}
+          <div className="tsd-sidebar">
+            {/* Teacher Score Input */}
+            <div className="tsd-score-card">
+              <label className="tsd-card-label">
+                {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
               </label>
-              <input 
-                type="text"
-                placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
-                value={teacherNote}
-                onChange={(e) => setTeacherNote(e.target.value)}
-                className="tsd-internal-note-input"
+              <div className="flex items-center gap-3">
+                <input 
+                  type="number" 
+                  step="0.5" 
+                  min="0" 
+                  max="10" 
+                  placeholder="0.0"
+                  value={finalScoreInput}
+                  onChange={(e) => setFinalScoreInput(e.target.value)}
+                  className="tsd-score-input"
+                />
+              </div>
+            </div>
+
+            {/* AI Grading Insight */}
+            <div className="tsd-ai-box">
+              <div className="tsd-ai-box-header">
+                <span>{isVi ? 'Nhận xét từ AI' : 'AI Feedback'}</span>
+              </div>
+              <MarkdownView 
+                content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
+                fallbackText={isVi 
+                  ? 'Chưa có nhận xét từ AI.' 
+                  : 'No AI feedback available.'}
+                className="tsd-ai-markdown"
               />
+            </div>
+
+            {/* Feedback Editor */}
+            <div className="tsd-feedback-card">
+              <h3 className="tsd-card-title">
+                {t('submissionDetails.feedbackTitle')}
+              </h3>
+
+              <textarea 
+                className="tsd-feedback-textarea"
+                placeholder={t('submissionDetails.feedbackPlaceholder')} 
+                rows={5}
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+              />
+
+              <div className="mt-3">
+                <label className="block text-xs font-semibold text-slate-500 mb-1">
+                  {isVi ? 'Ghi chú nội bộ' : 'Private Notes'}
+                </label>
+                <input 
+                  type="text"
+                  placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
+                  value={teacherNote}
+                  onChange={(e) => setTeacherNote(e.target.value)}
+                  className="tsd-internal-note-input"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <StickyActionBar 
         leftActions={
