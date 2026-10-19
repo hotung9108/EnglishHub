@@ -115,6 +115,8 @@ export interface SubmitModuleAnswerPayload {
 
 export interface SubmitModulePayload {
   answers?: SubmitModuleAnswerPayload[];
+  audioStorageKey?: string;
+  storageKey?: string;
 }
 
 export interface SubmitModuleResponse {
@@ -329,6 +331,34 @@ export class SubmissionService {
       mimeType ? { mimeType } : {},
       options
     );
+  }
+
+  /**
+   * Uploads raw binary data (Blob or File) directly to a presigned S3/MinIO upload URL.
+   * Direct PUT to object storage does not send backend auth headers so as not to break S3 presigned URL signature.
+   */
+  async uploadDirectToStorage(
+    uploadUrl: string,
+    fileOrBlob: Blob | File,
+    mimeType: string
+  ): Promise<void> {
+    let targetUrl = uploadUrl;
+    // When running in dev environments where backend returns internal Docker hostname (http://minio:9000),
+    // route through Vite dev proxy (/s3-upload) so browser can resolve and keep Host signature intact.
+    if (uploadUrl.includes('//minio:9000/')) {
+      targetUrl = uploadUrl.replace(/^https?:\/\/minio:9000/, '/s3-upload');
+    }
+
+    const response = await fetch(targetUrl, {
+      method: 'PUT',
+      body: fileOrBlob,
+      headers: {
+        'Content-Type': mimeType,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Tải tệp lên kho lưu trữ thất bại (HTTP ${response.status}).`);
+    }
   }
 }
 

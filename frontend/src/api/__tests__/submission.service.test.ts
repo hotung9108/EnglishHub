@@ -352,3 +352,95 @@ test('SubmissionService - audio and document upload URLs', async () => {
   assert.strictEqual(docResult, docResponse);
 });
 
+test('SubmissionService - submitModule sends audioStorageKey when submitting speaking module', async () => {
+  const http = new MockHttpClient();
+  const response: SubmitModuleResponse = {
+    message: 'Nộp phần thi thành công.',
+    submissionModuleId: 45,
+    status: 'SUBMITTED',
+    answers: [
+      {
+        id: 101,
+        questionId: null,
+        content: null,
+        audioStorageKey: 'submissions/12/module-45/audio.webm',
+        audioMimeType: 'audio/webm',
+        audioUploadStatus: 'READY',
+      },
+    ],
+  };
+  http.mockResponse = response;
+
+  const result = await new SubmissionService(http).submitModule(45, {
+    audioStorageKey: 'submissions/12/module-45/audio.webm',
+  });
+
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'POST',
+      url: '/submission-modules/45/submit',
+      data: {
+        audioStorageKey: 'submissions/12/module-45/audio.webm',
+      },
+      options: undefined,
+    },
+  ]);
+});
+
+test('SubmissionService - uploadDirectToStorage successfully sends PUT request', async () => {
+  const originalFetch = globalThis.fetch;
+  let interceptedUrl = '';
+  let interceptedMethod = '';
+  let interceptedContentType = '';
+
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    interceptedUrl = String(url);
+    interceptedMethod = init?.method || '';
+    interceptedContentType = (init?.headers as Record<string, string>)?.['Content-Type'] || '';
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const dummyBlob = new Blob(['sample-audio-bytes'], { type: 'audio/webm' });
+    await new SubmissionService(new MockHttpClient()).uploadDirectToStorage(
+      'https://storage.example.com/presigned-put-url',
+      dummyBlob,
+      'audio/webm'
+    );
+
+    assert.strictEqual(interceptedUrl, 'https://storage.example.com/presigned-put-url');
+    assert.strictEqual(interceptedMethod, 'PUT');
+    assert.strictEqual(interceptedContentType, 'audio/webm');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('SubmissionService - uploadDirectToStorage rewrites docker minio URLs to /s3-upload proxy', async () => {
+  const originalFetch = globalThis.fetch;
+  let interceptedUrl = '';
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    interceptedUrl = String(url);
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const dummyBlob = new Blob(['bytes'], { type: 'audio/webm' });
+    await new SubmissionService(new MockHttpClient()).uploadDirectToStorage(
+      'http://minio:9000/englishhub-dev/submissions/1/audio.webm?query=1',
+      dummyBlob,
+      'audio/webm'
+    );
+
+    assert.strictEqual(
+      interceptedUrl,
+      '/s3-upload/englishhub-dev/submissions/1/audio.webm?query=1'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+

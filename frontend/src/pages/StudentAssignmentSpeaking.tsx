@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -12,9 +12,11 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
 import '../styles/student-speaking.css';
 
@@ -33,11 +35,25 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
-  // Recording State
+  // Real Audio Recorder Hook
+  const {
+    isRecording,
+    recordingDuration,
+    audioBlob,
+    audioUrl,
+    backendMimeType,
+    permissionError,
+    startRecording,
+    stopRecording,
+    resetRecording,
+  } = useAudioRecorder();
+
+  // Audio Playback State
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [recordedAudioReady, setRecordedAudioReady] = useState(false);
+  const [playbackSeconds, setPlaybackSeconds] = useState(0);
+
+  // Personal Notes
   const [personalNotes, setPersonalNotes] = useState('');
   const [isNotesSaved, setIsNotesSaved] = useState(false);
 
@@ -49,6 +65,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => setReloadKey((k) => k + 1);
 
+  // Load assignment and submission data
   useEffect(() => {
     let isMounted = true;
 
@@ -89,8 +106,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
             if (isMounted) setSubmission(sub);
-          } catch {
-            // Fallback
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+            }
           }
         } else if (user?.id) {
           try {
@@ -103,13 +123,21 @@ const StudentAssignmentSpeaking: React.FC = () => {
             if (subList.data && subList.data.length > 0) {
               const sub = await submissionService.getSubmission(subList.data[0].id);
               if (isMounted) setSubmission(sub);
-            } else {
+            } else if (currentAssignment?.status === 'PUBLISHED') {
               const startRes = await submissionService.startAttempt(numericId);
               const sub = await submissionService.getSubmission(startRes.id);
               if (isMounted) setSubmission(sub);
+            } else if (currentAssignment?.status) {
+              if (isMounted) {
+                const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+              }
             }
-          } catch {
-            // Fallback
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
           }
         }
       } catch (err: unknown) {
@@ -130,32 +158,56 @@ const StudentAssignmentSpeaking: React.FC = () => {
     };
   }, [numericId, id, searchParams, user?.id, reloadKey]);
 
-  // Timer effect while recording
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRecording]);
-
+  // Handle Play/Pause for recorded audio
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (!audioPlayerRef.current || !audioUrl) return;
+
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioPlayerRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((playErr) => {
+        console.warn('Playback error:', playErr);
+        setIsPlaying(false);
+      });
+    }
   };
 
-  const toggleRecording = () => {
+  // Toggle Recording with real MediaRecorder
+  const toggleRecording = async () => {
+    setError(null);
     if (!isRecording) {
-      setIsRecording(true);
-      setIsPlaying(false);
-      setRecordingSeconds(0);
+      if (assignment?.status && assignment.status !== 'PUBLISHED') {
+        const statusLabel = assignment.status === 'DRAFT' ? 'Nháp (DRAFT)' : assignment.status;
+        setError(`Bài tập này đang ở trạng thái ${statusLabel}, chưa thể thực hiện ghi âm làm bài.`);
+        return;
+      }
+      if (isPlaying && audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        setIsPlaying(false);
+      }
+      try {
+        await startRecording();
+      } catch (recErr: unknown) {
+        const msg = recErr instanceof Error ? recErr.message : 'Không thể kích hoạt microphone.';
+        setError(msg);
+      }
     } else {
-      setIsRecording(false);
-      setRecordedAudioReady(true);
+      stopRecording();
     }
+  };
+
+  // Reset recording to re-record
+  const handleResetRecording = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setPlaybackSeconds(0);
+    resetRecording();
   };
 
   const handleSaveNotes = () => {
@@ -163,23 +215,50 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setTimeout(() => setIsNotesSaved(false), 3000);
   };
 
+  // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
+    if (!audioBlob) {
+      setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
+      return;
+    }
+
+    if (isRecording) {
+      stopRecording();
+    }
+
+    if (!submission) {
+      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
+
     try {
       const subId = submission?.id;
       const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
       const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {});
-        } catch {
-          // Continue
-        }
+      if (!subModuleId) {
+        throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
       }
 
-      // Check if all modules in this submission are now completed
+      // Step 1: Request presigned PUT URL from backend
+      // Backend validates MIME against: 'audio/webm', 'audio/wav', 'audio/mpeg'
+      const { uploadUrl, storageKey } = await submissionService.getAudioUploadUrl(
+        subModuleId,
+        backendMimeType
+      );
+
+      // Step 2: Upload audio blob directly to S3 / MinIO storage
+      await submissionService.uploadDirectToStorage(uploadUrl, audioBlob, backendMimeType);
+
+      // Step 3: Submit module with audioStorageKey (backend probes storage and marks READY)
+      await submissionService.submitModule(subModuleId, {
+        audioStorageKey: storageKey,
+      });
+
+      // Step 4: Check if other modules in submission are already completed
       const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
@@ -187,12 +266,12 @@ const StudentAssignmentSpeaking: React.FC = () => {
         try {
           await submissionService.submitSubmission(subId);
         } catch {
-          // Continue
+          // Fallback continue
         }
       }
 
       if (allOthersDone) {
-        setSuccessMessage('Nộp bài thành công!');
+        setSuccessMessage('Nộp bài và tải lên bản ghi âm thành công!');
         setTimeout(() => {
           if (subId) {
             navigate(`/student/submissions/${subId}`);
@@ -207,8 +286,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
         }, 1200);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -220,8 +299,28 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const recordedAudioReady = Boolean(audioBlob && audioUrl);
+  const activeError = permissionError || error;
+
   return (
     <div className="speaking-container">
+      {/* Hidden audio element for previewing the recorded sound */}
+      <audio
+        ref={audioPlayerRef}
+        src={audioUrl || undefined}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setPlaybackSeconds(0);
+        }}
+        onTimeUpdate={() => {
+          if (audioPlayerRef.current) {
+            setPlaybackSeconds(Math.floor(audioPlayerRef.current.currentTime));
+          }
+        }}
+      />
+
       {/* Breadcrumbs & Navigation */}
       <div className="speaking-breadcrumbs">
         <button 
@@ -238,11 +337,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
         </span>
       </div>
 
-      {error && (
+      {activeError && (
         <div className="speaking-error-banner">
           <div className="speaking-error-msg">
             <AlertCircle size={18} />
-            <span>{error}</span>
+            <span>{activeError}</span>
           </div>
           <Button
             variant="danger"
@@ -294,13 +393,13 @@ const StudentAssignmentSpeaking: React.FC = () => {
           <section className="speaking-card">
             <div className="speaking-card-header">
               <h2 className="speaking-card-title">
-                Phòng thu âm
+                Ghi âm
               </h2>
               <span className={`speaking-card-timing ${isRecording ? 'recording' : ''}`}>
                 {isRecording 
-                  ? `Đang thu âm: ${formatTime(recordingSeconds)}` 
+                  ? `Đang thu âm: ${formatTime(recordingDuration)}` 
                   : recordedAudioReady 
-                    ? `Đã thu âm: ${formatTime(recordingSeconds)}` 
+                    ? `Đã thu âm: ${formatTime(recordingDuration)}` 
                     : ''}
               </span>
             </div>
@@ -323,7 +422,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   <button 
                     type="button"
                     className="speaking-btn-icon" 
-                    onClick={() => { setRecordedAudioReady(false); setRecordingSeconds(0); }}
+                    onClick={handleResetRecording}
+                    disabled={isRecording || !recordedAudioReady}
                     title="Thu âm lại từ đầu"
                   >
                     <RotateCcw size={18} />
@@ -332,7 +432,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   <button 
                     type="button"
                     className={`speaking-btn-record ${isRecording ? 'active' : ''}`}
-                    onClick={toggleRecording}
+                    onClick={() => void toggleRecording()}
                     title={isRecording ? 'Dừng thu âm' : 'Bắt đầu thu âm'}
                   >
                     {isRecording ? <MicOff size={28} /> : <Mic size={28} />}
@@ -342,8 +442,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                     type="button"
                     className="speaking-btn-icon"
                     onClick={togglePlay}
-                    disabled={!recordedAudioReady}
-                    title="Phát lại bản ghi"
+                    disabled={!recordedAudioReady || isRecording}
+                    title={isPlaying ? 'Tạm dừng phát' : 'Phát lại bản ghi'}
                   >
                     {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                   </button>
@@ -351,12 +451,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
                 <div className="speaking-recorder-hint">
                   {isRecording ? (
-                    <span className="speaking-status-recording">Đang ghi âm...</span>
+                    <span className="speaking-status-recording">
+                      Đang ghi âm... ({formatTime(recordingDuration)})
+                    </span>
                   ) : recordedAudioReady ? (
                     <span className="speaking-status-ready">
-                      Đã ghi âm ({formatTime(recordingSeconds)})
+                      {isPlaying
+                        ? `Đang phát lại (${formatTime(playbackSeconds)} / ${formatTime(recordingDuration)})`
+                        : `Đã ghi âm (${formatTime(recordingDuration)}) • Bấm Play để nghe lại hoặc Nộp bài`}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
+                  )}
                 </div>
               </div>
 
@@ -409,10 +515,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <div className="submission-file-box">
                 <div className="submission-file-info">
                   <div className="submission-file-title">
-                    {recordedAudioReady ? `speaking_attempt_${numericId}.mp3` : 'chua_co_ban_ghi.mp3'}
+                    {recordedAudioReady 
+                      ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}` 
+                      : 'chua_co_ban_ghi.webm'}
                   </div>
                   <div className="submission-file-meta">
-                    {recordedAudioReady ? formatTime(recordingSeconds) : 'Chưa có bản ghi âm'}
+                    {recordedAudioReady && audioBlob
+                      ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB` 
+                      : 'Chưa có bản ghi âm'}
                   </div>
                 </div>
                 <span className={`submission-file-status ${recordedAudioReady ? 'ready' : 'pending'}`}>
@@ -430,7 +540,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>Đang gửi bài...</span>
+                    <span>Đang tải lên &amp; gửi bài...</span>
                   </>
                 ) : (
                   <span>Nộp bài</span>
