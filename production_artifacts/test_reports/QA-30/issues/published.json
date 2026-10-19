@@ -1,0 +1,155 @@
+[
+  {
+    "key": "deploy",
+    "number": 173,
+    "title": "[FE][Student Overview] Hiển thị giới hạn 3 lượt thay vì maxSubmissions từ API",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/173",
+    "cases": [
+      "QA30-007",
+      "QA30-045"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  },
+  {
+    "key": "short-answer",
+    "number": 182,
+    "title": "[FE][Student Quiz] Câu SHORT_ANSWER hiển thị lựa chọn A/B/C/D thay vì ô nhập",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/182",
+    "cases": [
+      "QA30-013",
+      "QA30-014",
+      "QA30-015"
+    ],
+    "blockedCases": null,
+    "splitFrom": 173
+  },
+  {
+    "key": "speaking-empty",
+    "number": 183,
+    "title": "[FE][Student Speaking] Nút nộp bật khi chưa có bản ghi âm",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/183",
+    "cases": [
+      "QA30-039"
+    ],
+    "blockedCases": null,
+    "splitFrom": 173
+  },
+  {
+    "key": "writing-contract",
+    "number": 174,
+    "title": "[FE][Student Writing] Nộp bài chỉ có văn bản xong nhưng nội dung bài luận bị mất",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/174",
+    "cases": [
+      "QA30-011"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  },
+  {
+    "key": "writing-submit",
+    "number": 175,
+    "title": "[FE][Student Writing] Nộp PDF xong nhưng bài nộp không có tài liệu được lưu",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/175",
+    "cases": [
+      "QA30-012"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  },
+  {
+    "key": "submit-after-error",
+    "number": 184,
+    "title": "[FE][Student Writing] Vẫn hoàn tất bài nộp sau khi submit-module trả HTTP 400",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/184",
+    "cases": [
+      "QA30-038"
+    ],
+    "blockedCases": null,
+    "splitFrom": 175
+  },
+  {
+    "key": "speaking-upload",
+    "number": 176,
+    "title": "[FE][Student Speaking] Đã ghi và nộp bài nhưng bài nộp không có audio được lưu",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/176",
+    "cases": [
+      "QA30-016"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  },
+  {
+    "key": "mcq-options",
+    "number": 177,
+    "title": "[API/FE][Student Quiz] Câu trắc nghiệm chỉ hiện A/B/C/D, thiếu nội dung đáp án lựa chọn",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/177",
+    "cases": [
+      "QA30-025",
+      "QA30-026",
+      "QA30-027"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  },
+  {
+    "key": "grade-mapping",
+    "number": 178,
+    "title": "[FE/API][Student Grades] Bảng điểm không hiển thị đúng bài đã chấm do nhầm submissionId với assignmentId",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/178",
+    "cases": [
+      "QA30-028"
+    ],
+    "blockedCases": [
+      "QA30-017",
+      "QA30-018"
+    ],
+    "splitFrom": null
+  },
+  {
+    "key": "grading-status",
+    "number": 179,
+    "title": "[FE][Student Feedback] Không có thẻ nhận xét chính thức dù grading đã COMPLETED",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/179",
+    "cases": [
+      "QA30-022"
+    ],
+    "blockedCases": [
+      "QA30-034"
+    ],
+    "splitFrom": null
+  },
+  {
+    "key": "attempt-grading-status",
+    "number": 185,
+    "title": "[FE][Student Overview] Lịch sử hiện Chờ chấm điểm dù cùng lượt đã có điểm chính thức 7.5/10",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/185",
+    "cases": [
+      "QA30-024"
+    ],
+    "blockedCases": null,
+    "splitFrom": 179
+  },
+  {
+    "key": "assignment-results-filter",
+    "number": 186,
+    "title": "[FE][Student Assignments] Bài đã có điểm chính thức không xuất hiện ở tab Đã có kết quả",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/186",
+    "cases": [
+      "QA30-030"
+    ],
+    "blockedCases": null,
+    "splitFrom": 179
+  },
+  {
+    "key": "evaluation-link",
+    "number": 180,
+    "title": "[FE][Student Feedback] Nút xem đánh giá định kỳ mở kết quả bài không liên quan",
+    "url": "https://github.com/hotung9108/EnglishHub/issues/180",
+    "cases": [
+      "QA30-021"
+    ],
+    "blockedCases": null,
+    "splitFrom": null
+  }
+]

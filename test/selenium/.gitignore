@@ -5,3 +5,4 @@ reports/
 fixtures/staging.json
 fixtures/cleanup-state.json
 *.local.postman_environment.json
+fixtures/qa30.json
