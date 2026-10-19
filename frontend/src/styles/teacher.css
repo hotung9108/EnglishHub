@@ -1464,4 +1464,111 @@
   border-color: var(--primary);
 }
 
+/* ==========================================================================
+   Speaking AI Grading & Audio Components
+   ========================================================================== */
+.tsd-btn-ai-speaking {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  font-weight: 600;
+  background-color: var(--primary, #1b4d3e);
+  color: #ffffff;
+  border: 1px solid var(--primary, #1b4d3e);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.tsd-btn-ai-speaking:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.tsd-btn-ai-speaking:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.tsd-btn-ai-speaking:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tsd-speaking-ai-action {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.tsd-module-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tsd-module-tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid var(--outline-variant, #cbd5e1);
+  background-color: var(--surface, #ffffff);
+  color: var(--on-surface-variant, #475569);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tsd-module-tab:hover {
+  background-color: var(--surface-dim, #f1f5f9);
+  color: var(--on-surface, #0f172a);
+}
+
+.tsd-module-tab.active {
+  background-color: var(--primary, #1b4d3e);
+  color: #ffffff;
+  border-color: var(--primary, #1b4d3e);
+  font-weight: 600;
+}
+
+.tsd-audio-player-wrap {
+  margin-bottom: 16px;
+  padding: 16px;
+  background-color: var(--surface-container-low, #f8fafc);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+}
+
+.tsd-audio-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface, #1e293b);
+  margin-bottom: 10px;
+}
+
+.tsd-audio-player {
+  width: 100%;
+  height: 40px;
+  outline: none;
+}
+
+.tsd-transcript-box {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--surface-container, #e2e8f0);
+}
+
+.tsd-transcript-text {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--on-surface, #1e293b);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+
 

@@ -1,26 +1,42 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, Download, Printer, FileText, ChevronLeft, ChevronRight,
-  User, Star, Sparkles, MessageSquare,
+  User, Star, MessageSquare,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import { parseApiError } from '../api';
 import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../api/services/submission.service';
-import { gradingService, type AiGradingSuggestionResponse, type SubmissionModuleGradingResponse } from '../api/services/grading.service';
+import { 
+  gradingService, 
+  type AiGradingSuggestionResponse, 
+  type SubmissionModuleGradingResponse,
+  type GradingDetailResponse 
+} from '../api/services/grading.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { userService } from '../api/services/user.service';
+
+const resolveAudioUrl = (storageKey?: string | null): string => {
+  if (!storageKey) return '';
+  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
+    return storageKey;
+  }
+  return `/s3-upload/englishhub-dev/${storageKey.replace(/^\/+/, '')}`;
+};
 
 export const TeacherSubmissionDetails: React.FC = () => {
   const navigate = useNavigate();
   const { id, studentId } = useParams<{ id: string; studentId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -28,9 +44,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // Entities
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+  const [selectedModuleId, setSelectedModuleId] = useState<number | null>(() => {
+    const modParam = searchParams.get('moduleId');
+    return modParam && Number.isFinite(Number(modParam)) ? Number(modParam) : null;
+  });
   const [moduleDetail, setModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
   const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
+  const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
   const [studentInfo, setStudentInfo] = useState<{ name: string; email: string; code: string } | null>(null);
 
   // Class student list for Prev / Next navigation
@@ -52,128 +73,183 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const loadModuleData = useCallback(async (targetModuleId: number) => {
+    try {
+      const modDetailRes = await submissionService.getSubmissionModuleDetail(targetModuleId);
+      setModuleDetail(modDetailRes);
+    } catch {
+      setModuleDetail(null);
+    }
+
+    try {
+      const gradingRes = await gradingService.getBySubmissionModuleId(targetModuleId);
+      setGradingSummary(gradingRes);
+      if (gradingRes.finalScore !== null && gradingRes.finalScore !== undefined) {
+        setFinalScoreInput(String(gradingRes.finalScore));
+      }
+      if (gradingRes.id) {
+        try {
+          const detail = await gradingService.getById(gradingRes.id);
+          setGradingDetail(detail);
+          if (detail.finalScore !== null && detail.finalScore !== undefined) {
+            setFinalScoreInput(String(detail.finalScore));
+          }
+          if (detail.finalFeedback) {
+            setFeedbackText(detail.finalFeedback);
+          } else if (detail.aiFeedback) {
+            setFeedbackText((prev) => prev || detail.aiFeedback || '');
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      setGradingSummary(null);
+      setGradingDetail(null);
+    }
+
+    try {
+      const aiRes = await gradingService.getAiSuggestion(targetModuleId);
+      setAiSuggestion(aiRes);
+      if (aiRes.aiFeedback) {
+        setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
+      }
+      if (aiRes.suggestedScore !== null && aiRes.suggestedScore !== undefined) {
+        setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
+      }
+    } catch {
+      setAiSuggestion(null);
+    }
+  }, []);
+
+  const handleSelectModule = (modId: number) => {
+    setSelectedModuleId(modId);
+    setSearchParams({ moduleId: String(modId) }, { replace: true });
+    loadModuleData(modId);
+  };
+
   useEffect(() => {
     let isMounted = true;
     if (!id || !studentId) return;
 
     const loadSubmissionData = async () => {
-
-    try {
-      const assignmentIdNum = Number(id);
-      const studentIdNum = Number(studentId);
-
-      // 1. Fetch assignment detail
-      const assignRes = await assignmentService.getAssignment(assignmentIdNum);
-      setAssignment(assignRes);
-
-      // 2. Fetch student profile/name
       try {
-        const usersRes = await userService.listUsers({ role: 'STUDENT', limit: 100 });
-        const studentUser = usersRes.data.find(u => u.id === studentIdNum);
-        if (studentUser) {
-          setStudentInfo({
-            name: studentUser.fullName,
-            email: studentUser.email,
-            code: `HV-${studentUser.id.toString().padStart(4, '0')}`
-          });
-        } else {
-          setStudentInfo({
-            name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
-            email: `student${studentIdNum}@englishhub.edu.vn`,
-            code: `HV-${studentIdNum.toString().padStart(4, '0')}`
-          });
+        const assignmentIdNum = Number(id);
+        const studentIdNum = Number(studentId);
+
+        // 1. Fetch assignment detail
+        const assignRes = await assignmentService.getAssignment(assignmentIdNum);
+        if (isMounted) setAssignment(assignRes);
+
+        // 2. Fetch student profile/name
+        try {
+          const usersRes = await userService.listUsers({ role: 'STUDENT', limit: 100 });
+          const studentUser = usersRes.data.find(u => u.id === studentIdNum);
+          if (isMounted) {
+            if (studentUser) {
+              setStudentInfo({
+                name: studentUser.fullName,
+                email: studentUser.email,
+                code: `HV-${studentUser.id.toString().padStart(4, '0')}`
+              });
+            } else {
+              setStudentInfo({
+                name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+                email: `student${studentIdNum}@englishhub.edu.vn`,
+                code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+              });
+            }
+          }
+        } catch {
+          if (isMounted) {
+            setStudentInfo({
+              name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+              email: `student${studentIdNum}@englishhub.edu.vn`,
+              code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+            });
+          }
         }
-      } catch {
-        setStudentInfo({
-          name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
-          email: `student${studentIdNum}@englishhub.edu.vn`,
-          code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+
+        // 3. Find submission for this student and assignment
+        const subListRes = await submissionService.listSubmissions({
+          assignmentId: assignmentIdNum,
+          studentId: studentIdNum,
+          limit: 10
         });
-      }
 
-      // 3. Find submission for this student and assignment
-      const subListRes = await submissionService.listSubmissions({
-        assignmentId: assignmentIdNum,
-        studentId: studentIdNum,
-        limit: 10
-      });
+        const matchedSubItem = subListRes.data && subListRes.data.length > 0 ? subListRes.data[0] : null;
 
-      const matchedSubItem = subListRes.data && subListRes.data.length > 0 ? subListRes.data[0] : null;
-
-      if (!matchedSubItem) {
-        setSubmission(null);
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch full submission detail
-      const subDetail = await submissionService.getSubmission(matchedSubItem.id);
-      setSubmission(subDetail);
-
-      // 4. Fetch module details & grading
-      if (subDetail.modules && subDetail.modules.length > 0) {
-        const firstMod = subDetail.modules[0];
-        try {
-          const modDetailRes = await submissionService.getSubmissionModuleDetail(firstMod.id);
-          setModuleDetail(modDetailRes);
-        } catch {
-          // ignore
+        if (!matchedSubItem) {
+          if (isMounted) {
+            setSubmission(null);
+            setIsLoading(false);
+          }
+          return;
         }
 
+        // Fetch full submission detail
+        const subDetail = await submissionService.getSubmission(matchedSubItem.id);
+        if (!isMounted) return;
+        setSubmission(subDetail);
+
+        // 4. Determine initial module
+        if (subDetail.modules && subDetail.modules.length > 0) {
+          let initialMod = subDetail.modules[0];
+          const queryModId = searchParams.get('moduleId');
+          const parsedModId = queryModId && Number.isFinite(Number(queryModId)) ? Number(queryModId) : null;
+
+          if (parsedModId) {
+            const found = subDetail.modules.find(m => m.id === parsedModId);
+            if (found) initialMod = found;
+          } else {
+            const speakingMod = subDetail.modules.find(m => m.skill === 'SPEAKING');
+            if (speakingMod) initialMod = speakingMod;
+          }
+
+          setSelectedModuleId(initialMod.id);
+          await loadModuleData(initialMod.id);
+        }
+
+        // 5. Fetch sibling submissions for Prev/Next
         try {
-          const gradingRes = await gradingService.getBySubmissionModuleId(firstMod.id);
-          setGradingSummary(gradingRes);
-          if (gradingRes.finalScore !== null && gradingRes.finalScore !== undefined) {
-            setFinalScoreInput(String(gradingRes.finalScore));
+          const siblingRes = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
+          if (isMounted && siblingRes.data) {
+            const uniqueStudents = Array.from(new Set(siblingRes.data.map((s) => s.studentId))).map((sId) => ({
+              studentId: sId
+            }));
+            setClassSubmissions(uniqueStudents);
           }
         } catch {
           // ignore
         }
-
-        try {
-          const aiRes = await gradingService.getAiSuggestion(firstMod.id);
-          setAiSuggestion(aiRes);
-          if (aiRes.aiFeedback) {
-            setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
-          }
-          if (aiRes.suggestedScore !== null && aiRes.suggestedScore !== undefined) {
-            setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
-          }
-        } catch {
-          // ignore
+      } catch (err) {
+        console.error('Failed to load student submission details:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải chi tiết bài nộp của học viên. Vui lòng thử lại.' : 'Failed to load submission details. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
+    };
 
-      // 5. Fetch sibling submissions for Prev/Next
-      try {
-        const siblingRes = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
-        if (siblingRes.data) {
-          const uniqueStudents = Array.from(new Set(siblingRes.data.map((s) => s.studentId))).map((sId) => ({
-            studentId: sId
-          }));
-          setClassSubmissions(uniqueStudents);
-        }
-      } catch {
-        // ignore
-      }
-    } catch (err) {
-      console.error('Failed to load student submission details:', err);
-      if (isMounted) {
-        setError(isVi ? 'Không thể tải chi tiết bài nộp của học viên. Vui lòng thử lại.' : 'Failed to load submission details. Please retry.');
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
+    loadSubmissionData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData]);
+
+  const activeModule = useMemo(() => {
+    if (!submission?.modules || submission.modules.length === 0) return null;
+    if (selectedModuleId) {
+      const found = submission.modules.find(m => m.id === selectedModuleId);
+      if (found) return found;
     }
-  };
-
-  loadSubmissionData();
-
-  return () => {
-    isMounted = false;
-  };
-}, [id, studentId, isVi, reloadKey]);
+    const speakingMod = submission.modules.find(m => m.skill === 'SPEAKING');
+    return speakingMod || submission.modules[0];
+  }, [submission, selectedModuleId]);
 
   // Navigate to prev/next student
   const currentIndex = useMemo(() => {
@@ -195,15 +271,30 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   // Trigger AI Analyze
   const handleTriggerAiAnalyze = async () => {
-    if (!submission?.modules?.[0]?.id) return;
+    const targetModuleId = activeModule?.id;
+    if (!targetModuleId) return;
+
+    setIsAnalyzingAi(true);
     try {
-      showToast(isVi ? 'Đang gửi yêu cầu phân tích tới AI Grading Engine...' : 'Requesting AI analysis...');
-      await gradingService.requestAiAnalysis(submission.modules[0].id);
-      showToast(isVi ? 'AI Engine đã nhận yêu cầu, đang xử lý!' : 'AI Engine is processing submission!');
-      setTimeout(() => setReloadKey((k) => k + 1), 2000);
+      showToast(isVi ? 'Đang gửi yêu cầu chấm điểm bằng AI...' : 'Requesting AI grading...');
+      await gradingService.requestAiAnalysis(targetModuleId);
+      showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
+
+      setTimeout(async () => {
+        try {
+          await loadModuleData(targetModuleId);
+          showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+        } catch (pollErr) {
+          console.error('Error refreshing grading after AI:', pollErr);
+        } finally {
+          setIsAnalyzingAi(false);
+        }
+      }, 3500);
     } catch (err) {
       console.error('Failed to trigger AI analyze:', err);
-      showToast(isVi ? 'Lỗi khi kích hoạt AI. Vui lòng thử lại!' : 'Failed to trigger AI analysis.');
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Lỗi khi kích hoạt AI. Vui lòng thử lại.' : 'Failed to trigger AI analysis.'));
+      setIsAnalyzingAi(false);
     }
   };
 
@@ -238,11 +329,35 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     } catch (err) {
       console.error('Failed to submit grade:', err);
-      showToast(isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!');
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!'));
     } finally {
       setIsSubmittingGrade(false);
     }
   };
+
+  // Check if current active module is speaking
+  const isSpeaking = activeModule?.skill === 'SPEAKING' || 
+    moduleDetail?.answers?.some(a => !!a.audioStorageKey);
+
+  const audioAnswer = moduleDetail?.answers?.find(a => !!a.audioStorageKey);
+  const audioStorageKey = audioAnswer?.audioStorageKey;
+  const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
+
+  // Format AI transcript if available
+  const formattedTranscript = useMemo(() => {
+    if (!gradingDetail?.aiTranscript) return null;
+    const tr = gradingDetail.aiTranscript;
+    if (typeof tr === 'string') return tr;
+    if (typeof tr === 'object' && tr !== null) {
+      const obj = tr as Record<string, unknown>;
+      if (typeof obj.full_transcript === 'string') return obj.full_transcript;
+      if (typeof obj.text === 'string') return obj.text;
+      if (typeof obj.transcript === 'string') return obj.transcript;
+      return JSON.stringify(obj, null, 2);
+    }
+    return String(tr);
+  }, [gradingDetail?.aiTranscript]);
 
   // Extract student text answer
   const studentAnswerText = useMemo(() => {
@@ -373,7 +488,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
       {/* Quick Actions Bar */}
       <div className="tsd-actions-bar">
         <Button 
-          variant="secondary"
+          variant="secondary" 
           size="sm"
           onClick={() => showToast(isVi ? 'Đang chuẩn bị tải về bài nộp...' : 'Downloading submission...')}
           icon={Download}
@@ -387,14 +502,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
           icon={Printer}
         >
           {t('submissionDetails.btnPrint')}
-        </Button>
-        <Button 
-          variant="secondary"
-          size="sm"
-          onClick={handleTriggerAiAnalyze}
-          icon={Sparkles}
-        >
-          {isVi ? 'Phân tích lại với AI' : 'Re-run AI Analysis'}
         </Button>
       </div>
 
@@ -437,11 +544,35 @@ export const TeacherSubmissionDetails: React.FC = () => {
         </div>
       </div>
 
+      {/* Module Switcher Tabs if multiple modules exist */}
+      {submission.modules && submission.modules.length > 1 && (
+        <div className="tsd-module-tabs">
+          {submission.modules.map((m) => {
+            const isSelected = m.id === (activeModule?.id || selectedModuleId);
+            const label = m.skill || (isVi ? `Phần ${m.id}` : `Module ${m.id}`);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className={`tsd-module-tab ${isSelected ? 'active' : ''}`}
+                onClick={() => handleSelectModule(m.id)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <MetricCard 
           title={isVi ? 'Điểm số đề xuất' : 'Suggested Score'}
-          value={finalScoreInput || '7.0'}
+          value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
+            ? String(gradingDetail.finalScore) 
+            : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined 
+                ? String(aiSuggestion.suggestedScore) 
+                : (finalScoreInput || '--'))}
           suffix="/ 10"
           footerText={
             <span className="text-emerald-600 font-medium inline-flex items-center gap-1">
@@ -452,10 +583,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
         />
 
         <MetricCard 
-          title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
-          value={String(wordCount)}
-          suffix={isVi ? 'từ' : 'words'}
-          footerText={wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu (>= 250 từ)' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target')}
+          title={isSpeaking ? (isVi ? 'Kỹ năng chấm' : 'Skill') : (isVi ? 'Độ dài bài nộp' : 'Word Count')}
+          value={isSpeaking ? 'Speaking' : String(wordCount)}
+          suffix={isSpeaking ? '' : (isVi ? 'từ' : 'words')}
+          footerText={isSpeaking 
+            ? (isVi ? 'Bản ghi âm trực tuyến' : 'Online recording') 
+            : (wordCount >= 250 ? (isVi ? 'Đạt số từ tối thiểu' : 'Meets minimum word count') : (isVi ? 'Chưa đủ số từ tối thiểu' : 'Below target'))}
         />
       </div>
 
@@ -487,8 +620,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <FileItem 
                     key={ans.id}
                     name={ans.audioStorageKey}
-                    extension="mp3"
-                    size="Bản ghi âm phát âm"
+                    extension="wav"
+                    size="Bản ghi âm bài nói"
                     details={t('submissionDetails.submittedOn')}
                     onDownload={() => showToast(isVi ? 'Đang mở audio phát âm...' : 'Opening audio...')}
                   />
@@ -507,10 +640,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <div className="tsd-answer-header">
             <div className="tsd-answer-title">
               <span className="tsd-answer-title-dot"></span>
-              <span>{isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}</span>
+              <span>
+                {isSpeaking 
+                  ? (isVi ? 'Bài nói của học viên' : 'Student Speaking Submission')
+                  : (isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer')}
+              </span>
             </div>
             <div className="text-xs text-slate-500">
-              {wordCount} {isVi ? 'từ' : 'words'}
+              {isSpeaking ? 'Speaking' : `${wordCount} ${isVi ? 'từ' : 'words'}`}
             </div>
           </div>
 
@@ -518,14 +655,61 @@ export const TeacherSubmissionDetails: React.FC = () => {
             <div className="tsd-prompt-label">
               {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
             </div>
-            <p className="m-0 whitespace-pre-line">
-              {studentAnswerText}
-            </p>
+
+            {isSpeaking ? (
+              <div>
+                {audioUrl ? (
+                  <div className="tsd-audio-player-wrap">
+                    <div className="tsd-audio-label">
+                      {isVi ? 'Bản ghi âm bài nói' : 'Audio Recording'}
+                    </div>
+                    <audio controls src={audioUrl} className="tsd-audio-player">
+                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                    </audio>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 italic">
+                    {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
+                  </p>
+                )}
+
+                {/* Clean AI grading button for Speaking: no badge, no icon, no subtitle, no redundant text */}
+                <div className="tsd-speaking-ai-action">
+                  <button
+                    type="button"
+                    className="tsd-btn-ai-speaking"
+                    disabled={isAnalyzingAi}
+                    onClick={handleTriggerAiAnalyze}
+                  >
+                    {isAnalyzingAi 
+                      ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
+                      : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI')}
+                  </button>
+                </div>
+
+                {formattedTranscript && (
+                  <div className="tsd-transcript-box">
+                    <div className="tsd-prompt-label">
+                      {isVi ? 'Văn bản chuyển đổi từ giọng nói (Transcript)' : 'Speech-to-text Transcript'}
+                    </div>
+                    <p className="tsd-transcript-text">{formattedTranscript}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="m-0 whitespace-pre-line">
+                {studentAnswerText}
+              </p>
+            )}
           </div>
 
           <div className="tsd-answer-footer">
             <div>
-              {t('submissionDetails.wordCountPrefix')}<strong>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong>
+              {isSpeaking ? (
+                <span>{isVi ? 'Kỹ năng: Nói (Speaking)' : 'Skill: Speaking'}</span>
+              ) : (
+                <span>{t('submissionDetails.wordCountPrefix')}<strong>{wordCount} {t('submissionDetails.wordCountSuffix')}</strong></span>
+              )}
             </div>
           </div>
         </div>
@@ -535,17 +719,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
           {/* AI Grading Insight */}
           <div className="tsd-ai-box">
             <div className="tsd-ai-box-header">
-              <span className="flex items-center gap-1.5">
-                <Sparkles size={16} /> {t('submissionDetails.aiSuggestionsTitle')}
-              </span>
-              <span className="tsd-ai-badge">
-                {aiSuggestion?.modelUsed || 'AI Engine'}
-              </span>
+              <span>{t('submissionDetails.aiSuggestionsTitle')}</span>
             </div>
             <p className="tsd-ai-desc">
-              {aiSuggestion?.aiFeedback || (isVi 
-                ? 'AI Engine đã sẵn sàng phân tích cấu trúc ngữ pháp và vốn từ vựng.' 
-                : 'AI Engine is ready to diagnose grammar and vocabulary.')}
+              {gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback || (isVi 
+                ? 'AI Engine đã sẵn sàng phân tích bài nộp.' 
+                : 'AI Engine is ready to diagnose submission.')}
             </p>
           </div>
 
@@ -559,7 +738,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 type="number" 
                 step="0.5" 
                 min="0" 
-                max="10"
+                max="10" 
                 placeholder="0.0"
                 value={finalScoreInput}
                 onChange={(e) => setFinalScoreInput(e.target.value)}
