@@ -8,3 +8,4 @@ export * from './Skeleton';
 export * from './DocumentTitleManager';
 export * from './Pagination';
 export * from './pagination.utils';
+export * from './MarkdownView';

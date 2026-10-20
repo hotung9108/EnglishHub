@@ -138,11 +138,11 @@ export const TeacherDashboard: React.FC = () => {
 
   // Derived: All student lookup map
   const studentMap = useMemo(() => {
-    const map = new Map<number, { name: string; code?: string }>();
+    const map = new Map<number, { name: string; code?: string; email?: string }>();
     for (const ec of enrichedClasses) {
       for (const m of ec.members) {
         if (!map.has(m.studentId)) {
-          map.set(m.studentId, { name: m.fullName, code: m.studentCode });
+          map.set(m.studentId, { name: m.fullName, code: m.studentCode, email: m.email });
         }
       }
     }
@@ -215,6 +215,8 @@ export const TeacherDashboard: React.FC = () => {
             assignmentTitle: assignInfo?.title || (isVi ? `Bài tập #${sub.assignmentId}` : `Assignment #${sub.assignmentId}`),
             studentId: String(sub.studentId),
             studentName: studentInfo?.name || (isVi ? `Học viên #${sub.studentId}` : `Student #${sub.studentId}`),
+            studentEmail: studentInfo?.email,
+            studentCode: studentInfo?.code,
             studentAvatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(studentInfo?.name || 'ST')}`,
             className: assignInfo?.className || ec.summary.name,
             skill,
@@ -697,7 +699,12 @@ export const TeacherDashboard: React.FC = () => {
                       <button 
                         type="button"
                         className="teacher-dash-btn-grade"
-                        onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`)}
+                        onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`, {
+                          state: {
+                            studentName: item.studentName,
+                            studentCode: item.studentCode
+                          }
+                        })}
                       >
                         <span>{isVi ? 'Chấm bài' : 'Grade'}</span>
                       </button>

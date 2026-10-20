@@ -45,3 +45,8 @@ export type {
   TeacherSummary,
   UpdateClassPayload,
 } from '@/api/services/class.service';
+export { useAudioRecorder, getBackendMimeType } from './useAudioRecorder';
+export type {
+  UseAudioRecorderOptions,
+  UseAudioRecorderResult,
+} from './useAudioRecorder';
