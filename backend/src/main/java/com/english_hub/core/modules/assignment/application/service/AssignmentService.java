@@ -14,10 +14,12 @@ import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepos
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepository;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +57,7 @@ public class AssignmentService {
 	}
 
 	@Transactional(readOnly = true)
-	public AssignmentPage listAssignments(String statusValue, long classId, int page, int limit) {
+	public AssignmentListResult listAssignments(String statusValue, long classId, int page, int limit) {
 		User caller = currentUserProvider.requireActiveUser();
 		requireClassAccess(classId, caller);
 		AssignmentStatus status = parseStatusFilter(statusValue);
@@ -63,7 +65,14 @@ public class AssignmentService {
 		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest(INVALID_DATA_MESSAGE);
 		}
-		return assignmentRepository.findPage(classId, status, pageRequest);
+		AssignmentPage assignmentPage = assignmentRepository.findPage(classId, status, pageRequest);
+		if (assignmentPage.assignments().isEmpty()) {
+			return new AssignmentListResult(assignmentPage, Map.of());
+		}
+		List<Long> assignmentIds = assignmentPage.assignments().stream().map(Assignment::id).toList();
+		Map<Long, List<ModuleSkill>> skillsByAssignmentId =
+				assignmentRepository.findSkillsByAssignmentIds(assignmentIds);
+		return new AssignmentListResult(assignmentPage, skillsByAssignmentId);
 	}
 
 	@Transactional
@@ -264,6 +273,15 @@ public class AssignmentService {
 		}
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	public record AssignmentListResult(
+			AssignmentPage assignmentPage,
+			Map<Long, List<ModuleSkill>> skillsByAssignmentId) {
+
+		public List<ModuleSkill> skillsFor(Long assignmentId) {
+			return skillsByAssignmentId.getOrDefault(assignmentId, List.of());
+		}
 	}
 
 	public record AssignmentDetailResult(
