@@ -80,7 +80,7 @@ export const TeacherDashboard: React.FC = () => {
           effectiveClasses.map(async (cls): Promise<EnrichedClassData> => {
             let members: ClassMember[];
             let assignments: AssignmentSummary[];
-            let submissions: SubmissionListItem[] = [];
+            let submissions: SubmissionListItem[];
 
             try {
               members = await classService.listMembers(cls.id);
@@ -95,18 +95,14 @@ export const TeacherDashboard: React.FC = () => {
               assignments = [];
             }
 
-            // Fetch submissions for assignments in this class
-            if (assignments.length > 0) {
-              const subPromises = assignments.map(async (a) => {
-                try {
-                  const subRes = await submissionService.listSubmissions({ assignmentId: a.id, limit: 50 });
-                  return subRes.data || [];
-                } catch {
-                  return [];
-                }
-              });
-              const subResults = await Promise.all(subPromises);
-              submissions = subResults.flat();
+            const classId = cls.id;
+            const assignmentIds = new Set(assignments.map((assignment) => assignment.id));
+            try {
+              const classSubmissions = await submissionService.listAllSubmissions({ classId });
+              submissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
+            } catch {
+              submissions = [];
+              console.warn('Failed to load class submissions', { classId });
             }
 
             return {
@@ -190,7 +186,7 @@ export const TeacherDashboard: React.FC = () => {
 
         if (isPendingGrading) {
           const studentInfo = studentMap.get(sub.studentId);
-          const assignInfo = sub.assignmentId ? assignmentMap.get(sub.assignmentId) : undefined;
+          const assignInfo = assignmentMap.get(sub.assignmentId);
           const firstMod = sub.modules[0];
           const skill: TeacherSkill = mapSkill(firstMod?.skill);
 
@@ -215,7 +211,7 @@ export const TeacherDashboard: React.FC = () => {
 
           list.push({
             id: `sub-${sub.id}`,
-            assignmentId: String(sub.assignmentId || '1'),
+            assignmentId: String(sub.assignmentId),
             assignmentTitle: assignInfo?.title || (isVi ? `Bài tập #${sub.assignmentId}` : `Assignment #${sub.assignmentId}`),
             studentId: String(sub.studentId),
             studentName: studentInfo?.name || (isVi ? `Học viên #${sub.studentId}` : `Student #${sub.studentId}`),
@@ -424,7 +420,7 @@ export const TeacherDashboard: React.FC = () => {
     for (const ec of enrichedClasses) {
       for (const sub of ec.submissions) {
         const studentInfo = studentMap.get(sub.studentId);
-        const assignInfo = sub.assignmentId ? assignmentMap.get(sub.assignmentId) : undefined;
+        const assignInfo = assignmentMap.get(sub.assignmentId);
         const studentName = studentInfo?.name || (isVi ? 'Học viên' : 'Student');
 
         if (isSubmissionGraded(sub)) {

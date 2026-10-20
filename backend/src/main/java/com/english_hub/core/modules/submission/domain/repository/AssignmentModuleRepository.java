@@ -7,4 +7,6 @@ import java.util.List;
 public interface AssignmentModuleRepository {
 
 	List<ModuleInfo> findModulesByAssignmentId(Long assignmentId);
+
+	List<ModuleInfo> findModulesByAssignmentIds(List<Long> assignmentIds);
 }

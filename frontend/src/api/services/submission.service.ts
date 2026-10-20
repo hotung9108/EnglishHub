@@ -71,7 +71,7 @@ export interface SubmissionModuleSummary {
 
 export interface SubmissionListItem {
   id: number;
-  assignmentId?: number;
+  assignmentId: number;
   studentId: number;
   attemptNumber: number;
   status: SubmissionStatus;
@@ -151,6 +151,7 @@ export interface SubmissionModuleDetailResponse {
 }
 
 export interface SubmissionListParams {
+  classId?: number;
   assignmentId?: number;
   studentId?: number;
   status?: SubmissionStatus;
@@ -170,6 +171,7 @@ export function normalizeSubmissionListParams(params: SubmissionListParams = {})
       : Math.min(100, Math.max(1, Math.floor(requestedLimit)));
 
   return {
+    ...(params.classId !== undefined ? { classId: params.classId } : {}),
     ...(params.assignmentId !== undefined ? { assignmentId: params.assignmentId } : {}),
     ...(params.studentId !== undefined ? { studentId: params.studentId } : {}),
     ...(params.status !== undefined ? { status: params.status } : {}),
@@ -272,6 +274,37 @@ export class SubmissionService {
       ...options,
       params: normalizeSubmissionListParams(params),
     });
+  }
+
+  async listAllSubmissions(
+    params: Omit<SubmissionListParams, 'page' | 'limit'> = {},
+    options?: ApiRequestOptions
+  ): Promise<SubmissionListItem[]> {
+    const limit = 100;
+    const errorMessage = 'Dữ liệu phân trang không nhất quán';
+    const firstPage = await this.listSubmissions({ ...params, page: 1, limit }, options);
+    const total = firstPage.pagination?.total;
+    if (!Number.isInteger(total) || total < 0) throw new Error(errorMessage);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const submissions: SubmissionListItem[] = [];
+    const submissionIds = new Set<number>();
+
+    for (let page = 1; page <= totalPages; page++) {
+      const response = page === 1
+        ? firstPage
+        : await this.listSubmissions({ ...params, page, limit }, options);
+      const pageTotal = response.pagination?.total;
+      if (!Number.isInteger(pageTotal) || pageTotal < 0 || (page < totalPages && response.data.length !== limit)) {
+        throw new Error(errorMessage);
+      }
+      for (const submission of response.data) {
+        if (submissionIds.has(submission.id)) throw new Error(errorMessage);
+        submissionIds.add(submission.id);
+        submissions.push(submission);
+      }
+    }
+
+    return submissions;
   }
 
   submitSubmission(

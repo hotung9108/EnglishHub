@@ -97,9 +97,11 @@ export const TeacherClassProgress: React.FC = () => {
     let isMounted = true;
 
     const fetchClassProgressData = async () => {
+      setError(null);
       try {
         // 1. Fetch all classes
         const classRes = await classService.list({ limit: 100 });
+        if (!isMounted) return;
         const allClasses: ClassSummary[] = classRes.data || [];
         setClassesList(allClasses);
 
@@ -131,39 +133,39 @@ export const TeacherClassProgress: React.FC = () => {
         } catch {
           // Fallback to summary
         }
+        if (!isMounted) return;
         setCurrentClass(classDetail);
 
         // 4. Fetch enrolled members
         let members: ClassMember[] = [];
         try {
           members = await classService.listMembers(targetClassSummary.id);
+          if (!isMounted) return;
           setEnrolledMembers(members);
         } catch {
           members = [];
         }
+        if (!isMounted) return;
 
         // 5. Fetch assignments for this class
         let rawAssignments: AssignmentSummary[] = [];
         try {
           const aRes = await assignmentService.listAssignments(targetClassSummary.id, { limit: 100 });
+          if (!isMounted) return;
           rawAssignments = aRes.data || [];
         } catch {
           rawAssignments = [];
         }
+        if (!isMounted) return;
 
-        // 6. Fetch submissions for each assignment
+        // 6. Fetch class submissions, keeping only the assignments loaded above
+        const assignmentIds = new Set(rawAssignments.map((assignment) => assignment.id));
+        const classSubmissions = await submissionService.listAllSubmissions({ classId: targetClassSummary.id });
+        if (!isMounted) return;
+        const allSubmissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
         const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
-        const allSubmissions: SubmissionListItem[] = [];
-
-        for (const a of rawAssignments) {
-          try {
-            const sRes = await submissionService.listSubmissions({ assignmentId: a.id, limit: 100 });
-            const items = sRes.data || [];
-            allSubmissionsByAssignId[a.id] = items;
-            allSubmissions.push(...items);
-          } catch {
-            allSubmissionsByAssignId[a.id] = [];
-          }
+        for (const submission of allSubmissions) {
+          (allSubmissionsByAssignId[submission.assignmentId] ??= []).push(submission);
         }
 
         // Map class assignments items (clean, real fields)
@@ -210,6 +212,7 @@ export const TeacherClassProgress: React.FC = () => {
             status
           };
         });
+        if (!isMounted) return;
         setClassAssignments(mappedAssignments);
 
         // 7. Build Student Grade Roster
@@ -291,6 +294,7 @@ export const TeacherClassProgress: React.FC = () => {
           };
         });
 
+        if (!isMounted) return;
         setStudentsRoster(rosterRows);
       } catch (err) {
         console.error('Failed to load class progress data:', err);
