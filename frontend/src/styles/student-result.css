@@ -26,11 +26,10 @@
 .result-breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   font-size: 13px;
   color: var(--on-surface-variant);
-  margin-bottom: 20px;
-  padding-top: 12px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
 }
 
@@ -39,8 +38,8 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   border-radius: var(--radius-md, 8px);
   background-color: var(--surface);
   color: var(--on-surface);
@@ -53,8 +52,14 @@
 .result-back-btn:hover {
   background-color: var(--surface-container-low);
   color: var(--primary);
-  border-color: var(--primary);
+  border-color: var(--border-hover, #c2a882);
   transform: translateX(-2px);
+}
+
+.result-crumb-sep {
+  color: var(--outline-variant);
+  font-weight: 300;
+  user-select: none;
 }
 
 .result-crumb-link {
@@ -62,10 +67,20 @@
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
 }
 
 .result-crumb-link:hover {
   text-decoration: underline;
+}
+
+.result-crumb-current {
+  color: var(--text-muted, #736b63);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* --------------------------------------------------------------------------
@@ -164,71 +179,22 @@
 }
 
 .result-hero-score-box {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 22px;
-  background-color: var(--surface-dim, #F5F5F4);
-  border: 1px solid var(--border-color, #E7E5E4);
-  border-radius: 12px;
-  padding: 16px 24px;
+  justify-content: center;
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px solid var(--outline-variant, #e6dfd5);
+  border-radius: var(--radius-md, 10px);
+  padding: 14px 24px;
   z-index: 1;
 }
 
-.result-score-main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 80px;
-}
-
 .result-score-number {
-  font-size: 38px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--primary, #4F46E5);
-}
-
-.result-score-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary, #78716C);
-  margin-top: 4px;
-}
-
-.result-score-divider {
-  width: 1px;
-  height: 48px;
-  background-color: var(--border-color, #E7E5E4);
-}
-
-.result-score-sub {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.result-score-100 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary, #292524);
-}
-
-.result-score-sub-label {
-  font-size: 11px;
-  color: var(--text-secondary, #78716C);
-}
-
-.result-score-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-  margin-top: 4px;
-  color: var(--color-success, #16A34A);
+  letter-spacing: -0.01em;
+  color: var(--primary, #1b4d3e);
 }
 
 .result-hero-actions {
@@ -675,8 +641,38 @@
 }
 
 /* --------------------------------------------------------------------------
-   8. SPEAKING VIEW: Audio Player & Speech-to-Text Phonetics
+   8. SPEAKING VIEW: Audio Player & Teacher Feedback
    -------------------------------------------------------------------------- */
+.result-audio-player-wrap {
+  margin-top: 0;
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px 12px;
+}
+
+.result-audio-player {
+  width: 100%;
+  height: 40px;
+  outline: none;
+}
+
+.result-audio-empty {
+  padding: 16px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px dashed var(--outline-variant, #e6dfd5);
+  font-size: 13px;
+  color: var(--on-surface-variant, #736b63);
+  text-align: center;
+}
+
+.result-teacher-feedback-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--on-surface);
+}
+
 .speaking-audio-player {
   background-color: var(--surface-dim, #f5f5f4);
   color: var(--text-primary, #292524);

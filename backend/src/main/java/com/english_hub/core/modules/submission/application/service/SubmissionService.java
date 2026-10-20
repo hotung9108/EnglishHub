@@ -69,7 +69,7 @@ public class SubmissionService {
 	private static final String SUBMISSION_NOT_FOUND_MESSAGE = "Không tìm thấy lượt làm bài.";
 	private static final String INVALID_PARAM_MESSAGE = "Dữ liệu không hợp lệ.";
 	private static final String INVALID_STATUS_MESSAGE = "status không hợp lệ.";
-	private static final String TEACHER_ASSIGNMENT_REQUIRED_MESSAGE = "assignmentId là bắt buộc đối với giáo viên.";
+	private static final String TEACHER_ASSIGNMENT_REQUIRED_MESSAGE = "classId hoặc assignmentId là bắt buộc đối với giáo viên.";
 	private static final String ALREADY_SUBMITTED_MESSAGE = "Phần làm bài này đã được nộp.";
 	private static final String INVALID_ANSWER_CONTENT_MESSAGE = "Nội dung câu trả lời không hợp lệ.";
 	private static final String MODULE_OR_QUESTION_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài hoặc câu hỏi.";
@@ -199,7 +199,7 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public SubmissionListResult list(
-			Long assignmentId, Long studentId, String statusValue, int page, int limit) {
+			Long classId, Long assignmentId, Long studentId, String statusValue, int page, int limit) {
 		SubmissionPageRequest pageRequest = new SubmissionPageRequest(page, limit);
 		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest(INVALID_PARAM_MESSAGE);
@@ -218,17 +218,20 @@ public class SubmissionService {
 				scopedStudentId = caller.id();
 			}
 			case TEACHER -> {
-				if (assignmentId == null) {
+				if (classId == null && assignmentId == null) {
 					throw ApiException.badRequest(TEACHER_ASSIGNMENT_REQUIRED_MESSAGE);
 				}
-				if (!isTeacherOfAssignment(caller.id(), assignmentId)) {
+				boolean allowed = classId != null
+						? classTeachingRepository.isTeacherOfClass(caller.id(), classId)
+						: isTeacherOfAssignment(caller.id(), assignmentId);
+				if (!allowed) {
 					throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 				}
 			}
 			default -> throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		SubmissionPage result = submissionRepository.findPage(
-				new SubmissionFilter(assignmentId, scopedStudentId, status), pageRequest);
+				new SubmissionFilter(classId, assignmentId, scopedStudentId, status), pageRequest);
 		return composeList(result);
 	}
 
@@ -669,15 +672,19 @@ public class SubmissionService {
 				.findBySubmissionModuleIds(submissionModuleIds)
 				.stream()
 				.collect(Collectors.toMap(Grading::getSubmissionModuleId, Function.identity()));
-		Map<Long, Map<Long, ModuleInfo>> moduleInfoByAssignment = submissions.stream()
+		List<Long> assignmentIds = submissions.stream()
 				.map(Submission::getAssignmentId)
 				.distinct()
-				.collect(Collectors.toMap(Function.identity(), this::modulesOf));
+				.toList();
+		Map<Long, Map<Long, ModuleInfo>> moduleInfoByAssignment = assignmentModuleRepository
+				.findModulesByAssignmentIds(assignmentIds).stream()
+				.collect(Collectors.groupingBy(ModuleInfo::assignmentId,
+						Collectors.toMap(ModuleInfo::moduleId, Function.identity())));
 		List<SubmissionListItemResult> items = submissions.stream()
 				.map(submission -> toListItem(
 						submission,
 						modulesBySubmissionId.getOrDefault(submission.getId(), List.of()),
-						moduleInfoByAssignment.get(submission.getAssignmentId()),
+						moduleInfoByAssignment.getOrDefault(submission.getAssignmentId(), Map.of()),
 						gradingBySubmissionModuleId))
 				.toList();
 		return new SubmissionListResult(page.page(), page.limit(), page.total(), items);
@@ -718,6 +725,7 @@ public class SubmissionService {
 				.toList();
 		return new SubmissionListItemResult(
 				submission.getId(),
+				submission.getAssignmentId(),
 				submission.getStudentId(),
 				submission.getAttemptNumber(),
 				submission.getStatus(),
@@ -822,6 +830,7 @@ public class SubmissionService {
 
 	public record SubmissionListItemResult(
 			Long id,
+			Long assignmentId,
 			Long studentId,
 			int attemptNumber,
 			SubmissionStatus status,

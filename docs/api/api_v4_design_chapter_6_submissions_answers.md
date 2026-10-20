@@ -56,19 +56,33 @@
 
 ## 6.3 #39. Danh sách lượt làm bài
 
-**Mô tả:** Học viên xem bài làm của mình; giáo viên xem theo bài tập / học viên. Mỗi item trong danh sách kèm `modules` và `gradings` để hiển thị tổng quan kết quả mà không cần gọi thêm request.
+**Mô tả:** Học viên xem bài làm của mình; giáo viên xem theo lớp / bài tập / học viên. Mỗi item trong danh sách kèm `modules` và `gradings` để hiển thị tổng quan kết quả mà không cần gọi thêm request.
 
-**Method - Path:** `GET /submissions?assignmentId={}&studentId={}&status={}&page={}&limit={}`
+**Method - Path:** `GET /submissions?classId={}&assignmentId={}&studentId={}&status={}&page={}&limit={}`
 
 **Headers:** `Authorization: Bearer <accessToken>`
 
 **Body:** *(none)*
 
+**Bộ lọc và phân quyền:**
+
+- `classId`, `assignmentId`, `studentId`, `status` là các bộ lọc kết hợp bằng AND. `status` của submission nhận `IN_PROGRESS`, `SUBMITTED`, `GRADED`.
+- Khi có `classId`, chỉ lấy submission của assignment trong lớp và `is_deleted = false`; không loại `DRAFT`. Không áp điều kiện xóa mềm cho cách gọi chỉ có `assignmentId`.
+- Teacher phải có `classId` hoặc `assignmentId`; thiếu cả hai trả `400`. Có `classId` thì kiểm quyền phụ trách lớp trước: lớp không tồn tại hoặc không do teacher phụ trách đều trả `403`.
+- Teacher có `classId` hợp lệ và `assignmentId` thì chỉ lọc giao nhau, không kiểm guard quyền assignment riêng. Assignment ngoài lớp (kể cả của teacher khác), đã xóa hoặc không tồn tại trả `200`, `data: []`, `pagination.total: 0`.
+- Teacher chỉ có `assignmentId` giữ kiểm quyền phụ trách lớp của assignment như trước.
+- Admin được lọc lớp bất kỳ; lớp không tồn tại trả `200` rỗng.
+- Student luôn bị giới hạn về chính mình; `classId` chỉ là filter thêm. Truyền `studentId` người khác vẫn trả `403`.
+- Phân trang giữ `page` từ 1 (mặc định 1), `limit` từ 1 đến **100** (mặc định 20), sắp xếp submission ID giảm dần. Mỗi response chỉ là một trang; caller đọc thêm trang theo `pagination.total` nếu cần toàn lớp.
+- Mỗi item bổ sung `assignmentId`; các field và envelope cũ giữ nguyên. Thứ tự `modules` vẫn theo `orderIndex` tăng dần.
+
 **Response:**
 
 | Mô tả | Code | Return |
 |:---|:---:|:---|
-| Lấy danh sách thành công. | `200` | `{ "data": [ { "id": 88, "studentId": 41, "attemptNumber": 1, "status": "GRADED", "submittedAt": "...", "modules": [ { "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "GRADED", "grading": { "finalScore": 8.0, "maxScoreSnapshot": 10.0, "status": "COMPLETED" } } ] } ], "pagination": { "page": 1, "limit": 20, "total": 12 } }` |
+| Lấy danh sách thành công. | `200` | `{ "data": [ { "id": 88, "assignmentId": 5, "studentId": 41, "attemptNumber": 1, "status": "GRADED", "submittedAt": "...", "modules": [ { "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "GRADED", "grading": { "finalScore": 8.0, "maxScoreSnapshot": 10.0, "status": "COMPLETED" } } ] } ], "pagination": { "page": 1, "limit": 20, "total": 12 } }` |
+| Thiếu cả hai filter đối với teacher. | `400` | `{ "error": "classId hoặc assignmentId là bắt buộc đối với giáo viên." }` |
+| Không có quyền truy cập lớp / assignment hoặc student khác. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Lỗi hệ thống. | `500` | `{ "error": "Lỗi máy chủ." }` |
 

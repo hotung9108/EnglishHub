@@ -20,7 +20,11 @@
     "prepare:teacher": "node support/teacher/prepare-fixtures.js",
     "cleanup:teacher": "node support/teacher/cleanup-fixtures.js",
     "docs:teacher": "node tools/document-teacher-cases.mjs",
-    "postman:teacher-access": "node tools/build-039-postman.mjs"
+    "postman:teacher-access": "node tools/build-039-postman.mjs",
+    "test:student": "node run-student.js",
+    "test:student:watch": "node run-student.js --watch",
+    "prepare:student": "node run-student.js --prepare-only",
+    "docs:student": "node tools/document-student-cases.mjs"
   },
   "dependencies": {
     "selenium-webdriver": "4.35.0"

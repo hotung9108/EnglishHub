@@ -6,7 +6,7 @@ import {
   PenTool, Mic, BookOpen, Headphones,
   RotateCcw, GraduationCap
 } from 'lucide-react';
-import { Button, EmptyState, Skeleton, Pagination } from '../components/common';
+import { Button, EmptyState, Skeleton, Pagination, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
@@ -480,8 +480,8 @@ export const StudentFeedback: React.FC = () => {
                   ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
                   : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
               </div>
-              <div className="whitespace-pre-line text-slate-700 leading-relaxed text-sm">
-                {item.content}
+              <div className="text-slate-700 leading-relaxed text-sm">
+                <MarkdownView content={item.content} />
               </div>
             </div>
 

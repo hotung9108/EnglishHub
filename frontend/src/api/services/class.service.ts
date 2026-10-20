@@ -67,6 +67,7 @@ export interface ClassMember {
   studentId: number;
   fullName: string;
   studentCode?: string;
+  email?: string;
 }
 
 export interface ClassMemberListResponse {

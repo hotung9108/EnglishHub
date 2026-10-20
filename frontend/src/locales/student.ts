@@ -90,7 +90,7 @@ export const studentVi = {
     cueCardReference: 'Dàn ý & Bài mẫu tham khảo',
     btnHideScript: 'Ẩn / Hiện gợi ý',
     sampleScriptExcerpt: 'Dàn ý gợi ý: Bắt đầu bằng việc giới thiệu vấn đề ô nhiễm không khí tại đô thị. Phân tích nguyên nhân do phương tiện cá nhân và khí thải công nghiệp. Đề xuất phát triển giao thông công cộng và năng lượng xanh.',
-    studioTitle: 'Phòng thu âm trực tiếp (Live Voice Studio)',
+    studioTitle: 'Ghi trực tiếp',
     btnResetRecording: 'Thu âm lại từ đầu',
     prepNotesLabel: 'Ghi chú cá nhân của bạn (Personal Notes / Outline):',
     prepNotesPlaceholder: 'Nhập dàn ý chuẩn bị của bạn tại đây (ví dụ: Point 1: Air smog -> Cause: Traffic -> Solution: Electric bus)...',

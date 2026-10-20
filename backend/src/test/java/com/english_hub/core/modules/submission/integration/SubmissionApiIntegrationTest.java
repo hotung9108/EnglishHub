@@ -462,20 +462,20 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void listSubmissionsRequiresAnAssignmentIdForATeacher() throws Exception {
+	void listSubmissionsRequiresAClassOrAssignmentIdForATeacher() throws Exception {
 		mockMvc.perform(get("/api/v1/submissions")
 						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));
+				.andExpect(jsonPath("$.error").value("classId hoặc assignmentId là bắt buộc đối với giáo viên."));
 	}
 
 	@Test
-	void teacherClassIdFilterDoesNotReplaceTheRequiredAssignmentId() throws Exception {
+	void teacherClassIdFilterRejectsAForeignClassWithoutAnAssignmentId() throws Exception {
 		mockMvc.perform(get("/api/v1/submissions")
 						.param("classId", String.valueOf(otherClassId))
 						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("assignmentId là bắt buộc đối với giáo viên."));
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 	}
 
 	@Test
@@ -488,6 +488,113 @@ class SubmissionApiIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data", hasSize(1)))
 				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@Test
+	void listTeacherClassIncludesDraftButExcludesDeletedAndForeignAssignments() throws Exception {
+		startSubmissionAsStudentMember();
+		long draftId = assignment(classId, AssignmentStatus.DRAFT,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		long deletedId = assignment(classId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, true);
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(draftId, studentMemberId, 1);
+		submissionRepository.create(deletedId, studentMemberId, 1);
+		submissionRepository.create(foreignId, studentOtherId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(2)))
+				.andExpect(jsonPath("$.data[0].assignmentId").value(draftId))
+				.andExpect(jsonPath("$.data[1].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(2));
+
+		// The legacy assignment-only filter must still include soft-deleted assignments.
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("assignmentId", String.valueOf(deletedId))
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(deletedId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@Test
+	void listTeacherClassAndAssignmentIntersectWithoutCheckingForeignAssignmentOwnership() throws Exception {
+		startSubmissionAsStudentMember();
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(foreignId, studentOtherId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.param("assignmentId", publishedAssignmentId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		for (long assignmentId : List.of(foreignId, Long.MAX_VALUE)) {
+			mockMvc.perform(get("/api/v1/submissions")
+							.param("classId", classId.toString())
+							.param("assignmentId", String.valueOf(assignmentId))
+							.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+					.andExpect(status().isOk())
+					.andExpect(jsonPath("$.data", hasSize(0)))
+					.andExpect(jsonPath("$.pagination.total").value(0));
+		}
+	}
+
+	@Test
+	void listTeacherRejectsMissingClassEvenWithOwnAssignment() throws Exception {
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", String.valueOf(Long.MAX_VALUE))
+						.param("assignmentId", publishedAssignmentId.toString())
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void listAdminClassFilterReturnsEmptyForMissingClass() throws Exception {
+		startSubmissionAsStudentMember();
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].assignmentId").value(publishedAssignmentId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", String.valueOf(Long.MAX_VALUE))
+						.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+	}
+
+	@Test
+	void listStudentClassFilterKeepsOwnScopeAndRejectsOtherStudentId() throws Exception {
+		long ownId = startSubmissionAsStudentMember();
+		submissionRepository.create(publishedAssignmentId, studentClassmateId, 1);
+		long foreignId = assignment(otherClassId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(48), 2, false);
+		submissionRepository.create(foreignId, studentMemberId, 1);
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data[0].id").value(ownId))
+				.andExpect(jsonPath("$.data[0].studentId").value(studentMemberId))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+
+		mockMvc.perform(get("/api/v1/submissions")
+						.param("classId", classId.toString())
+						.param("studentId", studentClassmateId.toString())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden());
 	}
 
 	@Test

@@ -1,0 +1,10 @@
+id: "BUG-QA30-mcq-options"
+title: "[API/FE][Student Quiz] Câu trắc nghiệm chỉ hiện A/B/C/D, thiếu nội dung đáp án lựa chọn"
+assignee: "@be-primary"
+status: "To Do"
+issue_url: "https://github.com/hotung9108/EnglishHub/issues/177"
+test_cases: ["QA30-025", "QA30-026", "QA30-027"]
+blocked_cases: []
+evidence_run: "qa30-2026-10-19T11-31-19-695Z"
+details: "production_artifacts/test_reports/QA-30/issues/mcq-options.md"
+description: "One observable failure per issue. Preconditions, numbered reproduction, expected/actual, evidence and retest criteria are in the linked details document. Diagnostic-only evidence is explicitly scoped there."

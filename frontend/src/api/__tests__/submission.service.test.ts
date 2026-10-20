@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MockHttpClient } from './helpers/mock-http-client';
+import type { ApiRequestOptions } from '../interfaces/http.interface';
 import {
   findInProgressAttempt,
   getRemainingAttempts,
@@ -86,6 +87,7 @@ test('SubmissionService #39 - lists attempts with normalized query and forwards 
     data: [
       {
         id: 81,
+        assignmentId: 12,
         studentId: 25,
         attemptNumber: 1,
         status: 'IN_PROGRESS',
@@ -112,6 +114,7 @@ test('SubmissionService #39 - lists attempts with normalized query and forwards 
 
   const result = await new SubmissionService(http).listSubmissions(
     {
+      classId: 1,
       assignmentId: 12,
       studentId: undefined,
       status: undefined,
@@ -128,10 +131,194 @@ test('SubmissionService #39 - lists attempts with normalized query and forwards 
       url: '/submissions',
       options: {
         ...options,
-        params: { assignmentId: 12, page: 1, limit: 100 },
+        params: { classId: 1, assignmentId: 12, page: 1, limit: 100 },
       },
     },
   ]);
+});
+
+test('listAllSubmissions uses one request for zero to 100 submissions and forwards classId/options', async () => {
+  const options = { signal: new AbortController().signal };
+  for (const total of [0, 1, 100]) {
+    const http = new MockHttpClient();
+    const data: SubmissionListItem[] = Array.from({ length: total }, (_, index) => ({
+      id: 81 + index,
+      assignmentId: 12,
+      studentId: 25,
+      attemptNumber: 1,
+      status: 'SUBMITTED',
+      submittedAt: null,
+      modules: [],
+    }));
+    http.mockResponse = { data, pagination: { page: 1, limit: 100, total } };
+
+    const result = await new SubmissionService(http).listAllSubmissions({ classId: 1 }, options);
+
+    assert.deepStrictEqual(result, data);
+    assert.deepStrictEqual(http.calls, [{
+      method: 'GET',
+      url: '/submissions',
+      options: { ...options, params: { classId: 1, page: 1, limit: 100 } },
+    }]);
+  }
+});
+
+test('listAllSubmissions awaits each page and concatenates all pages in order', async () => {
+  const http = new MockHttpClient();
+  const options = { signal: new AbortController().signal };
+  const data: SubmissionListItem[] = Array.from({ length: 201 }, (_, index) => ({
+    id: 81 + index,
+    assignmentId: 12,
+    studentId: 25,
+    attemptNumber: 1,
+    status: 'SUBMITTED',
+    submittedAt: null,
+    modules: [],
+  }));
+  let releaseSecondPage!: () => void;
+  const secondPageGate = new Promise<void>((resolve) => { releaseSecondPage = resolve; });
+  let notifySecondPage!: () => void;
+  const secondPageStarted = new Promise<void>((resolve) => { notifySecondPage = resolve; });
+  http.get = async <T>(url: string, requestOptions?: ApiRequestOptions): Promise<T> => {
+    http.calls.push({ method: 'GET', url, options: requestOptions });
+    const page = Number(requestOptions?.params?.page);
+    if (page === 2) {
+      notifySecondPage();
+      await secondPageGate;
+    }
+    return {
+      data: data.slice((page - 1) * 100, page * 100),
+      pagination: { page, limit: 100, total: data.length },
+    } as T;
+  };
+
+  const pending = new SubmissionService(http).listAllSubmissions({ classId: 1 }, options);
+  await secondPageStarted;
+  try {
+    // Page 3 must not start while page 2 is still pending.
+    assert.deepStrictEqual(http.calls.map((call) => call.options?.params?.page), [1, 2]);
+  } finally {
+    releaseSecondPage();
+  }
+
+  assert.deepStrictEqual(await pending, data);
+  assert.deepStrictEqual(http.calls, [1, 2, 3].map((page) => ({
+    method: 'GET',
+    url: '/submissions',
+    options: { ...options, params: { classId: 1, page, limit: 100 } },
+  })));
+});
+
+test('listAllSubmissions rejects on a later page without returning partial data or requesting further pages', async () => {
+  const http = new MockHttpClient();
+  const failure = new Error('page 2 failed');
+  const firstItem: SubmissionListItem = {
+    id: 81, assignmentId: 12, studentId: 25, attemptNumber: 1,
+    status: 'SUBMITTED', submittedAt: null, modules: [],
+  };
+  http.get = async <T>(url: string, options?: ApiRequestOptions): Promise<T> => {
+    http.calls.push({ method: 'GET', url, options });
+    if (options?.params?.page === 2) throw failure;
+    return {
+      data: Array.from({ length: 100 }, (_, index) => ({ ...firstItem, id: firstItem.id + index })),
+      pagination: { page: 1, limit: 100, total: 201 },
+    } as T;
+  };
+
+  await assert.rejects(
+    new SubmissionService(http).listAllSubmissions({ classId: 1 }),
+    (error: unknown) => error === failure
+  );
+  assert.deepStrictEqual(http.calls.map((call) => call.options?.params), [
+    { classId: 1, page: 1, limit: 100 },
+    { classId: 1, page: 2, limit: 100 },
+  ]);
+});
+
+test('listAllSubmissions rejects duplicate submission IDs across pages', async () => {
+  const http = new MockHttpClient();
+  const data: SubmissionListItem[] = Array.from({ length: 100 }, (_, index) => ({
+    id: 81 + index, assignmentId: 12, studentId: 25, attemptNumber: 1,
+    status: 'SUBMITTED', submittedAt: null, modules: [],
+  }));
+  http.get = async <T>(url: string, options?: ApiRequestOptions): Promise<T> => {
+    http.calls.push({ method: 'GET', url, options });
+    const page = Number(options?.params?.page);
+    return {
+      data: page === 1 ? data : [data[0]],
+      pagination: { page, limit: 100, total: 101 },
+    } as T;
+  };
+
+  await assert.rejects(
+    new SubmissionService(http).listAllSubmissions({ classId: 1 }),
+    { message: 'Dữ liệu phân trang không nhất quán' }
+  );
+  assert.strictEqual(http.calls.length, 2);
+});
+
+for (const invalidTotal of [undefined, NaN, Infinity, -1, 1.5]) {
+  for (const invalidPage of [1, 2]) {
+    test(`listAllSubmissions rejects total=${String(invalidTotal)} on page ${invalidPage}`, async () => {
+      const http = new MockHttpClient();
+      http.get = async <T>(url: string, options?: ApiRequestOptions): Promise<T> => {
+        http.calls.push({ method: 'GET', url, options });
+        const page = Number(options?.params?.page);
+        return {
+          data: Array.from({ length: 100 }, (_, index) => ({
+            id: index + 1, assignmentId: 12, studentId: 25, attemptNumber: 1,
+            status: 'SUBMITTED', submittedAt: null, modules: [],
+          })),
+          pagination: { page, limit: 100, total: page === invalidPage ? invalidTotal : 101 },
+        } as T;
+      };
+
+      await assert.rejects(
+        new SubmissionService(http).listAllSubmissions({ classId: 1 }),
+        { message: 'Dữ liệu phân trang không nhất quán' }
+      );
+      assert.strictEqual(http.calls.length, invalidPage);
+    });
+  }
+}
+
+for (const shortPage of [1, 2]) {
+  test(`listAllSubmissions rejects an incomplete non-final page ${shortPage}`, async () => {
+    const http = new MockHttpClient();
+    http.get = async <T>(url: string, options?: ApiRequestOptions): Promise<T> => {
+      http.calls.push({ method: 'GET', url, options });
+      const page = Number(options?.params?.page);
+      return {
+        data: Array.from({ length: page === shortPage ? 50 : 100 }, (_, index) => ({
+          id: (page - 1) * 100 + index + 1, assignmentId: 12, studentId: 25, attemptNumber: 1,
+          status: 'SUBMITTED', submittedAt: null, modules: [],
+        })),
+        pagination: { page, limit: 100, total: 201 },
+      } as T;
+    };
+
+    await assert.rejects(
+      new SubmissionService(http).listAllSubmissions({ classId: 1 }),
+      { message: 'Dữ liệu phân trang không nhất quán' }
+    );
+    assert.strictEqual(http.calls.length, shortPage);
+  });
+}
+
+test('listAllSubmissions does not enforce the final page length', async () => {
+  const http = new MockHttpClient();
+  const data: SubmissionListItem[] = Array.from({ length: 100 }, (_, index) => ({
+    id: 81 + index, assignmentId: 12, studentId: 25, attemptNumber: 1,
+    status: 'SUBMITTED', submittedAt: null, modules: [],
+  }));
+  http.get = async <T>(url: string, options?: ApiRequestOptions): Promise<T> => {
+    http.calls.push({ method: 'GET', url, options });
+    const page = Number(options?.params?.page);
+    return { data: page === 1 ? data : [], pagination: { page, limit: 100, total: 101 } } as T;
+  };
+
+  assert.deepStrictEqual(await new SubmissionService(http).listAllSubmissions({ classId: 1 }), data);
+  assert.strictEqual(http.calls.length, 2);
 });
 
 test('SubmissionService #40 - submits without a body and forwards options', async () => {
@@ -186,6 +373,7 @@ test('normalizeSubmissionListParams omits undefined filters from query params', 
   http.mockResponse = { data: [], pagination: { page: 1, limit: 20, total: 0 } };
 
   await new SubmissionService(http).listSubmissions({
+    classId: undefined,
     assignmentId: undefined,
     studentId: undefined,
     status: undefined,
@@ -213,6 +401,7 @@ test('getRemainingAttempts handles zero, available, exhausted, and overused limi
 test('findInProgressAttempt handles empty, absent, single, and unsorted multiple matches', () => {
   const completedAttempt: SubmissionListItem = {
     id: 70,
+    assignmentId: 12,
     studentId: 25,
     attemptNumber: 1,
     status: 'SUBMITTED',
@@ -221,6 +410,7 @@ test('findInProgressAttempt handles empty, absent, single, and unsorted multiple
   };
   const olderInProgressAttempt: SubmissionListItem = {
     id: 80,
+    assignmentId: 12,
     studentId: 25,
     attemptNumber: 2,
     status: 'IN_PROGRESS',
@@ -229,6 +419,7 @@ test('findInProgressAttempt handles empty, absent, single, and unsorted multiple
   };
   const newerInProgressAttempt: SubmissionListItem = {
     id: 95,
+    assignmentId: 12,
     studentId: 25,
     attemptNumber: 3,
     status: 'IN_PROGRESS',
@@ -351,4 +542,96 @@ test('SubmissionService - audio and document upload URLs', async () => {
   const docResult = await new SubmissionService(http).getDocumentUploadUrl(44, 'application/pdf');
   assert.strictEqual(docResult, docResponse);
 });
+
+test('SubmissionService - submitModule sends audioStorageKey when submitting speaking module', async () => {
+  const http = new MockHttpClient();
+  const response: SubmitModuleResponse = {
+    message: 'Nộp phần thi thành công.',
+    submissionModuleId: 45,
+    status: 'SUBMITTED',
+    answers: [
+      {
+        id: 101,
+        questionId: null,
+        content: null,
+        audioStorageKey: 'submissions/12/module-45/audio.webm',
+        audioMimeType: 'audio/webm',
+        audioUploadStatus: 'READY',
+      },
+    ],
+  };
+  http.mockResponse = response;
+
+  const result = await new SubmissionService(http).submitModule(45, {
+    audioStorageKey: 'submissions/12/module-45/audio.webm',
+  });
+
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'POST',
+      url: '/submission-modules/45/submit',
+      data: {
+        audioStorageKey: 'submissions/12/module-45/audio.webm',
+      },
+      options: undefined,
+    },
+  ]);
+});
+
+test('SubmissionService - uploadDirectToStorage successfully sends PUT request', async () => {
+  const originalFetch = globalThis.fetch;
+  let interceptedUrl = '';
+  let interceptedMethod = '';
+  let interceptedContentType = '';
+
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    interceptedUrl = String(url);
+    interceptedMethod = init?.method || '';
+    interceptedContentType = (init?.headers as Record<string, string>)?.['Content-Type'] || '';
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const dummyBlob = new Blob(['sample-audio-bytes'], { type: 'audio/webm' });
+    await new SubmissionService(new MockHttpClient()).uploadDirectToStorage(
+      'https://storage.example.com/presigned-put-url',
+      dummyBlob,
+      'audio/webm'
+    );
+
+    assert.strictEqual(interceptedUrl, 'https://storage.example.com/presigned-put-url');
+    assert.strictEqual(interceptedMethod, 'PUT');
+    assert.strictEqual(interceptedContentType, 'audio/webm');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('SubmissionService - uploadDirectToStorage rewrites docker minio URLs to /s3-upload proxy', async () => {
+  const originalFetch = globalThis.fetch;
+  let interceptedUrl = '';
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    interceptedUrl = String(url);
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const dummyBlob = new Blob(['bytes'], { type: 'audio/webm' });
+    await new SubmissionService(new MockHttpClient()).uploadDirectToStorage(
+      'http://minio:9000/englishhub-dev/submissions/1/audio.webm?query=1',
+      dummyBlob,
+      'audio/webm'
+    );
+
+    assert.strictEqual(
+      interceptedUrl,
+      '/s3-upload/englishhub-dev/submissions/1/audio.webm?query=1'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 

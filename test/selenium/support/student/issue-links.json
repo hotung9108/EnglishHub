@@ -1,0 +1,128 @@
+{
+  "QA30-007": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/173",
+      "group": "deploy"
+    }
+  ],
+  "QA30-045": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/173",
+      "group": "deploy"
+    }
+  ],
+  "QA30-013": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/182",
+      "group": "short-answer"
+    }
+  ],
+  "QA30-014": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/182",
+      "group": "short-answer"
+    }
+  ],
+  "QA30-015": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/182",
+      "group": "short-answer"
+    }
+  ],
+  "QA30-039": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/183",
+      "group": "speaking-empty"
+    }
+  ],
+  "QA30-011": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/174",
+      "group": "writing-contract"
+    }
+  ],
+  "QA30-012": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/175",
+      "group": "writing-submit"
+    }
+  ],
+  "QA30-038": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/184",
+      "group": "submit-after-error (diagnostic)"
+    }
+  ],
+  "QA30-016": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/176",
+      "group": "speaking-upload"
+    }
+  ],
+  "QA30-025": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/177",
+      "group": "mcq-options"
+    }
+  ],
+  "QA30-026": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/177",
+      "group": "mcq-options"
+    }
+  ],
+  "QA30-027": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/177",
+      "group": "mcq-options"
+    }
+  ],
+  "QA30-028": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/178",
+      "group": "grade-mapping"
+    }
+  ],
+  "QA30-017": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/178",
+      "group": "grade-mapping"
+    }
+  ],
+  "QA30-018": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/178",
+      "group": "grade-mapping"
+    }
+  ],
+  "QA30-022": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/179",
+      "group": "grading-status"
+    }
+  ],
+  "QA30-034": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/179",
+      "group": "grading-status"
+    }
+  ],
+  "QA30-024": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/185",
+      "group": "attempt-grading-status"
+    }
+  ],
+  "QA30-030": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/186",
+      "group": "assignment-results-filter"
+    }
+  ],
+  "QA30-021": [
+    {
+      "url": "https://github.com/hotung9108/EnglishHub/issues/180",
+      "group": "evaluation-link"
+    }
+  ]
+}
