@@ -1,0 +1,11 @@
+# Keep staging evidence and fixture identities local. Commit only the public handoff.
+*
+!.gitignore
+!README.md
+!ISSUE-LINKS-2026-10-20.md
+!issues/
+issues/*
+!issues/public/
+issues/public/*
+!issues/public/*.md
+!issues/public/manifest.json
