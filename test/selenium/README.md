@@ -74,3 +74,15 @@ Khung Selenium cũ đã lưu trong `legacy/` vì có JSON/import/cú pháp chưa
 [Hướng dẫn QA29](QA29-README.md) và [51 test case](QA29-TEST-CASES.md) dùng chung package, cấu hình, browser factory, BasePage và LoginPage ở đây. Case nằm trong `tests/teacher/`, Page Object trong `pages/teacher/`, API fixture/cleanup/report trong `support/teacher/`; `run-teacher.js` điều phối vòng đời riêng của bộ test Giáo viên. `npm.cmd run check` kiểm tra cả QA28 và QA29, không gọi staging hoặc mở browser.
 
 [Bàn giao QA29](../../production_artifacts/test_reports/QA-29/README.md): task đã hoàn tất kiểm thử và bàn giao issue; lượt ngày 15/10/2026 đạt 41 Passed / 7 Failed / 3 Blocked. Đây là kết quả trước khi tích hợp vào repo, không phải lần chạy mới trên develop. Mọi launcher QA29 nằm trong `test/scripts/`.
+
+## QA30 — luồng Học viên
+
+[Hướng dẫn QA30](QA30-README.md), [45 test case](QA30-TEST-CASES.md) và [bản đồ UI](QA30-UI-MAP.md) dùng cùng framework QA28/QA29. Runner `run-student.js`, Page Object `pages/student/`, case `tests/student/`, fixture/readback/preflight `support/student/`; `utils/suite-reporter.js` xuất HTML/JSON/JUnit/evidence cho cả Teacher và Student, giữ API `writeTeacherReport` tương thích QA29.
+
+```powershell
+npm.cmd run check                 # Offline framework checks; no staging/browser
+..\scripts\QA30-Run-Report.cmd     # Headless suite; opens report when finished
+..\scripts\QA30-Watch-Student.cmd  # Select a case and watch visible browser
+```
+
+Cấu hình Admin/Teacher QA trong `.env`; setup tạo Student QA riêng, tài khoản/ledger/cache/report gốc không vào Git. Full run tạo dữ liệu mới để giữ bằng chứng, không tự dọn mọi dữ liệu QA cũ. Xem [trạng thái và issue hiện hành](../../production_artifacts/test_reports/QA-30/README.md): lượt lịch sử 19/10 có 24 Pass / 18 Fail / 3 Blocked; QA30 vẫn In Progress/chờ review. PR tích hợp test không sửa các bug sản phẩm hoặc tự xác nhận Done.

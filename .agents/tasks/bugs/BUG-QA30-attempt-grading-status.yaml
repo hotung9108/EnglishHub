@@ -1,0 +1,10 @@
+id: "BUG-QA30-attempt-grading-status"
+title: "[FE][Student Overview] Lịch sử hiện Chờ chấm điểm dù cùng lượt đã có điểm chính thức 7.5/10"
+assignee: "@fe-primary"
+status: "To Do"
+issue_url: "https://github.com/hotung9108/EnglishHub/issues/185"
+test_cases: ["QA30-024"]
+blocked_cases: []
+evidence_run: "qa30-2026-10-19T11-31-19-695Z"
+details: "production_artifacts/test_reports/QA-30/issues/attempt-grading-status.md"
+description: "One observable failure per issue. Preconditions, numbered reproduction, expected/actual, evidence and retest criteria are in the linked details document. Diagnostic-only evidence is explicitly scoped there."

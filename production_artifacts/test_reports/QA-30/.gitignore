@@ -1,0 +1,7 @@
+# Local tracker backups and generated handoff bundles; canonical issues live in issues/.
+issue-correction-2026-10-19/before/
+issue-correction-2026-10-19/bundle/
+issue-correction-2026-10-19/drafts/
+issue-correction-2026-10-19/after-*.json
+issue-correction-2026-10-19/corrected-manifest.json
+issue-correction-2026-10-19/publication-journal.json

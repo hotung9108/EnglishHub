@@ -1,0 +1,15 @@
+id: "QA-30"
+title: "Viết và chạy Selenium luồng Học viên trên staging"
+assignee: "@tester"
+status: "In Progress"
+updated_at: "2026-10-19"
+branch: "feature/qa-30-student-selenium"
+latest_run: "qa30-2026-10-19T11-31-19-695Z"
+test_revision: "v8-independent-checks"
+staging_results: {"PASSED": 24, "FAILED": 18, "BLOCKED": 3, "ABORTED": 0}
+handoff_status: "Reopened after user rejected issue quality; QA29 template applied. Awaiting review; no new Done claim."
+issue_correction: "8 existing issues rewritten; 5 grouped behaviors split into separate issues; 13 title/body readbacks verified. No new staging run."
+issues: ["https://github.com/hotung9108/EnglishHub/issues/173", "https://github.com/hotung9108/EnglishHub/issues/182", "https://github.com/hotung9108/EnglishHub/issues/183", "https://github.com/hotung9108/EnglishHub/issues/174", "https://github.com/hotung9108/EnglishHub/issues/175", "https://github.com/hotung9108/EnglishHub/issues/184", "https://github.com/hotung9108/EnglishHub/issues/176", "https://github.com/hotung9108/EnglishHub/issues/177", "https://github.com/hotung9108/EnglishHub/issues/178", "https://github.com/hotung9108/EnglishHub/issues/179", "https://github.com/hotung9108/EnglishHub/issues/185", "https://github.com/hotung9108/EnglishHub/issues/186", "https://github.com/hotung9108/EnglishHub/issues/180"]
+pending: ["User review of corrected issue scope, reproduction and evidence", "Resolve remaining QA acceptance/coverage blockers before marking Done"]
+artifacts: ["production_artifacts/test_reports/QA-30/issue-correction-2026-10-19/README.md", "production_artifacts/test_reports/QA-30/issue-correction-2026-10-19/corrected-issue-map.json", "production_artifacts/test_reports/QA-30/issues/published.json"]
+integration: "Prepared against develop 3ced11c; test-only PR requested; acceptance remains In Progress."

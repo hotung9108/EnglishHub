@@ -1,0 +1,203 @@
+{
+  "checkedAt": "2026-10-19T11:10:43.647Z",
+  "checks": [
+    {
+      "id": "QA30-017",
+      "run": "qa30-2026-10-19T11-08-22-390Z",
+      "firstPage": {
+        "pagination": {
+          "page": 1,
+          "limit": 20,
+          "total": 64
+        },
+        "target": {
+          "id": 1499,
+          "studentId": 698,
+          "attemptNumber": 1,
+          "status": "SUBMITTED",
+          "submittedAt": "2026-10-19T11:08:31.41796Z",
+          "modules": [
+            {
+              "id": 2671,
+              "moduleId": 2058,
+              "skill": "READING",
+              "taskType": "QUIZ",
+              "status": "GRADED",
+              "grading": {
+                "finalScore": 7.5,
+                "maxScoreSnapshot": 10,
+                "status": "COMPLETED"
+              }
+            }
+          ]
+        }
+      },
+      "fixture": {
+        "assignmentId": 1547,
+        "submissionId": 1499,
+        "gradingId": 1803
+      },
+      "detail": {
+        "id": 1499,
+        "assignmentId": 1547,
+        "status": "SUBMITTED",
+        "modules": [
+          {
+            "id": 2671,
+            "moduleId": 2058,
+            "skill": "READING",
+            "taskType": "QUIZ",
+            "status": "GRADED",
+            "grading": {
+              "id": 1803,
+              "method": "TEACHER_MANUAL",
+              "status": "COMPLETED",
+              "finalScore": 7.5,
+              "maxScoreSnapshot": 10,
+              "aiFeedback": null,
+              "finalFeedback": "QA30 official feedback 2026-10-19T11-08-25-616Z: clear response; practise examples."
+            }
+          }
+        ]
+      },
+      "grading": {
+        "status": "COMPLETED",
+        "finalScore": 7.5,
+        "maxScoreSnapshot": 10,
+        "feedbackMatches": true
+      },
+      "deployedGradeFilterIncludesParent": false,
+      "deployedAssignmentLookupId": 1499
+    },
+    {
+      "id": "QA30-022",
+      "run": "qa30-2026-10-19T11-08-48-713Z",
+      "firstPage": {
+        "pagination": {
+          "page": 1,
+          "limit": 20,
+          "total": 65
+        },
+        "target": {
+          "id": 1500,
+          "studentId": 698,
+          "attemptNumber": 1,
+          "status": "SUBMITTED",
+          "submittedAt": "2026-10-19T11:08:58.173049Z",
+          "modules": [
+            {
+              "id": 2672,
+              "moduleId": 2059,
+              "skill": "READING",
+              "taskType": "QUIZ",
+              "status": "GRADED",
+              "grading": {
+                "finalScore": 7.5,
+                "maxScoreSnapshot": 10,
+                "status": "COMPLETED"
+              }
+            }
+          ]
+        }
+      },
+      "fixture": {
+        "assignmentId": 1548,
+        "submissionId": 1500,
+        "gradingId": 1804
+      },
+      "detail": {
+        "id": 1500,
+        "assignmentId": 1548,
+        "status": "SUBMITTED",
+        "modules": [
+          {
+            "id": 2672,
+            "moduleId": 2059,
+            "skill": "READING",
+            "taskType": "QUIZ",
+            "status": "GRADED",
+            "grading": {
+              "id": 1804,
+              "method": "TEACHER_MANUAL",
+              "status": "COMPLETED",
+              "finalScore": 7.5,
+              "maxScoreSnapshot": 10,
+              "aiFeedback": null,
+              "finalFeedback": "QA30 official feedback 2026-10-19T11-08-52-081Z: clear response; practise examples."
+            }
+          }
+        ]
+      },
+      "grading": {
+        "status": "COMPLETED",
+        "finalScore": 7.5,
+        "maxScoreSnapshot": 10,
+        "feedbackMatches": true
+      },
+      "deployedGradeFilterIncludesParent": false,
+      "deployedAssignmentLookupId": 1500
+    },
+    {
+      "id": "QA30-025",
+      "run": "qa30-2026-10-19T11-09-05-074Z",
+      "fixture": {
+        "assignmentId": 1549,
+        "moduleId": 2060,
+        "questionId": 1735,
+        "questionType": "MULTIPLE_CHOICE",
+        "options": [
+          "daily practice",
+          "once a year",
+          "never study",
+          "skip feedback"
+        ]
+      },
+      "studentQuestions": {
+        "data": [
+          {
+            "id": 1735,
+            "content": "QA30: choose the phrase daily practice.",
+            "questionType": "MULTIPLE_CHOICE",
+            "score": 10,
+            "orderIndex": 1
+          }
+        ]
+      },
+      "teacherQuestions": {
+        "data": [
+          {
+            "id": 1735,
+            "content": "QA30: choose the phrase daily practice.",
+            "questionType": "MULTIPLE_CHOICE",
+            "score": 10,
+            "orderIndex": 1,
+            "correctAnswer": {
+              "options": [
+                {
+                  "id": 1,
+                  "content": "daily practice",
+                  "isCorrect": true
+                },
+                {
+                  "id": 2,
+                  "content": "once a year",
+                  "isCorrect": false
+                },
+                {
+                  "id": 3,
+                  "content": "never study",
+                  "isCorrect": false
+                },
+                {
+                  "id": 4,
+                  "content": "skip feedback",
+                  "isCorrect": false
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

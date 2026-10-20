@@ -1,0 +1,10 @@
+id: "BUG-QA30-grade-mapping"
+title: "[FE/API][Student Grades] Bảng điểm không hiển thị đúng bài đã chấm do nhầm submissionId với assignmentId"
+assignee: "@fe-primary"
+status: "To Do"
+issue_url: "https://github.com/hotung9108/EnglishHub/issues/178"
+test_cases: ["QA30-028"]
+blocked_cases: ["QA30-017", "QA30-018"]
+evidence_run: "qa30-2026-10-19T11-31-19-695Z"
+details: "production_artifacts/test_reports/QA-30/issues/grade-mapping.md"
+description: "One observable failure per issue. Preconditions, numbered reproduction, expected/actual, evidence and retest criteria are in the linked details document. Diagnostic-only evidence is explicitly scoped there."
