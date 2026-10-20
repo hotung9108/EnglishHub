@@ -1,0 +1,147 @@
+[
+  {
+    "key": "accounts-search",
+    "title": "[FE][Admin Accounts] Không tìm thấy tài khoản mới dù API có bản ghi",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-003**.\nMức độ đề xuất: **Medium**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó phiên Admin và một Teacher QA mới. GET user xác nhận email, role TEACHER, trạng thái ACTIVE; có thể tìm Teacher này tại màn Giáo viên.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Vào Quản lý tài khoản (Accounts).\n2. Nhập chính xác email Teacher QA vừa được API xác minh.\n3. Chờ tải/tìm kiếm hoàn tất và kiểm tra danh sách.\n4. Đối chiếu cùng email tại màn Giáo viên và API đọc user.\n\n## Kết quả mong đợi\n\nAccounts tìm được đúng tài khoản mới theo email.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nAccounts trả 0 dòng, trong khi API có bản ghi ACTIVE và màn Giáo viên tìm được cùng Teacher.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nChưa xác định root cause ở truy vấn, phân trang hay đồng bộ. QA31-006/007/008 bị chặn bởi lỗi này; không mở thành ba bug mới.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Tìm chính xác và một phần email của Teacher/Student mới và cũ.\n- [ ] Từ tài khoản tìm được, kiểm tra tiếp các case sửa/khóa đang bị chặn.\n\n<!-- QA31-issue-key:accounts-search -->\n",
+    "cases": [
+      "QA31-003"
+    ],
+    "blockedCases": [
+      "QA31-006",
+      "QA31-007",
+      "QA31-008"
+    ],
+    "severity": "Medium",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "accounts-search.md",
+    "number": 189,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/189"
+  },
+  {
+    "key": "students-search",
+    "title": "[FE][Admin Students] Không tìm thấy học viên mới dù đã tồn tại và ghi danh vào lớp",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-014**.\nMức độ đề xuất: **Medium**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó Student QA mới ACTIVE; API đọc user và roster xác nhận Student đã ghi danh vào lớp QA.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, vào danh sách Học viên.\n2. Tìm bằng email chính xác của Student QA.\n3. Chờ tải/tìm kiếm hoàn tất.\n4. Đối chiếu với API user và roster của lớp QA.\n\n## Kết quả mong đợi\n\nDanh sách trả đúng Student phù hợp với email đã nhập.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nSau thời gian chờ tìm kiếm 30 giây vẫn không tìm được Student; API và roster có bản ghi tương ứng.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nTìm Student cũ đã Pass không loại trừ lỗi tìm Student mới. QA31-041 bị chặn trước bước khóa.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Tìm Student mới bằng email/tên và kiểm tra kết quả sau reload.\n- [ ] Kiểm tra Student cũ và trường hợp không có kết quả.\n\n<!-- QA31-issue-key:students-search -->\n",
+    "cases": [
+      "QA31-014"
+    ],
+    "blockedCases": [
+      "QA31-041"
+    ],
+    "severity": "Medium",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "students-search.md",
+    "number": 190,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/190"
+  },
+  {
+    "key": "student-profile-identity",
+    "title": "[FE][Admin Student Profile] URL của học viên được chọn nhưng hồ sơ hiển thị người khác",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-020**.\nMức độ đề xuất: **High**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó Student QA trong roster lớp QA; đã biết đúng ID và danh tính bằng API. Dùng dữ liệu QA riêng.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, mở quản lý lớp QA.\n2. Tìm dòng Student QA trong roster.\n3. Bấm mở hồ sơ từ đúng dòng đó.\n4. Kiểm tra URL /admin/students/<studentId> và so tên/email/mã học viên trên hồ sơ với Student đã chọn.\n\n## Kết quả mong đợi\n\nURL và toàn bộ thông tin hồ sơ thuộc cùng Student được chọn.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nURL mang đúng ID Student được chọn nhưng phần danh tính hiển thị người khác. Không tiếp tục thao tác khóa/reset trên hồ sơ sai.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nĐây là lỗi danh tính hiển thị đã quan sát; chưa kết luận API trả dữ liệu người khác hay FE dùng dữ liệu mẫu. QA31-042 bị chặn bởi cùng lỗi.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Mở hai Student QA khác nhau và kiểm tra toàn bộ thông tin theo đúng ID.\n- [ ] Reload và điều hướng qua lại không giữ danh tính của người khác.\n\n<!-- QA31-issue-key:student-profile-identity -->\n",
+    "cases": [
+      "QA31-020"
+    ],
+    "blockedCases": [
+      "QA31-042"
+    ],
+    "severity": "High",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "student-profile-identity.md",
+    "number": 191,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/191"
+  },
+  {
+    "key": "class-assignments-error-state",
+    "title": "[FE][Admin Class Assignments] API trả 403 nhưng giao diện báo lớp chưa có bài tập",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-021**.\nMức độ đề xuất: **Medium**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nLớp QA có ít nhất một assignment PUBLISHED, đã được xác minh bằng phiên Teacher; có phiên Admin.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, mở quản lý lớp QA.\n2. Mở tab Bài tập & Điểm số.\n3. Chờ hết loading, ghi lại số bài và thông báo.\n4. Trong Network kiểm tra GET /api/v1/classes/<classId>/assignments.\n\n## Kết quả mong đợi\n\nKhi request bị từ chối hoặc lỗi, UI báo lỗi tải/giới hạn quyền; chỉ hiển thị lớp rỗng khi có response thành công xác nhận rỗng.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nRequest trả HTTP 403 nhưng UI đếm 0 và hiện “Chưa có bài tập nào được giao cho lớp này”, dù fixture có bài PUBLISHED.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nIssue về UI trình bày lỗi thành dữ liệu rỗng. Không suy ra backend phải cho Admin đọc chỉ từ HTTP 403; quyền đọc cần đối chiếu contract.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] 403/5xx/mất mạng có thông báo lỗi đúng.\n- [ ] Response 200 rỗng và 200 có bài hiển thị đúng từng trạng thái.\n\n<!-- QA31-issue-key:class-assignments-error-state -->\n",
+    "cases": [
+      "QA31-021"
+    ],
+    "blockedCases": [],
+    "severity": "Medium",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "class-assignments-error-state.md",
+    "number": 192,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/192"
+  },
+  {
+    "key": "reports-class-filter",
+    "title": "[FE][Admin Reports] Chọn một lớp nhưng bảng báo cáo vẫn hiển thị các lớp khác",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-025**.\nMức độ đề xuất: **Medium**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó lớp QA với dữ liệu đối chứng: một bài đã chấm 8/10, hoàn thành 100%; hệ thống còn lớp khác.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, mở Báo cáo.\n2. Chọn đúng lớp QA trong bộ lọc lớp.\n3. Chờ dữ liệu và KPI cập nhật.\n4. Kiểm tra mọi dòng trong bảng kết quả theo lớp đã chọn.\n\n## Kết quả mong đợi\n\nBảng chỉ hiển thị lớp đã chọn, đồng bộ với bộ lọc và KPI.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nDòng lớp QA đúng 1 bài / 80% / 100%, nhưng bảng vẫn hiển thị 89 dòng có cả lớp khác.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nKhông phải lỗi quy đổi thang điểm. Root cause chưa được khẳng định; assertion Fail ở phạm vi dòng sau khi lọc.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Chọn lần lượt hai lớp, mọi dòng thuộc lớp đang chọn.\n- [ ] Xóa bộ lọc khôi phục bảng và KPI toàn hệ thống.\n\n<!-- QA31-issue-key:reports-class-filter -->\n",
+    "cases": [
+      "QA31-025"
+    ],
+    "blockedCases": [],
+    "severity": "Medium",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "reports-class-filter.md",
+    "number": 193,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/193"
+  },
+  {
+    "key": "audit-detail-access",
+    "title": "[Integration][Admin Audit] Không mở được chi tiết lịch sử chấm điểm vì API detail trả 403",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-031**.\nMức độ đề xuất: **High**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó grading QA COMPLETED, điểm 8 và lịch sử sửa điểm 7.5 → 8; phiên Admin có quyền xem Audit theo FE-23.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, mở lịch sử chấm điểm/Audit.\n2. Tìm đúng grading QA.\n3. Bấm xem chi tiết để mở drawer.\n4. Kiểm tra request detail và change-logs của cùng grading trong Network.\n\n## Kết quả mong đợi\n\nAdmin mở được chi tiết cùng lịch sử sửa điểm theo chức năng Audit trong FE-23.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nRequest detail trả HTTP 403, trong khi change-logs trả 200 và có lịch sử sửa điểm; drawer không hiển thị được chi tiết.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nLỗi tích hợp truy cập chi tiết. Chưa kiểm tra được render từng dòng log phía sau bước bị chặn.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Admin mở được detail và logs của grading QA.\n- [ ] Kiểm tra đúng danh tính bài, điểm và lịch sử; tài khoản không được phép vẫn bị chặn.\n\n<!-- QA31-issue-key:audit-detail-access -->\n",
+    "cases": [
+      "QA31-031"
+    ],
+    "blockedCases": [],
+    "severity": "High",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "audit-detail-access.md",
+    "number": 194,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/194"
+  },
+  {
+    "key": "admin-role-mapping",
+    "title": "[FE][Admin Accounts] Chọn vai trò Admin nhưng tài khoản mới được tạo thành Student",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-036**.\nMức độ đề xuất: **High**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nAdmin được tạo tài khoản Admin theo yêu cầu nghiệp vụ đã xác nhận. Chuẩn bị email QA mới và dữ liệu hợp lệ.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin, vào Accounts.\n2. Bấm Thêm tài khoản.\n3. Nhập họ tên, email QA mới, mật khẩu hợp lệ.\n4. Chọn vai trò Admin.\n5. Xác minh giá trị select là ADMIN trước khi lưu.\n6. Bấm Lưu, ghi kết quả tạo.\n7. Dùng API Admin tìm lại đúng email để kiểm tra role đã lưu.\n\n## Kết quả mong đợi\n\nUser được tạo có role ADMIN, nhất quán với lựa chọn trong form.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nUI chọn ADMIN trước khi submit; tạo tài khoản trả 201 nhưng đọc lại user có role STUDENT.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nKhông gộp với issue API từ chối payload ADMIN: đây là hành vi UI chọn một role nhưng lưu role khác. Teacher/Student creation riêng đã Pass.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] QA31-036 tạo Admin và đọc lại role ADMIN.\n- [ ] QA31-037/038 tạo Teacher/Student vẫn lưu đúng role.\n\n<!-- QA31-issue-key:admin-role-mapping -->\n",
+    "cases": [
+      "QA31-036"
+    ],
+    "blockedCases": [],
+    "severity": "High",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "admin-role-mapping.md",
+    "number": 195,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/195"
+  },
+  {
+    "key": "admin-create-api",
+    "title": "[BE][Admin Users] API tạo tài khoản từ chối role ADMIN hợp lệ bằng HTTP 400",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-036** (liên quan; diagnostic API độc lập).\nMức độ đề xuất: **High**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nAdmin được tạo Admin theo yêu cầu nghiệp vụ đã xác nhận; có phiên Admin hợp lệ, email QA chưa tồn tại và dữ liệu hợp lệ.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Gửi POST /api/v1/admin/users với fullName, email QA mới, password hợp lệ và role ADMIN.\n2. Ghi status và response, không đưa token/password vào báo cáo công khai.\n3. GET /api/v1/admin/users?q=<email>&limit=100 bằng cùng phiên Admin.\n4. Kiểm tra có user tương ứng và role ADMIN hay không.\n\n## Kết quả mong đợi\n\nAPI chấp nhận dữ liệu hợp lệ để tạo ADMIN theo yêu cầu nghiệp vụ, trả thành công và lưu đúng role.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nDiagnostic API độc lập nhận HTTP 400; GET tìm đúng email trả 200 với danh sách rỗng. Không có response body lỗi chi tiết trong artifact.\n\nNguồn kiểm chứng: diagnostic API độc lập đã lưu; không cộng vào thống kê Selenium.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nĐây là API diagnostic bổ sung liên quan QA31-036, không cộng thêm một Selenium Fail. Không khẳng định thông báo lỗi hay nguyên nhân bên trong khi evidence chưa có.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Tạo ADMIN thành công và đọc lại đúng role.\n- [ ] Email trùng/dữ liệu sai vẫn bị validate; Teacher/Student không hồi quy.\n\n<!-- QA31-issue-key:admin-create-api -->\n",
+    "cases": [
+      "QA31-036"
+    ],
+    "blockedCases": [],
+    "severity": "High",
+    "evidenceRun": "qa31-2026-10-19T17-00-23-498Z",
+    "kind": "API_DIAGNOSTIC",
+    "file": "admin-create-api.md",
+    "number": 196,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/196"
+  },
+  {
+    "key": "system-settings-route",
+    "title": "[FE][Admin Settings] Trang cấu hình hệ thống theo FE-23 đang mở hồ sơ cá nhân",
+    "body": "Nguồn: **QA-31 — kiểm thử Admin trên staging**, ngày 20/10/2026. Testcase: **QA31-048**.\nMức độ đề xuất: **Medium**. Một issue mô tả một hành vi lỗi.\n\n## Tiền điều kiện\n\nCó phiên Admin. Đối chiếu FE-23 TC-05 yêu cầu cấu hình hệ thống gồm model chấm Writing và thao tác Lưu/Khôi phục.\n\nDùng fixture QA riêng; các giá trị `<...>` là placeholder cần thay bằng dữ liệu QA của lần tái hiện. Không dùng dữ liệu người dùng thật.\n\n## Các bước tái hiện\n\n1. Đăng nhập Admin.\n2. Bấm Cài đặt trên sidebar.\n3. Chờ URL /admin/settings tải xong.\n4. Tìm form model chấm Writing cùng nút Lưu/Khôi phục theo FE-23.\n\n## Kết quả mong đợi\n\nMở được form cấu hình hệ thống theo FE-23 TC-05.\n\n## Kết quả thực tế và bằng chứng đã quan sát\n\nTrang hiển thị Hồ sơ cá nhân/Bảo mật tài khoản và trường profile; không có form cấu hình model cùng Lưu/Khôi phục cấu hình hệ thống.\n\nNguồn kiểm chứng: Selenium headless full run r6 (50 case: 35 Pass / 9 Fail / 6 Blocked), đối chiếu evidence API/DOM/network và report đã lưu.\n\nBản công khai đã lược URL môi trường, tên/email tài khoản, ID dữ liệu thực và artifact thô. Không đính kèm thông tin đăng nhập. Report/evidence gốc được bàn giao riêng cho nhóm dự án; các quan sát ở trên không phải kết quả chạy mới.\n\n## Phạm vi và ảnh hưởng\n\nSai lệch chức năng so với FE-23. Nếu phạm vi đã đổi cần cập nhật đặc tả được phê duyệt. QA31-049 chưa kiểm tra được save/reload/reset vì thiếu form.\n\n## Tiêu chí hoàn tất và retest\n\n- [ ] Mở đúng form cấu hình theo yêu cầu.\n- [ ] Chạy tiếp QA31-049 để xác minh lưu, reload và khôi phục.\n\n<!-- QA31-issue-key:system-settings-route -->\n",
+    "cases": [
+      "QA31-048"
+    ],
+    "blockedCases": [
+      "QA31-049"
+    ],
+    "severity": "Medium",
+    "evidenceRun": "qa31-2026-10-19T17-30-35-992Z",
+    "kind": "SELENIUM",
+    "file": "system-settings-route.md",
+    "number": 197,
+    "url": "https://github.com/hotung9108/EnglishHub/issues/197"
+  }
+]
