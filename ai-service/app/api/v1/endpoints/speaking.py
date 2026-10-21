@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from typing import Optional
 import logging
 from app.schemas.speaking import AnalyzeSpeakingRequest, AnalyzeSpeakingResponse
-from app.services.audio_processor import AudioProcessor
+from app.services.audio_processor import AudioProcessor, MAX_INPUT_SIZE_BYTES
 from app.services.gemini_service import GeminiService
 
 logger = logging.getLogger("ai_service.api.speaking")
@@ -66,11 +66,11 @@ async def analyze_speaking(request: AnalyzeSpeakingRequest) -> AnalyzeSpeakingRe
     "/analyze/speaking/upload",
     response_model=AnalyzeSpeakingResponse,
     status_code=status.HTTP_200_OK,
-    summary="Upload trực tiếp file âm thanh (MP3/WAV/M4A/WEBM) để chấm điểm Nói",
+    summary="Upload trực tiếp file âm thanh (MP3/WAV/M4A/WEBM/OGG) để chấm điểm Nói",
     description="Nhận file audio trực tiếp từ máy tính qua multipart/form-data. Phù hợp nhất để test trên Swagger UI hoặc cURL."
 )
 async def analyze_speaking_upload(
-    file: UploadFile = File(..., description="File âm thanh cần chấm (mp3, wav, m4a, webm)"),
+    file: UploadFile = File(..., description="File âm thanh cần chấm (mp3, wav, m4a, webm, ogg)"),
     submission_module_id: int = Form(1, alias="submissionModuleId"),
     module_instructions: Optional[str] = Form(None, alias="moduleInstructions"),
     ai_instruction_snapshot: Optional[str] = Form(None, alias="aiInstructionSnapshot"),
@@ -86,6 +86,11 @@ async def analyze_speaking_upload(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="File âm thanh rỗng (0 bytes)."
+            )
+        if len(audio_bytes) > MAX_INPUT_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Dung lượng tệp âm thanh vượt quá giới hạn 25 MiB.",
             )
 
         mime_type = file.content_type or "audio/mp3"
