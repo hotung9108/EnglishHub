@@ -7,12 +7,25 @@ import {
   AlignLeft, AlignCenter, Undo, Redo, Info,
   AlertCircle, RefreshCw, Loader2, X
 } from 'lucide-react';
+import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { 
+  submissionService, 
+  type SubmissionDetail,
+  type SubmitModulePayload 
+} from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common';
 import '../styles/student-writing.css';
+
+const getDocumentMimeType = (file: File): string => {
+  const fileName = file.name.toLowerCase();
+  if (fileName.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return 'application/pdf';
+};
 
 const StudentAssignmentWriting: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -162,15 +175,9 @@ const StudentAssignmentWriting: React.FC = () => {
     const validExtensions = ['.pdf', '.docx'];
     const fileName = file.name.toLowerCase();
     const hasValidExt = validExtensions.some((ext) => fileName.endsWith(ext));
-    const validMimes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'
-    ];
-    const hasValidMime = file.type ? validMimes.includes(file.type) : true;
 
-    if (!hasValidExt && !hasValidMime) {
-      setError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF hoặc DOCX.');
+    if (!hasValidExt) {
+      setError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF (.pdf) hoặc Word (.docx).');
       return;
     }
 
@@ -219,78 +226,83 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (editorText.trim() === '' && !uploadedFile) {
-      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+    const trimmedText = editorText.trim();
+    const hasText = trimmedText.length > 0;
+    const hasFile = !!uploadedFile;
+
+    if (!hasText && !hasFile) {
+      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm (.pdf, .docx) trước khi nộp.');
+      return;
+    }
+
+    if (!submission?.id) {
+      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
+
+    const writingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+    const subModuleId = writingSubMod?.id || submission.modules?.[0]?.id;
+
+    if (!subModuleId) {
+      setError('Không tìm thấy thông tin phần làm bài viết trong bài nộp.');
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
+
     try {
-      const subId = submission?.id;
-      const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
-      const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+      const subId = submission.id;
+      let docStorageKey: string | undefined;
 
-      // 1. Upload document file if selected
-      if (uploadedFile && subModuleId) {
-        try {
-          const { uploadUrl } = await submissionService.getDocumentUploadUrl(
-            subModuleId,
-            uploadedFile.type || 'application/pdf'
-          );
-          if (uploadUrl) {
-            await fetch(uploadUrl, {
-              method: 'PUT',
-              body: uploadedFile,
-              headers: {
-                'Content-Type': uploadedFile.type || 'application/octet-stream',
-              },
-            });
+      // 1. Tải tệp lên kho lưu trữ trước nếu học sinh có đính kèm file
+      if (uploadedFile) {
+        const mimeType = getDocumentMimeType(uploadedFile);
+        const { uploadUrl, storageKey } = await submissionService.getDocumentUploadUrl(
+          subModuleId,
+          mimeType
+        );
+        docStorageKey = storageKey;
+        await submissionService.uploadDirectToStorage(uploadUrl, uploadedFile, mimeType);
+      }
+
+      // 2. Gửi bài làm module kèm storageKey (nếu có file) và/hoặc answers (nếu có text)
+      const payload: SubmitModulePayload = {};
+      if (docStorageKey) {
+        payload.storageKey = docStorageKey;
+      }
+      if (hasText) {
+        payload.answers = [
+          {
+            questionId: 1,
+            content: { text: trimmedText }
           }
-        } catch (uploadErr) {
-          console.warn('Document storage upload skipped or failed, proceeding with module submission:', uploadErr);
-        }
+        ];
       }
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {
-            answers: [
-              {
-                questionId: 1,
-                content: { text: editorText }
-              }
-            ]
-          });
-        } catch (err) {
-          // Continue if already submitted
-          console.warn('Writing submit module notice:', err);
-        }
-      }
+      await submissionService.submitModule(subModuleId, payload);
 
-      // Check if all modules in this submission are now completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
-      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+      // 3. Kiểm tra xem tất cả các module trong submission đã hoàn thành chưa
+      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone =
+        otherModules.length === 0 ||
+        otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
-      if (subId && allOthersDone) {
+      if (allOthersDone) {
         try {
           await submissionService.submitSubmission(subId);
         } catch {
-          // Continue
+          // Bỏ qua nếu backend đã tự động submit submission cha
         }
       }
 
-      // Clear draft
+      // Xóa bản nháp sau khi nộp thành công
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
       if (allOthersDone) {
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
-          if (subId) {
-            navigate(`/student/submissions/${subId}`);
-          } else {
-            navigate(`/student/assignments/${id}/result`);
-          }
+          navigate(`/student/submissions/${subId}`);
         }, 1200);
       } else {
         setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
@@ -299,8 +311,8 @@ const StudentAssignmentWriting: React.FC = () => {
         }, 1200);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }

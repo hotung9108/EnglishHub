@@ -11,6 +11,7 @@ import {
   type SubmissionDetail,
   type SubmissionListItem,
   type SubmissionListResponse,
+  type SubmitModuleResponse,
   type SubmitResponse,
 } from '../services/submission.service';
 
@@ -634,4 +635,50 @@ test('SubmissionService - uploadDirectToStorage rewrites docker minio URLs to /s
   }
 });
 
+test('SubmissionService - submitModule sends storageKey and answers when submitting writing module', async () => {
+  const http = new MockHttpClient();
+  const response: SubmitModuleResponse = {
+    message: 'Nộp phần thi thành công.',
+    submissionModuleId: 46,
+    status: 'SUBMITTED',
+    answers: [
+      {
+        id: 102,
+        questionId: 1,
+        content: { text: 'Essay text content' },
+        docStorageKey: 'submissions/12/module-46/essay.docx',
+        docMimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        docUploadStatus: 'READY',
+      },
+    ],
+  };
+  http.mockResponse = response;
 
+  const result = await new SubmissionService(http).submitModule(46, {
+    storageKey: 'submissions/12/module-46/essay.docx',
+    answers: [
+      {
+        questionId: 1,
+        content: { text: 'Essay text content' },
+      },
+    ],
+  });
+
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'POST',
+      url: '/submission-modules/46/submit',
+      data: {
+        storageKey: 'submissions/12/module-46/essay.docx',
+        answers: [
+          {
+            questionId: 1,
+            content: { text: 'Essay text content' },
+          },
+        ],
+      },
+      options: undefined,
+    },
+  ]);
+});
