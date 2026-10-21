@@ -613,6 +613,52 @@
   gap: 8px;
 }
 
+/* Close Assignment Confirmation Modal */
+.tad-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.tad-modal-box {
+  background-color: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 16px);
+  padding: 24px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+}
+
+.tad-modal-title {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.tad-modal-description {
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tad-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
 .tad-back-btn {
   display: inline-flex;
   align-items: center;
@@ -971,6 +1017,19 @@
   font-weight: 500;
 }
 
+.tad-badge-in-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--tertiary-container, #FBF4E6);
+  color: var(--tertiary, #8C5E14);
+  border: 1px solid var(--tertiary-fixed, #ECD8B0);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .tad-badge-missing {
   display: inline-flex;
   align-items: center;
@@ -990,6 +1049,7 @@
   border-radius: 50%;
 }
 .tad-badge-dot.submitted { background-color: var(--secondary, #17523F); }
+.tad-badge-dot.in-progress { background-color: var(--tertiary, #8C5E14); }
 .tad-badge-dot.missing { background-color: var(--error, #8F2222); }
 
 .tad-grading-graded {

@@ -115,7 +115,7 @@ export const TeacherClasses: React.FC = () => {
               });
               const allSubs = (await Promise.all(subPromises)).flat();
               pendingCount = allSubs.filter(
-                (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
+                (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
               ).length;
 
               for (const s of allSubs) {

@@ -217,6 +217,10 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
   // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
     if (!audioBlob) {
       setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
       return;

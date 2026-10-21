@@ -29,7 +29,8 @@ export function parseAttemptRule(value) {
 export function verifyAttemptRule(value, maximum, attempts) {
   const actual = parseAttemptRule(value);
   assert.equal(actual.maximum, maximum, `Overview attempt limit differs from API: UI=${actual.maximum}, API=${maximum}; display="${value}"`);
-  assert.equal(actual.used, attempts.length, 'Overview attempt count differs from API');
+  const completed = attempts.filter(a => a.status !== 'IN_PROGRESS').length;
+  assert.equal(actual.used, completed, 'Overview attempt count differs from API');
   if (actual.remaining !== undefined && maximum !== null) {
     const completed = attempts.filter(a => a.status !== 'IN_PROGRESS').length;
     assert.equal(actual.remaining, Math.max(0, maximum - completed), 'Overview remaining attempts differ from API');

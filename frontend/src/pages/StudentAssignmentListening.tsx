@@ -124,10 +124,14 @@ const StudentAssignmentListening: React.FC = () => {
             if (subList.data && subList.data.length > 0) {
               const sub = await submissionService.getSubmission(subList.data[0].id);
               if (isMounted) setSubmission(sub);
-            } else {
+            } else if (currentAssignment?.status === 'PUBLISHED') {
               const startRes = await submissionService.startAttempt(numericId);
               const sub = await submissionService.getSubmission(startRes.id);
               if (isMounted) setSubmission(sub);
+            } else if (currentAssignment?.status === 'CLOSED') {
+              if (isMounted) {
+                setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+              }
             }
           } catch {
             // Fallback
@@ -168,6 +172,10 @@ const StudentAssignmentListening: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
     if (answeredCount === 0) {
       if (!confirm('Bạn chưa trả lời câu hỏi nào. Bạn có chắc chắn muốn nộp bài?')) {
         return;

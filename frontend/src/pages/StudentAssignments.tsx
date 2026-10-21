@@ -128,7 +128,7 @@ const StudentAssignments: React.FC = () => {
                   } else if (matchedSub.status === 'SUBMITTED') {
                     displayStatus = 'pending';
                   } else if (matchedSub.status === 'IN_PROGRESS') {
-                    displayStatus = 'in_progress';
+                    displayStatus = a.status === 'CLOSED' ? 'not_started' : 'in_progress';
                   }
                 }
 

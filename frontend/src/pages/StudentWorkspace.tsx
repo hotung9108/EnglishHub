@@ -123,7 +123,12 @@ export const StudentWorkspace: React.FC = () => {
         })
       );
 
-      const dynamicDrafts: DraftItem[] = detailedSubmissions.map((sub) => {
+      const dynamicDrafts: DraftItem[] = detailedSubmissions
+        .filter((sub) => {
+          const assignment = assignmentMap.get(String(sub.assignmentId || sub.id));
+          return assignment?.status !== 'CLOSED';
+        })
+        .map((sub) => {
         const assignmentIdStr = String(sub.assignmentId || sub.id);
         const assignment = assignmentMap.get(assignmentIdStr);
         const className = assignment?.className || (classes.length > 0 ? classes[0].name : 'Lớp học của tôi');
@@ -488,7 +493,7 @@ export const StudentWorkspace: React.FC = () => {
           {drafts.length === 0 && (
             <EmptyState
               icon={<CheckCircle2 size={40} className="text-emerald-600" />}
-              title={isVi ? 'Không có bản nháp nào đang dở dang!' : 'No unfinished drafts!'}
+              title={isVi ? 'Không có bản nháp nào đang làm!' : 'No unfinished drafts!'}
               description={isVi ? 'Tuyệt vời, bạn đã hoàn tất nộp tất cả bài tập.' : 'Great job! You have submitted all assigned work.'}
               action={
                 <Button 

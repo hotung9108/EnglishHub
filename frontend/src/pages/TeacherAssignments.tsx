@@ -155,9 +155,9 @@ export const TeacherAssignments: React.FC = () => {
               submissions = [];
             }
 
-            const submittedCount = submissions.length;
+            const submittedCount = submissions.filter((s) => s.status !== 'IN_PROGRESS').length;
             const pendingGradingCount = submissions.filter(
-              (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
+              (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
             ).length;
 
             // Days left & Status
