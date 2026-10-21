@@ -11,6 +11,13 @@ Implemented the Assignment CRUD/status APIs under `/api/v1`:
 - `DELETE /assignments/{assignmentId}` (soft delete)
 - `PATCH /assignments/{assignmentId}/status`
 
+## Assignment list skills
+
+Each item returned by `GET /classes/{classId}/assignments` includes `skills`, an array of strings
+(`READING`, `LISTENING`, `WRITING`, `SPEAKING`) taken from the assignment's actual modules.
+Duplicate skills are removed while preserving module `orderIndex` order. An assignment without
+modules returns `skills: []`, never `null`. Existing fields and pagination are unchanged.
+
 ## Authorization matrix
 
 - Teacher: may read/write only assignments belonging to a class where `classes.teacher_id` is their user id.

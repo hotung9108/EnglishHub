@@ -9,9 +9,14 @@ import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSumm
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.infrastructure.mapper.AssignmentPersistenceMapper;
+import com.english_hub.core.modules.assignment.infrastructure.mapper.AssignmentSkillPersistenceMapper;
+import com.english_hub.core.modules.assignment.infrastructure.persistence.projection.AssignmentSkillProjection;
+import com.english_hub.core.modules.assignment.infrastructure.persistence.repository.AssignmentSkillJpaRepository;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,14 +32,20 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 	private final AssignmentRepository jpaRepository;
 	private final AssignmentModuleRepository assignmentModuleRepository;
 	private final AssignmentPersistenceMapper mapper;
+	private final AssignmentSkillJpaRepository assignmentSkillJpaRepository;
+	private final AssignmentSkillPersistenceMapper skillMapper;
 
 	public AssignmentJpaAdapter(
 			AssignmentRepository jpaRepository,
 			AssignmentModuleRepository assignmentModuleRepository,
-			AssignmentPersistenceMapper mapper) {
+			AssignmentPersistenceMapper mapper,
+			AssignmentSkillJpaRepository assignmentSkillJpaRepository,
+			AssignmentSkillPersistenceMapper skillMapper) {
 		this.jpaRepository = jpaRepository;
 		this.assignmentModuleRepository = assignmentModuleRepository;
 		this.mapper = mapper;
+		this.assignmentSkillJpaRepository = assignmentSkillJpaRepository;
+		this.skillMapper = skillMapper;
 	}
 
 	@Override
@@ -97,6 +108,16 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 				jpaRepository.findAll(buildSpecification(classId, status), pageable);
 		List<Assignment> assignments = page.getContent().stream().map(mapper::toDomain).toList();
 		return new AssignmentPage(assignments, pageRequest.page(), pageRequest.limit(), page.getTotalElements());
+	}
+
+	@Override
+	public Map<Long, List<ModuleSkill>> findSkillsByAssignmentIds(List<Long> assignmentIds) {
+		if (assignmentIds.isEmpty()) {
+			return Map.of();
+		}
+		List<AssignmentSkillProjection> modules = assignmentSkillJpaRepository
+				.findByAssignmentIdInOrderByAssignmentIdAscOrderIndexAscIdAsc(assignmentIds);
+		return skillMapper.toSkillsByAssignmentId(modules);
 	}
 
 	@Override

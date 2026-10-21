@@ -13,6 +13,7 @@ export interface AssignmentSummary {
   title: string;
   status: AssignmentStatus;
   closeAt: string;
+  skills: AssignmentSkill[];
   openAt?: string | null;
   maxSubmissions?: number | null;
 }

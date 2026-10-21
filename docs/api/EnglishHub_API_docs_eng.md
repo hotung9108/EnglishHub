@@ -1262,6 +1262,7 @@ Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writi
 | `title` | string | Title |
 | `status` | string | Status |
 | `closeAt` | string (date-time) | Closing time |
+| `skills` | string[] | Skills from the assignment's actual modules: `READING`, `LISTENING`, `WRITING`, `SPEAKING`. Duplicates are removed while preserving module `orderIndex` order. Returns `[]` when the assignment has no modules; never `null`. |
 
 ---
 

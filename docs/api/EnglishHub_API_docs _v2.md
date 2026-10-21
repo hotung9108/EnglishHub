@@ -1286,6 +1286,7 @@ Tiến bộ của một học viên.
 | `title` | string | Tiêu đề |
 | `status` | string | Trạng thái |
 | `closeAt` | string (date-time) | Thời điểm đóng |
+| `skills` | string[] | Các kỹ năng `READING`, `LISTENING`, `WRITING`, `SPEAKING` lấy từ module thật của bài tập, loại trùng và giữ thứ tự `orderIndex` của module. Trả `[]` khi bài chưa có module, không bao giờ `null`. |
 
 ---
 

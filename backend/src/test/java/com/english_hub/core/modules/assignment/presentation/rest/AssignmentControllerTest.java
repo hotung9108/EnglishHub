@@ -8,6 +8,7 @@ import com.english_hub.core.modules.assignment.application.command.CreateAssignm
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentListResult;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentUpdateResult;
 import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
@@ -21,8 +22,10 @@ import com.english_hub.core.modules.assignment.presentation.rest.dto.MessageResp
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentRequest;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentResponse;
 import com.english_hub.core.modules.assignment.presentation.rest.dto.UpdateAssignmentStatusRequest;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +52,10 @@ class AssignmentControllerTest {
 
 	@Test
 	void mapsAssignmentListAndPagination() {
+		AssignmentPage page = new AssignmentPage(List.of(assignment(5L, AssignmentStatus.PUBLISHED)), 1, 20, 4);
 		when(assignmentService.listAssignments("PUBLISHED", 3L, 1, 20))
-				.thenReturn(new AssignmentPage(List.of(assignment(5L, AssignmentStatus.PUBLISHED)), 1, 20, 4));
+				.thenReturn(new AssignmentListResult(page,
+						Map.of(5L, List.of(ModuleSkill.READING, ModuleSkill.LISTENING, ModuleSkill.WRITING, ModuleSkill.SPEAKING))));
 
 		ResponseEntity<AssignmentListResponse> response =
 				assignmentController.listAssignments(3L, "PUBLISHED", 1, 20);
@@ -58,8 +63,25 @@ class AssignmentControllerTest {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody().data()).hasSize(1);
 		assertThat(response.getBody().data().getFirst().id()).isEqualTo(5L);
+		assertThat(response.getBody().data().getFirst().title()).isEqualTo("Weekly Test 1");
 		assertThat(response.getBody().data().getFirst().status()).isEqualTo("PUBLISHED");
+		assertThat(response.getBody().data().getFirst().closeAt()).isEqualTo(CLOSE_AT);
+		assertThat(response.getBody().data().getFirst().skills())
+				.containsExactly(ModuleSkill.READING, ModuleSkill.LISTENING, ModuleSkill.WRITING, ModuleSkill.SPEAKING);
+		assertThat(response.getBody().pagination().page()).isEqualTo(1);
+		assertThat(response.getBody().pagination().limit()).isEqualTo(20);
 		assertThat(response.getBody().pagination().total()).isEqualTo(4);
+	}
+
+	@Test
+	void mapsEmptySkillsAsEmptyArray() {
+		AssignmentPage page = new AssignmentPage(List.of(assignment(5L, AssignmentStatus.DRAFT)), 1, 20, 1);
+		when(assignmentService.listAssignments(null, 3L, 1, 20))
+				.thenReturn(new AssignmentListResult(page, Map.of()));
+
+		ResponseEntity<AssignmentListResponse> response = assignmentController.listAssignments(3L, null, 1, 20);
+
+		assertThat(response.getBody().data().getFirst().skills()).isNotNull().isEmpty();
 	}
 
 	@Test
