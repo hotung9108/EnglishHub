@@ -619,11 +619,45 @@ Trigger AI to automatically analyze and grade a submission module.
 ---
 
 ### GET `/api/v1/submission-modules/{id}/grading/ai-suggestion`
-Retrieve AI grading suggestion and detailed rubric analysis for a submission module (UC25).
+Retrieve stored AI grading suggestions and available rubric metadata for a submission module (UC25). This endpoint reads the database only; it does not call ai-service or trigger AI analysis.
+
+**Authorization:** Bearer access token with role `TEACHER`. The teacher must own the submission's class (`classes.teacher_id` matches the current user ID). Ownership is checked before the skill guard.
+
+**Supported Skills:** `SPEAKING`, `WRITING`. An owning teacher receives HTTP 400 for `READING` or `LISTENING`. This rejection does not block manual grading through `PUT /api/v1/gradings/{id}` (`id` is the grading ID); normal ownership and score validation still apply.
 
 **Path Params:** `id` (int64)
 
-**Response:** `AiGradingSuggestionResponse`
+**Response:** `AiGradingSuggestionResponse` (HTTP 200), returned directly at the JSON root without a `data` wrapper or success message. Nullable fields depend on the stored grading data; HTTP 200 does not guarantee populated AI metadata.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `submissionModuleId` | int64 | Submission module ID |
+| `gradingId` | int64 | Grading record ID |
+| `skill` | string | `SPEAKING` or `WRITING` |
+| `status` | string | Stored grading status |
+| `suggestedScore` | number \| null | From stored `criteriaScores.overallScore`; does not fall back to the final score |
+| `maxScore` | number \| null | Stored maximum-score snapshot; may be null for legacy data |
+| `aiFeedback` | string \| null | Stored AI feedback |
+| `criteriaScores` | JSON \| null | Rubric scores extracted from stored AI metadata |
+| `metrics` | JSON \| null | Stored `fluencyMetrics`, `textMetrics`, or `metrics`, in that priority order |
+| `annotations` | `AnswerAnnotationResponse[]` | Stored annotations for the first answer; an empty array when none are available |
+| `transcript` | JSON \| null | Stored transcript data, including array form; may be absent for Writing |
+| `modelUsed` | string \| null | Model name from stored AI metadata |
+| `providerUsed` | string \| null | Provider name from stored AI metadata |
+| `canTriggerAi` | boolean | True for grading status `PENDING` or `FAILED`; this GET does not trigger analysis |
+| `fallbackManualGradingAvailable` | boolean | True in the current implementation |
+| `fallbackMessage` | string | Guidance based on the stored grading status |
+
+**Response Statuses:**
+
+| Status | Condition | Body / message |
+|--------|-----------|----------------|
+| 200 | Owning teacher reads a supported skill with an existing grading | `AiGradingSuggestionResponse` as described above |
+| 400 | Owning teacher reads `READING` or `LISTENING` | `{"error":"Gợi ý chấm AI chỉ hỗ trợ cho kỹ năng Nói (Speaking) và Viết (Writing)."}` |
+| 401 | Missing access token, invalid signature, or expired token | `{"error":"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."}` |
+| 403 | Role is `STUDENT` or `ADMIN` (route authorization), or the teacher does not own the class (service ownership check) | `{"error":"Bạn không có quyền thực hiện thao tác này."}` |
+
+The two 403 rejection layers return the same body; status and body alone do not identify which layer rejected the request.
 
 ---
 
@@ -1574,19 +1608,19 @@ Same structure as `AnswerResponse`.
 | `submissionModuleId` | int64 | Submission module ID |
 | `gradingId` | int64 | Grading record ID |
 | `skill` | string | Evaluated skill (`SPEAKING`, `WRITING`) |
-| `status` | string | Current AI processing status |
-| `suggestedScore` | number | Score suggested by AI |
-| `maxScore` | number | Maximum possible score |
-| `aiFeedback` | string | AI-generated comprehensive feedback |
-| `criteriaScores` | object (JSON) | Detailed score breakdown by criteria/rubric |
-| `metrics` | object (JSON) | Additional AI metrics (CEFR, readability, fluency, etc.) |
+| `status` | string | Stored grading status |
+| `suggestedScore` | number \| null | Stored `criteriaScores.overallScore`; no fallback to the final score |
+| `maxScore` | number \| null | Stored maximum-score snapshot; may be null for legacy data |
+| `aiFeedback` | string \| null | Stored AI feedback |
+| `criteriaScores` | JSON \| null | Rubric scores extracted from stored AI metadata |
+| `metrics` | JSON \| null | Stored fluency, text, or other AI metrics |
 | `annotations` | `AnswerAnnotationResponse[]` | Detected errors and inline annotations |
-| `transcript` | object (JSON) | Speech-to-text transcript data (for Speaking) |
-| `modelUsed` | string | AI model name utilized |
-| `providerUsed` | string | AI provider name (e.g., Gemini) |
-| `canTriggerAi` | boolean | Whether re-triggering AI evaluation is permitted |
-| `fallbackManualGradingAvailable` | boolean | Whether teacher can proceed with manual override |
-| `fallbackMessage` | string | Informational message when fallback is triggered |
+| `transcript` | JSON \| null | Stored transcript data, including array form |
+| `modelUsed` | string \| null | Model name from stored AI metadata |
+| `providerUsed` | string \| null | Provider name from stored AI metadata |
+| `canTriggerAi` | boolean | True for `PENDING` or `FAILED`; this GET does not trigger analysis |
+| `fallbackManualGradingAvailable` | boolean | True in the current implementation |
+| `fallbackMessage` | string | Guidance based on the stored grading status |
 
 ---
 

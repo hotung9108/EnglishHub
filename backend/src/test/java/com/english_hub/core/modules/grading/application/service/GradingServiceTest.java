@@ -666,6 +666,22 @@ class GradingServiceTest {
 	}
 
 	@Test
+	void getAiSuggestion_readingSkill_throwsBadRequestWithoutReadingGradingOrCallingAi() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findBySubmissionModuleId(14L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.READING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.getAiSuggestion(14L))
+				.satisfies(exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+					assertThat(exception.getMessage())
+							.isEqualTo("Gợi ý chấm AI chỉ hỗ trợ cho kỹ năng Nói (Speaking) và Viết (Writing).");
+				});
+		verifyNoInteractions(gradingRepository, answerRepository, answerAnnotationRepository, gradingAiAnalysisService);
+	}
+
+	@Test
 	void getAiSuggestion_nonOwnerTeacher_throwsForbidden() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, UserRole.TEACHER));
 		when(gradingContextRepository.findBySubmissionModuleId(14L))

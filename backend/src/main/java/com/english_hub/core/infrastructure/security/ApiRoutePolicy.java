@@ -157,6 +157,10 @@ public final class ApiRoutePolicy {
 					HttpMethod.GET,
 					"/api/v1/submission-modules/{id}/grading",
 					List.of("TEACHER", "STUDENT")),
+				new RouteRule(
+						HttpMethod.GET,
+						"/api/v1/submission-modules/{id}/grading/ai-suggestion",
+						List.of("TEACHER")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/submission-modules/{id}/grading/ai-analyze",
