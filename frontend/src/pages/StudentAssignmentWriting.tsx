@@ -118,10 +118,14 @@ const StudentAssignmentWriting: React.FC = () => {
             if (subList.data && subList.data.length > 0) {
               const sub = await submissionService.getSubmission(subList.data[0].id);
               if (isMounted) setSubmission(sub);
-            } else {
+            } else if (currentAssignment?.status === 'PUBLISHED') {
               const startRes = await submissionService.startAttempt(numericId);
               const sub = await submissionService.getSubmission(startRes.id);
               if (isMounted) setSubmission(sub);
+            } else if (currentAssignment?.status === 'CLOSED') {
+              if (isMounted) {
+                setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+              }
             }
           } catch {
             // Fallback if unable to start or list
@@ -219,6 +223,10 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
     if (editorText.trim() === '' && !uploadedFile) {
       setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
       return;
@@ -308,6 +316,9 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const instructionsText = moduleDetail?.instructions || 
     'Yêu cầu: Hoàn thành bài viết Writing (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và bố cục mạch lạc. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo thang điểm 10.';
+
+  const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+  const maxScore = moduleDetail?.maxScore ?? writingSubMod?.grading?.maxScoreSnapshot ?? 10;
 
   return (
     <div className="writing-container">
@@ -520,12 +531,12 @@ const StudentAssignmentWriting: React.FC = () => {
             <div>
               <div className="writing-info-row">
                 <span className="writing-info-label">Thang điểm:</span>
-                <span className="writing-info-val">100 điểm (Quy đổi Band 9.0)</span>
+                <span className="writing-info-val">{maxScore} điểm</span>
               </div>
               
               <div className="writing-info-row">
-                <span className="writing-info-label">Lượt thi hiện tại:</span>
-                <span className="writing-info-val text-primary">
+                <span className="writing-info-label">Lượt làm bài:</span>
+                <span className="writing-info-val">
                   Lần {submission?.attemptNumber ?? 1}
                 </span>
               </div>

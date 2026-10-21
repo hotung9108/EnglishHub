@@ -4,6 +4,7 @@ import {
   ArrowLeft, Edit2, FileText, Search, Bell, 
   RefreshCw, AlertCircle, CheckCircle2, HelpCircle, Lock, Headphones
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -28,7 +29,7 @@ interface EnrolledStudentSubmissionRow {
   initials: string;
   avatarBg: string;
   avatarColor: string;
-  status: 'submitted' | 'missing';
+  status: 'submitted' | 'in_progress' | 'missing';
   gradingStatus: 'graded' | 'pending' | 'none';
   submissionId?: number;
   finalScore?: number | null;
@@ -46,6 +47,18 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState<boolean>(false);
+
+  const { user } = useAuth();
+  const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
+  const [currentClass, setCurrentClass] = useState<ClassSummary | null>(null);
+
+  const isOwner = useMemo(() => {
+    if (!user || user.role !== 'teacher') return false;
+    if (currentClass) {
+      return currentClass.teacherId ? currentClass.teacherId === user.id : true;
+    }
+    return true;
+  }, [user, currentClass]);
 
   // Data
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
@@ -93,25 +106,50 @@ export const TeacherAssignmentDetails: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleCloseAssignment = async () => {
-    if (!assignment) return;
-    const confirmMsg = isVi 
-      ? 'Bạn có chắc chắn muốn đóng bài tập này không? Học viên sẽ không thể nộp bài sau khi đóng.'
-      : 'Are you sure you want to close this assignment? Students will not be able to submit after closing.';
-    if (!window.confirm(confirmMsg)) return;
+  const handleOpenCloseModal = () => {
+    if (!assignment || assignment.status !== 'PUBLISHED' || !isOwner) return;
+    setShowCloseModal(true);
+  };
+
+  const handleConfirmClose = async () => {
+    if (!assignment || assignment.status !== 'PUBLISHED' || !isOwner) return;
 
     setIsClosing(true);
     try {
-      await assignmentService.updateAssignmentStatus(assignment.id, 'CLOSED');
+      const response = await assignmentService.updateAssignmentStatus(assignment.id, 'CLOSED');
       setAssignment((prev) => (prev ? { ...prev, status: 'CLOSED' } : null));
-      showToast(isVi ? 'Đã đóng bài tập thành công.' : 'Assignment closed successfully.');
-    } catch (err) {
+      setStudents((prev) =>
+        prev.map((s) => (s.status === 'in_progress' ? { ...s, status: 'missing' } : s))
+      );
+      setShowCloseModal(false);
+      showToast(response?.message || (isVi ? 'Đã đóng bài tập thành công.' : 'Assignment closed successfully.'));
+    } catch (err: unknown) {
       console.error('Failed to close assignment:', err);
-      showToast(isVi ? 'Không thể đóng bài tập. Vui lòng thử lại.' : 'Failed to close assignment. Please retry.');
+      let errorMsg = isVi ? 'Không thể đóng bài tập. Vui lòng thử lại.' : 'Failed to close assignment. Please retry.';
+      if (err && typeof err === 'object') {
+        const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+        if (apiErr.response?.data?.message) {
+          errorMsg = apiErr.response.data.message;
+        } else if (apiErr.message) {
+          errorMsg = apiErr.message;
+        }
+      }
+      showToast(errorMsg);
     } finally {
       setIsClosing(false);
     }
   };
+
+  useEffect(() => {
+    if (!showCloseModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isClosing) {
+        setShowCloseModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCloseModal, isClosing]);
 
   useEffect(() => {
     let isMounted = true;
@@ -216,6 +254,9 @@ export const TeacherAssignmentDetails: React.FC = () => {
         }
       }
 
+      if (isMounted) {
+        setCurrentClass(matchedClass || null);
+      }
       setClassName(matchedClass ? matchedClass.name : (classesList[0]?.name || 'Lớp tiếng Anh'));
 
       let classMembers: ClassMember[] = [];
@@ -241,7 +282,16 @@ export const TeacherAssignmentDetails: React.FC = () => {
       const textColors = ['#1B4D3E', '#D97706', '#BE185D', '#7E22CE', '#059669', '#8C5E14'];
 
       const studentRows: EnrolledStudentSubmissionRow[] = classMembers.map((member, index) => {
-        const matchedSub = submissionsList.find((s) => s.studentId === member.studentId);
+        const studentSubs = submissionsList.filter((s) => s.studentId === member.studentId);
+        studentSubs.sort((a, b) => {
+          const aIsDone = a.status === 'SUBMITTED' || a.status === 'GRADED';
+          const bIsDone = b.status === 'SUBMITTED' || b.status === 'GRADED';
+          if (aIsDone && !bIsDone) return -1;
+          if (!aIsDone && bIsDone) return 1;
+          return (b.attemptNumber || b.id) - (a.attemptNumber || a.id);
+        });
+        const matchedSub = studentSubs[0];
+
         const nameParts = member.fullName.trim().split(' ');
         const initials = nameParts.length > 1 
           ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase() 
@@ -249,21 +299,26 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
         const colorIndex = index % bgColors.length;
 
-        let status: 'submitted' | 'missing' = 'missing';
+        let status: 'submitted' | 'in_progress' | 'missing' = 'missing';
         let gradingStatus: 'graded' | 'pending' | 'none' = 'none';
         let finalScore: number | null = null;
 
         if (matchedSub) {
-          status = 'submitted';
-          const hasGraded = matchedSub.status === 'GRADED' || 
-            matchedSub.modules.some((m: SubmissionModuleSummary) => m.grading?.status === 'COMPLETED' || (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined));
-          
-          if (hasGraded) {
-            gradingStatus = 'graded';
-            const firstModScore = matchedSub.modules[0]?.grading?.finalScore;
-            finalScore = firstModScore ?? null;
+          if (matchedSub.status === 'IN_PROGRESS') {
+            status = assignDetail.status === 'CLOSED' ? 'missing' : 'in_progress';
+            gradingStatus = 'none';
           } else {
-            gradingStatus = 'pending';
+            status = 'submitted';
+            const hasGraded = matchedSub.status === 'GRADED' || 
+              matchedSub.modules?.some((m: SubmissionModuleSummary) => m.grading?.status === 'COMPLETED' || (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined));
+            
+            if (hasGraded) {
+              gradingStatus = 'graded';
+              const firstModScore = matchedSub.modules?.[0]?.grading?.finalScore;
+              finalScore = firstModScore ?? null;
+            } else {
+              gradingStatus = 'pending';
+            }
           }
         }
 
@@ -307,7 +362,8 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const metrics = useMemo(() => {
     const totalStudents = Math.max(1, students.length);
     const submittedCount = students.filter((s) => s.status === 'submitted').length;
-    const missingCount = students.filter((s) => s.status === 'missing').length;
+    const inProgressCount = students.filter((s) => s.status === 'in_progress').length;
+    const missingCount = students.filter((s) => s.status !== 'submitted').length;
     const gradedCount = students.filter((s) => s.gradingStatus === 'graded').length;
     const pendingCount = students.filter((s) => s.gradingStatus === 'pending').length;
 
@@ -326,6 +382,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
     return {
       totalStudents,
       submittedCount,
+      inProgressCount,
       missingCount,
       gradedCount,
       pendingCount,
@@ -338,7 +395,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
       if (activeTab === 'submitted' && s.status !== 'submitted') return false;
-      if (activeTab === 'missing' && s.status !== 'missing') return false;
+      if (activeTab === 'missing' && s.status === 'submitted') return false;
 
       if (subTab === 'graded' && s.gradingStatus !== 'graded') return false;
       if (subTab === 'pending' && s.gradingStatus !== 'pending') return false;
@@ -438,26 +495,30 @@ export const TeacherAssignmentDetails: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-3">
-          <Button 
-            variant="secondary"
-            size="sm"
-            icon={Edit2}
-            onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
-          >
-            {t('assignmentDetails.btnEdit')}
-          </Button>
+          {isOwner && (
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Edit2}
+              onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+            >
+              {t('assignmentDetails.btnEdit')}
+            </Button>
+          )}
 
-          <Button 
-            variant="secondary"
-            size="sm"
-            icon={Lock}
-            disabled={assignment.status !== 'PUBLISHED'}
-            loading={isClosing}
-            onClick={handleCloseAssignment}
-            title={assignment.status === 'CLOSED' ? (isVi ? 'Bài tập này đã đóng' : 'Assignment is already closed') : undefined}
-          >
-            {t('assignmentDetails.btnClose')}
-          </Button>
+          {isOwner && (
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Lock}
+              disabled={assignment.status !== 'PUBLISHED' || isClosing}
+              loading={isClosing}
+              onClick={handleOpenCloseModal}
+              title={assignment.status === 'CLOSED' ? (isVi ? 'Bài tập này đã đóng' : 'Assignment is already closed') : undefined}
+            >
+              {t('assignmentDetails.btnClose')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -788,6 +849,11 @@ export const TeacherAssignmentDetails: React.FC = () => {
                         <div className="tad-badge-dot submitted" />
                         {t('assignmentDetails.statusSubmittedLabel')}
                       </span>
+                    ) : student.status === 'in_progress' ? (
+                      <span className="tad-badge-in-progress">
+                        <div className="tad-badge-dot in-progress" />
+                        {t('assignmentDetails.statusInProgressLabel')}
+                      </span>
                     ) : (
                       <span className="tad-badge-missing">
                         <div className="tad-badge-dot missing" />
@@ -885,6 +951,51 @@ export const TeacherAssignmentDetails: React.FC = () => {
           />
         )}
       </div>
+      {/* Confirmation Modal for Closing Assignment */}
+      {showCloseModal && (
+        <div 
+          className="tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="close-modal-title"
+          onClick={() => !isClosing && setShowCloseModal(false)}
+        >
+          <div 
+            className="tad-modal-box" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="close-modal-title" className="tad-modal-title">
+              {isVi ? 'Đóng bài tập' : 'Close Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? 'Bạn có chắc chắn muốn đóng bài tập này không? Học viên sẽ không thể nộp bài sau khi đóng.'
+                : 'Are you sure you want to close this assignment? Students will not be able to submit after closing.'}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isClosing}
+                onClick={() => setShowCloseModal(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isClosing}
+                disabled={isClosing}
+                onClick={handleConfirmClose}
+              >
+                {isVi ? 'Đóng bài tập' : 'Close Assignment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
-  ArrowLeft, Download, Printer, FileText, ChevronLeft, ChevronRight,
+  ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2
 } from 'lucide-react';
@@ -232,7 +232,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
           limit: 10
         });
 
-        const matchedSubItem = subListRes.data && subListRes.data.length > 0 ? subListRes.data[0] : null;
+        const submissions = subListRes.data || [];
+        const completedSub = submissions.find(s => s.status === 'GRADED' || s.status === 'SUBMITTED');
+        const matchedSubItem = completedSub || (submissions.length > 0 ? submissions[0] : null);
 
         if (!matchedSubItem) {
           if (isMounted) {
@@ -246,6 +248,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
         const subDetail = await submissionService.getSubmission(matchedSubItem.id);
         if (!isMounted) return;
         setSubmission(subDetail);
+
+        if (subDetail.status === 'IN_PROGRESS') {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+          return;
+        }
 
         // 4. Determine initial module
         if (subDetail.modules && subDetail.modules.length > 0) {
@@ -269,7 +278,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
         try {
           const siblingRes = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
           if (isMounted && siblingRes.data) {
-            const uniqueStudents = Array.from(new Set(siblingRes.data.map((s) => s.studentId))).map((sId) => ({
+            const uniqueStudents = Array.from(new Set(siblingRes.data.filter((s) => s.status !== 'IN_PROGRESS').map((s) => s.studentId))).map((sId) => ({
               studentId: sId
             }));
             setClassSubmissions(uniqueStudents);
@@ -526,28 +535,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
           {assignment?.title || (isVi ? 'BÀI TẬP TIẾNG ANH' : 'ENGLISH ASSIGNMENT')}
         </h1>
       </div>
-
-      {/* Quick Actions Bar (Only for non-speaking modules) */}
-      {!isSpeaking && (
-        <div className="tsd-actions-bar">
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={() => showToast(isVi ? 'Đang chuẩn bị tải về bài nộp...' : 'Downloading submission...')}
-            icon={Download}
-          >
-            {t('submissionDetails.btnDownloadAll')}
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="sm"
-            onClick={() => window.print()}
-            icon={Printer}
-          >
-            {t('submissionDetails.btnPrint')}
-          </Button>
-        </div>
-      )}
 
       {/* Student Banner */}
       <div className="tsd-student-card">

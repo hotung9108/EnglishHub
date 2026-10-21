@@ -158,6 +158,15 @@ const StudentAssignmentOverview: React.FC = () => {
 
   const handleStartSkill = async (targetSkill: string) => {
     if (isStarting) return;
+    if (assignment?.status === 'CLOSED') {
+      const subMod = inProgressSub?.modules?.find(
+        (sm) => sm.skill?.toUpperCase() === targetSkill.toUpperCase()
+      );
+      if (!subMod || (subMod.status !== 'SUBMITTED' && subMod.status !== 'GRADED')) {
+        setError('Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.');
+        return;
+      }
+    }
     setIsStarting(true);
     setError(null);
     try {
@@ -166,8 +175,13 @@ const StudentAssignmentOverview: React.FC = () => {
         try {
           const startRes = await submissionService.startAttempt(numericAssignmentId);
           submissionId = startRes.id;
-        } catch {
-          submissionId = undefined;
+        } catch (startErr: unknown) {
+          console.error('startAttempt error:', startErr);
+          const errData = startErr as { response?: { data?: { message?: string } }; message?: string };
+          const msg = errData?.response?.data?.message || errData?.message || 'Không thể bắt đầu làm bài. Bài tập có thể đã đóng.';
+          setError(msg);
+          setIsStarting(false);
+          return;
         }
       }
 
@@ -194,13 +208,19 @@ const StudentAssignmentOverview: React.FC = () => {
 
   const handleFinalizeSubmission = async () => {
     if (!inProgressSub) return;
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể nộp toàn bộ bài tập.');
+      return;
+    }
     setIsStarting(true);
     try {
       await submissionService.submitSubmission(inProgressSub.id);
       navigate(`/student/submissions/${inProgressSub.id}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('Failed to finalize submission:', err);
-      navigate(`/student/submissions/${inProgressSub.id}`);
+      const errData = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = errData?.response?.data?.message || errData?.message || 'Không thể hoàn tất nộp bài.';
+      setError(msg);
     } finally {
       setIsStarting(false);
     }
@@ -208,6 +228,10 @@ const StudentAssignmentOverview: React.FC = () => {
 
   const handleStartAttempt = async () => {
     if (isStarting) return;
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.');
+      return;
+    }
     setIsStarting(true);
     setError(null);
     try {
@@ -216,9 +240,13 @@ const StudentAssignmentOverview: React.FC = () => {
         try {
           const startRes = await submissionService.startAttempt(numericAssignmentId);
           submissionId = startRes.id;
-        } catch {
-          // If startAttempt fails (e.g. mock ID), proceed with default
-          submissionId = undefined;
+        } catch (startErr: unknown) {
+          console.error('startAttempt error:', startErr);
+          const errData = startErr as { response?: { data?: { message?: string } }; message?: string };
+          const msg = errData?.response?.data?.message || errData?.message || 'Không thể bắt đầu làm bài. Bài tập có thể đã đóng.';
+          setError(msg);
+          setIsStarting(false);
+          return;
         }
       }
 
@@ -319,7 +347,7 @@ const StudentAssignmentOverview: React.FC = () => {
               </span>
               <span className="overview-meta-divider">•</span>
               <span className={`overview-meta-status ${assignment?.status === 'PUBLISHED' ? 'open' : 'closed'}`}>
-                {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đang đóng'}
+                {assignment?.status === 'PUBLISHED' ? 'Đang mở nhận bài' : 'Đã đóng'}
               </span>
             </div>
           </div>
@@ -342,29 +370,23 @@ const StudentAssignmentOverview: React.FC = () => {
         {/* Rules Grid */}
         <div className="overview-rules-grid">
           <div className="overview-rule-card">
-            <div className="overview-rule-label">Thời lượng làm bài</div>
-            <div className="overview-rule-val">40 Phút</div>
+            <div className="overview-rule-label">Thời hạn nộp</div>
+            <div className="overview-rule-val">
+              {assignment?.status === 'CLOSED'
+                ? 'Đã đóng'
+                : assignment?.closeAt
+                  ? new Date(assignment.closeAt).toLocaleDateString('vi-VN')
+                  : 'Mở trực tuyến'}
+            </div>
           </div>
 
           <div className="overview-rule-card">
             <div className="overview-rule-label">Số lượt nộp cho phép</div>
             <div className="overview-rule-val">
               {isUnlimited 
-                ? `Không giới hạn (Đã làm ${attempts.length} lần)` 
-                : `Tối đa ${maxSubmissions} lần (Đã nộp ${attempts.length}/${maxSubmissions})`}
+                ? `Không giới hạn (Đã nộp ${completedAttemptsCount} lần)` 
+                : `Tối đa ${maxSubmissions} lần (Đã nộp ${completedAttemptsCount}/${maxSubmissions})`}
             </div>
-          </div>
-
-          <div className="overview-rule-card">
-            <div className="overview-rule-label">Thời hạn nộp</div>
-            <div className="overview-rule-val">
-              {assignment?.closeAt ? new Date(assignment.closeAt).toLocaleDateString('vi-VN') : 'Mở trực tuyến'}
-            </div>
-          </div>
-
-          <div className="overview-rule-card">
-            <div className="overview-rule-label">Phương thức tính điểm</div>
-            <div className="overview-rule-val">Lấy điểm cao nhất (Best)</div>
           </div>
         </div>
 
@@ -412,9 +434,9 @@ const StudentAssignmentOverview: React.FC = () => {
                       variant={isCompleted ? 'secondary' : 'primary'}
                       size="sm"
                       onClick={() => handleStartSkill(m.skill)}
-                      disabled={isStarting}
+                      disabled={isStarting || (assignment?.status === 'CLOSED' && !isCompleted)}
                     >
-                      {isCompleted ? 'Xem lại' : inProgressSub ? 'Làm phần này' : 'Bắt đầu'}
+                      {isCompleted ? 'Xem lại' : assignment?.status === 'CLOSED' ? 'Đã đóng' : inProgressSub ? 'Làm phần này' : 'Bắt đầu'}
                     </Button>
                   </div>
                 );
@@ -422,19 +444,6 @@ const StudentAssignmentOverview: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* Instructions */}
-        <div className="overview-instructions-box">
-          <h3 className="overview-instructions-title">
-            Hướng dẫn &amp; Yêu cầu bài làm
-          </h3>
-          <div className="overview-instructions-content">
-            <p>1. Đọc kỹ yêu cầu từng phần câu hỏi và hoàn thành tất cả các mục trước khi nhấn Nộp bài.</p>
-            <p>2. Trả lời đầy đủ, hệ thống sẽ tự động lưu bài nháp (Draft) định kỳ để bảo vệ dữ liệu khi làm.</p>
-            <p>3. Sau khi nộp bài, hệ thống AI và Giảng viên sẽ tiến hành phân tích, chấm điểm và highlight nhận xét chi tiết.</p>
-            <p>4. Bạn có thể xem lại kết quả bài làm và feedback bất kỳ lúc nào trong danh sách Lịch sử các lần làm bài.</p>
-          </div>
-        </div>
 
         {/* Attempts Table */}
         <div className="overview-attempts-section">
@@ -491,7 +500,7 @@ const StudentAssignmentOverview: React.FC = () => {
                           {att.status === 'graded' 
                             ? 'Đã có điểm' 
                             : att.status === 'in_progress' 
-                              ? 'Đang làm dở' 
+                              ? (assignment?.status === 'CLOSED' ? 'Chưa nộp (Đã đóng)' : 'Đang làm') 
                               : 'Chờ chấm điểm'}
                         </span>
                       </td>
@@ -503,6 +512,15 @@ const StudentAssignmentOverview: React.FC = () => {
                             onClick={() => navigate(`/student/submissions/${att.id}`)}
                           >
                             Xem kết quả bài nộp
+                          </Button>
+                        ) : assignment?.status === 'CLOSED' ? (
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            disabled
+                            title="Bài tập đã đóng, không thể tiếp tục làm bài"
+                          >
+                            Đã đóng
                           </Button>
                         ) : (
                           <Button 
@@ -526,23 +544,45 @@ const StudentAssignmentOverview: React.FC = () => {
         <div className="overview-cta-box">
           <div className="overview-cta-info">
             <div className="overview-cta-title">
-              {inProgressSub
+              {assignment?.status === 'CLOSED'
+                ? 'Bài tập này đã được giáo viên đóng. Không tiếp nhận bài làm hoặc nộp bài mới.'
+                : inProgressSub
                 ? isAllSubModulesCompleted
                   ? `Bạn đã hoàn thành tất cả các phần thi (Lần ${inProgressSub.attemptNumber}). Bạn có thể nộp toàn bộ bài tập ngay bây giờ.`
-                  : `Bạn đang có bài làm dở (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
+                  : `Bạn đang làm bài (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
                 : isUnlimited
-                  ? `Bắt đầu làm bài (Lần ${attempts.length + 1}).`
+                  ? `Bắt đầu làm bài (Lần ${completedAttemptsCount + 1}).`
                   : remainingAttempts !== null && remainingAttempts > 0 
                     ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
                     : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
             </div>
             <div className="overview-cta-desc">
-              Điểm số tổng kết môn học sẽ ghi nhận lần làm bài có kết quả tốt nhất của bạn.
+              {assignment?.status === 'CLOSED'
+                ? 'Vui lòng liên hệ giảng viên nếu bạn cần gia hạn thời gian nộp bài.'
+                : 'Điểm số tổng kết môn học sẽ ghi nhận lần làm bài có kết quả tốt nhất của bạn.'}
             </div>
           </div>
 
           <div className="overview-cta-action">
-            {inProgressSub ? (
+            {assignment?.status === 'CLOSED' ? (
+              <button 
+                className="overview-cta-btn" 
+                onClick={() => {
+                  const completedAttempts = attempts.filter((a) => a.status !== 'in_progress');
+                  const targetSub = bestAttempt ? bestAttempt.id : completedAttempts[0]?.id;
+                  if (targetSub) {
+                    navigate(`/student/submissions/${targetSub}`);
+                  } else {
+                    navigate(`/student/assignments/${id || 'HW-01'}/result`);
+                  }
+                }}
+                disabled={attempts.filter((a) => a.status !== 'in_progress').length === 0}
+                type="button"
+                title={attempts.filter((a) => a.status !== 'in_progress').length === 0 ? 'Bài tập đã được giáo viên đóng' : 'Xem kết quả bài nộp'}
+              >
+                {attempts.filter((a) => a.status !== 'in_progress').length > 0 ? 'Xem kết quả bài nộp' : 'Bài tập đã đóng (Không thể làm bài)'}
+              </button>
+            ) : inProgressSub ? (
               isAllSubModulesCompleted ? (
                 <button 
                   className="overview-cta-btn" 
@@ -569,7 +609,7 @@ const StudentAssignmentOverview: React.FC = () => {
                 disabled={isStarting}
                 type="button"
               >
-                {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${attempts.length + 1})`}
+                {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${completedAttemptsCount + 1})`}
               </button>
             ) : (
               <button 

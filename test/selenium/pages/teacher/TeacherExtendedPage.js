@@ -108,7 +108,13 @@ export class TeacherExtendedPage extends TeacherPage {
     await this.openAssignment(data.extra.edit.title);
     const control = await this.feature(exactButton('Đóng bài tập', 'Close Assignment'), 'Đóng bài tập');
     await this.clickElement(control);
-    const alert = await this.driver.switchTo().alert().catch(() => null); if (alert) await alert.accept();
+    const alert = await this.driver.switchTo().alert().catch(() => null);
+    if (alert) {
+      await alert.accept();
+    } else {
+      const confirmBtn = await this.visible(By.css('.tad-modal-actions .btn-danger, .tad-modal-actions button:last-child')).catch(() => null);
+      if (confirmBtn) await this.clickElement(confirmBtn);
+    }
     await this.driver.wait(async () => (await data.api.get('teacher', `/assignments/${data.extra.edit.id}`)).status === 'CLOSED', this.config.timeout);
   }
   async skillFilter() {

@@ -167,7 +167,7 @@ export const TeacherEditAssignment: React.FC = () => {
           const subs = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
           setTurnoutStats({
             total: members.length,
-            submitted: subs.data?.length || 0
+            submitted: subs.data?.filter((s) => s.status !== 'IN_PROGRESS').length || 0
           });
         } catch {
           // Fallback
