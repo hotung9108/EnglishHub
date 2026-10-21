@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.persistence.entity.Answer;
@@ -57,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -314,6 +316,90 @@ class GradingApiIntegrationTest {
 				.andExpect(jsonPath("$.data").isNotEmpty())
 				.andExpect(jsonPath("$.pagination").doesNotExist())
 				.andExpect(jsonPath("$.meta").doesNotExist());
+	}
+
+	@Test
+	void teacherCanReadAiSuggestionForOwnedWriting() throws Exception {
+		Grading target = requireWritingAiGrading();
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}/grading/ai-suggestion", target.getSubmissionModuleId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.submissionModuleId").value(target.getSubmissionModuleId()))
+				.andExpect(jsonPath("$.gradingId").value(target.getId()))
+				.andExpect(jsonPath("$.skill").value("WRITING"))
+				.andExpect(jsonPath("$.status").value("AI_GRADED"))
+				.andExpect(jsonPath("$.maxScore").value(10.0))
+				.andExpect(jsonPath("$.aiFeedback").value(target.getAiFeedback()))
+				.andExpect(jsonPath("$.annotations", hasSize(2)))
+				.andExpect(jsonPath("$.annotations[0].source").value("AI"))
+				.andExpect(jsonPath("$.canTriggerAi").value(false))
+				.andExpect(jsonPath("$.fallbackManualGradingAvailable").value(true))
+				.andExpect(jsonPath("$.data").doesNotExist())
+				.andExpect(jsonPath("$.error").doesNotExist());
+	}
+
+	@Test
+	void readingAiSuggestionBadRequestDoesNotBlockManualGrading() throws Exception {
+		Grading target = gradingRepository.findAll().stream()
+				.filter(grading -> {
+					var submissionModule = submissionModuleRepository.findById(grading.getSubmissionModuleId()).orElseThrow();
+					return submissionModule.getModuleId().equals(moduleIds.get(ModuleSkill.READING));
+				})
+				.findFirst()
+				.orElseThrow();
+		long submissionModuleId = target.getSubmissionModuleId();
+		String body = "{\"finalScore\":6.50,\"finalFeedback\":\"Reviewed by teacher\",\"note\":\"manual review\"}";
+		assertThat(target.getFinalScore()).isNotNull().isNotEqualByComparingTo("6.50");
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}/grading/ai-suggestion", submissionModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error")
+						.value("Gợi ý chấm AI chỉ hỗ trợ cho kỹ năng Nói (Speaking) và Viết (Writing)."));
+
+		mockMvc.perform(put("/api/v1/gradings/{id}", target.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(body))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Cập nhật điểm thành công."));
+
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/submission-modules/{id}/grading", submissionModuleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(target.getId()))
+				.andExpect(jsonPath("$.status").value("COMPLETED"))
+				.andExpect(jsonPath("$.finalScore").value(6.5));
+	}
+
+	@Test
+	void otherTeacherCannotReadWritingAiSuggestionBecauseOfOwnership() throws Exception {
+		Grading target = requireWritingAiGrading();
+		assertThat(otherTeacherId).isNotEqualTo(teacherId);
+
+		var result = mockMvc.perform(get("/api/v1/submission-modules/{id}/grading/ai-suggestion", target.getSubmissionModuleId())
+					.header("Authorization", bearer(otherTeacherId, UserRole.TEACHER)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."))
+				.andReturn();
+
+		assertThat(result.getResolvedException()).isInstanceOfSatisfying(ApiException.class,
+				exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	private Grading requireWritingAiGrading() {
+		return gradingRepository.findAll().stream()
+				.filter(grading -> grading.getStatus() == GradingStatus.AI_GRADED)
+				.filter(grading -> {
+					var submissionModule = submissionModuleRepository.findById(grading.getSubmissionModuleId()).orElseThrow();
+					return submissionModule.getModuleId().equals(moduleIds.get(ModuleSkill.WRITING));
+				})
+				.findFirst()
+				.orElseThrow();
 	}
 
 	private void createSubmittedAttempt() {
