@@ -12,10 +12,8 @@ import {
   Headphones, 
   FileText, 
   CheckCircle2, 
-  Clock, 
   Search, 
   Calendar, 
-  Sparkles, 
   Layers, 
   AlertCircle, 
   RefreshCw,
@@ -107,10 +105,14 @@ const StudentAssignments: React.FC = () => {
                     const subRes = await submissionService.listSubmissions({
                       assignmentId: a.id,
                       studentId: user.id,
-                      limit: 1
+                      limit: 10
                     });
                     if (subRes.data && subRes.data.length > 0) {
-                      matchedSub = subRes.data[0];
+                      const subs = subRes.data;
+                      matchedSub = subs.find(s => isSubmissionGraded(s))
+                        || subs.find(s => s.status === 'SUBMITTED')
+                        || subs.find(s => s.status === 'IN_PROGRESS')
+                        || subs[0];
                     }
                   } catch {
                     // Fallback
@@ -128,7 +130,7 @@ const StudentAssignments: React.FC = () => {
                   } else if (matchedSub.status === 'SUBMITTED') {
                     displayStatus = 'pending';
                   } else if (matchedSub.status === 'IN_PROGRESS') {
-                    displayStatus = a.status === 'CLOSED' ? 'not_started' : 'in_progress';
+                    displayStatus = 'in_progress';
                   }
                 }
 
@@ -520,13 +522,6 @@ const StudentAssignments: React.FC = () => {
                           )}
                         </span>
                       )}
-
-                      {assignment.score !== undefined && (
-                        <span className="std-asg-score-badge">
-                          <Sparkles size={11} />
-                          <span>{t('studentAssignments.scorePrefix')}{assignment.score}/100 • Band {(assignment.score / 100 * 9).toFixed(1)}</span>
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -535,29 +530,25 @@ const StudentAssignments: React.FC = () => {
                 <div className="std-asg-card-right">
                   {(assignment.status === 'pending' || assignment.status === 'ai_processing') && (
                     <div className="std-asg-status-badge grading">
-                      <span className="std-asg-dot" />
-                      {t('studentAssignments.statusGrading')}
+                      {t('studentAssignments.statusPending')}
                     </div>
                   )}
 
                   {assignment.status === 'in_progress' && (
                     <div className="std-asg-status-badge in_progress">
-                      <Clock size={12} />
                       {t('studentAssignments.statusInProgress')}
                     </div>
                   )}
 
                   {assignment.status === 'graded' && (
                     <div className="std-asg-status-badge graded">
-                      <CheckCircle2 size={13} strokeWidth={2.2} />
-                      {t('studentAssignments.tabGraded')}
+                      {t('studentAssignments.statusGraded')}
                     </div>
                   )}
 
                   {assignment.status === 'not_started' && (
                     <div className="std-asg-status-badge not_started">
-                      <Clock size={13} strokeWidth={2} />
-                      {t('studentAssignments.tabNotStarted')}
+                      {t('studentAssignments.statusNotStarted')}
                     </div>
                   )}
 

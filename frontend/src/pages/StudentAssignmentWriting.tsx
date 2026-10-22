@@ -12,6 +12,12 @@ import { moduleService, type ModuleDetailResponse } from '../api/services/module
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  getSkillLabel
+} from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
@@ -301,10 +307,23 @@ const StudentAssignmentWriting: React.FC = () => {
           }
         }, 1200);
       } else {
-        setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
-        setTimeout(() => {
-          navigate(`/student/assignments/${id}/overview`);
-        }, 1200);
+        const currentSubModules = (submission?.modules || []).map((m) =>
+          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+        );
+        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          setSuccessMessage(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          setTimeout(() => {
+            navigate(nextRoute);
+          }, 1500);
+        } else {
+          setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`);
+          }, 1200);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
@@ -331,6 +350,23 @@ const StudentAssignmentWriting: React.FC = () => {
         <span className="writing-crumb-active">
           {assignment?.title || `Writing #${id}`}
         </span>
+        {assignment?.modules && assignment.modules.length > 1 && (
+          <div className="writing-stepper-wrapper">
+            <ExamStepper
+              variant="compact"
+              modules={assignment.modules}
+              submissionModules={submission?.modules}
+              currentSkill="WRITING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isCompleted || step.isAccessible) {
+                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {error && (

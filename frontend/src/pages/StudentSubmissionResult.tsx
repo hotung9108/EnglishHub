@@ -593,7 +593,13 @@ export const StudentSubmissionResult: React.FC = () => {
       });
     }
     if (list.length === 0) return [selectedSkill || 'READING'];
-    return Array.from(new Set(list));
+    const unique = Array.from(new Set(list));
+    const standardOrder: SubmissionSkill[] = ['LISTENING', 'READING', 'WRITING', 'SPEAKING'];
+    return unique.sort((a, b) => {
+      const idxA = standardOrder.indexOf(a);
+      const idxB = standardOrder.indexOf(b);
+      return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
+    });
   }, [submission, assignment, selectedSkill]);
 
   // Empty submission state
@@ -706,7 +712,6 @@ export const StudentSubmissionResult: React.FC = () => {
         <div className="result-hero-left">
           <div className="result-badge-row">
             <span className="result-hero-tag">
-              <Award size={13} />
               {isGraded ? t('studentResult.statusGraded') : t('studentResult.statusAiGrading')}
             </span>
 
@@ -737,8 +742,6 @@ export const StudentSubmissionResult: React.FC = () => {
           <div className="result-hero-meta">
             <span><strong>{t('studentResult.submittedOn')}:</strong> {submission?.submittedAt ? new Date(submission.submittedAt).toLocaleDateString('vi-VN') : 'Hôm nay'}</span>
             <span>•</span>
-            <span><strong>{t('studentResult.gradedBy')}:</strong> {gradingDetail?.reviewedBy ? `Giảng viên #${gradingDetail.reviewedBy}` : t('studentResult.gradedByVal')}</span>
-            <span>•</span>
             <span><strong>Kỹ năng:</strong> {selectedSkill}</span>
           </div>
         </div>
@@ -767,54 +770,28 @@ export const StudentSubmissionResult: React.FC = () => {
 
       {/* 3. Skill / Module Switcher */}
       {availableSkills.length > 0 && (
-        <section className="result-skill-switcher">
+        <section className="result-skill-switcher" aria-label={t('studentResult.moduleSwitcherLabel')}>
           <span className="result-filter-count">
             {t('studentResult.moduleSwitcherLabel')}
           </span>
 
-          {availableSkills.includes('WRITING') && (
-            <button
-              type="button"
-              className={`result-skill-btn ${selectedSkill === 'WRITING' ? 'active' : ''}`}
-              onClick={() => void handleSelectSkill('WRITING')}
-            >
-              <FileEdit size={15} />
-              <span>Writing</span>
-            </button>
-          )}
-
-          {availableSkills.includes('SPEAKING') && (
-            <button
-              type="button"
-              className={`result-skill-btn ${selectedSkill === 'SPEAKING' ? 'active' : ''}`}
-              onClick={() => void handleSelectSkill('SPEAKING')}
-            >
-              <Mic size={15} />
-              <span>Speaking</span>
-            </button>
-          )}
-
-          {availableSkills.includes('READING') && (
-            <button
-              type="button"
-              className={`result-skill-btn ${selectedSkill === 'READING' ? 'active' : ''}`}
-              onClick={() => void handleSelectSkill('READING')}
-            >
-              <BookOpen size={15} />
-              <span>Reading</span>
-            </button>
-          )}
-
-          {availableSkills.includes('LISTENING') && (
-            <button
-              type="button"
-              className={`result-skill-btn ${selectedSkill === 'LISTENING' ? 'active' : ''}`}
-              onClick={() => void handleSelectSkill('LISTENING')}
-            >
-              <Headphones size={15} />
-              <span>Listening</span>
-            </button>
-          )}
+          <div className="result-skill-buttons-group">
+            {availableSkills.map((skill) => {
+              const Icon = skill === 'LISTENING' ? Headphones : skill === 'READING' ? BookOpen : skill === 'SPEAKING' ? Mic : FileEdit;
+              const label = skill.charAt(0) + skill.slice(1).toLowerCase();
+              return (
+                <button
+                  key={skill}
+                  type="button"
+                  className={`result-skill-btn ${selectedSkill === skill ? 'active' : ''}`}
+                  onClick={() => void handleSelectSkill(skill)}
+                >
+                  <Icon size={15} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 
