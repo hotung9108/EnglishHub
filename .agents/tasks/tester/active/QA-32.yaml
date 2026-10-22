@@ -5,6 +5,7 @@ status: "In Progress"
 priority: "P0"
 updated_at: "2026-10-22"
 branch: "feature/qa-32-ui-components"
+pr: "https://github.com/hotung9108/EnglishHub/pull/216"
 base: "e8e85a4d6ffa54a1bc8e107c61a8a82c44028ded"
 completed_scope:
   - "Thiết lập Vitest, RTL, jest-dom, jsdom, coverage 80% từng file/từng chỉ số."

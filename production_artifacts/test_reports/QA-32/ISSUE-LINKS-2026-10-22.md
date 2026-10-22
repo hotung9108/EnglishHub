@@ -29,9 +29,29 @@ Nội dung bên dưới đã chuẩn bị, **chưa đăng lên Trello**.
 Acceptance: 102 Pass / 2 todo; known-bugs riêng: 9 Fail đã ghi nhận.
 Coverage từng màn hình/từng chỉ số >=80%; tổng statements 94.64%, branches 85.3%, functions 90%, lines 95.08%.
 139 API client/utility tests Pass; typecheck/build Pass; lint exit 0 với 1 warning có sẵn.
-7 bug mới #207–213, feature gap annotation #214, cần chốt bước điểm #215. Dùng lại #184 và liên kết hợp đồng #174.
+Issue đã đăng và xác minh:
+- [FE][Student Writing] Báo nộp thành công và xóa nháp khi hoàn tất submission thất bại
+  https://github.com/hotung9108/EnglishHub/issues/207
+- [FE][Student Writing] Báo nộp thành công khi không tải được lượt nộp
+  https://github.com/hotung9108/EnglishHub/issues/208
+- [FE][Teacher Create Assignment] Vẫn phát hành bài khi tạo module thất bại
+  https://github.com/hotung9108/EnglishHub/issues/209
+- [FE][Teacher Create Assignment] Cho gửi lịch đóng bài trước lịch mở
+  https://github.com/hotung9108/EnglishHub/issues/210
+- [FE][Teacher Create Assignment] Giá trị datetime-local mặc định dùng giờ UTC
+  https://github.com/hotung9108/EnglishHub/issues/211
+- [FE][Grading] Lưu bản nháp nhận xét gọi endpoint hoàn tất chấm điểm
+  https://github.com/hotung9108/EnglishHub/issues/212
+- [FE][Student Writing] Assignment ID không hợp lệ âm thầm tải bài số 1
+  https://github.com/hotung9108/EnglishHub/issues/213
+- [FE][Feature gap][QA-32] Bổ sung luồng duyệt annotation trên TeacherSubmissionDetails
+  https://github.com/hotung9108/EnglishHub/issues/214
+- [Spec][QA-32] Làm rõ bước điểm 0.5 hay điểm thập phân bất kỳ trong thang 0–10
+  https://github.com/hotung9108/EnglishHub/issues/215
+Dùng lại lỗi module submit: https://github.com/hotung9108/EnglishHub/issues/184
+Hợp đồng text-only/question ID: https://github.com/hotung9108/EnglishHub/issues/174
 Giữ In Progress vì annotation chưa có UI và cần chốt ngoại lệ DoD. Chỉ sửa test/config/tài liệu, không sửa app.
-PR: đang chuẩn bị.
+PR: https://github.com/hotung9108/EnglishHub/pull/216
 Report: production_artifacts/test_reports/QA-32/README.md
 Chạy: cd frontend; npm ci; npm run test:ui
 Giới hạn: API mock/jsdom; chưa retest staging/Selenium.

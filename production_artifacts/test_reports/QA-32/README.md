@@ -1,5 +1,7 @@
 # QA-32 — Bàn giao Vitest và React Testing Library
 
+PR bàn giao: [#216](https://github.com/hotung9108/EnglishHub/pull/216).
+
 Nhánh: feature/qa-32-ui-components, base develop e8e85a4d6ffa54a1bc8e107c61a8a82c44028ded.
 Ngày kiểm chứng: 22/10/2026, Windows / Node 22.19.0 / npm 10.9.3 / jsdom / TZ Asia/Ho_Chi_Minh.
 
