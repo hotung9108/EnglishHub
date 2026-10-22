@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, BookOpen, 
-  Timer, Bookmark, Highlighter, 
+  Bookmark, Highlighter, 
   ChevronLeft, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -12,6 +12,12 @@ import { submissionService, type SubmissionDetail, type SubmitModuleAnswerPayloa
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  getSkillLabel
+} from '../utils/examStepper.utils';
 import '../styles/student-exam.css';
 
 const StudentAssignmentReading: React.FC = () => {
@@ -248,10 +254,23 @@ const StudentAssignmentReading: React.FC = () => {
           }
         }, 1200);
       } else {
-        setSuccessMessage('Đã hoàn thành phần thi Reading! Đang quay lại trang tổng quan bài tập...');
-        setTimeout(() => {
-          navigate(`/student/assignments/${id}/overview`);
-        }, 1200);
+        const currentSubModules = (submission?.modules || []).map((m) =>
+          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+        );
+        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          setSuccessMessage(`Đã hoàn thành phần thi Reading! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          setTimeout(() => {
+            navigate(nextRoute);
+          }, 1500);
+        } else {
+          setSuccessMessage('Đã hoàn thành phần thi Reading! Đang quay lại trang tổng quan bài tập...');
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`);
+          }, 1200);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
@@ -272,9 +291,9 @@ const StudentAssignmentReading: React.FC = () => {
             variant="secondary"
             size="sm"
             icon={ArrowLeft}
-            onClick={() => navigate('/student/assignments')}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
           >
-            Quay lại danh sách bài tập
+            Tổng quan bài thi
           </Button>
           
           <div className="exam-breadcrumbs">
@@ -286,12 +305,23 @@ const StudentAssignmentReading: React.FC = () => {
           </div>
         </div>
 
-        <div className="exam-header-right">
-          <div className="exam-timer-badge">
-            <Timer size={16} />
-            <span>40:00</span>
+        {assignment?.modules && assignment.modules.length > 1 && (
+          <div className="exam-header-right">
+            <ExamStepper
+              variant="compact"
+              modules={assignment.modules}
+              submissionModules={submission?.modules}
+              currentSkill="READING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isCompleted || step.isAccessible) {
+                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                }
+              }}
+            />
           </div>
-        </div>
+        )}
       </div>
 
       {error && (

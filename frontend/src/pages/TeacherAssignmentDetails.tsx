@@ -8,7 +8,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
+import {
+  submissionService,
+  type SubmissionListItem,
+  isSubmissionGraded,
+  getSubmissionFinalScore
+} from '../api/services/submission.service';
 import { moduleService } from '../api/services/module.service';
 import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
 import { Button, EmptyState, Pagination } from '../components/common';
@@ -309,13 +314,9 @@ export const TeacherAssignmentDetails: React.FC = () => {
             gradingStatus = 'none';
           } else {
             status = 'submitted';
-            const hasGraded = matchedSub.status === 'GRADED' || 
-              matchedSub.modules?.some((m: SubmissionModuleSummary) => m.grading?.status === 'COMPLETED' || (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined));
-            
-            if (hasGraded) {
+            if (isSubmissionGraded(matchedSub)) {
               gradingStatus = 'graded';
-              const firstModScore = matchedSub.modules?.[0]?.grading?.finalScore;
-              finalScore = firstModScore ?? null;
+              finalScore = getSubmissionFinalScore(matchedSub);
             } else {
               gradingStatus = 'pending';
             }

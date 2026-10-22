@@ -13,6 +13,13 @@ import {
   isSubmissionGraded,
   getSubmissionFinalScore
 } from '../api/services/submission.service';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  isModuleAccessible,
+  getSkillLabel
+} from '../utils/examStepper.utils';
 import '../styles/student-overview.css';
 
 interface AttemptRecord {
@@ -38,6 +45,7 @@ const StudentAssignmentOverview: React.FC = () => {
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [attempts, setAttempts] = useState<AttemptRecord[]>([]);
   const [inProgressSub, setInProgressSub] = useState<SubmissionListItem | null>(null);
+  const [latestCompletedSub, setLatestCompletedSub] = useState<SubmissionListItem | null>(null);
 
   const numericAssignmentId = useMemo(() => {
     const parsed = Number(id);
@@ -80,7 +88,15 @@ const StudentAssignmentOverview: React.FC = () => {
             });
             const list = subRes.data || [];
             const activeAttempt = findInProgressAttempt(list);
-            if (isMounted) setInProgressSub(activeAttempt);
+            const completedAttemptsList = list
+              .filter((item) => item.status === 'SUBMITTED' || item.status === 'GRADED')
+              .sort((a, b) => b.attemptNumber - a.attemptNumber);
+            const latestCompleted = completedAttemptsList[0] || null;
+
+            if (isMounted) {
+              setInProgressSub(activeAttempt);
+              setLatestCompletedSub(latestCompleted);
+            }
 
             // Find best score
             let maxVal = -1;
@@ -156,7 +172,7 @@ const StudentAssignmentOverview: React.FC = () => {
       .join(', ');
   }, [modules]);
 
-  const handleStartSkill = async (targetSkill: string) => {
+  const handleStartSkill = async (targetSkill: string, targetIndex?: number) => {
     if (isStarting) return;
     if (assignment?.status === 'CLOSED') {
       const subMod = inProgressSub?.modules?.find(
@@ -167,6 +183,16 @@ const StudentAssignmentOverview: React.FC = () => {
         return;
       }
     }
+
+    // Verify sequential unlocking: If targetIndex > 0, make sure previous modules are completed
+    if (targetIndex !== undefined && targetIndex > 0 && assignment?.modules) {
+      const accessible = isModuleAccessible(targetIndex, assignment.modules, inProgressSub?.modules);
+      if (!accessible) {
+        setError(`Vui lòng hoàn thành phần thi trước (Phần ${targetIndex}) để tiếp tục.`);
+        return;
+      }
+    }
+
     setIsStarting(true);
     setError(null);
     try {
@@ -185,19 +211,9 @@ const StudentAssignmentOverview: React.FC = () => {
         }
       }
 
-      const sLower = targetSkill.toLowerCase();
       const idParam = id || '1';
-      const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
-
-      if (sLower === 'speaking') {
-        navigate(`/student/assignments/speaking/${idParam}${queryStr}`);
-      } else if (sLower === 'reading') {
-        navigate(`/student/assignments/reading/${idParam}${queryStr}`);
-      } else if (sLower === 'listening') {
-        navigate(`/student/assignments/listening/${idParam}${queryStr}`);
-      } else {
-        navigate(`/student/assignments/${idParam}${queryStr}`);
-      }
+      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId);
+      navigate(targetRoute);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
       setError(msg);
@@ -236,10 +252,13 @@ const StudentAssignmentOverview: React.FC = () => {
     setError(null);
     try {
       let submissionId = inProgressSub?.id;
+      let activeModules: Array<{ id: number; moduleId: number; skill?: string | null; status: string }> | undefined = inProgressSub?.modules;
+
       if (!submissionId) {
         try {
           const startRes = await submissionService.startAttempt(numericAssignmentId);
           submissionId = startRes.id;
+          activeModules = startRes.modules;
         } catch (startErr: unknown) {
           console.error('startAttempt error:', startErr);
           const errData = startErr as { response?: { data?: { message?: string } }; message?: string };
@@ -250,33 +269,12 @@ const StudentAssignmentOverview: React.FC = () => {
         }
       }
 
-      // Find first uncompleted module or first module
-      let targetSkill = assignment?.modules?.[0]?.skill?.toLowerCase() || '';
-      if (inProgressSub && inProgressSub.modules && assignment?.modules) {
-        const uncompleted = assignment.modules.find((m) => {
-          const sm = inProgressSub.modules?.find(
-            (subM) => subM.skill?.toUpperCase() === m.skill?.toUpperCase() || subM.moduleId === m.id
-          );
-          return !sm || (sm.status !== 'SUBMITTED' && sm.status !== 'GRADED');
-        });
-        if (uncompleted) {
-          targetSkill = uncompleted.skill.toLowerCase();
-        }
-      }
-
-      const titleLower = (assignment?.title || id || '').toLowerCase();
+      // Find first uncompleted module or first module in assignment sequence
+      const nextMod = getNextIncompleteModule(assignment?.modules || [], activeModules) || assignment?.modules?.[0];
+      const targetSkill = nextMod?.skill || 'WRITING';
       const idParam = id || '1';
-      const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
-
-      if (targetSkill === 'speaking' || titleLower.includes('spk') || titleLower.includes('speaking') || titleLower.includes('nói')) {
-        navigate(`/student/assignments/speaking/${idParam}${queryStr}`);
-      } else if (targetSkill === 'reading' || titleLower.includes('rd') || titleLower.includes('reading') || titleLower.includes('đọc')) {
-        navigate(`/student/assignments/reading/${idParam}${queryStr}`);
-      } else if (targetSkill === 'listening' || titleLower.includes('ls') || titleLower.includes('listening') || titleLower.includes('nghe')) {
-        navigate(`/student/assignments/listening/${idParam}${queryStr}`);
-      } else {
-        navigate(`/student/assignments/${idParam}${queryStr}`);
-      }
+      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId);
+      navigate(targetRoute);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
       setError(msg);
@@ -284,6 +282,11 @@ const StudentAssignmentOverview: React.FC = () => {
       setIsStarting(false);
     }
   };
+
+  const displaySub = inProgressSub || latestCompletedSub;
+  const hasActiveAttempt = Boolean(inProgressSub);
+  const nextIncompleteModule = getNextIncompleteModule(assignment?.modules || [], inProgressSub?.modules);
+  const nextSkillName = nextIncompleteModule ? getSkillLabel(nextIncompleteModule.skill) : '';
 
   const isAllSubModulesCompleted = Boolean(
     inProgressSub &&
@@ -395,53 +398,33 @@ const StudentAssignmentOverview: React.FC = () => {
           <div className="overview-sections-container">
             <div className="overview-sections-header">
               <h2 className="overview-section-title">
-                Các phần thi trong bài tập ({assignment.modules.length} kỹ năng)
+                Tiến trình các phần thi ({assignment.modules.length} kỹ năng)
               </h2>
               <span className="overview-section-subtitle">
-                Học viên có thể hoàn thành từng phần kỹ năng trước khi nộp toàn bộ bài tập
+                Học viên hoàn thành lần lượt từng kỹ năng theo thứ tự trước khi nộp toàn bộ bài tập
               </span>
             </div>
 
-            <div className="overview-sections-grid">
-              {assignment.modules.map((m, idx) => {
-                const subMod = inProgressSub?.modules?.find(
-                  (sm) => sm.skill?.toUpperCase() === m.skill?.toUpperCase() || sm.moduleId === m.id
-                );
-                const isCompleted = subMod?.status === 'SUBMITTED' || subMod?.status === 'GRADED';
-                const skillName =
-                  m.skill === 'WRITING'
-                    ? 'Writing'
-                    : m.skill === 'SPEAKING'
-                    ? 'Speaking'
-                    : m.skill === 'READING'
-                    ? 'Reading'
-                    : m.skill === 'LISTENING'
-                    ? 'Listening'
-                    : m.skill;
-
-                return (
-                  <div key={m.id || idx} className="overview-module-card">
-                    <div className="overview-module-info">
-                      <div className="overview-module-title">
-                        Phần {idx + 1}: {skillName}
-                      </div>
-                      <div className={`overview-module-status ${isCompleted ? 'completed' : inProgressSub ? 'in-progress' : 'not-started'}`}>
-                        {isCompleted ? 'Đã hoàn thành' : inProgressSub ? 'Chưa hoàn thành' : 'Chưa bắt đầu'}
-                      </div>
-                    </div>
-
-                    <Button
-                      variant={isCompleted ? 'secondary' : 'primary'}
-                      size="sm"
-                      onClick={() => handleStartSkill(m.skill)}
-                      disabled={isStarting || (assignment?.status === 'CLOSED' && !isCompleted)}
-                    >
-                      {isCompleted ? 'Xem lại' : assignment?.status === 'CLOSED' ? 'Đã đóng' : inProgressSub ? 'Làm phần này' : 'Bắt đầu'}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
+            <ExamStepper
+              modules={assignment.modules}
+              submissionModules={displaySub?.modules}
+              assignmentId={numericAssignmentId}
+              submissionId={displaySub?.id}
+              hasActiveAttempt={hasActiveAttempt}
+              variant="overview"
+              onSelectModule={(skill, step) => {
+                if (step.isCompleted) {
+                  const targetSubId = displaySub?.id || bestAttempt?.id;
+                  if (targetSubId) {
+                    navigate(`/student/submissions/${targetSubId}`);
+                    return;
+                  }
+                }
+                void handleStartSkill(skill, step.index);
+              }}
+              disabled={isStarting}
+              isClosed={assignment?.status === 'CLOSED'}
+            />
           </div>
         )}
 
@@ -599,7 +582,7 @@ const StudentAssignmentOverview: React.FC = () => {
                   disabled={isStarting}
                   type="button"
                 >
-                  {isStarting ? 'Đang mở bài làm...' : `Tiếp tục làm bài (Lần ${inProgressSub.attemptNumber})`}
+                  {isStarting ? 'Đang mở bài làm...' : `Tiếp tục làm bài (Phần: ${nextSkillName || 'Kỹ năng tiếp theo'})`}
                 </button>
               )
             ) : isUnlimited || (remainingAttempts !== null && remainingAttempts > 0) ? (

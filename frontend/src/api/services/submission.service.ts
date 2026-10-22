@@ -221,26 +221,70 @@ export interface SubmissionGradedCheckInput {
   }> | null;
 }
 
+/**
+ * Checks if a specific module in a submission has been graded.
+ */
+export function isModuleGraded(module?: {
+  status?: string | null;
+  grading?: {
+    status?: string | null;
+    finalScore?: number | null;
+  } | null;
+} | null): boolean {
+  if (!module) return false;
+  return (
+    module.status === 'GRADED' ||
+    module.grading?.status === 'COMPLETED' ||
+    (module.grading?.finalScore !== null && module.grading?.finalScore !== undefined)
+  );
+}
+
+/**
+ * Checks if a submission is fully graded.
+ * For assignments with multiple modules (e.g. Speaking, Writing, Reading),
+ * a submission is ONLY considered graded when ALL submitted modules are graded.
+ * If only Reading is auto-graded while Speaking/Writing are still pending teacher review,
+ * the submission as a whole remains pending grading.
+ */
 export function isSubmissionGraded(sub?: SubmissionGradedCheckInput | null): boolean {
   if (!sub) return false;
   if (sub.status === 'GRADED') return true;
   if (!sub.modules || sub.modules.length === 0) return false;
-  return sub.modules.some(
-    (m) =>
-      m.status === 'GRADED' ||
-      m.grading?.status === 'COMPLETED' ||
-      (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined)
-  );
+  return sub.modules.every((m) => isModuleGraded(m));
 }
 
+/**
+ * Checks if some (but not all) modules are graded in a multi-module submission.
+ */
+export function isSubmissionPartiallyGraded(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub?.modules || sub.modules.length <= 1) return false;
+  const gradedCount = sub.modules.filter((m) => isModuleGraded(m)).length;
+  return gradedCount > 0 && gradedCount < sub.modules.length;
+}
+
+/**
+ * Calculates overall final score for a submission.
+ * For multi-module submissions, returns the average score across modules only when all are graded.
+ * Returns null if the submission has not been fully graded yet.
+ */
 export function getSubmissionFinalScore(sub?: SubmissionGradedCheckInput | null): number | null {
   if (!sub?.modules || sub.modules.length === 0) return null;
+
+  // All modules must be graded to have a finalized overall score
+  if (!isSubmissionGraded(sub)) {
+    return null;
+  }
+
+  const validScores: number[] = [];
   for (const m of sub.modules) {
     if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
-      return m.grading.finalScore;
+      validScores.push(Number(m.grading.finalScore));
     }
   }
-  return null;
+
+  if (validScores.length === 0) return null;
+  const avg = validScores.reduce((acc, curr) => acc + curr, 0) / validScores.length;
+  return Math.round(avg * 10) / 10;
 }
 
 export class SubmissionService {

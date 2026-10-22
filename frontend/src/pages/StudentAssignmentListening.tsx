@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, Headphones, 
-  Timer, Bookmark, ChevronLeft,
+  Bookmark, ChevronLeft,
   Play, Pause, Volume2, SkipBack, SkipForward,
   AlertCircle, RefreshCw, Lightbulb
 } from 'lucide-react';
@@ -13,6 +13,12 @@ import { submissionService, type SubmissionDetail, type SubmitModuleAnswerPayloa
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  getSkillLabel
+} from '../utils/examStepper.utils';
 import '../styles/student-exam.css';
 
 const StudentAssignmentListening: React.FC = () => {
@@ -251,10 +257,23 @@ const StudentAssignmentListening: React.FC = () => {
           }
         }, 1200);
       } else {
-        setSuccessMessage('Đã hoàn thành phần thi Listening! Đang quay lại trang tổng quan bài tập...');
-        setTimeout(() => {
-          navigate(`/student/assignments/${id}/overview`);
-        }, 1200);
+        const currentSubModules = (submission?.modules || []).map((m) =>
+          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+        );
+        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          setSuccessMessage(`Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          setTimeout(() => {
+            navigate(nextRoute);
+          }, 1500);
+        } else {
+          setSuccessMessage('Đã hoàn thành phần thi Listening! Đang quay lại trang tổng quan bài tập...');
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`);
+          }, 1200);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
@@ -275,9 +294,9 @@ const StudentAssignmentListening: React.FC = () => {
             variant="secondary"
             size="sm"
             icon={ArrowLeft}
-            onClick={() => navigate('/student/assignments')}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
           >
-            Quay lại danh sách bài tập
+            Tổng quan bài thi
           </Button>
           
           <div className="exam-breadcrumbs">
@@ -289,12 +308,23 @@ const StudentAssignmentListening: React.FC = () => {
           </div>
         </div>
 
-        <div className="exam-header-right">
-          <div className="exam-timer-badge">
-            <Timer size={16} />
-            <span>30:00</span>
+        {assignment?.modules && assignment.modules.length > 1 && (
+          <div className="exam-header-right">
+            <ExamStepper
+              variant="compact"
+              modules={assignment.modules}
+              submissionModules={submission?.modules}
+              currentSkill="LISTENING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isCompleted || step.isAccessible) {
+                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                }
+              }}
+            />
           </div>
-        </div>
+        )}
       </div>
 
       {error && (

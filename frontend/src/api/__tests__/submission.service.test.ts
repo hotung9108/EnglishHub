@@ -7,6 +7,10 @@ import {
   getRemainingAttempts,
   normalizeSubmissionListParams,
   SubmissionService,
+  isModuleGraded,
+  isSubmissionGraded,
+  isSubmissionPartiallyGraded,
+  getSubmissionFinalScore,
   type StartSubmissionResponse,
   type SubmissionDetail,
   type SubmissionListItem,
@@ -635,3 +639,73 @@ test('SubmissionService - uploadDirectToStorage rewrites docker minio URLs to /s
 });
 
 
+
+test('isModuleGraded accurately determines whether an individual module is graded', () => {
+  assert.strictEqual(isModuleGraded(null), false);
+  assert.strictEqual(isModuleGraded(undefined), false);
+  assert.strictEqual(isModuleGraded({ status: 'IN_PROGRESS' }), false);
+  assert.strictEqual(isModuleGraded({ status: 'SUBMITTED', grading: { status: 'PENDING', finalScore: null } }), false);
+  assert.strictEqual(isModuleGraded({ status: 'GRADED' }), true);
+  assert.strictEqual(isModuleGraded({ status: 'SUBMITTED', grading: { status: 'COMPLETED' } }), true);
+  assert.strictEqual(isModuleGraded({ status: 'SUBMITTED', grading: { finalScore: 8.5 } }), true);
+});
+
+test('isSubmissionGraded: multi-module exam with Reading (auto-graded) + Speaking + Writing', () => {
+  // Scenario: Student completed all 3 modules in an exam with Speaking, Writing, Reading.
+  // Reading is auto-graded upon submit (status GRADED / grading COMPLETED).
+  // Speaking & Writing are awaiting teacher grading (status SUBMITTED / grading PENDING).
+  const partiallyGradedSubmission = {
+    id: 101,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'SUBMITTED', grading: { status: 'PENDING', finalScore: null } }, // Speaking
+      { status: 'SUBMITTED', grading: { status: 'PENDING', finalScore: null } }, // Writing
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 9.0 } },   // Reading (auto-graded)
+    ]
+  };
+
+  // Must NOT be marked as fully graded!
+  assert.strictEqual(isSubmissionGraded(partiallyGradedSubmission), false);
+  assert.strictEqual(isSubmissionPartiallyGraded(partiallyGradedSubmission), true);
+  assert.strictEqual(getSubmissionFinalScore(partiallyGradedSubmission), null);
+
+  // Once teacher grades Speaking (8.0) and Writing (7.0):
+  const fullyGradedSubmission = {
+    id: 101,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 8.0 } }, // Speaking
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 7.0 } }, // Writing
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 9.0 } }, // Reading
+    ]
+  };
+
+  assert.strictEqual(isSubmissionGraded(fullyGradedSubmission), true);
+  assert.strictEqual(isSubmissionPartiallyGraded(fullyGradedSubmission), false);
+  // Average of (8.0 + 7.0 + 9.0) / 3 = 8.0
+  assert.strictEqual(getSubmissionFinalScore(fullyGradedSubmission), 8.0);
+});
+
+test('isSubmissionGraded: single-module auto-graded assignment is graded once submitted', () => {
+  const singleAutoGraded = {
+    id: 102,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 8.5 } }
+    ]
+  };
+  assert.strictEqual(isSubmissionGraded(singleAutoGraded), true);
+  assert.strictEqual(isSubmissionPartiallyGraded(singleAutoGraded), false);
+  assert.strictEqual(getSubmissionFinalScore(singleAutoGraded), 8.5);
+
+  const singlePending = {
+    id: 103,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'SUBMITTED', grading: { status: 'PENDING', finalScore: null } }
+    ]
+  };
+  assert.strictEqual(isSubmissionGraded(singlePending), false);
+  assert.strictEqual(isSubmissionPartiallyGraded(singlePending), false);
+  assert.strictEqual(getSubmissionFinalScore(singlePending), null);
+});

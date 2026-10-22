@@ -137,6 +137,7 @@ function App() {
             <Route path="assignments/:id/result" element={<StudentSubmissionResult />} />
             <Route path="submissions/:id" element={<StudentSubmissionResult />} />
             <Route path="assignments/:id" element={<StudentAssignmentWriting />} />
+            <Route path="assignments/writing/:id" element={<StudentAssignmentWriting />} />
             <Route path="assignments/reading/:id" element={<StudentAssignmentReading />} />
             <Route path="assignments/listening/:id" element={<StudentAssignmentListening />} />
             <Route path="assignments/speaking/:id" element={<StudentAssignmentSpeaking />} />

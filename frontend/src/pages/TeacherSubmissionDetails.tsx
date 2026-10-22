@@ -8,7 +8,12 @@ import {
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { parseApiError } from '../api';
-import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../api/services/submission.service';
+import {
+  submissionService,
+  type SubmissionDetail,
+  type SubmissionModuleDetailResponse,
+  isModuleGraded
+} from '../api/services/submission.service';
 import { 
   gradingService, 
   type AiGradingSuggestionResponse, 
@@ -589,14 +594,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
           {submission.modules.map((m) => {
             const isSelected = m.id === (activeModule?.id || selectedModuleId);
             const label = m.skill || (isVi ? `Phần ${m.id}` : `Module ${m.id}`);
+            const isDone = isModuleGraded(m);
             return (
               <button
                 key={m.id}
                 type="button"
-                className={`tsd-module-tab ${isSelected ? 'active' : ''}`}
+                className={`tsd-module-tab ${isSelected ? 'active' : ''} ${isDone ? 'done' : ''}`}
                 onClick={() => handleSelectModule(m.id)}
+                title={isDone ? (isVi ? 'Phần này đã có điểm' : 'Module graded') : (isVi ? 'Chưa chấm điểm' : 'Pending grading')}
               >
-                {label}
+                {label} {isDone ? '✓' : ''}
               </button>
             );
           })}
