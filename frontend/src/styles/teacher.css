@@ -1812,3 +1812,122 @@
 
 
 
+
+/* ==========================================================================
+   Teacher Submission Details Writing & Document Extensions
+   ========================================================================== */
+.tsd-page-empty {
+  padding-top: var(--spacing-xl, 32px);
+}
+
+.tsd-student-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  margin-bottom: 4px;
+}
+
+.tsd-time-block {
+  text-align: right;
+}
+
+.tsd-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md, 16px);
+  margin-bottom: var(--spacing-lg, 24px);
+}
+
+@media (max-width: 640px) {
+  .tsd-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tsd-answer-attached-files {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px solid var(--outline-variant, #e6dfd5);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.tsd-attached-files-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #1b4d3e);
+  margin-bottom: 10px;
+}
+
+.tsd-attached-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tsd-file-only-note {
+  padding: 16px;
+  border-radius: var(--radius-sm, 8px);
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px dashed var(--outline-variant, #e6dfd5);
+  font-family: var(--font-sans, sans-serif);
+  font-size: 13px;
+  color: var(--text-secondary, #736b63);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.tsd-file-only-note p {
+  margin: 0;
+}
+
+.tsd-essay-paragraph {
+  margin: 0;
+  font-family: serif;
+  color: var(--on-surface);
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+.tsd-answer-wordcount {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.tsd-score-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tsd-score-scale {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+
+.tsd-internal-note-wrap {
+  margin-top: 12px;
+}
+
+.tsd-note-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  margin-bottom: 4px;
+}
+
+.tsd-ai-header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary, #1b4d3e);
+}

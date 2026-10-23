@@ -16,7 +16,8 @@ import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
@@ -109,6 +110,10 @@ const StudentAssignmentWriting: React.FC = () => {
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
+            if (sub.status === 'SUBMITTED' || sub.status === 'GRADED') {
+              navigate(`/student/submissions/${sub.id}`, { replace: true });
+              return;
+            }
             if (isMounted) setSubmission(sub);
           } catch {
             // Fallback
@@ -118,16 +123,31 @@ const StudentAssignmentWriting: React.FC = () => {
             const subList = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1
+              limit: 10
             });
-            if (subList.data && subList.data.length > 0) {
-              const sub = await submissionService.getSubmission(subList.data[0].id);
+            const submissions = subList.data || [];
+            const inProgressSub = submissions.find((s) => s.status === 'IN_PROGRESS');
+            const completedSub = submissions.find((s) => s.status === 'SUBMITTED' || s.status === 'GRADED');
+
+            if (inProgressSub) {
+              const sub = await submissionService.getSubmission(inProgressSub.id);
               if (isMounted) setSubmission(sub);
             } else if (currentAssignment?.status === 'PUBLISHED') {
-              const startRes = await submissionService.startAttempt(numericId);
-              const sub = await submissionService.getSubmission(startRes.id);
-              if (isMounted) setSubmission(sub);
+              try {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (isMounted) setSubmission(sub);
+              } catch (startErr) {
+                // If startAttempt failed (e.g. max attempts reached, already submitted)
+                if (completedSub) {
+                  navigate(`/student/submissions/${completedSub.id}`, { replace: true });
+                  return;
+                }
+                throw startErr;
+              }
+            } else if (completedSub) {
+              navigate(`/student/submissions/${completedSub.id}`, { replace: true });
+              return;
             } else if (currentAssignment?.status === 'CLOSED') {
               if (isMounted) {
                 setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
@@ -233,56 +253,74 @@ const StudentAssignmentWriting: React.FC = () => {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (editorText.trim() === '' && !uploadedFile) {
-      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+
+    const trimmedText = editorText.trim();
+    if (trimmedText === '' && !uploadedFile) {
+      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm (Word/PDF) trước khi nộp.');
+      return;
+    }
+
+    const subId = submission?.id;
+    const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+    const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+
+    if (!submission || !subModuleId) {
+      setError('Không tìm thấy thông tin phần thi bài viết để nộp. Vui lòng làm mới trang hoặc kiểm tra kết quả bài đã nộp.');
+      return;
+    }
+
+    if (submission.status === 'SUBMITTED' || submission.status === 'GRADED') {
+      navigate(`/student/submissions/${submission.id}`, { replace: true });
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
     try {
-      const subId = submission?.id;
-      const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
-      const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+      let uploadedStorageKey: string | undefined = undefined;
 
       // 1. Upload document file if selected
-      if (uploadedFile && subModuleId) {
+      if (uploadedFile) {
+        const mimeType = getBackendDocumentMimeType(uploadedFile);
         try {
-          const { uploadUrl } = await submissionService.getDocumentUploadUrl(
+          const { uploadUrl, storageKey } = await submissionService.getDocumentUploadUrl(
             subModuleId,
-            uploadedFile.type || 'application/pdf'
+            mimeType
           );
-          if (uploadUrl) {
-            await fetch(uploadUrl, {
-              method: 'PUT',
-              body: uploadedFile,
-              headers: {
-                'Content-Type': uploadedFile.type || 'application/octet-stream',
-              },
-            });
+
+          if (!uploadUrl || !storageKey) {
+            throw new Error('Không nhận được liên kết tải tệp lên từ máy chủ.');
           }
+
+          // Upload directly to MinIO/S3 via proxy-safe helper
+          await submissionService.uploadDirectToStorage(uploadUrl, uploadedFile, mimeType);
+          uploadedStorageKey = storageKey;
         } catch (uploadErr) {
-          console.warn('Document storage upload skipped or failed, proceeding with module submission:', uploadErr);
+          console.error('Document storage upload failed:', uploadErr);
+          const uploadMsg = uploadErr instanceof Error ? uploadErr.message : 'Tải tệp bài làm lên kho lưu trữ thất bại.';
+          setError(`Lỗi tải tệp đính kèm: ${uploadMsg}`);
+          setIsSubmitting(false);
+          return;
         }
       }
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {
-            answers: [
-              {
-                questionId: 1,
-                content: { text: editorText }
-              }
-            ]
-          });
-        } catch (err) {
-          // Continue if already submitted
-          console.warn('Writing submit module notice:', err);
-        }
-      }
+      // 2. Submit module with storageKey and text content answers
+      const questionId = 1;
+      await submissionService.submitModule(subModuleId, {
+        storageKey: uploadedStorageKey,
+        answers: [
+          {
+            questionId,
+            content: {
+              text: trimmedText,
+              fileName: uploadedFile ? uploadedFile.name : undefined,
+              hasAttachedFile: Boolean(uploadedFile),
+            },
+          },
+        ],
+      });
 
-      // Check if all modules in this submission are now completed
+      // 3. Check if all modules in this submission are now completed
       const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
@@ -326,6 +364,7 @@ const StudentAssignmentWriting: React.FC = () => {
         }
       }
     } catch (err: unknown) {
+      console.error('Submit writing assignment error:', err);
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
       setError(msg);
     } finally {
@@ -542,7 +581,7 @@ const StudentAssignmentWriting: React.FC = () => {
               <Button 
                 variant="primary"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoading || !submission}
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >

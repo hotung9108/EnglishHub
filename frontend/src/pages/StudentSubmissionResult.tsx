@@ -82,6 +82,10 @@ function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
   return '';
 }
 
+function formatCriterionScore(val?: number | null): string {
+  return typeof val === 'number' && Number.isFinite(val) ? val.toFixed(1) : '--';
+}
+
 
 
 export const StudentSubmissionResult: React.FC = () => {
@@ -356,6 +360,13 @@ export const StudentSubmissionResult: React.FC = () => {
     return `${scoreVal}/${maxVal}`;
   }, [rawScore, maxScore]);
 
+  const rubricMaxScore = useMemo<number>(() => {
+    if (aiSuggestion?.maxScore != null && aiSuggestion.maxScore > 0) {
+      return aiSuggestion.maxScore;
+    }
+    return 10;
+  }, [aiSuggestion]);
+
   const isGraded = useMemo<boolean>(() => {
     if (submission?.status === 'GRADED') return true;
     if (activeSubModule?.status === 'GRADED') return true;
@@ -524,60 +535,71 @@ export const StudentSubmissionResult: React.FC = () => {
 
   const criteriaList = useMemo(() => {
     if (selectedSkill === 'SPEAKING') {
+      const fc = criteriaScores?.fluencyAndCoherence ?? criteriaScores?.fluencyCohesion;
+      const lr = criteriaScores?.lexicalResource;
+      const gra = criteriaScores?.grammaticalRangeAndAccuracy ?? criteriaScores?.grammaticalRange;
+      const pr = criteriaScores?.pronunciation;
+
       return [
         { 
           key: 'fc', 
           title: 'Fluency & Coherence', 
-          score: criteriaScores?.fluencyCohesion != null ? criteriaScores.fluencyCohesion.toFixed(1) : (isGraded ? '--' : '--'), 
+          score: formatCriterionScore(fc), 
           desc: 'Nhịp nói tự nhiên, phát triển ý liền mạch, hạn chế khoảng ngừng ngắt quãng.' 
         },
         { 
           key: 'lr', 
           title: 'Lexical Resource', 
-          score: criteriaScores?.lexicalResource != null ? criteriaScores.lexicalResource.toFixed(1) : (isGraded ? '--' : '--'), 
+          score: formatCriterionScore(lr), 
           desc: 'Vận dụng linh hoạt cụm từ chuyên đề, chuyển đổi từ đồng nghĩa chính xác.' 
         },
         { 
           key: 'gr', 
-          title: 'Grammatical Range', 
-          score: criteriaScores?.grammaticalRange != null ? criteriaScores.grammaticalRange.toFixed(1) : (isGraded ? '--' : '--'), 
+          title: 'Grammatical Range & Accuracy', 
+          score: formatCriterionScore(gra), 
           desc: 'Kiểm soát tốt câu ghép và câu điều kiện, ít lỗi chia động từ.' 
         },
         { 
           key: 'pr', 
           title: 'Pronunciation', 
-          score: criteriaScores?.pronunciation != null ? criteriaScores.pronunciation.toFixed(1) : (isGraded ? '--' : '--'), 
+          score: formatCriterionScore(pr), 
           desc: 'Ngữ điệu tự nhiên, chuẩn trọng âm từ và âm đuôi /s/, /ed/ rõ ràng.' 
         }
       ];
     }
+
+    const tr = criteriaScores?.taskResponse ?? criteriaScores?.taskAchievement;
+    const cc = criteriaScores?.coherenceAndCohesion ?? criteriaScores?.coherenceCohesion;
+    const lr = criteriaScores?.lexicalResource;
+    const gra = criteriaScores?.grammaticalRangeAndAccuracy ?? criteriaScores?.grammaticalRange;
+
     return [
       { 
         key: 'ta', 
         title: 'Task Achievement', 
-        score: criteriaScores?.taskAchievement != null ? criteriaScores.taskAchievement.toFixed(1) : (isGraded ? '--' : '--'), 
+        score: formatCriterionScore(tr), 
         desc: 'Trả lời đầy đủ các vế của đề bài. Lập luận chặt chẽ và đưa ra dẫn chứng xác đáng.' 
       },
       { 
         key: 'cc', 
         title: 'Coherence & Cohesion', 
-        score: criteriaScores?.coherenceCohesion != null ? criteriaScores.coherenceCohesion.toFixed(1) : (isGraded ? '--' : '--'), 
+        score: formatCriterionScore(cc), 
         desc: 'Cấu trúc bài viết logic. Sử dụng linh hoạt các liên từ chuyển tiếp mạch lạc.' 
       },
       { 
         key: 'lr', 
         title: 'Lexical Resource', 
-        score: criteriaScores?.lexicalResource != null ? criteriaScores.lexicalResource.toFixed(1) : (isGraded ? '--' : '--'), 
+        score: formatCriterionScore(lr), 
         desc: 'Vốn từ vựng phong phú. Vận dụng tốt các cụm collocations học thuật nâng cao.' 
       },
       { 
         key: 'gr', 
         title: 'Grammatical Range & Accuracy', 
-        score: criteriaScores?.grammaticalRange != null ? criteriaScores.grammaticalRange.toFixed(1) : (isGraded ? '--' : '--'), 
+        score: formatCriterionScore(gra), 
         desc: 'Phối hợp đa dạng các cấu trúc ngữ pháp phức. Hạn chế tối đa các lỗi chia thì.' 
       }
     ];
-  }, [selectedSkill, criteriaScores, isGraded]);
+  }, [selectedSkill, criteriaScores]);
 
   // Available skills in submission
   const availableSkills: SubmissionSkill[] = useMemo(() => {
@@ -991,7 +1013,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     {criteriaList.map((crit) => (
                       <div key={crit.key} className="flex-between">
                         <span className="text-on-surface-variant">{crit.title}:</span>
-                        <strong className="text-primary">{crit.score} / 10</strong>
+                        <strong className="text-primary">{crit.score} / {rubricMaxScore}</strong>
                       </div>
                     ))}
                   </div>
@@ -1214,27 +1236,25 @@ export const StudentSubmissionResult: React.FC = () => {
         <div className="flex-col gap-24">
           {/* 4 Rubrics Breakdown */}
           <section className="result-rubrics-grid">
-            {criteriaList.map((crit, idx) => {
+            {criteriaList.map((crit) => {
               const numScore = Number(crit.score);
               const hasScore = !isNaN(numScore);
-              const colors = ['#2563eb', '#8b5cf6', '#f59e0b', '#10b981'];
-              const color = colors[idx % colors.length];
+              const progressPercent = hasScore 
+                ? Math.min(100, Math.max(0, (numScore / rubricMaxScore) * 100)) 
+                : 0;
 
               return (
-                <div key={crit.key} className="result-rubric-card" style={{ borderColor: color }}>
+                <div key={crit.key} className={`result-rubric-card result-rubric-${crit.key}`}>
                   <div className="result-rubric-header">
                     <h3 className="result-rubric-title">{crit.title}</h3>
-                    <span className="result-rubric-score" style={{ color }}>
-                      {hasScore ? `${crit.score} / 10` : '-- / 10'}
+                    <span className="result-rubric-score">
+                      {hasScore ? `${crit.score} / ${rubricMaxScore}` : `-- / ${rubricMaxScore}`}
                     </span>
                   </div>
                   <div className="result-rubric-bar-track">
                     <div 
                       className="result-rubric-bar-fill" 
-                      style={{ 
-                        width: hasScore ? `${(numScore / 10) * 100}%` : '0%', 
-                        backgroundColor: color 
-                      }} 
+                      style={{ width: `${progressPercent}%` }} 
                     />
                   </div>
                   <p className="result-rubric-desc">{crit.desc}</p>

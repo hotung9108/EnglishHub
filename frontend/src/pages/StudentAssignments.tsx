@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react';
 import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
+import { getStudentAssignmentActionRoute } from '../utils/examStepper.utils';
 import '../styles/student-ecosystem.css';
 
 type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
@@ -210,22 +211,6 @@ const StudentAssignments: React.FC = () => {
     };
   }, [user?.id, reloadKey]);
 
-  const getAssignmentRoute = (assignment: StudentAssignmentDisplay) => {
-    const typeLower = assignment.type.toLowerCase();
-    if (typeLower.includes('speaking')) {
-      return `/student/assignments/speaking/${assignment.id}`;
-    }
-    if (typeLower.includes('reading')) {
-      return `/student/assignments/reading/${assignment.id}`;
-    }
-    if (typeLower.includes('listening')) {
-      return `/student/assignments/listening/${assignment.id}`;
-    }
-    if (typeLower.includes('writing')) {
-      return `/student/assignments/${assignment.id}`;
-    }
-    return `/student/assignments/${assignment.id}/overview`;
-  };
 
   // Filtered by class & search query & status filter
   const filteredAssignments = useMemo(() => {
@@ -468,13 +453,7 @@ const StudentAssignments: React.FC = () => {
           paginatedAssignments.map((assignment) => {
             const badge = getTypeBadge(assignment.type);
             const handleAction = () => {
-              if (assignment.status === 'graded') {
-                navigate(assignment.submissionId ? `/student/submissions/${assignment.submissionId}` : `/student/assignments/${assignment.id}/result`);
-              } else if (assignment.status === 'not_started') {
-                navigate(`/student/assignments/${assignment.id}/overview`);
-              } else {
-                navigate(getAssignmentRoute(assignment));
-              }
+              navigate(getStudentAssignmentActionRoute(assignment));
             };
 
             return (
