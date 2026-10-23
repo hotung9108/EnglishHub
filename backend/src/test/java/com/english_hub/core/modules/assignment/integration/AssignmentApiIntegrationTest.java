@@ -149,6 +149,80 @@ class AssignmentApiIntegrationTest {
 	}
 
 	@Test
+	void listReturnsTotalForEveryMatchingPageInASingleQuery() throws Exception {
+		assignmentRepository.save(new Assignment(
+				classId,
+				"Weekly Test 2",
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				2,
+				false,
+				AssignmentStatus.PUBLISHED));
+		assignmentRepository.save(new Assignment(
+				classId,
+				"Weekly Test 3",
+				"Instructions",
+				OffsetDateTime.parse("2026-09-15T00:00:00Z"),
+				OffsetDateTime.parse("2026-09-20T23:59:00Z"),
+				2,
+				false,
+				AssignmentStatus.DRAFT));
+
+		// Page 1 of 2 rows: the total must still reflect all 3 matching rows.
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.param("page", "1")
+					.param("limit", "2")
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(2)))
+				.andExpect(jsonPath("$.pagination.total").value(3));
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.param("page", "2")
+					.param("limit", "2")
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.pagination.total").value(3));
+
+		// The status filter must be applied before the window count.
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.param("status", "PUBLISHED")
+					.param("limit", "2")
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@Test
+	void listReturnsZeroTotalForAnEmptyPage() throws Exception {
+		ClassEntity emptyClass = classRepository.save(new ClassEntity(
+				"Empty assignment class " + uniqueSuffix(),
+				"Intermediate",
+				"Empty page fixture",
+				LocalDate.of(2026, 9, 15),
+				null,
+				com.english_hub.core.modules.classroom.domain.model.ClassStatus.ACTIVE,
+				teacherId));
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", emptyClass.getId())
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+	}
+
+	@Test
+	void listReturnsNotFoundForAnUnknownClass() throws Exception {
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", 999_999_999L)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy lớp học."));
+	}
+
+	@Test
 	void teacherAndStudentFromOneClassCannotReadAssignmentsFromAnotherClass() throws Exception {
 		ClassEntity foreignClass = classRepository.save(new ClassEntity(
 				"Foreign assignment class " + uniqueSuffix(),

@@ -1,7 +1,9 @@
 package com.english_hub.core.modules.classroom.infrastructure.adapter;
 
+import com.english_hub.core.common.config.CacheConfig;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
@@ -26,6 +28,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +71,20 @@ public class ClassJpaAdapter implements ClassRepository {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = CacheConfig.CLASS_ACCESS, key = "#classId + ':' + #userId")
+	public Optional<ClassAccess> findAccess(long classId, long userId) {
+		List<Object[]> rows = jpaRepository.findAccessRow(classId, userId);
+		if (rows.isEmpty()) {
+			return Optional.empty();
+		}
+		Object[] row = rows.get(0);
+		Long teacherId = row[0] == null ? null : ((Number) row[0]).longValue();
+		boolean studentMember = row.length > 1 && Boolean.TRUE.equals(row[1]);
+		return Optional.of(new ClassAccess(classId, teacherId, studentMember));
+	}
+
+	@Override
 	public List<EnglishClass> findAll() {
 		return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
 	}
@@ -82,12 +100,14 @@ public class ClassJpaAdapter implements ClassRepository {
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public EnglishClass save(EnglishClass entity) {
 		ClassEntity saved = jpaRepository.save(mapper.toEntity(entity));
 		return mapper.toDomain(saved);
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public void deleteById(Long id) {
 		jpaRepository.deleteById(id);
 	}

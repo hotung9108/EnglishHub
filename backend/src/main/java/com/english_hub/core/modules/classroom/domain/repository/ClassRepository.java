@@ -3,6 +3,7 @@ package com.english_hub.core.modules.classroom.domain.repository;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.persistence.repository.IRepository;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
@@ -12,6 +13,12 @@ import java.util.Optional;
 public interface ClassRepository extends IRepository<EnglishClass, Long> {
 
 	ClassPage findPage(ClassStatus status, UserRole callerRole, long callerUserId, ClassPageRequest pageRequest);
+
+	/**
+	 * Resolves the class owner and the caller's membership in one query.
+	 * Empty when the class does not exist.
+	 */
+	Optional<ClassAccess> findAccess(long classId, long userId);
 
 	Optional<TeacherInfo> findTeacher(Long teacherId);
 
