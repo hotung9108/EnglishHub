@@ -15,8 +15,11 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.english_hub.core.common.config.CacheConfig;
 
 /** JPA adapter for the ClassMemberRepository domain port. */
 @Repository
@@ -56,12 +59,14 @@ public class ClassMemberJpaAdapter implements ClassMemberRepository {
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public ClassMember save(ClassMember entity) {
 		ClassMemberEntity saved = jpaRepository.save(mapper.toEntity(entity));
 		return mapper.toDomain(saved);
 	}
 
 	@Override
+	@CacheEvict(cacheNames = CacheConfig.CLASS_ACCESS, allEntries = true)
 	public void deleteById(Long id) {
 		jpaRepository.deleteById(id);
 	}

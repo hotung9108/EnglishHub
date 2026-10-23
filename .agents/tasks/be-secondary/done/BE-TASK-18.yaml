@@ -1,0 +1,10 @@
+id: BE-TASK-18
+title: "Giảm độ trễ Staging Home Server ↔ Neon PostgreSQL (BUG-24 / TASK-PERF-01 + TASK-PERF-04)"
+assignee: "@be-secondary"
+status: "Done"
+priority: "Critical"
+description: "Fix the 450-580ms staging API latency caused by 6-7 sequential round-trips to Neon Singapore plus debug SQL logging enabled in production. Implemented: (1) application-prod.properties with show-sql/format_sql off, open-in-view=false, INFO/WARN logging, Hikari pool 12/2/keepalive 60s/max-lifetime 600s, gzip; (2) Caffeine L1 caches 'users' (5 min TTL, snapshot copy on read) and 'class-access' (1 min TTL) with @CacheEvict on every user/class/class-member write; (3) ClassRepository.findAccess single native query (classes + EXISTS class_members) replacing class.findById + member exists; (4) AssignmentJpaAdapter.findPage uses COUNT(*) OVER () so list pagination needs one query instead of count+select. Also corrected the false claims in BUG-24 (fixes were never applied, numbers were never measured) and the stale NFR sections 2.2/4.6. Result: 6-7 round-trips -> 2 warm-cache round-trips per list request; staged p95 < 200ms target still needs measurement after deploy."
+artifacts:
+  - "production_artifacts/be_to_tester/staging-latency-optimization-testing-instructions.md"
+  - "docs/NON_FUNCTIONAL_REQUIREMENTS_AND_STAGING_PERFORMANCE.md"
+  - ".agents/private/errors/BUG-24 Báo cáo Tối ưu Độ trễ Home Server ↔ Neon PostgreSQL.md"

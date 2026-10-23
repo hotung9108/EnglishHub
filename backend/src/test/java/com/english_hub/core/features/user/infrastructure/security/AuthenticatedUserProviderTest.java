@@ -7,6 +7,7 @@ import com.english_hub.core.infrastructure.security.JwtPrincipal;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider.AuthenticatedIdentity;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
+import com.english_hub.core.modules.user.infrastructure.cache.UserSnapshotCache;
 import com.english_hub.core.modules.user.infrastructure.security.AuthenticatedUserProvider;
 
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +45,7 @@ class AuthenticatedUserProviderTest {
 	void returnsAdminIdentityWithoutQueryingTheRepository() {
 		authenticate(new JwtPrincipal(1L,
 				com.english_hub.core.modules.user.domain.model.UserRole.ADMIN));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
 
@@ -57,7 +58,7 @@ class AuthenticatedUserProviderTest {
 	void returnsTeacherIdentityWithoutQueryingTheRepository() {
 		authenticate(new JwtPrincipal(4L,
 				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
 
@@ -70,7 +71,7 @@ class AuthenticatedUserProviderTest {
 	void returnsStudentIdentityWithoutQueryingTheRepository() {
 		authenticate(new JwtPrincipal(13L,
 				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		AuthenticatedIdentity identity = provider.requireAuthenticatedIdentity();
 
@@ -81,7 +82,7 @@ class AuthenticatedUserProviderTest {
 
 	@Test
 	void rejectsIdentityWithoutAuthenticationWithoutQueryingTheRepository() {
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		ApiException exception = assertThrows(ApiException.class, provider::requireAuthenticatedIdentity);
 
@@ -93,7 +94,7 @@ class AuthenticatedUserProviderTest {
 	@Test
 	void rejectsIdentityWithANonJwtPrincipalWithoutQueryingTheRepository() {
 		authenticate("not-a-jwt-principal");
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		ApiException exception = assertThrows(ApiException.class, provider::requireAuthenticatedIdentity);
 
@@ -104,7 +105,7 @@ class AuthenticatedUserProviderTest {
 
 	@Test
 	void rejectsARequestWithoutAuthentication() {
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireActiveUser)
 				.isInstanceOf(ApiException.class)
@@ -115,7 +116,7 @@ class AuthenticatedUserProviderTest {
 	@Test
 	void rejectsAnAuthenticationWithANonJwtPrincipal() {
 		authenticate("not-a-jwt-principal");
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireActiveUser)
 				.isInstanceOf(ApiException.class)
@@ -128,7 +129,7 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(404L,
 				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(404L)).thenReturn(Optional.empty());
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireActiveUser)
 				.isInstanceOf(ApiException.class)
@@ -140,7 +141,7 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(12L,
 				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(user(12L, UserRole.STUDENT, UserStatus.LOCKED, false)));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireActiveUser)
 				.isInstanceOf(ApiException.class)
@@ -152,7 +153,7 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(12L,
 				com.english_hub.core.modules.user.domain.model.UserRole.STUDENT));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(user(12L, UserRole.STUDENT, UserStatus.ACTIVE, true)));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireActiveUser)
 				.isInstanceOf(ApiException.class)
@@ -165,9 +166,15 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(12L,
 				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(activeUser));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
-		assertThat(provider.requireActiveUser()).isSameAs(activeUser);
+		User result = provider.requireActiveUser();
+
+		// The cache owns the stored instance, so callers receive a copy they may mutate.
+		assertThat(result).isNotSameAs(activeUser);
+		assertThat(result.id()).isEqualTo(activeUser.id());
+		assertThat(result.email()).isEqualTo(activeUser.email());
+		assertThat(result.role()).isEqualTo(activeUser.role());
 	}
 
 	@Test
@@ -176,9 +183,13 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(1L,
 				com.english_hub.core.modules.user.domain.model.UserRole.ADMIN));
 		when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
-		assertThat(provider.requireAdmin()).isSameAs(admin);
+		User result = provider.requireAdmin();
+
+		assertThat(result).isNotSameAs(admin);
+		assertThat(result.id()).isEqualTo(admin.id());
+		assertThat(result.role()).isEqualTo(UserRole.ADMIN);
 	}
 
 	@Test
@@ -187,7 +198,7 @@ class AuthenticatedUserProviderTest {
 		authenticate(new JwtPrincipal(12L,
 				com.english_hub.core.modules.user.domain.model.UserRole.TEACHER));
 		when(userRepository.findById(12L)).thenReturn(Optional.of(teacher));
-		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(userRepository);
+		AuthenticatedUserProvider provider = new AuthenticatedUserProvider(new UserSnapshotCache(userRepository));
 
 		assertThatThrownBy(provider::requireAdmin)
 				.isInstanceOf(ApiException.class)
