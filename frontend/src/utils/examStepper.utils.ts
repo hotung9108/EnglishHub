@@ -209,3 +209,50 @@ export function calculateExamSteps(
     };
   });
 }
+
+
+/**
+ * Normalizes document MIME types for backend storage (PDF and DOCX).
+ */
+export function getBackendDocumentMimeType(file: { name?: string; type?: string }): string {
+  const fileName = (file.name || '').toLowerCase();
+  const fileType = (file.type || '').toLowerCase();
+
+  if (
+    fileName.endsWith('.docx') ||
+    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    fileType === 'application/msword'
+  ) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return 'application/pdf';
+}
+
+/**
+ * Resolves the target route for a student assignment card based on its status.
+ * - Graded / pending / ai_processing: routes to review results (/student/submissions/:subId or /result).
+ * - Not started: routes to assignment overview.
+ * - In progress: routes to current test-taking skill module with submissionId.
+ */
+export function getStudentAssignmentActionRoute(assignment: {
+  id: number | string;
+  status: 'not_started' | 'in_progress' | 'pending' | 'graded' | 'ai_processing';
+  type: string;
+  submissionId?: number;
+}): string {
+  const isCompletedOrGrading =
+    assignment.status === 'graded' ||
+    assignment.status === 'pending' ||
+    assignment.status === 'ai_processing';
+
+  if (isCompletedOrGrading) {
+    return assignment.submissionId
+      ? `/student/submissions/${assignment.submissionId}`
+      : `/student/assignments/${assignment.id}/result`;
+  }
+  if (assignment.status === 'not_started') {
+    return `/student/assignments/${assignment.id}/overview`;
+  }
+  return getSkillRoute(assignment.type, assignment.id, assignment.submissionId);
+}
+

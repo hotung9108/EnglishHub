@@ -9,14 +9,15 @@ import {
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, type SubmissionDetail, type SubmitModulePayload } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
@@ -119,7 +120,7 @@ const StudentAssignmentWriting: React.FC = () => {
               assignmentId: numericId,
               studentId: user.id,
               status: 'IN_PROGRESS',
-              limit: 1
+              limit: 1,
             });
             if (subList.data && subList.data.length > 0) {
               const sub = await submissionService.getSubmission(subList.data[0].id);
@@ -233,56 +234,90 @@ const StudentAssignmentWriting: React.FC = () => {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (editorText.trim() === '' && !uploadedFile) {
+
+    const trimmedText = editorText.trim();
+    if (trimmedText === '' && !uploadedFile) {
       setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+      return;
+    }
+
+    const subId = submission?.id;
+    const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+    const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+
+    if (!submission || !subModuleId) {
+      setError('Không tìm thấy thông tin phần thi bài viết để nộp. Vui lòng làm mới trang hoặc kiểm tra kết quả bài đã nộp.');
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
     try {
-      const subId = submission?.id;
-      const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
-      const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
+      let uploadedStorageKey: string | undefined = undefined;
 
       // 1. Upload document file if selected
-      if (uploadedFile && subModuleId) {
+      if (uploadedFile) {
+        const mimeType = getBackendDocumentMimeType(uploadedFile);
         try {
-          const { uploadUrl } = await submissionService.getDocumentUploadUrl(
+          const { uploadUrl, storageKey } = await submissionService.getDocumentUploadUrl(
             subModuleId,
-            uploadedFile.type || 'application/pdf'
+            mimeType
           );
-          if (uploadUrl) {
-            await fetch(uploadUrl, {
-              method: 'PUT',
-              body: uploadedFile,
-              headers: {
-                'Content-Type': uploadedFile.type || 'application/octet-stream',
-              },
-            });
+
+          if (!uploadUrl || !storageKey) {
+            throw new Error('Không nhận được liên kết tải tệp lên từ máy chủ.');
           }
-        } catch (uploadErr) {
-          console.warn('Document storage upload skipped or failed, proceeding with module submission:', uploadErr);
-        }
-      }
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {
-            answers: [
-              {
-                questionId: 1,
-                content: { text: editorText }
-              }
-            ]
+          let targetUrl = uploadUrl;
+          if (uploadUrl.includes('//minio:9000/')) {
+            targetUrl = uploadUrl.replace(/^https?:\/\/minio:9000/, '/s3-upload');
+          }
+
+          const uploadResp = await fetch(targetUrl, {
+            method: 'PUT',
+            body: uploadedFile,
+            headers: {
+              'Content-Type': uploadedFile.type || 'application/octet-stream',
+            },
           });
-        } catch (err) {
-          // Continue if already submitted
-          console.warn('Writing submit module notice:', err);
+          if (!uploadResp.ok) {
+            throw new Error(`Tải tệp lên kho lưu trữ thất bại (HTTP ${uploadResp.status}).`);
+          }
+
+          uploadedStorageKey = storageKey;
+        } catch (uploadErr) {
+          console.error('Document storage upload failed:', uploadErr);
+          const uploadMsg = uploadErr instanceof Error ? uploadErr.message : 'Tải tệp bài làm lên kho lưu trữ thất bại.';
+          setError(`Lỗi tải tệp đính kèm: ${uploadMsg}`);
+          setIsSubmitting(false);
+          return;
         }
       }
 
-      // Check if all modules in this submission are now completed
+      // 2. Submit module with storageKey and text content answers
+      const questionId = 1;
+      const submitPayload: SubmitModulePayload = {
+        answers: [
+          {
+            questionId,
+            content: uploadedFile
+              ? {
+                  text: trimmedText,
+                  fileName: uploadedFile.name,
+                  hasAttachedFile: true,
+                }
+              : { text: trimmedText },
+          },
+        ],
+      };
+
+      if (uploadedStorageKey) {
+        submitPayload.storageKey = uploadedStorageKey;
+      }
+
+      await submissionService.submitModule(subModuleId, submitPayload);
+
+      // 3. Check if all modules in this submission are now completed
       const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
@@ -326,6 +361,7 @@ const StudentAssignmentWriting: React.FC = () => {
         }
       }
     } catch (err: unknown) {
+      console.error('Submit writing assignment error:', err);
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
       setError(msg);
     } finally {

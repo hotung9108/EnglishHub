@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import config from './vite.config.ts';
+import config from './vitest.config.ts';
 
 // Deliberately red reproductions of application defects, outside the passing
 // QA-32 acceptance suite. Run explicitly; never count these as passing coverage.

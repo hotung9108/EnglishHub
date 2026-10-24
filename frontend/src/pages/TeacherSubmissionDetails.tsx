@@ -3,9 +3,9 @@ import { useNavigate, useParams, useSearchParams, useLocation } from 'react-rout
 import { 
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
-  Save, Send, RefreshCw, AlertCircle, CheckCircle2
+  Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { parseApiError } from '../api';
 import {
@@ -23,12 +23,19 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { classService, type ClassMember } from '../api/services/class.service';
 
-const resolveAudioUrl = (storageKey?: string | null): string => {
+const resolveStorageUrl = (storageKey?: string | null): string => {
   if (!storageKey) return '';
   if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
     return storageKey;
   }
   return `/s3-upload/englishhub-dev/${storageKey.replace(/^\/+/, '')}`;
+};
+
+const resolveAudioUrl = resolveStorageUrl;
+
+const getFileNameFromKey = (storageKey: string): string => {
+  const baseName = storageKey.split('/').pop();
+  return baseName || storageKey;
 };
 
 export const TeacherSubmissionDetails: React.FC = () => {
@@ -84,6 +91,27 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
+  const handleViewDocument = (storageKey: string) => {
+    const url = resolveStorageUrl(storageKey);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadDocument = (storageKey: string) => {
+    const url = resolveStorageUrl(storageKey);
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    const fileName = getFileNameFromKey(storageKey);
+    link.download = fileName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -113,7 +141,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           if (detail.finalFeedback) {
             setFeedbackText(detail.finalFeedback);
           } else if (detail.aiFeedback) {
-            setFeedbackText((prev) => prev || detail.aiFeedback || '');
+            setFeedbackText(detail.aiFeedback);
           }
         } catch {
           // ignore
@@ -308,7 +336,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData]);
+  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData, routeState]);
 
   const activeModule = useMemo(() => {
     if (!submission?.modules || submission.modules.length === 0) return null;
@@ -415,24 +443,29 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const audioStorageKey = audioAnswer?.audioStorageKey;
   const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
 
+  // Extract attached documents (for Writing or file uploads)
+  const attachedDocAnswers = useMemo(() => {
+    return moduleDetail?.answers?.filter(a => !!a.docStorageKey) || [];
+  }, [moduleDetail?.answers]);
+
   // Extract student text answer
   const studentAnswerText = useMemo(() => {
     if (!moduleDetail?.answers || moduleDetail.answers.length === 0) {
-      return isVi 
-        ? 'Học viên đã nộp bài tập trực tuyến.' 
-        : 'Student submitted the online assignment.';
+      return '';
     }
 
     const firstAnswer = moduleDetail.answers[0];
     if (typeof firstAnswer.content === 'string') {
-      return firstAnswer.content;
+      return firstAnswer.content.trim();
     }
     if (typeof firstAnswer.content === 'object' && firstAnswer.content !== null) {
       const obj = firstAnswer.content as Record<string, unknown>;
-      return (obj.text || obj.essay || obj.answer || obj.content || JSON.stringify(obj)) as string;
+      const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
+      if (typeof textVal === 'string') return textVal.trim();
+      return JSON.stringify(obj);
     }
-    return String(firstAnswer.content);
-  }, [moduleDetail, isVi]);
+    return String(firstAnswer.content ?? '').trim();
+  }, [moduleDetail]);
 
   const wordCount = useMemo(() => {
     if (!studentAnswerText) return 0;
@@ -474,7 +507,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   if (!submission) {
     return (
-      <div className="tsd-page-container pt-8">
+      <div className="tsd-page-container tsd-page-empty">
         <EmptyState
           icon={FileText}
           title={isVi ? 'Học viên này chưa nộp bài tập' : 'No submission found for this student'}
@@ -548,15 +581,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
             <User size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="tsd-student-name-row">
               <h2 className="tsd-student-name">
                 {studentInfo?.name || (isVi ? `Học viên #${studentId}` : `Student #${studentId}`)}
               </h2>
-              {!isSpeaking && (
-                <span className="tsd-status-chip">
-                  {submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
-                </span>
-              )}
+              <StatusBadge
+                status={submission.status === 'GRADED' ? 'success' : 'info'}
+                label={submission.status === 'GRADED' ? (isVi ? 'Đã có điểm' : 'Graded') : t('submissionDetails.statusSubmitted')}
+              />
               <span className="tsd-student-code">
                 {studentInfo?.code || `HV-${studentId}`}
               </span>
@@ -570,7 +602,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
         </div>
 
         <div className="tsd-time-info">
-          <div className="text-right">
+          <div className="tsd-time-block">
             <div className="tsd-time-label">{t('submissionDetails.submissionTimePrefix')}</div>
             <div className="tsd-time-val">
               {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'Vừa xong'}
@@ -578,9 +610,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
           </div>
           {!isSpeaking && (
             <>
-              <div className="tsd-time-divider"></div>
+              <div className="tsd-time-divider" />
               <div className="tsd-ontime-indicator">
-                <span className="tsd-ontime-dot"></span>
+                <span className="tsd-ontime-dot" />
                 <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
               </div>
             </>
@@ -612,7 +644,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
       {/* Metrics Row (Only for non-speaking modules) */}
       {!isSpeaking && (
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="tsd-metrics-grid">
           <MetricCard 
             title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
             value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
@@ -622,41 +654,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   : '--')}
             suffix="/ 10"
           />
-
-          <MetricCard 
-            title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
-            value={String(wordCount)}
-            suffix={isVi ? 'từ' : 'words'}
-          />
-        </div>
-      )}
-
-      {/* Submission Files & Attachments (Only for non-speaking document uploads) */}
-      {!isSpeaking && moduleDetail?.answers && moduleDetail.answers.some(a => a.docStorageKey) && (
-        <div className="tsd-files-card">
-          <div className="tsd-files-header">
-            <h3 className="tsd-files-title">
-              {t('submissionDetails.filesTitle')}
-            </h3>
-          </div>
-          
-          <div className="tsd-files-list">
-            {moduleDetail.answers.map((ans) => {
-              if (ans.docStorageKey) {
-                return (
-                  <FileItem 
-                    key={ans.id}
-                    name={ans.docStorageKey}
-                    extension={ans.docMimeType?.includes('pdf') ? 'pdf' : 'docx'}
-                    size="Tệp đính kèm"
-                    details={t('submissionDetails.submittedOn')}
-                    onDownload={() => showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...')}
-                  />
-                );
-              }
-              return null;
-            })}
-          </div>
         </div>
       )}
 
@@ -689,18 +686,20 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   </div>
                 )}
 
-                <button
+                <Button
                   type="button"
-                  className="tsd-btn-ai-speaking"
-                  disabled={isAnalyzingAi}
+                  variant="primary"
+                  size="sm"
+                  loading={isAnalyzingAi}
                   onClick={handleTriggerAiAnalyze}
+                  icon={Sparkles}
                 >
                   {isAnalyzingAi 
                     ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
                     : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
                         ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
                         : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -786,12 +785,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <div className="tsd-answer-card">
             <div className="tsd-answer-header">
               <div className="tsd-answer-title">
+                <span className="tsd-answer-title-dot" />
                 <span>
                   {isVi ? 'Nội dung bài làm học viên' : 'Student Submitted Answer'}
                 </span>
               </div>
-              <div className="text-xs text-slate-500">
-                {wordCount} {isVi ? 'từ' : 'words'}
+              <div className="tsd-answer-wordcount">
+                {wordCount > 0 
+                  ? `${wordCount} ${isVi ? 'từ' : 'words'}` 
+                  : (attachedDocAnswers.length > 0 ? (isVi ? 'Tệp đính kèm' : 'Attached file') : (isVi ? '0 từ' : '0 words'))}
               </div>
             </div>
 
@@ -800,9 +802,50 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
 
-              <p className="m-0 whitespace-pre-line">
-                {studentAnswerText}
-              </p>
+              {/* Display attached document files if student uploaded file */}
+              {attachedDocAnswers.length > 0 && (
+                <div className="tsd-answer-attached-files">
+                  <div className="tsd-attached-files-label">
+                    <FileText size={15} />
+                    <span>{isVi ? 'Tệp bài làm của học viên:' : 'Student submission document:'}</span>
+                  </div>
+                  <div className="tsd-attached-files-list">
+                    {attachedDocAnswers.map((ans) => {
+                      const docKey = ans.docStorageKey || '';
+                      const isPdf = ans.docMimeType?.includes('pdf') || docKey.toLowerCase().endsWith('.pdf');
+                      const extension = isPdf ? 'pdf' : 'docx';
+                      const fileName = getFileNameFromKey(docKey);
+
+                      return (
+                        <FileItem 
+                          key={ans.id}
+                          name={fileName}
+                          extension={extension}
+                          size={isVi ? 'Tệp bài làm' : 'Submission file'}
+                          details={t('submissionDetails.submittedOn')}
+                          onView={() => handleViewDocument(docKey)}
+                          onDownload={() => handleDownloadDocument(docKey)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Display text essay if available */}
+              {studentAnswerText ? (
+                <p className="tsd-essay-paragraph whitespace-pre-line">
+                  {studentAnswerText}
+                </p>
+              ) : attachedDocAnswers.length > 0 ? (
+                <div className="tsd-file-only-note">
+                  <p>{isVi ? 'Học viên đã nộp bài hoàn chỉnh qua tệp đính kèm ở trên. Hãy bấm "Xem" hoặc "Tải xuống" để kiểm tra bài làm.' : 'Student submitted their assignment via the attached document above. Click "View" or "Download" to review.'}</p>
+                </div>
+              ) : (
+                <p className="tsd-file-only-note">
+                  {isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.'}
+                </p>
+              )}
             </div>
 
             <div className="tsd-answer-footer">
@@ -819,7 +862,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <label className="tsd-card-label">
                 {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
               </label>
-              <div className="flex items-center gap-3">
+              <div className="tsd-score-input-wrap">
                 <input 
                   type="number" 
                   step="0.5" 
@@ -830,19 +873,37 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   onChange={(e) => setFinalScoreInput(e.target.value)}
                   className="tsd-score-input"
                 />
+                <span className="tsd-score-scale">/ 10</span>
               </div>
             </div>
 
-            {/* AI Grading Insight */}
+            {/* AI Grading Insight with Grade with AI Button */}
             <div className="tsd-ai-box">
               <div className="tsd-ai-box-header">
-                <span>{isVi ? 'Nhận xét từ AI' : 'AI Feedback'}</span>
+                <span className="tsd-ai-header-title">
+                  <Sparkles size={14} />
+                  {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
+                </span>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  loading={isAnalyzingAi}
+                  onClick={handleTriggerAiAnalyze}
+                  icon={Sparkles}
+                >
+                  {isAnalyzingAi 
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
+                    : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
+                        ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
+                        : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
+                </Button>
               </div>
               <MarkdownView 
                 content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
                 fallbackText={isVi 
-                  ? 'Chưa có nhận xét từ AI.' 
-                  : 'No AI feedback available.'}
+                  ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.' 
+                  : 'No AI feedback available. Click "Grade with AI" to generate AI insights.'}
                 className="tsd-ai-markdown"
               />
             </div>
@@ -861,8 +922,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 onChange={(e) => setFeedbackText(e.target.value)}
               />
 
-              <div className="mt-3">
-                <label className="block text-xs font-semibold text-slate-500 mb-1">
+              <div className="tsd-internal-note-wrap">
+                <label className="tsd-note-label">
                   {isVi ? 'Ghi chú nội bộ' : 'Private Notes'}
                 </label>
                 <input 

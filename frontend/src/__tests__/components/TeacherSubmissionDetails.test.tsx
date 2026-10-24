@@ -64,12 +64,23 @@ describe('TeacherSubmissionDetails', () => {
     const downloads = screen.getAllByRole('button', { name: 'Tải xuống' });
     await user.click(downloads[0]);
     expect(screen.getByText('Preparing download...')).toBeVisible();
+    const viewButtons = screen.getAllByRole('button', { name: 'Xem' });
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    await user.click(viewButtons[0]);
+    expect(openSpy).toHaveBeenCalled();
+    openSpy.mockRestore();
+
+    await user.click(screen.getByRole('button', { name: 'Save feedback draft' }));
+    expect(await screen.findByText('Grading draft saved!')).toBeVisible();
     fireEvent.change(score, { target: { value: '-1' } });
     await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
     expect(screen.getByText('Invalid score (range 0.0 - 10.0)!')).toBeVisible();
     fireEvent.change(score, { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
     expect(await screen.findByText('Grade finalized and published to student!')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Back to submissions list/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments/12');
   });
 
   it('shows English empty and error states and recovers on retry', async () => {

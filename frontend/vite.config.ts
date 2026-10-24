@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vite'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -11,31 +11,6 @@ const defaultStorageTarget = isDocker ? 'http://minio:9000' : 'http://127.0.0.1:
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/__tests__/setup.ts'],
-    include: ['src/__tests__/components/**/*.test.tsx'],
-    clearMocks: true,
-    restoreMocks: true,
-    env: { TZ: 'Asia/Ho_Chi_Minh' },
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'lcov', 'json-summary'],
-      include: [
-        'src/pages/Login.tsx',
-        'src/pages/TeacherCreateAssignment.tsx',
-        'src/pages/StudentAssignmentWriting.tsx',
-        'src/pages/TeacherSubmissionDetails.tsx',
-      ],
-      thresholds: {
-        perFile: true,
-        statements: 80,
-        branches: 80,
-        functions: 80,
-        lines: 80,
-      },
-    },
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -59,4 +34,3 @@ export default defineConfig({
     },
   },
 })
-
