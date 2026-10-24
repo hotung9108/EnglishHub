@@ -74,6 +74,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class SubmissionUploadUrlApiIntegrationTest {
 
+	private static final String DOCX_MIME_TYPE =
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 	private static final String BUCKET = "englishhub-upload-test";
 	private static final String ACCESS_KEY = "minioadmin";
 	private static final String SECRET_KEY = "minioadmin";
@@ -354,6 +357,99 @@ class SubmissionUploadUrlApiIntegrationTest {
 				.andExpect(jsonPath("$.answers[0].docStorageKey")
 						.value("submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.pdf"))
 				.andExpect(jsonPath("$.answers[0].docMimeType").value("application/pdf"))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+	}
+
+	@Test
+	void submitsDocxEssayWithEmptyBody() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		String storageKey = "submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.docx";
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url",
+						essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"" + DOCX_MIME_TYPE + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.storageKey").value(storageKey))
+				.andReturn().getResponse().getContentAsString();
+
+		HttpResponse<Void> put = HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", DOCX_MIME_TYPE)
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+		assertThat(put.statusCode()).isBetween(200, 299);
+		assertThat(storageService.objectExists(storageKey)).isTrue();
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().is2xxSuccessful())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value(DOCX_MIME_TYPE))
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(storageKey))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+		assertThat(submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+
+		submitOfficialAsStudentMember(submissionId);
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value(DOCX_MIME_TYPE))
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(storageKey))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+	}
+
+	@Test
+	void submitsDocxEssayWithUiPayload() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		String storageKey = "submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.docx";
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url",
+						essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"" + DOCX_MIME_TYPE + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.storageKey").value(storageKey))
+				.andReturn().getResponse().getContentAsString();
+
+		HttpResponse<Void> put = HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", DOCX_MIME_TYPE)
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+		assertThat(put.statusCode()).isBetween(200, 299);
+		assertThat(storageService.objectExists(storageKey)).isTrue();
+
+		String submitBody = "{\"answers\":[{\"questionId\":" + essayModuleId
+				+ ",\"content\":{\"text\":\"My essay text\",\"fileName\":\"essay.docx\",\"hasAttachedFile\":true}}],"
+				+ "\"storageKey\":\"" + storageKey + "\"}";
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(submitBody))
+				.andExpect(status().is2xxSuccessful())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value(DOCX_MIME_TYPE))
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(storageKey))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
+		assertThat(submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+
+		submitOfficialAsStudentMember(submissionId);
+		mockMvc.perform(get("/api/v1/submission-modules/{id}", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value(DOCX_MIME_TYPE))
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(storageKey))
 				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
 	}
 
