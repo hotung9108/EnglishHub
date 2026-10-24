@@ -10,6 +10,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.GradingDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleEntry;
+import com.english_hub.core.modules.submission.application.service.SubmissionService.ModuleSummaryResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.QuestionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionDetailResult;
 import com.english_hub.core.modules.submission.application.service.SubmissionService.SubmissionListItemResult;
@@ -59,6 +60,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +81,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -482,7 +485,7 @@ class SubmissionServiceTest {
 		essayModule.setId(151L);
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L)))
 				.thenReturn(List.of(quizModule, essayModule));
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L))).thenReturn(List.of(
 				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 1, BigDecimal.TEN),
 				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 2, BigDecimal.TEN)));
 		Grading quizGrading = grading(150L, GradingMethod.AUTO, GradingStatus.COMPLETED);
@@ -491,13 +494,14 @@ class SubmissionServiceTest {
 		when(gradingRepository.findBySubmissionModuleIds(List.of(150L, 151L)))
 				.thenReturn(List.of(quizGrading));
 
-		SubmissionListResult result = submissionService.list(null, null, null, 1, 20);
+		SubmissionListResult result = submissionService.list(null, null, null, null, 1, 20);
 
 		assertThat(result.page()).isEqualTo(1);
 		assertThat(result.limit()).isEqualTo(20);
 		assertThat(result.total()).isEqualTo(1);
 		SubmissionListItemResult item = result.data().getFirst();
 		assertThat(item.id()).isEqualTo(88L);
+		assertThat(item.assignmentId()).isEqualTo(5L);
 		assertThat(item.studentId()).isEqualTo(41L);
 		assertThat(item.modules()).hasSize(2);
 		assertThat(item.modules().getFirst().grading().status()).isEqualTo(GradingStatus.COMPLETED);
@@ -512,7 +516,7 @@ class SubmissionServiceTest {
 	void listRejectsAStudentRequestingAnotherStudentsSubmissions() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 
-		assertThatThrownBy(() -> submissionService.list(null, 42L, null, 1, 20))
+		assertThatThrownBy(() -> submissionService.list(null, null, 42L, null, 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
 	}
@@ -524,21 +528,21 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L))).thenReturn(List.of());
 		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
 
-		SubmissionListResult result = submissionService.list(null, 41L, null, 1, 20);
+		SubmissionListResult result = submissionService.list(null, null, 41L, null, 1, 20);
 
 		assertThat(result.total()).isEqualTo(1);
 	}
 
 	@Test
-	void listTeacherRequiresAnAssignmentId() {
+	void listTeacherRequiresAClassOrAssignmentId() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
 
-		assertThatThrownBy(() -> submissionService.list(null, null, null, 1, 20))
+		assertThatThrownBy(() -> submissionService.list(null, null, null, null, 1, 20))
 				.isInstanceOf(ApiException.class)
-				.hasMessage("assignmentId là bắt buộc đối với giáo viên.");
+				.hasMessage("classId hoặc assignmentId là bắt buộc đối với giáo viên.");
 	}
 
 	@Test
@@ -550,10 +554,10 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L))).thenReturn(List.of());
 		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
 
-		SubmissionListResult result = submissionService.list(5L, null, null, 1, 20);
+		SubmissionListResult result = submissionService.list(null, 5L, null, null, 1, 20);
 
 		assertThat(result.total()).isEqualTo(1);
 		verify(submissionRepository).findPage(
@@ -567,7 +571,7 @@ class SubmissionServiceTest {
 		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(classTeachingRepository.isTeacherOfClass(8L, 3L)).thenReturn(false);
 
-		assertThatThrownBy(() -> submissionService.list(5L, null, null, 1, 20))
+		assertThatThrownBy(() -> submissionService.list(null, 5L, null, null, 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
 	}
@@ -579,10 +583,10 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 1, 20, 1));
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L))).thenReturn(List.of());
 		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
 
-		SubmissionListResult result = submissionService.list(null, null, null, 1, 20);
+		SubmissionListResult result = submissionService.list(null, null, null, null, 1, 20);
 
 		assertThat(result.total()).isEqualTo(1);
 	}
@@ -594,10 +598,10 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findPage(any(), any())).thenReturn(new SubmissionPage(List.of(submission), 2, 10, 1));
 		when(submissionModuleRepository.findBySubmissionIds(List.of(88L))).thenReturn(List.of());
-		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of());
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L))).thenReturn(List.of());
 		when(gradingRepository.findBySubmissionModuleIds(List.of())).thenReturn(List.of());
 
-		SubmissionListResult result = submissionService.list(5L, 41L, "IN_PROGRESS", 2, 10);
+		SubmissionListResult result = submissionService.list(null, 5L, 41L, "IN_PROGRESS", 2, 10);
 
 		assertThat(result.page()).isEqualTo(2);
 		verify(submissionRepository).findPage(
@@ -609,10 +613,10 @@ class SubmissionServiceTest {
 
 	@Test
 	void listRejectsAnInvalidPagination() {
-		assertThatThrownBy(() -> submissionService.list(null, null, null, 0, 20))
+		assertThatThrownBy(() -> submissionService.list(null, null, null, null, 0, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Dữ liệu không hợp lệ.");
-		assertThatThrownBy(() -> submissionService.list(null, null, null, 1, 101))
+		assertThatThrownBy(() -> submissionService.list(null, null, null, null, 1, 101))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Dữ liệu không hợp lệ.");
 	}
@@ -621,13 +625,117 @@ class SubmissionServiceTest {
 	void listRejectsAnInvalidStatusFilter() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 
-		assertThatThrownBy(() -> submissionService.list(null, null, "INVALID_STATUS", 1, 20))
+		assertThatThrownBy(() -> submissionService.list(null, null, null, "INVALID_STATUS", 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("status không hợp lệ.");
 	}
 
 	@Test
+	void listTeacherClassBatchesDistinctAssignmentsAndPreservesModuleOrder() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+		when(classTeachingRepository.isTeacherOfClass(7L, 3L)).thenReturn(true);
+		Submission first = submission(5L, 41L, 1);
+		first.setId(88L);
+		Submission second = submission(6L, 41L, 1);
+		second.setId(89L);
+		Submission third = submission(5L, 42L, 1);
+		third.setId(90L);
+		when(submissionRepository.findPage(any(), any()))
+				.thenReturn(new SubmissionPage(List.of(first, second, third), 1, 100, 3));
+		SubmissionModule reading = new SubmissionModule(88L, 9L, SubmissionStatus.IN_PROGRESS);
+		reading.setId(150L);
+		SubmissionModule writing = new SubmissionModule(88L, 10L, SubmissionStatus.IN_PROGRESS);
+		writing.setId(151L);
+		when(submissionModuleRepository.findBySubmissionIds(List.of(88L, 89L, 90L)))
+				.thenReturn(List.of(reading, writing));
+		when(assignmentModuleRepository.findModulesByAssignmentIds(List.of(5L, 6L))).thenReturn(List.of(
+				new ModuleInfo(9L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 2, BigDecimal.TEN),
+				new ModuleInfo(10L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1, BigDecimal.TEN)));
+
+		SubmissionListResult result = submissionService.list(3L, null, null, null, 1, 100);
+
+		assertThat(result.data()).extracting(SubmissionListItemResult::assignmentId).containsExactly(5L, 6L, 5L);
+		assertThat(result.data().getFirst().modules()).extracting(ModuleSummaryResult::moduleId)
+				.containsExactly(10L, 9L);
+		assertThat(result.data().get(1).modules()).isEmpty();
+		verify(assignmentModuleRepository).findModulesByAssignmentIds(List.of(5L, 6L));
+		verify(assignmentModuleRepository, never()).findModulesByAssignmentId(anyLong());
+		verifyNoInteractions(assignmentWindowRepository);
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.classId().equals(3L) && filter.assignmentId() == null), any());
+	}
+
+	@Test
+	void listTeacherClassAndAssignmentUseIntersectionWithoutAssignmentGuard() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+		when(classTeachingRepository.isTeacherOfClass(7L, 3L)).thenReturn(true);
+		when(submissionRepository.findPage(any(), any()))
+				.thenReturn(new SubmissionPage(List.of(), 1, 20, 0));
+
+		SubmissionListResult result = submissionService.list(3L, 6L, null, null, 1, 20);
+
+		assertThat(result.data()).isEmpty();
+		assertThat(result.total()).isZero();
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.classId().equals(3L) && filter.assignmentId().equals(6L)), any());
+		verifyNoInteractions(assignmentWindowRepository, assignmentModuleRepository);
+	}
+
+	@Test
+	void listRejectsTeacherForForeignOrMissingClassEvenWithAssignmentId() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(teacher(7L));
+
+		for (long classId : List.of(3L, Long.MAX_VALUE)) {
+			assertThatThrownBy(() -> submissionService.list(classId, 5L, null, null, 1, 20))
+					.isInstanceOf(ApiException.class)
+					.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		}
+		verifyNoInteractions(assignmentWindowRepository, submissionRepository);
+	}
+
+	@Test
+	void listAdminCanFilterAMissingClassAndEmptyPageDoesNotLoadModules() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+		when(submissionRepository.findPage(any(), any()))
+				.thenReturn(new SubmissionPage(List.of(), 1, 20, 0));
+
+		SubmissionListResult result = submissionService.list(Long.MAX_VALUE, null, null, null, 1, 20);
+
+		assertThat(result.data()).isEmpty();
+		assertThat(result.total()).isZero();
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.classId().equals(Long.MAX_VALUE) && filter.studentId() == null), any());
+		verifyNoInteractions(classTeachingRepository, assignmentWindowRepository,
+				assignmentModuleRepository, submissionModuleRepository, gradingRepository);
+	}
+
+	@Test
+	void listStudentClassFilterKeepsOwnStudentScope() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(submissionRepository.findPage(any(), any()))
+				.thenReturn(new SubmissionPage(List.of(), 1, 20, 0));
+
+		submissionService.list(3L, null, null, null, 1, 20);
+
+		verify(submissionRepository).findPage(
+				argThat(filter -> filter.classId().equals(3L) && filter.studentId().equals(41L)), any());
+		verifyNoInteractions(classTeachingRepository);
+	}
+
+	@Test
+	void listStudentClassFilterStillRejectsAnotherStudentId() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+
+		assertThatThrownBy(() -> submissionService.list(3L, null, 42L, null, 1, 20))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+		verifyNoInteractions(submissionRepository);
+	}
+
+	@Test
 	void submitsQuizAnswersAndFlipsTheModuleToSubmitted() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -667,6 +775,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submittingAModuleAnnouncesItForAutoGrading() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule rewriteModule = module(10L);
 		rewriteModule.setId(101L);
@@ -701,6 +811,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitsShortAnswerForARewriteModule() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule rewriteModule = module(10L);
 		rewriteModule.setId(101L);
@@ -727,6 +839,106 @@ class SubmissionServiceTest {
 		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
 		assertThat(result.answers()).hasSize(1);
 		assertThat(result.answers().get(0).content().path("text").asString()).isEqualTo("The answer is...");
+	}
+
+	@Test
+	void submitModuleRejectsAQuizAfterTheDeadline() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		SubmissionModule submissionModule = new SubmissionModule(88L, 9L, SubmissionStatus.IN_PROGRESS);
+		submissionModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(submissionModule));
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), OffsetDateTime.now().minusMinutes(5), 2)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(multipleChoice(21L, 1))))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(exception).hasMessage("Không thể nộp phần làm bài này vì đã quá hạn nộp bài.");
+				});
+
+		verify(answerRepository, never()).bulkCreate(anyLong(), anyList());
+		verify(submissionModuleRepository, never()).save(any());
+		verify(submissionRepository, never()).save(any());
+		verifyNoInteractions(eventPublisher, storageService);
+		assertThat(submissionModule.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void submitModuleRejectsAnEssayAfterTheDeadline() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		SubmissionModule submissionModule = new SubmissionModule(88L, 11L, SubmissionStatus.IN_PROGRESS);
+		submissionModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(submissionModule));
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), OffsetDateTime.now().minusMinutes(5), 2)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(exception).hasMessage("Không thể nộp phần làm bài này vì đã quá hạn nộp bài.");
+				});
+
+		verify(answerRepository, never()).bulkCreate(anyLong(), anyList());
+		verify(submissionModuleRepository, never()).save(any());
+		verify(submissionRepository, never()).save(any());
+		verifyNoInteractions(eventPublisher, storageService);
+		assertThat(submissionModule.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void submitModuleRejectsARecordingAfterTheDeadline() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		SubmissionModule submissionModule = new SubmissionModule(88L, 12L, SubmissionStatus.IN_PROGRESS);
+		submissionModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(submissionModule));
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), OffsetDateTime.now().minusMinutes(5), 2)));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(exception).hasMessage("Không thể nộp phần làm bài này vì đã quá hạn nộp bài.");
+				});
+
+		verify(answerRepository, never()).bulkCreate(anyLong(), anyList());
+		verify(submissionModuleRepository, never()).save(any());
+		verify(submissionRepository, never()).save(any());
+		verifyNoInteractions(eventPublisher, storageService);
+		assertThat(submissionModule.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void submitModuleRejectsAMissingAssignmentWindow() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		SubmissionModule submissionModule = new SubmissionModule(88L, 9L, SubmissionStatus.IN_PROGRESS);
+		submissionModule.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(submissionModule));
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(multipleChoice(21L, 1))))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(exception).hasMessage("Không tìm thấy bài tập.");
+				});
+
+		verify(answerRepository, never()).bulkCreate(anyLong(), anyList());
+		verify(submissionModuleRepository, never()).save(any());
+		verify(submissionRepository, never()).save(any());
+		verifyNoInteractions(eventPublisher, storageService);
+		assertThat(submissionModule.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
 	}
 
 	@Test
@@ -809,6 +1021,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModuleRejectsMissingOrEmptyAnswers() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -829,6 +1043,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModuleRejectsAnAnswerWithoutQuestionIdOrContent() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -853,6 +1069,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModuleRejectsDuplicateQuestionIds() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -874,6 +1092,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModuleRejectsAnUnknownQuestion() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -899,6 +1119,8 @@ class SubmissionServiceTest {
 	 */
 	@Test
 	void submitModuleRejectsAnAnswerWhoseShapeDoesNotMatchTheQuestionType() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -930,6 +1152,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModuleRejectsAnAnswerWithNoClaimedQuestionType() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
@@ -950,6 +1174,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_submitsEssayWithReadyStatusWhenFilePresent() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(102L, 88L, 11L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
@@ -981,6 +1207,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_probesDocxWhenPdfIsMissing() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(102L, 88L, 11L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
@@ -998,6 +1226,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_marksEssayUploadingWhenNoFileExists() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(102L, 88L, 11L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
@@ -1014,6 +1244,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_submitsRecordingWithReadyStatusWhenAudioExists() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
@@ -1034,6 +1266,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_probesAudioExtensionsInOrder() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
@@ -1053,6 +1287,8 @@ class SubmissionServiceTest {
 
 	@Test
 	void submitModule_marksRecordingUploadingWhenNoAudioExists() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));

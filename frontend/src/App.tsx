@@ -28,7 +28,6 @@ import StudentAssignmentOverview from './pages/StudentAssignmentOverview';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentFeedback from './pages/StudentFeedback';
 import StudentGrades from './pages/StudentGrades';
-import StudentAnalytics from './pages/StudentAnalytics';
 import TeacherAssignments from './pages/TeacherAssignments';
 import TeacherAssignmentDetails from './pages/TeacherAssignmentDetails';
 import TeacherCreateAssignment from './pages/TeacherCreateAssignment';
@@ -54,7 +53,7 @@ function ReportsRedirect() {
     return <Navigate to="/teacher/classes" replace />;
   }
   if (user?.role === 'student') {
-    return <Navigate to="/student/analytics" replace />;
+    return <Navigate to="/student/grades" replace />;
   }
   return <Navigate to="/admin/reports" replace />;
 }
@@ -138,13 +137,14 @@ function App() {
             <Route path="assignments/:id/result" element={<StudentSubmissionResult />} />
             <Route path="submissions/:id" element={<StudentSubmissionResult />} />
             <Route path="assignments/:id" element={<StudentAssignmentWriting />} />
+            <Route path="assignments/writing/:id" element={<StudentAssignmentWriting />} />
             <Route path="assignments/reading/:id" element={<StudentAssignmentReading />} />
             <Route path="assignments/listening/:id" element={<StudentAssignmentListening />} />
             <Route path="assignments/speaking/:id" element={<StudentAssignmentSpeaking />} />
             <Route path="workspace" element={<Navigate to="/student/assignments" replace />} />
             <Route path="feedback" element={<StudentFeedback />} />
             <Route path="grades" element={<StudentGrades />} />
-            <Route path="analytics" element={<StudentAnalytics />} />
+            <Route path="analytics" element={<Navigate to="/unauthorized" replace />} />
             <Route path="status" element={<StudentAssignments />} />
             <Route path="settings" element={<Settings />} />
             <Route path="profile" element={<Profile />} />

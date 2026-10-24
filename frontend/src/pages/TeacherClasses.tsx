@@ -10,7 +10,7 @@ import {
   Calendar, MapPin, 
   RefreshCw, AlertCircle
 } from 'lucide-react';
-import { Button, EmptyState } from '../components/common';
+import { Button, EmptyState, Pagination } from '../components/common';
 
 interface TeacherClassCardData {
   id: string;
@@ -43,6 +43,25 @@ export const TeacherClasses: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('current');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
+
+  const handleFilterChange = (newFilter: 'all' | 'active' | 'completed') => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const handleTermChange = (term: string) => {
+    setSelectedTerm(term);
+    setCurrentPage(1);
+  };
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -96,7 +115,7 @@ export const TeacherClasses: React.FC = () => {
               });
               const allSubs = (await Promise.all(subPromises)).flat();
               pendingCount = allSubs.filter(
-                (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
+                (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
               ).length;
 
               for (const s of allSubs) {
@@ -162,6 +181,14 @@ export const TeacherClasses: React.FC = () => {
       return true;
     });
   }, [classes, filter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClasses.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredClasses.slice(start, start + pageSize);
+  }, [filteredClasses, safeCurrentPage, pageSize]);
 
   const counts = useMemo(() => {
     const active = classes.filter((c) => c.status === 'active').length;
@@ -242,7 +269,7 @@ export const TeacherClasses: React.FC = () => {
           {/* Active Classes Card */}
           <div 
             className={`teacher-stat-card ${filter === 'active' ? 'active' : ''}`}
-            onClick={() => setFilter(filter === 'active' ? 'all' : 'active')}
+            onClick={() => handleFilterChange(filter === 'active' ? 'all' : 'active')}
           >
             <div>
               <div className="teacher-stat-num">{counts.active} {isVi ? 'Lớp' : 'Classes'}</div>
@@ -288,7 +315,7 @@ export const TeacherClasses: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
+              onClick={() => handleFilterChange('all')}
             >
               {isVi ? 'Tất cả lớp học' : 'All Classes'}
               <span className="teacher-pill-badge">{counts.all}</span>
@@ -296,7 +323,7 @@ export const TeacherClasses: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${filter === 'active' ? 'active' : ''}`}
-              onClick={() => setFilter('active')}
+              onClick={() => handleFilterChange('active')}
             >
               {isVi ? 'Đang diễn ra' : 'Active'}
               <span className="teacher-pill-badge">{counts.active}</span>
@@ -304,7 +331,7 @@ export const TeacherClasses: React.FC = () => {
             <button
               type="button"
               className={`teacher-pill ${filter === 'completed' ? 'active' : ''}`}
-              onClick={() => setFilter('completed')}
+              onClick={() => handleFilterChange('completed')}
             >
               {isVi ? 'Đã kết thúc' : 'Completed'}
               <span className="teacher-pill-badge">{counts.completed}</span>
@@ -315,7 +342,7 @@ export const TeacherClasses: React.FC = () => {
             {/* Term filter */}
             <select
               value={selectedTerm}
-              onChange={(e) => setSelectedTerm(e.target.value)}
+              onChange={(e) => handleTermChange(e.target.value)}
               className="select-input"
             >
               <option value="current">{isVi ? 'Học kỳ hiện tại' : 'Current Term'}</option>
@@ -330,7 +357,7 @@ export const TeacherClasses: React.FC = () => {
                 className="teacher-search-input"
                 placeholder={isVi ? 'Tìm kiếm mã lớp, tên lớp...' : 'Search class code, title...'}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
           </div>
@@ -340,7 +367,7 @@ export const TeacherClasses: React.FC = () => {
       {/* Classes Grid */}
       {!isLoading && !error && (
         <div className="teacher-classes-grid">
-          {filteredClasses.map((cls) => (
+          {paginatedClasses.map((cls) => (
             <div key={cls.id} className="teacher-class-card">
               <div>
                 {/* Header Badge */}
@@ -426,6 +453,25 @@ export const TeacherClasses: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && !error && filteredClasses.length > 0 && (
+        <Pagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredClasses.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[6, 9, 18, 27]}
+          itemLabel={isVi ? 'lớp học' : 'classes'}
+          isVi={isVi}
+          variant="standalone"
+        />
       )}
     </div>
   );

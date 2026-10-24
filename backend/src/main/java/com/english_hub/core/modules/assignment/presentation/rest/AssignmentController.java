@@ -4,6 +4,7 @@ import com.english_hub.core.modules.assignment.application.command.CreateAssignm
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentListResult;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentUpdateResult;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
@@ -47,10 +48,13 @@ public class AssignmentController {
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
-		AssignmentPage result = assignmentService.listAssignments(status, classId, page, limit);
+		AssignmentListResult result = assignmentService.listAssignments(status, classId, page, limit);
+		AssignmentPage assignmentPage = result.assignmentPage();
 		return ResponseEntity.ok(new AssignmentListResponse(
-				result.assignments().stream().map(AssignmentSummaryResponse::from).toList(),
-				new PaginationResponse(result.page(), result.limit(), result.total())));
+				assignmentPage.assignments().stream()
+						.map(assignment -> AssignmentSummaryResponse.from(assignment, result.skillsFor(assignment.id())))
+						.toList(),
+				new PaginationResponse(assignmentPage.page(), assignmentPage.limit(), assignmentPage.total())));
 	}
 
 	@PostMapping("/classes/{classId}/assignments")

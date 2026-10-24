@@ -10,6 +10,7 @@ export interface SubmissionModuleGradingResponse {
   method: GradingMethod;
   status: GradingStatus;
   finalScore: number | null;
+  finalFeedback?: string | null;
 }
 
 export interface GradingDetailResponse {
@@ -40,6 +41,29 @@ export interface AiGradingAnnotation {
   suggestedFix?: string | null;
 }
 
+export interface SpeakingCriteriaScores {
+  fluencyAndCoherence?: number;
+  fluencyCohesion?: number; // legacy fallback
+  lexicalResource?: number;
+  grammaticalRangeAndAccuracy?: number;
+  grammaticalRange?: number; // legacy fallback
+  pronunciation?: number;
+  overallScore?: number;
+}
+
+export interface WritingCriteriaScores {
+  taskResponse?: number;
+  taskAchievement?: number; // legacy fallback
+  coherenceAndCohesion?: number;
+  coherenceCohesion?: number; // legacy fallback
+  lexicalResource?: number;
+  grammaticalRangeAndAccuracy?: number;
+  grammaticalRange?: number; // legacy fallback
+  overallScore?: number;
+}
+
+export type CriteriaScores = SpeakingCriteriaScores & WritingCriteriaScores & Record<string, number | undefined>;
+
 export interface AiGradingSuggestionResponse {
   submissionModuleId: number;
   gradingId: number;
@@ -48,7 +72,7 @@ export interface AiGradingSuggestionResponse {
   suggestedScore: number | null;
   maxScore: number | null;
   aiFeedback: string | null;
-  criteriaScores: Record<string, number> | null;
+  criteriaScores: CriteriaScores | null;
   metrics: Record<string, number> | null;
   annotations: AiGradingAnnotation[];
   transcript: unknown | null;

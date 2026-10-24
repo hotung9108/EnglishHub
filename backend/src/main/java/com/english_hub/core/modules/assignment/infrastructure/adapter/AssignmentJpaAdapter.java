@@ -9,15 +9,15 @@ import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSumm
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.infrastructure.mapper.AssignmentPersistenceMapper;
-import jakarta.persistence.criteria.Predicate;
-import java.util.ArrayList;
+import com.english_hub.core.modules.assignment.infrastructure.mapper.AssignmentSkillPersistenceMapper;
+import com.english_hub.core.modules.assignment.infrastructure.persistence.projection.AssignmentSkillProjection;
+import com.english_hub.core.modules.assignment.infrastructure.persistence.repository.AssignmentSkillJpaRepository;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 /** JPA adapter for the Assignment domain repository port. */
@@ -27,14 +27,20 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 	private final AssignmentRepository jpaRepository;
 	private final AssignmentModuleRepository assignmentModuleRepository;
 	private final AssignmentPersistenceMapper mapper;
+	private final AssignmentSkillJpaRepository assignmentSkillJpaRepository;
+	private final AssignmentSkillPersistenceMapper skillMapper;
 
 	public AssignmentJpaAdapter(
 			AssignmentRepository jpaRepository,
 			AssignmentModuleRepository assignmentModuleRepository,
-			AssignmentPersistenceMapper mapper) {
+			AssignmentPersistenceMapper mapper,
+			AssignmentSkillJpaRepository assignmentSkillJpaRepository,
+			AssignmentSkillPersistenceMapper skillMapper) {
 		this.jpaRepository = jpaRepository;
 		this.assignmentModuleRepository = assignmentModuleRepository;
 		this.mapper = mapper;
+		this.assignmentSkillJpaRepository = assignmentSkillJpaRepository;
+		this.skillMapper = skillMapper;
 	}
 
 	@Override
@@ -89,14 +95,33 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 
 	@Override
 	public AssignmentPage findPage(Long classId, AssignmentStatus status, AssignmentPageRequest pageRequest) {
-		Pageable pageable = PageRequest.of(
-				pageRequest.page() - 1,
-				pageRequest.limit(),
-				Sort.by(Sort.Direction.DESC, "id"));
-		Page<com.english_hub.core.infrastructure.persistence.entity.Assignment> page =
-				jpaRepository.findAll(buildSpecification(classId, status), pageable);
-		List<Assignment> assignments = page.getContent().stream().map(mapper::toDomain).toList();
-		return new AssignmentPage(assignments, pageRequest.page(), pageRequest.limit(), page.getTotalElements());
+		Pageable pageable = PageRequest.of(pageRequest.page() - 1, pageRequest.limit());
+		// Single round-trip: the total rows are returned by COUNT(*) OVER () in the
+		// same query instead of a separate COUNT issued by Spring Data's Page support.
+		List<Object[]> rows = status == null
+				? jpaRepository.findPageWithTotalElements(classId, pageable)
+				: jpaRepository.findPageWithStatusAndTotalElements(
+						classId,
+						com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus.valueOf(status.name()),
+						pageable);
+		if (rows.isEmpty()) {
+			return new AssignmentPage(List.of(), pageRequest.page(), pageRequest.limit(), 0);
+		}
+		long totalElements = ((Number) rows.get(0)[1]).longValue();
+		List<Assignment> assignments = rows.stream()
+				.map(row -> mapper.toDomain((com.english_hub.core.infrastructure.persistence.entity.Assignment) row[0]))
+				.toList();
+		return new AssignmentPage(assignments, pageRequest.page(), pageRequest.limit(), totalElements);
+	}
+
+	@Override
+	public Map<Long, List<ModuleSkill>> findSkillsByAssignmentIds(List<Long> assignmentIds) {
+		if (assignmentIds.isEmpty()) {
+			return Map.of();
+		}
+		List<AssignmentSkillProjection> modules = assignmentSkillJpaRepository
+				.findByAssignmentIdInOrderByAssignmentIdAscOrderIndexAscIdAsc(assignmentIds);
+		return skillMapper.toSkillsByAssignmentId(modules);
 	}
 
 	@Override
@@ -104,22 +129,6 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 		return assignmentModuleRepository.findByAssignmentIdOrderByOrderIndexAsc(assignmentId).stream()
 				.map(this::toModuleSummary)
 				.toList();
-	}
-
-	private Specification<com.english_hub.core.infrastructure.persistence.entity.Assignment> buildSpecification(
-			Long classId,
-			AssignmentStatus status) {
-		return (root, query, criteriaBuilder) -> {
-			List<Predicate> predicates = new ArrayList<>();
-			predicates.add(criteriaBuilder.equal(root.get("classId"), classId));
-			predicates.add(criteriaBuilder.isFalse(root.get("deleted")));
-			if (status != null) {
-				predicates.add(criteriaBuilder.equal(
-						root.get("status"),
-						com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus.valueOf(status.name())));
-			}
-			return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
-		};
 	}
 
 	private AssignmentModuleSummary toModuleSummary(AssignmentModule module) {

@@ -52,6 +52,12 @@ export interface CreatedModuleResponse extends MessageResponse {
   id: number;
 }
 
+export interface AudioUploadResponse {
+  message: string;
+  sourceAudioStorageKey: string;
+  sourceAudioUploadStatus: string;
+}
+
 export class ModuleService {
   private readonly http: IHttpClient;
 
@@ -102,6 +108,22 @@ export class ModuleService {
 
   deleteModule(moduleId: number, options?: ApiRequestOptions): Promise<MessageResponse> {
     return this.http.delete<MessageResponse>(`/modules/${moduleId}`, options);
+  }
+
+  uploadAudio(
+    moduleId: number,
+    file: File,
+    options?: ApiRequestOptions
+  ): Promise<AudioUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<AudioUploadResponse>(`/modules/${moduleId}/audio`, formData, {
+      ...options,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(options?.headers || {}),
+      },
+    });
   }
 }
 

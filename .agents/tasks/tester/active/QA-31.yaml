@@ -1,0 +1,30 @@
+id: QA-31
+title: "Viết và chạy Selenium luồng Admin trên staging"
+assignee: "@tester"
+status: "In Progress"
+updated_at: "2026-10-20"
+branch: "feature/qa-31-admin-selenium"
+description: "50 case Admin. Người dùng đã chạy full r6 35 Pass / 9 Fail / 6 Blocked. Review 050 chưa đủ chứng cứ bug vì giả định sidebar; r7 sửa thành scope blocker cho run sau."
+completed_scope:
+  - "Khảo sát ban đầu chỉ đọc 17 màn/form/drawer; sau đó người dùng chạy suite đầu và đã review offline."
+  - "POM, fixture riêng và guard ownership, runner/report/evidence, launcher full run và watch."
+  - "Bổ sung quy trình đánh số đủ 40 case; các bug có bước tái hiện và evidence, tách full run r2 khỏi targeted retest r5."
+  - "Người dùng cho phép retest ngày 20/10: chạy 21 case, 11 Pass / 7 Fail / 3 Blocked. Follow-up UI search trên user tạo qua UI và API tạo Admin cũng đã thực hiện."
+  - "Viết thêm 041–050 với quy trình/expected rõ ràng; 62/62 framework checks đạt, kiểm tra native date input/events trên Chrome cục bộ đạt. Bản r6 đã được người dùng chạy; xem kết quả full run bên dưới."
+  - "Đã review full r6 50 case; date Reports 043–045 và status Audit 046–047 Pass; Student status/settings persistence Blocked bởi lỗi sản phẩm trước bước chính."
+pending:
+  - "Ghi nhận sai lệch system settings 048 theo FE-23; 049 chưa kiểm tra save/reset."
+  - "Chốt nghiệp vụ/luồng quản lý nội dung hệ thống: không coi thiếu menu sidebar riêng là chứng cứ thiếu toàn bộ chức năng; r7 chưa chạy staging."
+  - "Đã đăng 9 issue GitHub #189–197 theo từng lỗi, có testcase/bước tái hiện/retest. Tiếp tục theo dõi sửa lỗi và retest; bản public ẩn định danh staging."
+  - "Hủy/sửa/khóa Accounts và render Audit logs sau bước lỗi chưa được thực hiện; giữ Blocked/chưa kiểm tra, không ghi Pass."
+validation:
+  local_framework: "64/64 checks Pass, gồm report giữ link issue đúng testcase; 050 là SCOPE_REVIEW/Blocked khi thiếu luồng. CheckOnly đủ 50 case, JS syntax đạt, chưa chạy staging r7."
+  staging_suite: "Full r6 qa31-2026-10-19T17-30-35-992Z: 35 Pass / 9 Fail / 6 Blocked trên 50 case, fixtureErrors rỗng. Counts giữ nguyên; 050 được review riêng là scope chưa rõ."
+  coverage: "Not measured; không khẳng định >80%."
+artifacts:
+  - "test/selenium/QA31-README.md"
+  - "test/selenium/QA31-TEST-CASES.md"
+  - "test/selenium/run-admin.js"
+  - "production_artifacts/test_reports/QA-31/README.md"
+  - "production_artifacts/test_reports/QA-31/ISSUE-LINKS-2026-10-20.md"
+  - "production_artifacts/test_reports/QA-31/issues/public/manifest.json"

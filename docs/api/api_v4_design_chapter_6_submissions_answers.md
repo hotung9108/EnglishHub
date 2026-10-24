@@ -56,19 +56,33 @@
 
 ## 6.3 #39. Danh sách lượt làm bài
 
-**Mô tả:** Học viên xem bài làm của mình; giáo viên xem theo bài tập / học viên. Mỗi item trong danh sách kèm `modules` và `gradings` để hiển thị tổng quan kết quả mà không cần gọi thêm request.
+**Mô tả:** Học viên xem bài làm của mình; giáo viên xem theo lớp / bài tập / học viên. Mỗi item trong danh sách kèm `modules` và `gradings` để hiển thị tổng quan kết quả mà không cần gọi thêm request.
 
-**Method - Path:** `GET /submissions?assignmentId={}&studentId={}&status={}&page={}&limit={}`
+**Method - Path:** `GET /submissions?classId={}&assignmentId={}&studentId={}&status={}&page={}&limit={}`
 
 **Headers:** `Authorization: Bearer <accessToken>`
 
 **Body:** *(none)*
 
+**Bộ lọc và phân quyền:**
+
+- `classId`, `assignmentId`, `studentId`, `status` là các bộ lọc kết hợp bằng AND. `status` của submission nhận `IN_PROGRESS`, `SUBMITTED`, `GRADED`.
+- Khi có `classId`, chỉ lấy submission của assignment trong lớp và `is_deleted = false`; không loại `DRAFT`. Không áp điều kiện xóa mềm cho cách gọi chỉ có `assignmentId`.
+- Teacher phải có `classId` hoặc `assignmentId`; thiếu cả hai trả `400`. Có `classId` thì kiểm quyền phụ trách lớp trước: lớp không tồn tại hoặc không do teacher phụ trách đều trả `403`.
+- Teacher có `classId` hợp lệ và `assignmentId` thì chỉ lọc giao nhau, không kiểm guard quyền assignment riêng. Assignment ngoài lớp (kể cả của teacher khác), đã xóa hoặc không tồn tại trả `200`, `data: []`, `pagination.total: 0`.
+- Teacher chỉ có `assignmentId` giữ kiểm quyền phụ trách lớp của assignment như trước.
+- Admin được lọc lớp bất kỳ; lớp không tồn tại trả `200` rỗng.
+- Student luôn bị giới hạn về chính mình; `classId` chỉ là filter thêm. Truyền `studentId` người khác vẫn trả `403`.
+- Phân trang giữ `page` từ 1 (mặc định 1), `limit` từ 1 đến **100** (mặc định 20), sắp xếp submission ID giảm dần. Mỗi response chỉ là một trang; caller đọc thêm trang theo `pagination.total` nếu cần toàn lớp.
+- Mỗi item bổ sung `assignmentId`; các field và envelope cũ giữ nguyên. Thứ tự `modules` vẫn theo `orderIndex` tăng dần.
+
 **Response:**
 
 | Mô tả | Code | Return |
 |:---|:---:|:---|
-| Lấy danh sách thành công. | `200` | `{ "data": [ { "id": 88, "studentId": 41, "attemptNumber": 1, "status": "GRADED", "submittedAt": "...", "modules": [ { "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "GRADED", "grading": { "finalScore": 8.0, "maxScoreSnapshot": 10.0, "status": "COMPLETED" } } ] } ], "pagination": { "page": 1, "limit": 20, "total": 12 } }` |
+| Lấy danh sách thành công. | `200` | `{ "data": [ { "id": 88, "assignmentId": 5, "studentId": 41, "attemptNumber": 1, "status": "GRADED", "submittedAt": "...", "modules": [ { "id": 150, "moduleId": 9, "skill": "LISTENING", "taskType": "QUIZ", "status": "GRADED", "grading": { "finalScore": 8.0, "maxScoreSnapshot": 10.0, "status": "COMPLETED" } } ] } ], "pagination": { "page": 1, "limit": 20, "total": 12 } }` |
+| Thiếu cả hai filter đối với teacher. | `400` | `{ "error": "classId hoặc assignmentId là bắt buộc đối với giáo viên." }` |
+| Không có quyền truy cập lớp / assignment hoặc student khác. | `403` | `{ "error": "Bạn không có quyền thực hiện thao tác này." }` |
 | Chưa đăng nhập hoặc token không hợp lệ / hết hạn. | `401` | `{ "error": "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn." }` |
 | Lỗi hệ thống. | `500` | `{ "error": "Lỗi máy chủ." }` |
 
@@ -125,6 +139,8 @@
 ## 6.6 #43. Submit toàn bộ answers của 1 submission_module
 
 **Mô tả:** Học viên nộp tất cả câu trả lời cho 1 module trong một request. Chỉ được gọi khi `submission_module.status = IN_PROGRESS` **và `submission` cha cũng còn `IN_PROGRESS`** — mỗi module chỉ submit được 1 lần duy nhất. Sau khi submit, server đổi `submission_module.status → SUBMITTED`.
+
+Server kiểm tra `closeAt` hiện tại của assignment trước khi ghi answers hoặc chốt module. Khi `now > closeAt`, request bị từ chối dù module và submission cha vẫn `IN_PROGRESS`. Tại `now == closeAt`, request tiếp tục các kiểm tra hiện có. Quy tắc áp dụng cho Quiz/Rewrite và Essay/Recording.
 
 Với **Quiz / Short Answer**: truyền mảng `answers` kèm `questionId` và `content`.
 
@@ -211,6 +227,8 @@ nộp bài (request đó đã commit).
 | Mô tả | Code | Return |
 |:---|:---:|:---|
 | Submit thành công. | `200` | `{ "message": "Đã nộp phần làm bài.", "submissionModuleId": 150, "status": "SUBMITTED", "answers": [ { "id": 340, "questionId": 21, "content": { "selectedOptionIds": [1] } } ] }` |
+| Đã quá hạn nộp bài (`now > closeAt`). | `409` | `{ "error": "Không thể nộp phần làm bài này vì đã quá hạn nộp bài." }` |
+| Không tìm thấy assignment khi kiểm tra hạn. | `404` | `{ "error": "Không tìm thấy bài tập." }` |
 | Module đã được submit trước đó. | `400` | `{ "error": "Phần làm bài này đã được nộp." }` |
 | `submission` cha đã được nộp (`SUBMITTED`/`GRADED`) trong khi module vẫn `IN_PROGRESS`. | `400` | `{ "error": "Bài làm này đã được nộp." }` |
 | Thiếu answers. | `400` | `{ "error": "Nội dung câu trả lời không hợp lệ." }` |

@@ -30,6 +30,14 @@ public class AssignmentModulesJpaAdapter
 				.toList();
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public List<ModuleInfo> findModulesByAssignmentIds(List<Long> assignmentIds) {
+		return jpaRepository.findByAssignmentIdInOrderByAssignmentIdAscOrderIndexAsc(assignmentIds).stream()
+				.map(AssignmentModulesJpaAdapter::toModuleInfo)
+				.toList();
+	}
+
 	private static ModuleInfo toModuleInfo(AssignmentModule entity) {
 		return new ModuleInfo(
 				entity.getId(),

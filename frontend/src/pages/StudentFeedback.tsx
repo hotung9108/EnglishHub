@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, UserCheck, Star,
-  ArrowRight, Search, CheckCircle2, AlertCircle,
-  Lightbulb, PenTool, Mic, BookOpen, Headphones,
-  RotateCcw
+  ArrowRight, Search, AlertCircle,
+  PenTool, Mic, BookOpen, Headphones,
+  RotateCcw, GraduationCap
 } from 'lucide-react';
-import { Button, EmptyState, Skeleton } from '../components/common';
+import { Button, EmptyState, Skeleton, Pagination, MarkdownView } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded } from '../api/services/submission.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
@@ -18,19 +18,19 @@ import '../styles/student-ecosystem.css';
 
 interface FeedbackEntry {
   id: string;
-  assignmentId: string;
-  assignmentTitle: string;
+  type: 'evaluation' | 'submission';
+  targetTitle: string;
   className: string;
-  skill: 'writing' | 'speaking' | 'reading' | 'listening';
+  skill?: 'writing' | 'speaking' | 'reading' | 'listening';
   reviewerType: 'teacher' | 'ai';
   reviewerName: string;
   reviewerRole: string;
   date: string;
-  score: string;
+  score?: string;
   badgeType: string;
-  summaryComment: string;
-  keyStrengths: string[];
-  suggestedImprovement: string;
+  content: string;
+  actionUrl: string;
+  actionLabel: string;
 }
 
 export const StudentFeedback: React.FC = () => {
@@ -46,6 +46,25 @@ export const StudentFeedback: React.FC = () => {
   const [skillFilter, setSkillFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  const handleActiveFilterChange = (filter: 'all' | 'teacher' | 'ai') => {
+    setActiveFilter(filter);
+    setCurrentPage(1);
+  };
+
+  const handleSkillFilterChange = (skill: string) => {
+    setSkillFilter(skill);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
   const [reloadKey, setReloadKey] = useState(0);
   const handleReload = () => setReloadKey((k) => k + 1);
 
@@ -53,107 +72,178 @@ export const StudentFeedback: React.FC = () => {
     let isMounted = true;
 
     const fetchFeedback = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+      try {
+        setLoading(true);
+        setError(null);
 
-      const [evalsRes, submissionsRes, classesRes] = await Promise.allSettled([
-        user?.id ? studentEvaluationService.list(Number(user.id)) : Promise.reject('No user'),
-        submissionService.listSubmissions({ studentId: user?.id, status: 'GRADED' }),
-        classService.list()
-      ]);
+        // 1. Fetch Teacher Evaluations, Submissions, Classes in parallel
+        const [evalsRes, submissionsRes, classesRes] = await Promise.allSettled([
+          user?.id ? studentEvaluationService.list(Number(user.id)) : Promise.reject('No user'),
+          submissionService.listSubmissions({ studentId: user?.id, limit: 50 }),
+          classService.list()
+        ]);
 
-      const evals: StudentEvaluationListItem[] = evalsRes.status === 'fulfilled'
-        ? (evalsRes.value?.data || (Array.isArray(evalsRes.value) ? evalsRes.value : []))
-        : [];
-      const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
-        ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
-        : [];
-      const classes: ClassSummary[] = classesRes.status === 'fulfilled'
-        ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
-        : [];
+        const evals: StudentEvaluationListItem[] = evalsRes.status === 'fulfilled'
+          ? (evalsRes.value?.data || (Array.isArray(evalsRes.value) ? evalsRes.value : []))
+          : [];
+        const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+          ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
+          : [];
+        const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+          ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
+          : [];
 
-      const assignments = (await Promise.all(
-        classes.map(async (c) => {
-          try {
-            const res = await assignmentService.listAssignments(c.id);
-            return res.data || [];
-          } catch {
-            return [];
-          }
-        })
-      )).flat();
+        const classMap = new Map<number, string>();
+        classes.forEach(c => classMap.set(c.id, c.name));
 
-      const assignmentMap = new Map<string, AssignmentSummary>();
-      assignments.forEach(a => assignmentMap.set(String(a.id), a));
+        // 2. Fetch assignments for each class to map assignmentId -> Assignment & Class
+        const assignmentMap = new Map<string, AssignmentSummary>();
+        const assignmentClassMap = new Map<string, string>();
 
-      const classMap = new Map<number, string>();
-      classes.forEach(c => classMap.set(c.id, c.name));
+        await Promise.all(
+          classes.map(async (c) => {
+            try {
+              const res = await assignmentService.listAssignments(c.id);
+              const asgs = res.data || [];
+              asgs.forEach(a => {
+                assignmentMap.set(String(a.id), a);
+                assignmentClassMap.set(String(a.id), c.name);
+              });
+            } catch {
+              // Non-critical
+            }
+          })
+        );
 
-      const dynamicList: FeedbackEntry[] = [];
+        const dynamicList: FeedbackEntry[] = [];
 
-      // 1. Add Teacher Evaluations from [BE-20]
-      evals.forEach((ev) => {
-        const className = classMap.get(ev.classId) || `Lớp học #${ev.classId}`;
-        dynamicList.push({
-          id: `eval-${ev.id}`,
-          assignmentId: '1',
-          assignmentTitle: `Nhận xét định kỳ rèn luyện - ${className}`,
-          className,
-          skill: 'writing',
-          reviewerType: 'teacher',
-          reviewerName: ev.teacherName || 'Giảng viên Phụ trách Lớp',
-          reviewerRole: 'Giảng viên Chuyên môn',
-          date: ev.createdAt ? new Date(ev.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-US') : '20/03/2026',
-          score: 'Đạt chuẩn',
-          badgeType: 'Nhận xét lớp học',
-          summaryComment: ev.content,
-          keyStrengths: [
-            'Thái độ học tập nghiêm túc, hoàn thành các bài tập đầy đủ',
-            'Tiến bộ rõ rệt qua từng chuyên đề'
-          ],
-          suggestedImprovement: 'Tăng cường tương tác phản hồi trong giờ học và duy trì thói quen luyện đề mỗi ngày.'
-        });
-      });
-
-      // 2. Add Graded Submissions with AI & Teacher Reviews
-      submissions
-        .filter(sub => sub.status === 'GRADED')
-        .forEach((sub, idx) => {
-          const assignmentIdStr = String(sub.assignmentId || sub.id);
-          const assignment = assignmentMap.get(assignmentIdStr);
-          const className = classes.length > 0 ? classes[0].name : (isVi ? 'Lớp học' : 'Class');
-          
-          let detectedSkill: 'writing' | 'speaking' | 'reading' | 'listening' = 'writing';
-          const titleLower = (assignment?.title || '').toLowerCase();
-          if (titleLower.includes('speak')) detectedSkill = 'speaking';
-          else if (titleLower.includes('read')) detectedSkill = 'reading';
-          else if (titleLower.includes('listen')) detectedSkill = 'listening';
-
-          const isAi = idx % 2 === 0;
-          const scoreVal = sub.modules?.[0]?.grading?.finalScore;
-          const score10Val = scoreVal !== undefined && scoreVal !== null ? (scoreVal <= 10 ? scoreVal.toFixed(1) : (scoreVal / 10).toFixed(1)) : '--';
+        // 3. Process Teacher Evaluations (StudentEvaluation schema: id, classId, teacherName, content, createdAt)
+        evals.forEach((ev) => {
+          const className = classMap.get(ev.classId) || (isVi ? `Lớp học #${ev.classId}` : `Class #${ev.classId}`);
+          const formattedDate = ev.createdAt
+            ? new Date(ev.createdAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : '';
 
           dynamicList.push({
-            id: `sub-fb-${sub.id}`,
-            assignmentId: assignmentIdStr,
-            assignmentTitle: assignment?.title || `Bài tập #${assignmentIdStr}`,
+            id: `eval-${ev.id}`,
+            type: 'evaluation',
+            targetTitle: isVi ? `Đánh giá rèn luyện học tập - ${className}` : `Academic & Progress Evaluation - ${className}`,
             className,
-            skill: detectedSkill,
-            reviewerType: isAi ? 'ai' : 'teacher',
-            reviewerName: isAi ? 'EnglishHub AI Diagnostic Engine' : (isVi ? 'Giáo viên phụ trách' : 'Instructor'),
-            reviewerRole: isAi ? 'AI Evaluation' : (isVi ? 'Giảng viên Chuyên môn' : 'Instructor'),
-            date: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '',
-            score: score10Val !== '--' ? `${score10Val} / 10` : '--',
-            badgeType: score10Val !== '--' ? `${score10Val} / 10` : (isVi ? 'Đã chấm' : 'Graded'),
-            summaryComment: isAi 
-              ? 'Hệ thống AI đã phân tích chi tiết câu trả lời của bạn. Độ chính xác từ vựng và ngữ pháp đạt mức tốt.'
-              : 'Bài làm tốt, bố cục chặt chẽ. Cần chú ý hoàn thiện thêm các liên từ và đa dạng hóa cấu trúc câu.',
-            keyStrengths: [
-              'Bám sát yêu cầu đề bài và phân bổ thời gian hợp lý',
-              'Sử dụng linh hoạt các liên từ chuyển tiếp'
-            ],
-            suggestedImprovement: 'Rà soát lại các lỗi chính tả và thì quá khứ đơn trước khi nộp bài.'
+            reviewerType: 'teacher',
+            reviewerName: ev.teacherName || (isVi ? 'Giảng viên phụ trách lớp' : 'Course Instructor'),
+            reviewerRole: isVi ? 'Đánh giá định kỳ lớp học' : 'Class Evaluation',
+            date: formattedDate,
+            badgeType: isVi ? 'Nhận xét lớp học' : 'Class Review',
+            content: ev.content,
+            actionUrl: `/student/classes/${ev.classId}`,
+            actionLabel: isVi ? 'Xem thông tin lớp học' : 'View Class Details'
+          });
+        });
+
+        // 4. Process Graded Submissions (Fetch detail to get real finalFeedback & aiFeedback)
+        const gradedSubmissions = submissions
+          .filter(sub => isSubmissionGraded(sub))
+          .slice(0, 20);
+
+        const submissionDetails = await Promise.allSettled(
+          gradedSubmissions.map(sub => submissionService.getSubmission(sub.id))
+        );
+
+        submissionDetails.forEach((res) => {
+          if (res.status !== 'fulfilled' || !res.value) return;
+          const subDetail = res.value;
+          const assignmentIdStr = String(subDetail.assignmentId);
+          const assignment = assignmentMap.get(assignmentIdStr);
+          const className = assignmentClassMap.get(assignmentIdStr) || (classes.length > 0 ? classes[0].name : (isVi ? 'Lớp học' : 'Class'));
+          const assignmentTitle = assignment?.title || (isVi ? `Bài tập #${assignmentIdStr}` : `Assignment #${assignmentIdStr}`);
+          const formattedDate = subDetail.submittedAt
+            ? new Date(subDetail.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : '';
+
+          subDetail.modules?.forEach((mod) => {
+            const grading = mod.grading;
+            if (!grading) return;
+
+            const rawSkill = mod.skill?.toLowerCase();
+            const skill: 'writing' | 'speaking' | 'reading' | 'listening' =
+              rawSkill === 'speaking' || rawSkill === 'reading' || rawSkill === 'listening' ? rawSkill : 'writing';
+
+            const scoreVal = grading.finalScore;
+            const maxVal = grading.maxScoreSnapshot;
+            const scoreStr = scoreVal !== null && scoreVal !== undefined
+              ? (maxVal ? `${scoreVal} / ${maxVal}` : `${scoreVal} / 10`)
+              : undefined;
+
+            // Real teacher feedback
+            if (grading.finalFeedback && grading.finalFeedback.trim()) {
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-teacher`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: 'teacher',
+                reviewerName: isVi ? 'Giáo viên chấm bài' : 'Instructor',
+                reviewerRole: isVi ? 'Nhận xét bài nộp' : 'Submission Feedback',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Nhận xét bài nộp' : 'Submission Review',
+                content: grading.finalFeedback.trim(),
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
+
+            // Real AI feedback
+            if (grading.aiFeedback && grading.aiFeedback.trim()) {
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-ai`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: 'ai',
+                reviewerName: 'EnglishHub AI Diagnostic Engine',
+                reviewerRole: isVi ? 'Đánh giá tự động AI' : 'AI Diagnostic',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Đánh giá AI' : 'AI Evaluation',
+                content: grading.aiFeedback.trim(),
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
+
+            // If neither feedback text is present, but module has score / completed status
+            if (!grading.finalFeedback?.trim() && !grading.aiFeedback?.trim() && scoreStr) {
+              const isAuto = grading.method === 'AUTO';
+              dynamicList.push({
+                id: `sub-${subDetail.id}-mod-${mod.id}-graded`,
+                type: 'submission',
+                targetTitle: assignmentTitle,
+                className,
+                skill,
+                reviewerType: isAuto ? 'ai' : 'teacher',
+                reviewerName: isAuto ? 'Hệ thống tự động' : (isVi ? 'Giáo viên phụ trách' : 'Instructor'),
+                reviewerRole: isVi ? 'Kết quả chấm điểm' : 'Grading Result',
+                date: formattedDate,
+                score: scoreStr,
+                badgeType: isVi ? 'Đã chấm điểm' : 'Graded',
+                content: isVi 
+                  ? 'Bài làm đã được chấm điểm hoàn tất. Bạn có thể mở bài nộp để xem chi tiết điểm số và đáp án.' 
+                  : 'Grading is complete for this submission. You can open the submission to review scores and answers.',
+                actionUrl: `/student/submissions/${subDetail.id}`,
+                actionLabel: isVi ? 'Xem bài làm & Lời giải' : 'Review Submission'
+              });
+            }
           });
         });
 
@@ -182,27 +272,39 @@ export const StudentFeedback: React.FC = () => {
   const teacherFeedbackCount = feedbackList.filter(f => f.reviewerType === 'teacher').length;
   const aiFeedbackCount = feedbackList.filter(f => f.reviewerType === 'ai').length;
 
-  const filtered = feedbackList.filter(item => {
-    if (activeFilter === 'teacher' && item.reviewerType !== 'teacher') return false;
-    if (activeFilter === 'ai' && item.reviewerType !== 'ai') return false;
-    if (skillFilter !== 'all' && item.skill !== skillFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        item.assignmentTitle.toLowerCase().includes(q) ||
-        item.reviewerName.toLowerCase().includes(q) ||
-        item.summaryComment.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const filtered = useMemo(() => {
+    return feedbackList.filter(item => {
+      if (activeFilter === 'teacher' && item.reviewerType !== 'teacher') return false;
+      if (activeFilter === 'ai' && item.reviewerType !== 'ai') return false;
+      if (skillFilter !== 'all' && item.skill !== skillFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          item.targetTitle.toLowerCase().includes(q) ||
+          item.reviewerName.toLowerCase().includes(q) ||
+          item.className.toLowerCase().includes(q) ||
+          item.content.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [feedbackList, activeFilter, skillFilter, searchQuery]);
 
-  const getSkillIcon = (skill: string) => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedFeedback = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
+
+  const getSkillIcon = (skill?: string) => {
     switch (skill) {
       case 'writing': return <PenTool size={14} />;
       case 'speaking': return <Mic size={14} />;
       case 'reading': return <BookOpen size={14} />;
-      default: return <Headphones size={14} />;
+      case 'listening': return <Headphones size={14} />;
+      default: return <GraduationCap size={14} />;
     }
   };
 
@@ -213,7 +315,7 @@ export const StudentFeedback: React.FC = () => {
         <Skeleton height="48px" className="mb-6" />
         <div className="grid gap-5">
           {[1, 2].map(i => (
-            <Skeleton key={i} height="280px" />
+            <Skeleton key={i} height="240px" />
           ))}
         </div>
       </div>
@@ -249,7 +351,7 @@ export const StudentFeedback: React.FC = () => {
           <button
             type="button"
             className={`std-eco-pill ${activeFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('all')}
+            onClick={() => handleActiveFilterChange('all')}
           >
             {isVi ? 'Tất cả phản hồi' : 'All Reviews'}
             <span className="std-eco-pill-badge">{feedbackList.length}</span>
@@ -258,7 +360,7 @@ export const StudentFeedback: React.FC = () => {
           <button
             type="button"
             className={`std-eco-pill ${activeFilter === 'teacher' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('teacher')}
+            onClick={() => handleActiveFilterChange('teacher')}
           >
             <UserCheck size={14} />
             {isVi ? 'Từ Giảng viên' : 'From Instructors'}
@@ -268,7 +370,7 @@ export const StudentFeedback: React.FC = () => {
           <button
             type="button"
             className={`std-eco-pill ${activeFilter === 'ai' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('ai')}
+            onClick={() => handleActiveFilterChange('ai')}
           >
             <Sparkles size={14} />
             {isVi ? 'Từ Trợ lý AI' : 'From AI Diagnostic'}
@@ -280,7 +382,7 @@ export const StudentFeedback: React.FC = () => {
           {/* Skill Filter Dropdown */}
           <select
             value={skillFilter}
-            onChange={(e) => setSkillFilter(e.target.value)}
+            onChange={(e) => handleSkillFilterChange(e.target.value)}
             className="select-input"
           >
             <option value="all">{isVi ? 'Tất cả kỹ năng' : 'All Skills'}</option>
@@ -296,9 +398,9 @@ export const StudentFeedback: React.FC = () => {
             <input
               type="text"
               className="std-eco-search-input"
-              placeholder={isVi ? 'Tìm nhận xét, bài tập...' : 'Search feedback, teacher...'}
+              placeholder={isVi ? 'Tìm nhận xét, lớp, bài tập...' : 'Search feedback, teacher...'}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
             />
           </div>
         </div>
@@ -306,7 +408,7 @@ export const StudentFeedback: React.FC = () => {
 
       {/* Feedback List */}
       <div className="flex flex-col gap-5">
-        {filtered.map((item) => (
+        {paginatedFeedback.map((item) => (
           <div key={item.id} className="feedback-card">
             {/* Header */}
             <div className="feedback-header">
@@ -336,79 +438,62 @@ export const StudentFeedback: React.FC = () => {
                   </div>
 
                   <div className="text-xs text-slate-500">
-                    {item.className} • <span>{item.date}</span>
+                    {item.className} {item.date ? `• ${item.date}` : ''}
                   </div>
                 </div>
               </div>
 
               {/* Band Score & Skill Tag */}
               <div className="flex items-center gap-3">
-                <span className={`std-skill-tag ${item.skill}`}>
-                  {getSkillIcon(item.skill)}
-                  {item.skill}
-                </span>
+                {item.skill && (
+                  <span className={`std-skill-tag ${item.skill}`}>
+                    {getSkillIcon(item.skill)}
+                    {item.skill.charAt(0).toUpperCase() + item.skill.slice(1)}
+                  </span>
+                )}
 
-                <span className="grade-score-pill high">
-                  <Star size={13} fill="#059669" />
-                  {item.score}
-                </span>
+                {item.score && (
+                  <span className="grade-score-pill high">
+                    <Star size={13} fill="#059669" />
+                    {item.score}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Assignment Title */}
-            <div className="mb-4">
+            {/* Target Title */}
+            <div className="mb-2">
               <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">
-                {isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:'}
+                {item.type === 'submission' 
+                  ? (isVi ? 'Bài tập được đánh giá:' : 'Evaluated Assignment:') 
+                  : (isVi ? 'Đánh giá học tập lớp:' : 'Class Evaluation:')}
               </span>
               <h3 className="text-base font-bold text-primary m-0 mt-1">
-                {item.assignmentTitle}
+                {item.targetTitle}
               </h3>
             </div>
 
             {/* Quote Box: General Evaluation */}
             <div className="feedback-quote-box">
               <div className="text-xs font-bold uppercase text-primary tracking-wider mb-2">
-                {isVi ? 'Đánh giá tổng quan' : 'General Assessment'}
+                {item.reviewerType === 'ai'
+                  ? (isVi ? 'Nhận xét từ hệ thống AI' : 'AI Diagnostic Feedback')
+                  : (isVi ? 'Nhận xét của giảng viên' : 'Instructor Feedback')}
               </div>
-              <div>{item.summaryComment}</div>
-            </div>
-
-            {/* Key Strengths & Suggested Improvements */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              {/* Strengths */}
-              <div className="feedback-strengths-box">
-                <div className="flex items-center gap-2 font-bold mb-3 text-xs text-emerald-800">
-                  <CheckCircle2 size={16} />
-                  <span>{isVi ? 'Điểm mạnh nổi bật' : 'Key Strengths'}</span>
-                </div>
-                <ul className="m-0 pl-4 text-xs text-emerald-900 space-y-1">
-                  {item.keyStrengths.map((str, idx) => (
-                    <li key={idx}>{str}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Weakness / Advice */}
-              <div className="feedback-weakness-box">
-                <div className="flex items-center gap-2 font-bold mb-3 text-xs text-amber-800">
-                  <Lightbulb size={16} />
-                  <span>{isVi ? 'Gợi ý cần khắc phục' : 'Targeted Improvement'}</span>
-                </div>
-                <div className="text-xs text-amber-950 leading-relaxed">
-                  {item.suggestedImprovement}
-                </div>
+              <div className="text-slate-700 leading-relaxed text-sm">
+                <MarkdownView content={item.content} />
               </div>
             </div>
 
             {/* Action Footer */}
-            <div className="flex justify-end pt-4 border-t border-slate-100">
+            <div className="flex justify-end pt-3 border-t border-slate-100">
               <Button
                 variant="primary"
-                onClick={() => navigate(`/student/assignments/${item.assignmentId}/result`)}
+                onClick={() => navigate(item.actionUrl)}
                 icon={ArrowRight}
                 iconPosition="right"
               >
-                {isVi ? 'Xem bài làm & Lời giải chi tiết' : 'Review Full Submission & Corrections'}
+                {item.actionLabel}
               </Button>
             </div>
           </div>
@@ -418,7 +503,26 @@ export const StudentFeedback: React.FC = () => {
           <EmptyState
             icon={AlertCircle}
             title={isVi ? 'Không tìm thấy nhận xét nào phù hợp' : 'No feedback entries found'}
-            description={isVi ? 'Hãy thử đổi từ khóa tìm kiếm hoặc bỏ bớt bộ lọc.' : 'Try adjusting your search query or active filters.'}
+            description={isVi ? 'Hiện chưa có nhận xét nào hoặc hãy thử đổi từ khóa tìm kiếm.' : 'No feedback entries available or try adjusting your search.'}
+          />
+        )}
+
+        {/* Pagination */}
+        {filtered.length > 0 && (
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[5, 10, 20]}
+            itemLabel={isVi ? 'nhận xét' : 'feedback'}
+            isVi={isVi}
+            variant="standalone"
           />
         )}
       </div>
@@ -427,3 +531,4 @@ export const StudentFeedback: React.FC = () => {
 };
 
 export default StudentFeedback;
+

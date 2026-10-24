@@ -21,7 +21,8 @@
 10. [Grading](#10-grading)
 11. [Annotations](#11-annotations)
 12. [Student Evaluation](#12-student-evaluation)
-13. [DTO Objects](#13-dto-objects)
+13. [Reports](#13-reports)
+14. [DTO Objects](#14-dto-objects)
 
 ---
 
@@ -51,6 +52,27 @@ Log out and invalidate the refresh token.
 **Request Body:** `LogoutRequest`
 
 **Response:** `LogoutResponse`
+
+---
+
+### POST `/api/v1/auth/forgot-password`
+Request a password reset OTP for the specified email account.
+
+**Request Body:** `ForgotPasswordRequest`
+
+**Response:** `ForgotPasswordResponse`
+
+> 📧 The OTP is emailed to the user through EmailJS; the response **no longer** returns the OTP.
+> If email is not configured or delivery fails, the endpoint returns `502 Bad Gateway`.
+
+---
+
+### POST `/api/v1/auth/reset-password`
+Reset account password using the received OTP and verification token.
+
+**Request Body:** `ResetPasswordRequest`
+
+**Response:** `ResetPasswordResponse`
 
 ---
 
@@ -345,17 +367,47 @@ Delete a module.
 ---
 
 ### POST `/api/v1/modules/{moduleId}/audio`
-Upload an audio file for a module (multipart/form-data).
+Request a presigned PUT URL to upload the listening audio of a `LISTENING` module
+(teacher owner only). The client then PUTs the raw bytes directly to `uploadUrl` with a
+matching `Content-Type`, and calls `POST /api/v1/modules/{moduleId}/audio/confirm`.
 
 **Path Params:** `moduleId` (int64)
 
-**Request Body:** `multipart/form-data`
+**Request Body:** `application/json`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `file` | binary | Audio file to upload |
+| `mimeType` | string | One of `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`, `audio/wave`, `audio/mp4`, `audio/m4a`, `audio/x-m4a` |
 
-**Response:** `AudioUploadResponse`
+**Response:** `AudioUploadUrlResponse` (`{ message, uploadUrl, storageKey, expiresAt, sourceAudioUploadStatus }`, status `UPLOADING`)
+
+---
+
+### POST `/api/v1/modules/{moduleId}/audio/confirm`
+Probe object storage for the uploaded file and update the module status (teacher owner only).
+
+**Path Params:** `moduleId` (int64)
+
+**Request Body:** `application/json`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `storageKey` | string | The `storageKey` returned by the upload-url step |
+
+**Response:** `AudioUploadConfirmResponse` (`sourceAudioUploadStatus` = `READY` if uploaded, `FAILED` otherwise, HTTP `200` in both cases)
+
+---
+
+### GET `/api/v1/modules/{moduleId}/audio`
+Stream the raw listening-audio bytes. Allowed for the owning teacher and class-member students;
+`ADMIN` and non-member users get `403`. Returns `404` when the module has no audio.
+
+**Path Params:** `moduleId` (int64)
+
+**Response:** binary audio with the stored `Content-Type` and `Cache-Control: private, max-age=3600`
+
+> Full flow (including client examples and the submission-file uploads): see
+> [`docs/api/file-upload-guide-module-audio-and-submission-files.md`](./file-upload-guide-module-audio-and-submission-files.md).
 
 ---
 
@@ -566,6 +618,49 @@ Trigger AI to automatically analyze and grade a submission module.
 
 ---
 
+### GET `/api/v1/submission-modules/{id}/grading/ai-suggestion`
+Retrieve stored AI grading suggestions and available rubric metadata for a submission module (UC25). This endpoint reads the database only; it does not call ai-service or trigger AI analysis.
+
+**Authorization:** Bearer access token with role `TEACHER`. The teacher must own the submission's class (`classes.teacher_id` matches the current user ID). Ownership is checked before the skill guard.
+
+**Supported Skills:** `SPEAKING`, `WRITING`. An owning teacher receives HTTP 400 for `READING` or `LISTENING`. This rejection does not block manual grading through `PUT /api/v1/gradings/{id}` (`id` is the grading ID); normal ownership and score validation still apply.
+
+**Path Params:** `id` (int64)
+
+**Response:** `AiGradingSuggestionResponse` (HTTP 200), returned directly at the JSON root without a `data` wrapper or success message. Nullable fields depend on the stored grading data; HTTP 200 does not guarantee populated AI metadata.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `submissionModuleId` | int64 | Submission module ID |
+| `gradingId` | int64 | Grading record ID |
+| `skill` | string | `SPEAKING` or `WRITING` |
+| `status` | string | Stored grading status |
+| `suggestedScore` | number \| null | From stored `criteriaScores.overallScore`; does not fall back to the final score |
+| `maxScore` | number \| null | Stored maximum-score snapshot; may be null for legacy data |
+| `aiFeedback` | string \| null | Stored AI feedback |
+| `criteriaScores` | JSON \| null | Rubric scores extracted from stored AI metadata |
+| `metrics` | JSON \| null | Stored `fluencyMetrics`, `textMetrics`, or `metrics`, in that priority order |
+| `annotations` | `AnswerAnnotationResponse[]` | Stored annotations for the first answer; an empty array when none are available |
+| `transcript` | JSON \| null | Stored transcript data, including array form; may be absent for Writing |
+| `modelUsed` | string \| null | Model name from stored AI metadata |
+| `providerUsed` | string \| null | Provider name from stored AI metadata |
+| `canTriggerAi` | boolean | True for grading status `PENDING` or `FAILED`; this GET does not trigger analysis |
+| `fallbackManualGradingAvailable` | boolean | True in the current implementation |
+| `fallbackMessage` | string | Guidance based on the stored grading status |
+
+**Response Statuses:**
+
+| Status | Condition | Body / message |
+|--------|-----------|----------------|
+| 200 | Owning teacher reads a supported skill with an existing grading | `AiGradingSuggestionResponse` as described above |
+| 400 | Owning teacher reads `READING` or `LISTENING` | `{"error":"Gợi ý chấm AI chỉ hỗ trợ cho kỹ năng Nói (Speaking) và Viết (Writing)."}` |
+| 401 | Missing access token, invalid signature, or expired token | `{"error":"Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."}` |
+| 403 | Role is `STUDENT` or `ADMIN` (route authorization), or the teacher does not own the class (service ownership check) | `{"error":"Bạn không có quyền thực hiện thao tác này."}` |
+
+The two 403 rejection layers return the same body; status and body alone do not identify which layer rejected the request.
+
+---
+
 ### GET `/api/v1/answers/{id}/annotations`
 Retrieve the list of annotations (error highlights) for an answer.
 
@@ -671,9 +766,78 @@ Delete an evaluation.
 
 ---
 
+## 13. Reports
+
+### GET `/api/v1/reports/overview`
+Retrieve aggregated report metrics (class count, assigned assignment count, completion rate %, average score %, pending grading count and breakdown by grading status) for an optional date window, class, or teacher.
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `classId` | int64 | Optional class filter |
+| `teacherId` | int64 | Optional teacher filter |
+
+**Response:** `ReportOverviewResponse`
+
 ---
 
-## 13. DTO Objects
+### GET `/api/v1/reports/classes`
+Retrieve paginated list of classes with their assignment count, average score %, and completion rate %.
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `teacherId` | int64 | Optional teacher filter |
+| `page` | integer | Page number (default: `1`) |
+| `limit` | integer | Records per page (default: `20`) |
+
+**Response:** `ReportClassListResponse`
+
+---
+
+### GET `/api/v1/reports/classes/{id}/progress`
+Retrieve progress and scores for a specific class, including average score per assignment, lagging students, and unscored students based on a completion threshold.
+
+**Path Params:** `id` (int64)
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+| `threshold` | number (decimal) | Completion rate threshold % to identify lagging students (default: `50`) |
+
+**Response:** `ReportClassProgressResponse`
+
+---
+
+### GET `/api/v1/reports/students/{id}/progress`
+Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writing), and historical score timeline for a student.
+
+**Path Params:** `id` (int64)
+
+**Query Params:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `classId` | int64 | Optional class filter |
+| `from` | date (`yyyy-MM-dd`) | Start date boundary (inclusive) |
+| `to` | date (`yyyy-MM-dd`) | End date boundary (inclusive) |
+
+**Response:** `ReportStudentProgressResponse`
+
+---
+
+---
+
+## 14. DTO Objects
 
 ### Request DTOs
 
@@ -698,6 +862,23 @@ Delete an evaluation.
 | Field | Type | Description |
 |-------|------|-------------|
 | `refreshToken` | string | Refresh token to invalidate |
+
+---
+
+#### `ForgotPasswordRequest`
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | string | User email address to request password reset OTP |
+
+---
+
+#### `ResetPasswordRequest`
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | string | User email address |
+| `otp` | string | 6-digit OTP code received |
+| `token` | string | Password reset token (optional/if supported) |
+| `newPassword` | string | New password |
 
 ---
 
@@ -966,6 +1147,21 @@ Delete an evaluation.
 
 ---
 
+#### `ForgotPasswordResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Notification message |
+| `email` | string | Target email address |
+
+---
+
+#### `ResetPasswordResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Notification message confirming password reset |
+
+---
+
 #### `UserResponse`
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1100,6 +1296,7 @@ Delete an evaluation.
 | `title` | string | Title |
 | `status` | string | Status |
 | `closeAt` | string (date-time) | Closing time |
+| `skills` | string[] | Skills from the assignment's actual modules: `READING`, `LISTENING`, `WRITING`, `SPEAKING`. Duplicates are removed while preserving module `orderIndex` order. Returns `[]` when the assignment has no modules; never `null`. |
 
 ---
 
@@ -1202,12 +1399,23 @@ Delete an evaluation.
 
 ---
 
-#### `AudioUploadResponse`
+#### `AudioUploadUrlResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Message |
+| `uploadUrl` | string | Presigned PUT URL for the direct upload |
+| `storageKey` | string | Storage key to send to the confirm step |
+| `expiresAt` | string (date-time) | Expiry of the presigned URL |
+| `sourceAudioUploadStatus` | string | Upload status (`UPLOADING`) |
+
+---
+
+#### `AudioUploadConfirmResponse`
 | Field | Type | Description |
 |-------|------|-------------|
 | `message` | string | Message |
 | `sourceAudioStorageKey` | string | Audio file storage key |
-| `sourceAudioUploadStatus` | string | Upload status |
+| `sourceAudioUploadStatus` | string | `READY` or `FAILED` |
 
 ---
 
@@ -1394,6 +1602,28 @@ Same structure as `AnswerResponse`.
 
 ---
 
+#### `AiGradingSuggestionResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `submissionModuleId` | int64 | Submission module ID |
+| `gradingId` | int64 | Grading record ID |
+| `skill` | string | Evaluated skill (`SPEAKING`, `WRITING`) |
+| `status` | string | Stored grading status |
+| `suggestedScore` | number \| null | Stored `criteriaScores.overallScore`; no fallback to the final score |
+| `maxScore` | number \| null | Stored maximum-score snapshot; may be null for legacy data |
+| `aiFeedback` | string \| null | Stored AI feedback |
+| `criteriaScores` | JSON \| null | Rubric scores extracted from stored AI metadata |
+| `metrics` | JSON \| null | Stored fluency, text, or other AI metrics |
+| `annotations` | `AnswerAnnotationResponse[]` | Detected errors and inline annotations |
+| `transcript` | JSON \| null | Stored transcript data, including array form |
+| `modelUsed` | string \| null | Model name from stored AI metadata |
+| `providerUsed` | string \| null | Provider name from stored AI metadata |
+| `canTriggerAi` | boolean | True for `PENDING` or `FAILED`; this GET does not trigger analysis |
+| `fallbackManualGradingAvailable` | boolean | True in the current implementation |
+| `fallbackMessage` | string | Guidance based on the stored grading status |
+
+---
+
 #### `GradingMessageResponse`
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1489,6 +1719,112 @@ Same structure as `AnswerResponse`.
 | `page` | integer (int32) | Current page |
 | `limit` | integer (int32) | Records per page |
 | `total` | int64 | Total number of records |
+
+---
+
+#### `ReportOverviewResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `classCount` | int64 | Total active classes in reporting scope |
+| `assignedAssignmentCount` | int64 | Total assignments assigned across classes |
+| `completionRatePercent` | number | Overall submission completion percentage |
+| `averageScorePercent` | number | Overall class average score percentage |
+| `pendingGradingCount` | int64 | Total submissions awaiting grading |
+| `pendingByStatus` | object (Map<GradingStatus, Long>) | Breakdown of pending submissions grouped by grading status |
+
+---
+
+#### `ReportClassListResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `ClassSummary[]` | List of summarized class performance rows |
+| `pagination` | `ReportPaginationResponse` | Pagination metadata |
+
+---
+
+#### `ClassSummary` _(used in ReportClassListResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `classId` | int64 | Class ID |
+| `className` | string | Class name |
+| `status` | string | Class status (`ACTIVE`, `ARCHIVED`, etc.) |
+| `assignedAssignmentCount` | int64 | Total assignments assigned |
+| `averageScorePercent` | number | Average score across all completed submissions |
+| `completionRatePercent` | number | Submission completion percentage |
+
+---
+
+#### `ReportClassProgressResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `classId` | int64 | Class ID |
+| `completionRatePercent` | number | Overall class completion rate % |
+| `belowAverageRatePercent` | number | Percentage of students below threshold |
+| `totalStudentCount` | int64 | Total students enrolled |
+| `scoredStudentCount` | int64 | Students with scored submissions |
+| `belowAverageCount` | int64 | Count of students below threshold |
+| `assignmentScores` | `AssignmentScore[]` | Per-assignment score summary |
+| `laggingStudents` | `StudentProgress[]` | Students performing below threshold |
+| `unscoredStudents` | `StudentProgress[]` | Students with 0 completed/graded submissions |
+
+---
+
+#### `AssignmentScore` _(used in ReportClassProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `assignmentId` | int64 | Assignment ID |
+| `title` | string | Assignment title |
+| `averageScorePercent` | number | Average percentage score achieved |
+
+---
+
+#### `StudentProgress` _(used in ReportClassProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | int64 | Student ID |
+| `fullName` | string | Student full name |
+| `completedAssignments` | int64 | Number of completed assignments |
+| `totalAssignments` | int64 | Total assignments assigned |
+| `completionRatePercent` | number | Completion rate % |
+| `averageScorePercent` | number | Average score % |
+
+---
+
+#### `ReportStudentProgressResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | int64 | Student ID |
+| `studentName` | string | Student full name |
+| `classId` | int64 | Associated Class ID |
+| `skillAverages` | `SkillAverage[]` | Average performance broken down by skill |
+| `scoreTimeline` | `ScoreTimeline[]` | Chronological assignment scores |
+
+---
+
+#### `SkillAverage` _(used in ReportStudentProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `skill` | string | Skill module (`LISTENING`, `READING`, `WRITING`, `SPEAKING`) |
+| `averageScorePercent` | number | Average percentage score in this skill |
+
+---
+
+#### `ScoreTimeline` _(used in ReportStudentProgressResponse)_
+| Field | Type | Description |
+|-------|------|-------------|
+| `assignmentId` | int64 | Assignment ID |
+| `title` | string | Assignment title |
+| `submittedAt` | string (date-time) | Submission timestamp |
+| `scorePercent` | number | Score percentage achieved |
+
+---
+
+#### `ReportPaginationResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `page` | integer (int32) | Current page |
+| `limit` | integer (int32) | Records per page |
+| `total` | int64 | Total records matching query |
 
 ---
 

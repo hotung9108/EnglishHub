@@ -5,8 +5,10 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[c]));
 
-export function sanitize(message, users) {
-  let text = String(message);
+export function sanitize(message, users = {}) {
+  let text = String(message).replace(/\x1b\[[0-9;]*m/g, '')
+    .replace(/eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED_TOKEN]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~-]+/gi, '$1[REDACTED_TOKEN]');
   for (const user of Object.values(users)) {
     for (const secret of [user.email, user.password]) if (secret) text = text.split(secret).join('[REDACTED]');
   }

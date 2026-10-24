@@ -1,0 +1,22 @@
+id: QA-32
+title: "Thiết lập Vitest và React Testing Library cho UI Components"
+assignee: "@tester"
+status: "In Progress"
+priority: "P0"
+updated_at: "2026-10-22"
+branch: "feature/qa-32-ui-components"
+pr: "https://github.com/hotung9108/EnglishHub/pull/216"
+base: "e8e85a4d6ffa54a1bc8e107c61a8a82c44028ded"
+completed_scope:
+  - "Thiết lập Vitest, RTL, jest-dom, jsdom, coverage 80% từng file/từng chỉ số."
+  - "102 UI test Pass; 139 API client/utility test Pass; types/build Pass; lint exit 0 (1 warning có sẵn)."
+  - "9 known-bugs tái hiện riêng; 7 bug GitHub #207–213, annotation gap #214, score clarification #215."
+pending:
+  - "DoD duyệt annotation chưa có UI; người dùng yêu cầu chỉ ghi nhận, không sửa app trong task QA."
+  - "Chốt precision điểm ở #215; không tự coi step=0.5 là bug."
+  - "Dev sửa và retest lỗi tồn đọng; PR bộ test cần review/merge."
+artifacts:
+  - "docs/FRONTEND_UI_TESTING.md"
+  - "production_artifacts/test_reports/QA-32/README.md"
+  - "production_artifacts/test_reports/QA-32/ISSUE-LINKS-2026-10-22.md"
+  - "production_artifacts/test_reports/QA-32/evidence/summary.json"

@@ -18,3 +18,17 @@ test('reject malformed URLs, timeouts and browser settings', () => {
 test('report redacts configured credentials', () => {
   assert.equal(sanitize('mail@example.com passwordSecret', { admin: { email: 'mail@example.com', password: 'passwordSecret' } }), '[REDACTED] [REDACTED]');
 });
+
+test('QA28 local settings remain usable while SELENIUM settings take precedence', () => {
+  const env = {
+    QA28_BASE_URL: 'https://legacy.example.invalid', QA28_HEADLESS: 'false',
+    QA28_TEACHER_EMAIL: 'legacy@example.invalid', QA28_TEACHER_PASSWORD: 'synthetic-legacy',
+    SELENIUM_BASE_URL: 'https://canonical.example.invalid',
+    SELENIUM_TEACHER_PASSWORD: 'synthetic-canonical',
+  };
+  const config = loadConfig(env);
+  assert.equal(config.baseUrl, 'https://canonical.example.invalid');
+  assert.equal(config.headless, false);
+  assert.deepEqual(config.users.teacher, { email: 'legacy@example.invalid', password: 'synthetic-canonical' });
+  assert.equal(env.SELENIUM_TEACHER_EMAIL, undefined, 'Loading config must not mutate the input environment');
+});

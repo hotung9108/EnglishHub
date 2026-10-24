@@ -1,0 +1,7 @@
+id: BUG-QA32-ANNOTATION
+title: "[FE][Feature gap][QA-32] Bổ sung luồng duyệt annotation trên TeacherSubmissionDetails"
+assignee: "@fe-primary"
+status: "To Do"
+issue: "https://github.com/hotung9108/EnglishHub/issues/214"
+source: "QA-32 / develop e8e85a4 / component jsdom"
+description: "Chi tiết và retest: production_artifacts/test_reports/QA-32/issues/public/ANNOTATION.md"

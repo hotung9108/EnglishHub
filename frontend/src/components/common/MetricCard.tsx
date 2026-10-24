@@ -41,7 +41,7 @@ export const MetricCard = ({
 
   return (
     <div className={cardClasses} onClick={onClick}>
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start gap-2">
         <span className="metric-title">{title}</span>
         {icon && (
           <div 
@@ -55,15 +55,17 @@ export const MetricCard = ({
           </div>
         )}
       </div>
-      <div className="metric-value-wrap">
-        <span className="metric-value">{value}</span>
-        {suffix && <span className="metric-suffix">{suffix}</span>}
-      </div>
-      {footerText && (
-        <div className="metric-footer">
-          {footerText}
+      <div>
+        <div className="metric-value-wrap">
+          <span className="metric-value">{value}</span>
+          {suffix && <span className="metric-suffix">{suffix}</span>}
         </div>
-      )}
+        {footerText && (
+          <div className="metric-footer">
+            {footerText}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

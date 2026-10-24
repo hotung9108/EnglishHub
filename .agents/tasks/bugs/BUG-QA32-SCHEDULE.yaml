@@ -1,0 +1,7 @@
+id: BUG-QA32-SCHEDULE
+title: "[FE][Teacher Create Assignment] Cho gửi lịch đóng bài trước lịch mở"
+assignee: "@fe-primary"
+status: "To Do"
+issue: "https://github.com/hotung9108/EnglishHub/issues/210"
+source: "QA-32 / develop e8e85a4 / component jsdom"
+description: "Chi tiết và retest: production_artifacts/test_reports/QA-32/issues/public/SCHEDULE.md"

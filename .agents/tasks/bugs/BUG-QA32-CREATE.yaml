@@ -1,0 +1,7 @@
+id: BUG-QA32-CREATE
+title: "[FE][Teacher Create Assignment] Vẫn phát hành bài khi tạo module thất bại"
+assignee: "@fe-primary"
+status: "To Do"
+issue: "https://github.com/hotung9108/EnglishHub/issues/209"
+source: "QA-32 / develop e8e85a4 / component jsdom"
+description: "Chi tiết và retest: production_artifacts/test_reports/QA-32/issues/public/CREATE.md"

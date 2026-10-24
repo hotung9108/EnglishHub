@@ -482,6 +482,11 @@ class GradingMaxScoreSnapshotRegressionIntegrationTest {
 				public boolean objectExists(String storageKey) {
 					return true;
 				}
+
+				@Override
+				public void deleteObject(String storageKey) {
+					// no-op: the stub has no backing store
+				}
 			};
 		}
 	}

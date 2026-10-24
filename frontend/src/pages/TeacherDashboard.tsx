@@ -11,7 +11,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
 import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, type SubmissionModuleSummary, isSubmissionGraded } from '../api/services/submission.service';
 import type { 
   TeacherSkill, 
   TeacherPendingSubmission, 
@@ -80,7 +80,7 @@ export const TeacherDashboard: React.FC = () => {
           effectiveClasses.map(async (cls): Promise<EnrichedClassData> => {
             let members: ClassMember[];
             let assignments: AssignmentSummary[];
-            let submissions: SubmissionListItem[] = [];
+            let submissions: SubmissionListItem[];
 
             try {
               members = await classService.listMembers(cls.id);
@@ -95,18 +95,14 @@ export const TeacherDashboard: React.FC = () => {
               assignments = [];
             }
 
-            // Fetch submissions for assignments in this class
-            if (assignments.length > 0) {
-              const subPromises = assignments.map(async (a) => {
-                try {
-                  const subRes = await submissionService.listSubmissions({ assignmentId: a.id, limit: 50 });
-                  return subRes.data || [];
-                } catch {
-                  return [];
-                }
-              });
-              const subResults = await Promise.all(subPromises);
-              submissions = subResults.flat();
+            const classId = cls.id;
+            const assignmentIds = new Set(assignments.map((assignment) => assignment.id));
+            try {
+              const classSubmissions = await submissionService.listAllSubmissions({ classId });
+              submissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
+            } catch {
+              submissions = [];
+              console.warn('Failed to load class submissions', { classId });
             }
 
             return {
@@ -142,11 +138,11 @@ export const TeacherDashboard: React.FC = () => {
 
   // Derived: All student lookup map
   const studentMap = useMemo(() => {
-    const map = new Map<number, { name: string; code?: string }>();
+    const map = new Map<number, { name: string; code?: string; email?: string }>();
     for (const ec of enrichedClasses) {
       for (const m of ec.members) {
         if (!map.has(m.studentId)) {
-          map.set(m.studentId, { name: m.fullName, code: m.studentCode });
+          map.set(m.studentId, { name: m.fullName, code: m.studentCode, email: m.email });
         }
       }
     }
@@ -190,7 +186,7 @@ export const TeacherDashboard: React.FC = () => {
 
         if (isPendingGrading) {
           const studentInfo = studentMap.get(sub.studentId);
-          const assignInfo = sub.assignmentId ? assignmentMap.get(sub.assignmentId) : undefined;
+          const assignInfo = assignmentMap.get(sub.assignmentId);
           const firstMod = sub.modules[0];
           const skill: TeacherSkill = mapSkill(firstMod?.skill);
 
@@ -215,10 +211,12 @@ export const TeacherDashboard: React.FC = () => {
 
           list.push({
             id: `sub-${sub.id}`,
-            assignmentId: String(sub.assignmentId || '1'),
+            assignmentId: String(sub.assignmentId),
             assignmentTitle: assignInfo?.title || (isVi ? `Bài tập #${sub.assignmentId}` : `Assignment #${sub.assignmentId}`),
             studentId: String(sub.studentId),
             studentName: studentInfo?.name || (isVi ? `Học viên #${sub.studentId}` : `Student #${sub.studentId}`),
+            studentEmail: studentInfo?.email,
+            studentCode: studentInfo?.code,
             studentAvatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(studentInfo?.name || 'ST')}`,
             className: assignInfo?.className || ec.summary.name,
             skill,
@@ -347,7 +345,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'writing',
         skillName: 'Writing',
         avgScore: calcAvg(skillScores.writing),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('writing'),
         needsReviewCount: queueCounts.writing
       },
@@ -355,7 +352,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'speaking',
         skillName: 'Speaking',
         avgScore: calcAvg(skillScores.speaking),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('speaking'),
         needsReviewCount: queueCounts.speaking
       },
@@ -363,7 +359,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'reading',
         skillName: 'Reading',
         avgScore: calcAvg(skillScores.reading),
-        benchmark: 7.5,
         submissionRate: calcSkillSubmissionRate('reading'),
         needsReviewCount: queueCounts.reading
       },
@@ -371,7 +366,6 @@ export const TeacherDashboard: React.FC = () => {
         skill: 'listening',
         skillName: 'Listening',
         avgScore: calcAvg(skillScores.listening),
-        benchmark: 7.0,
         submissionRate: calcSkillSubmissionRate('listening'),
         needsReviewCount: queueCounts.listening
       }
@@ -428,10 +422,10 @@ export const TeacherDashboard: React.FC = () => {
     for (const ec of enrichedClasses) {
       for (const sub of ec.submissions) {
         const studentInfo = studentMap.get(sub.studentId);
-        const assignInfo = sub.assignmentId ? assignmentMap.get(sub.assignmentId) : undefined;
+        const assignInfo = assignmentMap.get(sub.assignmentId);
         const studentName = studentInfo?.name || (isVi ? 'Học viên' : 'Student');
 
-        if (sub.status === 'GRADED') {
+        if (isSubmissionGraded(sub)) {
           activities.push({
             id: `act-grad-${sub.id}`,
             type: 'ai_graded',
@@ -705,7 +699,12 @@ export const TeacherDashboard: React.FC = () => {
                       <button 
                         type="button"
                         className="teacher-dash-btn-grade"
-                        onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`)}
+                        onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`, {
+                          state: {
+                            studentName: item.studentName,
+                            studentCode: item.studentCode
+                          }
+                        })}
                       >
                         <span>{isVi ? 'Chấm bài' : 'Grade'}</span>
                       </button>
@@ -758,10 +757,6 @@ export const TeacherDashboard: React.FC = () => {
                       <span className="teacher-dash-skill-score">
                         {item.avgScore > 0 ? item.avgScore : '—'}
                       </span>
-                    </div>
-
-                    <div className="teacher-dash-skill-benchmark">
-                      {isVi ? `Mục tiêu chuẩn: ${item.benchmark}` : `Benchmark: ${item.benchmark}`}
                     </div>
 
                     <div className="teacher-dash-progress-track">

@@ -49,13 +49,14 @@ public class SubmissionController {
 
 	@GetMapping("/submissions")
 	public ResponseEntity<SubmissionListResponse> listSubmissions(
+			@RequestParam(required = false) Long classId,
 			@RequestParam(required = false) Long assignmentId,
 			@RequestParam(required = false) Long studentId,
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
 		return ResponseEntity.ok(
-				SubmissionListResponse.from(submissionService.list(assignmentId, studentId, status, page, limit)));
+				SubmissionListResponse.from(submissionService.list(classId, assignmentId, studentId, status, page, limit)));
 	}
 
 	@PostMapping("/submission-modules/{id}/submit")

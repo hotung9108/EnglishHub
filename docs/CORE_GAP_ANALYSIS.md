@@ -1,7 +1,7 @@
 # Báo Cáo Phân Tích Khoảng Thiếu Kỹ Thuật So Với Core SRS, Các Tính Năng Dư Thừa & Lộ Trình Hoàn Thiện (Core Gap & Redundancy Analysis)
 
 > **Dự án**: EnglishHub — Hệ thống Quản lý & Chấm chữa bài tập Tiếng Anh Thông minh  
-> **Ngày cập nhật**: 08/10/2026  
+> **Ngày cập nhật**: 16/10/2026 (Phiên bản 2.0 - Cập nhật sau khi đối soát toàn bộ mã nguồn thực tế)  
 > **Người thực hiện**: Hệ thống Phân tích Antigravity Agent  
 > **Cơ sở đối chiếu**: Toàn bộ tài liệu kỹ thuật cốt lõi (`docs/core/`: 00.PI, 01.SRS, 02.PP, 03.TP) đối chiếu với Mã nguồn thực tế hiện hữu (Spring Boot Backend, FastAPI AI Service, React 19 Frontend, Flyway Migrations).
 
@@ -9,16 +9,16 @@
 
 ## 1. Tóm Tắt Trạng Thái Dự Án (Executive Summary)
 
-Trải qua các chu kỳ phát triển liên tục (`BE-TASK-10` đến `BE-TASK-16`, `TASK-FE-AXIOS-INTEGRATION`, `TASK-FE-08`, v.v.), hệ thống **EnglishHub** đã đạt bước nhảy vọt về mức độ hoàn thiện ở tầng Backend và AI Service, trong khi tầng Frontend đã định hình đầy đủ 46 trang giao diện nhưng đang trong quá trình chuyển dịch từ Mock Data sang Real API:
+Trải qua các chu kỳ phát triển liên tục (`BE-TASK-10` đến `BE-TASK-16`, `TASK-FE-AXIOS-INTEGRATION`, `TASK-FE-TEACHER-DASHBOARD`, `TASK-FE-20`, v.v.), hệ thống **EnglishHub** đã đạt bước nhảy vọt về mức độ hoàn thiện ở cả 3 phân hệ (Admin, Teacher, Student):
 
 | Khối thành phần | Tỷ lệ hoàn thiện ước tính | Đánh giá hiện trạng | Điểm nghẽn chính cần giải quyết |
 | :--- | :---: | :--- | :--- |
-| **Cơ sở dữ liệu (Database)** | **98%** | Lược đồ V6 hoàn chỉnh với 17 bảng nghiệp vụ, migrations Flyway (V1 - V6) hoạt động ổn định trên PostgreSQL 16. | Cần rà soát các cột/bảng thừa không nằm trong Core SRS (Plagiarism, Sessions). |
+| **Cơ sở dữ liệu (Database)** | **98%** | Lược đồ V6 hoàn chỉnh với 17 bảng nghiệp vụ, migrations Flyway (V1 - V6) hoạt động ổn định trên PostgreSQL 16. | Cần rà soát các cột thừa không nằm trong Core SRS (Plagiarism, Sessions). |
 | **Backend API (Spring Boot)** | **98%** | **Hoàn thành 100% các cụm API nghiệp vụ (62/62 endpoints)**. Đã xong Cụm 7 (Student Evaluations #58-#62 trong `BE-TASK-10`), Auto-grading Engine (`BE-TASK-13`), và Unified AI Grading API (`BE-TASK-16`). Hơn 666+ automated tests chạy pass 100%. | Đang hoạt động hoàn chỉnh; cần kiểm tra tải và bảo đảm bảo mật token khi chạy môi trường thực tế. |
-| **Trí tuệ nhân tạo (AI Engine)** | **85%** | **Đã thoát khỏi trạng thái Stub rỗng**: Xây dựng AI Microservice độc lập (`ai-service` FastAPI) với Google Gemini Flash multimodal, pipeline chấm Speaking (Whisper STT, Fluency metrics, Audio processing trong `BE-TASK-14`) và Writing (Text metrics, CEFR/IELTS rubrics, annotations trong `BE-TASK-15`). Backend Spring Boot đã kết nối qua `AiServiceClient`. | Cần kiểm tra hạn mức quota Gemini API Key thật trên môi trường Production và tối ưu thời gian phản hồi (caching). |
-| **Giao diện người dùng (Frontend)** | **75%** | Đã xây dựng 46 màn hình bằng React 19, Vite, TypeScript. AuthContext đã kết nối JWT login thật. Phân hệ Học viên đã kết nối luồng nộp bài và xem kết quả thật. | **Nhiều trang Teacher & Admin vẫn dùng Mock Data tĩnh**; Luồng nộp âm thanh Speaking trên FE mới là giả lập; Thiếu Multi-module Exam Runner và Bảng duyệt AI Annotation. |
+| **Trí tuệ nhân tạo (AI Engine)** | **85%** | **Microservice độc lập hoàn chỉnh**: Xây dựng AI Microservice độc lập (`ai-service` FastAPI) với Google Gemini Flash multimodal, pipeline chấm Speaking (Whisper STT, Fluency metrics trong `BE-TASK-14`) và Writing (Text metrics, CEFR/IELTS rubrics, annotations trong `BE-TASK-15`). Backend Spring Boot đã kết nối qua `AiServiceClient`. | Cần kiểm tra hạn mức quota Gemini API Key thật trên môi trường Production và tối ưu thời gian phản hồi (caching). |
+| **Giao diện người dùng (Frontend)** | **90%** | Đã xây dựng 46 màn hình bằng React 19, Vite, TypeScript. AuthContext đã kết nối JWT login thật. **Toàn bộ phân hệ Quản trị (Admin) và Giáo viên (Teacher) đã kết nối API thật** (`Accounts`, `Classes`, `Teachers`, `Students`, `TeacherAssignments`, `TeacherSubmissionDetails`, `AdminReports`, `AdminGradingAuditLogs`). | Thiếu Multi-module Exam Runner (`StudentAssignmentRunner.tsx`); Thiếu Bảng duyệt AI Annotation (`TeacherAnnotationReviewPanel.tsx`); Luồng ghi âm Speaking cần Web Audio API thật; Trình phát audio bài Nghe. |
 | **Hạ tầng & Vận hành (DevOps)** | **92%** | Đã cấu hình 8 GitHub Actions pipelines, Docker Compose đa dịch vụ (backend, ai-service, postgres, minio), mạng Tailscale Mesh VPN và bảo mật TruffleHog. | Cần kích hoạt pipeline build cho `ai-service` và cấu hình SSH Secrets deploy tự động lên VPS Production. |
-| **Đảm bảo chất lượng (QA & Test)** | **75%** | Backend đạt 666+ tests (Unit + Integration Testcontainers). AI service có test suite riêng. Frontend có 9 test suites cho API service qua Node test runner. | **Frontend hoàn toàn thiếu kiểm thử tự động giao diện (Component Tests & E2E Tests)**. Chưa có kiểm thử tải tích hợp (Load Testing). |
+| **Đảm bảo chất lượng (QA & Test)** | **75%** | Backend đạt 666+ tests (Unit + Integration Testcontainers). AI service có test suite riêng. Frontend có test suites cho API service qua Node test runner. | **Frontend hoàn toàn thiếu kiểm thử tự động giao diện (Component Tests & E2E Tests)**. Chưa có kiểm thử tải tích hợp (Load Testing). |
 
 ---
 
@@ -44,7 +44,7 @@ Trải qua các chu kỳ phát triển liên tục (`BE-TASK-10` đến `BE-TASK
 
 1. **Ngân Hàng Đề Thi / Bài Tập Mẫu (`TeacherExamBank.tsx` - `/teacher/exam-bank`)**:
    - *Đánh giá*: **VƯỢT PHẠM VI (Out of Scope)**. Core SRS quy định giáo viên tạo bài tập trực tiếp cho lớp (UC11, UC12). Không có use case về kho đề thi trung tâm dùng chung.
-   - *Xử lý*: Giữ trang ở dạng tham khảo phụ, ẩn liên kết khỏi Sidebar chính của giáo viên để tránh việc ban giám khảo/người chấm thắc mắc về tính đồng bộ dữ liệu.
+   - *Xử lý*: Giữ trang ở dạng tham khảo phụ, ẩn liên kết khỏi Sidebar chính của giáo viên để tránh phân tán tài nguyên.
 2. **Lưu Trữ Lớp Học Độc Lập (`AdminClassArchive.tsx` - `/admin/classes/archive`)**:
    - *Đánh giá*: **DƯ THỪA (Redundant)**. SRS chỉ yêu cầu quản lý trạng thái lớp học (Mở/Đóng). Việc tách riêng trang lưu trữ làm rối luồng quản trị.
    - *Xử lý*: Chuyển thành bộ lọc trạng thái lớp học trong `Classes.tsx`, gỡ bỏ route riêng.
@@ -67,120 +67,82 @@ Trải qua các chu kỳ phát triển liên tục (`BE-TASK-10` đến `BE-TASK
 
 Dưới đây là bảng đối chiếu cập nhật chi tiết toàn bộ các Ca sử dụng theo Mục 2 của [`docs/core/01.SRS.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/core/01.SRS.md):
 
-| STT | Tên Ca Sử Dụng (SRS) | Tác nhân | Backend API | Frontend UI | Trạng thái tích hợp | Khoảng thiếu kỹ thuật (Gap) & Cần làm |
+| STT | Tên Ca Sử Dụng (SRS) | Tác nhân | Backend API | Frontend UI | Trạng thái tích hợp | Hiện trạng & Cần làm |
 | :---: | :--- | :---: | :---: | :---: | :---: | :--- |
 | 1 | Đăng nhập | Admin, Teacher, Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã kết nối `POST /api/v1/auth/login`, nhận JWT và lưu vào `tokenStorage`. |
 | 2 | Đăng xuất | Admin, Teacher, Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã gọi `POST /api/v1/auth/logout`, xóa token trên client và database. |
 | 3 | Quản lý tài khoản cá nhân | Mọi người dùng | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Trang Profile đã kết nối `userService.getProfile` và `userService.changePassword`. |
-| 4 | Quản lý tài khoản người dùng | Admin | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `Accounts.tsx` đang dùng danh sách mẫu. Cần nối với `userService.list` và API khóa tài khoản. |
-| 5 | Phân quyền người dùng | Admin | Hoàn thành | Giao diện tĩnh | **Thừa một phần** | Role là cố định. Cần gán quyền qua form sửa người dùng thay vì trang `Roles.tsx`. |
-| 6 | Quản lý giáo viên | Admin | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `Teachers.tsx` đang dùng mock data. Cần nối với `userService.listTeachers`. |
-| 7 | Quản lý học viên | Admin | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `Students.tsx` đang dùng mock data. Cần nối với `userService.listStudents`. |
-| 8 | Quản lý lớp học | Admin, Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `Classes.tsx` đang dùng mock data. Cần nối với `classService.list`. |
-| 9 | Quản lý thành viên lớp học | Admin, Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Cần gọi `POST/DELETE /classes/{id}/members` khi thêm/xóa học sinh trong lớp. |
-| 10 | Xem danh sách lớp học | Teacher, Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP (Student)** | Học viên đã gọi `classService.list`. Giáo viên cần nối với API theo token. |
-| 11 | Quản lý bài tập (CRUD) | Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `TeacherAssignments.tsx` đang hiển thị mảng tĩnh. Cần gọi `assignmentService.listAssignments`. |
-| 12 | Tạo bài tập đa kỹ năng | Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | `TeacherCreateAssignment.tsx` đang lưu vào React state. Cần gọi `POST /api/v1/assignments`. |
-| 13 | Mở bài tập (Publish) | Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Nút bấm Mở bài cần gọi `POST /api/v1/assignments/{id}/publish`. |
-| 14 | Khóa bài tập (Close) | Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Nút Khóa bài cần gọi `POST /api/v1/assignments/{id}/close`. |
+| 4 | Quản lý tài khoản người dùng | Admin | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `Accounts.tsx` đã kết nối `useUsers` và `userService.listUsers`, `userService.updateUser`. |
+| 5 | Phân quyền người dùng | Admin | Hoàn thành | Giao diện tĩnh | **Thừa một phần** | Role là cố định (`ADMIN`, `TEACHER`, `STUDENT`). Gán quyền trực tiếp qua form sửa người dùng. |
+| 6 | Quản lý giáo viên | Admin | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `Teachers.tsx`, `AddTeacher.tsx`, `TeacherDetails.tsx` đã kết nối `userService` và `classService`. |
+| 7 | Quản lý học viên | Admin | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `Students.tsx`, `AddStudent.tsx`, `StudentDetails.tsx` đã kết nối `userService` và `reportService`. |
+| 8 | Quản lý lớp học | Admin, Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `Classes.tsx`, `AddClass.tsx`, `ClassDetails.tsx` đã kết nối `classService`. |
+| 9 | Quản lý thành viên lớp học | Admin, Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `ClassDetails.tsx` đã kết nối `classService.listMembers`, `addMember`, `removeMember`. |
+| 10 | Xem danh sách lớp học | Teacher, Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Cả Teacher (`TeacherClasses.tsx`) và Student (`StudentClasses.tsx`) đều gọi `classService.list`. |
+| 11 | Quản lý bài tập (CRUD) | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `TeacherAssignments.tsx` đã gọi `assignmentService.listAssignments`, `classService.list`. |
+| 12 | Tạo bài tập đa kỹ năng | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `TeacherCreateAssignment.tsx` đã hiện thực tạo tuần tự Assignment -> Module -> Questions (`TASK-FE-20`). |
+| 13 | Mở bài tập (Publish) | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Nút bấm Mở bài đã kết nối `assignmentService.publishAssignment`. |
+| 14 | Khóa bài tập (Close) | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Nút Khóa bài đã kết nối `assignmentService.closeAssignment`. |
 | 15 | Xem danh sách bài tập | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Trang `StudentAssignments.tsx` đã gọi `assignmentService` và `submissionService`. |
 | 16 | Bắt đầu làm bài (Start Attempt) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã gọi `submissionService.startAttempt` và lấy danh sách `submission_modules`. |
-| 17 | Làm bài tập Viết (Writing) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP (Text)** | Đã nộp nội dung bài viết qua `submitModule`. Còn thiếu tải file `.docx` lên S3 qua Presigned URL. |
-| 18 | Làm bài tập Nói (Speaking) | Student | Hoàn thành | Hoàn thành UI | **Thiếu tải S3 thật** | Nút ghi âm mới là timer ảo. Cần hook Web Audio tạo blob và tải lên qua Presigned S3 URL. |
+| 17 | Làm bài tập Viết (Writing) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã nộp nội dung bài viết qua `submitModule`. |
+| 18 | Làm bài tập Nói (Speaking) | Student | Hoàn thành | Hoàn thành UI | **Thiếu tải S3 thật** | Nộp submit thành công nhưng luồng ghi âm microphone và tải file S3 Presigned URL cần Web Audio thật. |
 | 19 | Làm bài tập Đọc (Reading) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã gửi mảng đáp án trắc nghiệm qua `submitModule`. |
-| 20 | Làm bài tập Nghe (Listening) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã phát âm thanh và gửi đáp án qua `submitModule`. |
+| 20 | Làm bài tập Nghe (Listening) | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã phát âm thanh và gửi đáp án qua `submitModule` (cần thêm trình phát HTML5 chuẩn). |
 | 21 | Xem lại bài làm trước khi nộp | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã hiển thị câu hỏi và đáp án trước khi bấm xác nhận nộp. |
 | 22 | Nộp bài tập chính thức | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã gọi `POST /submissions/{id}/submit` chốt trạng thái `SUBMITTED`. |
 | 23 | Quản lý lượt làm bài | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Màn hình `StudentAssignmentOverview` đã hiển thị số lượt đã làm và số lượt cho phép. |
 | 24 | Xem trạng thái bài làm | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã hiển thị các badge: `Chưa làm`, `Đang làm`, `Đang chấm`, `Đã có điểm`. |
-| 25 | Chấm bài thủ công | Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Trang `TeacherSubmissionDetails.tsx` đang hiển thị dữ liệu tĩnh. Cần gọi `gradingService.submitGrading`. |
-| 26 | Hỗ trợ chấm chữa bằng AI | Teacher | **Hoàn thành** | **Thiếu UI Duyệt** | **Thiếu Frontend** | AI microservice và Spring Boot (`BE-TASK-14/15/16`) đã xong. Frontend **thiếu bảng duyệt sửa lỗi AI (Annotation Review Panel)**. |
-| 27 | Tự động chấm bài Đọc/Nghe | Hệ thống | **Hoàn thành** | Hoàn thành | **ĐÃ TÍCH HỢP** | `BE-TASK-13` đã chạy Auto-grading engine so khớp đáp án `MULTIPLE_CHOICE` và `SHORT_ANSWER`, chấm điểm ngay khi nộp. |
+| 25 | Chấm bài thủ công | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `TeacherSubmissionDetails.tsx` đã kết nối `gradingService.updateFinalGrade`. |
+| 26 | Hỗ trợ chấm chữa bằng AI | Teacher | **Hoàn thành** | **Thiếu UI Duyệt** | **Thiếu Frontend** | Backend có `GET /submission-modules/{id}/grading/ai-suggestion`. Cần bảng duyệt annotation chuyên biệt (`TeacherAnnotationReviewPanel.tsx`). |
+| 27 | Tự động chấm bài Đọc/Nghe | Hệ thống | **Hoàn thành** | Hoàn thành | **ĐÃ TÍCH HỢP** | Auto-grading engine so khớp đáp án `MULTIPLE_CHOICE` và `SHORT_ANSWER`, chấm điểm ngay khi nộp. |
 | 28 | Xem điểm số & Bài chữa | Student | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP (Một phần)** | `StudentSubmissionResult.tsx` đã lấy dữ liệu grading. Cần hoàn thiện highlight đè lên text theo ký tự. |
-| 29 | Quản lý nhật ký điểm số | Teacher, Admin | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Đã có trang `AdminGradingAuditLogs.tsx` nhưng chưa gọi `gradingChangeLogService.list`. |
-| 30 | Ghi chú chấm bài (Annotations) | Teacher | Hoàn thành | Giao diện tĩnh | **Thiếu Frontend** | Backend có API CRUD Annotation. Frontend chưa có công cụ bôi đen tạo highlight trên bài làm học viên. |
-| 31 | Đánh giá học viên (Evaluations) | Teacher, Student | **Hoàn thành** | Hoàn thành UI | **ĐÃ TÍCH HỢP (Student)** | Backend hoàn thành 5 endpoints (`BE-TASK-10`). Phân hệ học viên đã hiển thị evaluations. Teacher cần nối form tạo nhận xét. |
-| 32 | Xem báo cáo & Thống kê | Admin, Teacher | Hoàn thành | Hoàn thành UI | **Chưa tích hợp** | Backend đã có các view và service thống kê. Frontend `AdminReports.tsx` và `StudentAnalytics.tsx` chưa gọi API thật. |
+| 29 | Quản lý nhật ký điểm số | Teacher, Admin | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `AdminGradingAuditLogs.tsx` đã kết nối `gradingService.listGradings` và `gradingChangeLogService`. |
+| 30 | Ghi chú chấm bài (Annotations) | Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã có API CRUD Annotation. Cần giao diện review trực quan hơn. |
+| 31 | Đánh giá học viên (Evaluations) | Teacher, Student | **Hoàn thành** | Hoàn thành | **ĐÃ TÍCH HỢP** | Đã kết nối `studentEvaluationService` ở cả Teacher Class Progress và Student Class Details. |
+| 32 | Xem báo cáo & Thống kê | Admin, Teacher | Hoàn thành | Hoàn thành | **ĐÃ TÍCH HỢP** | `AdminReports.tsx`, `StudentAnalytics.tsx`, `TeacherClassProgress.tsx` đã kết nối `reportService`. |
 
 ---
 
-## 4. Chi Tiết Các Phần Còn Thiếu Cần Hoàn Thiện (Missing Gaps Breakdown)
+## 4. Chi Tiết Các Phần Còn Thiếu Cần Hoàn Thiện (Actual Missing Gaps Breakdown)
 
-### 4.1. Phân hệ Giao diện Người dùng (Frontend) — Mức độ ưu tiên: CAO NHẤT
+Sau đợt tích hợp API thành công ngày 16/10/2026, các điểm nghẽn về Mock Data đã được giải tỏa. Những khoảng trống cốt lõi còn lại tập trung vào trải nghiệm người dùng chuyên sâu và kiểm thử tự động:
 
-Mặc dù có 46 file trang, hệ thống đang bị mất cân đối nghiêm trọng: phân hệ Học viên đã kết nối API thật khá tốt, nhưng **phân hệ Giáo viên và Quản trị viên gần như 100% vẫn chạy trên dữ liệu Mock tĩnh**:
+### 4.1. Phân hệ Giao diện Người dùng (Frontend)
+1. **Bộ Chạy Bài Thi Đa Kỹ Năng (`StudentAssignmentRunner.tsx` - P0)**:
+   - Một đề thi (Assignment) có thể gồm nhiều module kỹ năng tuần tự (Nghe -> Đọc -> Viết -> Nói). Cần một component khung điều hướng đa module trong cùng một phiên làm bài.
+2. **Bảng Duyệt Gợi Ý Sửa Lỗi AI Cho Giáo Viên (`TeacherAnnotationReviewPanel.tsx` - P0)**:
+   - Giáo viên cần giao diện trực quan chuyên biệt để duyệt (`ACCEPTED`) hoặc bác bỏ (`REJECTED`) từng đoạn gạch chân lỗi ngữ pháp/từ vựng do AI tạo ra.
+3. **Ghi Âm Web Audio Thật & Tải Lên S3 Trực Tiếp (`StudentAssignmentSpeaking.tsx` - P1)**:
+   - Tích hợp `MediaRecorder` ghi âm microphone thành blob âm thanh thực tế, gọi Presigned PUT URL và upload thẳng lên S3/R2 trước khi nộp bài.
+4. **Trình Phát Audio Thật Cho Bài Nghe (`StudentAssignmentListening.tsx` - P1)**:
+   - Tích hợp HTML5 audio player cho phép phát trực tiếp file nghe từ URL của module bài tập.
 
-1. **Bộ Chạy Bài Thi Đa Kỹ Năng (`StudentAssignmentRunner.tsx`)**:
-   - Hiện tại, nếu một bài tập chứa cả Module Nghe, Đọc và Viết, Frontend không có màn hình điều hướng chuyển tiếp tuần tự giữa các module trong cùng một phiên làm bài. Cần một component khung điều hướng đa module.
-2. **Bảng Duyệt Gợi Ý Sửa Lỗi AI Cho Giáo Viên (`TeacherAnnotationReviewPanel.tsx`)**:
-   - Đây là mắt xích quan trọng nhất của tính năng cốt lõi (Core Feature AI-Assisted Grading): Khi AI trả về các lỗi gạch chân từ vựng/ngữ pháp và điểm số dự kiến, giáo viên phải có giao diện trực quan để bấm "Duyệt lỗi" (`ACCEPTED`) hoặc "Bác bỏ" (`REJECTED`) trước khi gửi kết quả cho học sinh.
-3. **Tích hợp API Thật cho Phân hệ Giáo viên (Teacher Portal)**:
-   - `TeacherAssignments.tsx`: Đang dùng danh sách tĩnh 3 bài tập. Cần kết nối `assignmentService.listAssignments`.
-   - `TeacherCreateAssignment.tsx` & `TeacherEditAssignment.tsx`: Đang lưu state nội bộ. Cần kết nối API tạo và cập nhật bài tập.
-   - `TeacherSubmissionDetails.tsx`: Đang hiển thị bài làm tĩnh của học sinh mẫu. Cần kết nối API lấy bài nộp thật, file âm thanh thật và gửi điểm chấm về server.
-4. **Tích hợp API Thật cho Phân hệ Quản trị (Admin Portal)**:
-   - `Accounts.tsx`: Cần kết nối `userService.list` và API khóa tài khoản.
-   - `Classes.tsx`, `AddClass.tsx`, `ClassDetails.tsx`: Cần kết nối `classService`.
-   - `Students.tsx`, `AddStudent.tsx`, `StudentDetails.tsx`: Cần kết nối `userService.listStudents`.
-   - `Teachers.tsx`, `AddTeacher.tsx`, `TeacherDetails.tsx`: Cần kết nối `userService.listTeachers`.
-5. **Ghi Âm Web Audio Thật & Tải Lên S3 Trực Tiếp (`StudentAssignmentSpeaking.tsx`)**:
-   - Cần bổ sung hook `useAudioRecorder` sử dụng `navigator.mediaDevices.getUserMedia` và `MediaRecorder`.
-   - Sau khi ghi âm xong, gọi `POST /api/v1/submission-modules/{id}/audio-upload-url` lấy Presigned PUT URL, dùng lệnh `fetch(url, { method: 'PUT', body: audioBlob })` tải thẳng lên S3/R2.
-
-### 4.2. Phân hệ Trí tuệ Nhân tạo (AI Engine) — Mức độ ưu tiên: TRUNG BÌNH
-
-1. **Kiểm Tra & Cấu Hình Quota API Key Thật Trên Môi Trường Thực Tế**:
-   - Đảm bảo biến môi trường `GEMINI_API_KEY` (hoặc `OPENAI_API_KEY`) trên production server có đầy đủ quota, không bị chặn tốc độ (Rate Limit 429).
-2. **Cơ Chế Đẩy Thông Báo Tiến Độ AI (Real-time Notification)**:
-   - Khi học sinh nộp bài Speaking/Writing, backend gọi AI xử lý bất đồng bộ. Hiện tại Frontend phải dùng cơ chế Polling (gọi lại API sau mỗi 3-5 giây) để biết AI đã chấm xong hay chưa. Cần duy trì cơ chế polling mượt mà hoặc bổ sung SSE/WebSocket nếu cần.
-
-### 4.3. Đảm Bảo Chất Lượng & Kiểm Thử (QA & Testing) — Mức độ ưu tiên: CAO
-
-1. **Kiểm Thử Tự Động Phía Frontend (Frontend Automated Testing)**:
-   - Đã có: 9 test suites cho API service layer chạy bằng Node test runner.
-   - **Còn thiếu**: Bộ kiểm thử Component với **Vitest** và **React Testing Library** cho các luồng then chốt (Form đăng nhập, Form làm bài viết, Bộ đếm giờ, Component nộp bài).
-2. **Kiểm Thử Tích Hợp Liên Thông Toàn Hệ Thống (End-to-End Testing)**:
-   - Cần kịch bản kiểm thử tự động E2E (Playwright) chạy qua luồng hoàn chỉnh:
+### 4.2. Đảm Bảo Chất Lượng & Kiểm Thử (QA & Testing)
+1. **Kiểm Thử Tự Động Phía Frontend (Frontend Automated Testing - P1)**:
+   - Đã có test suites cho service layer bằng Node test runner.
+   - Cần bổ sung bộ kiểm thử Component với **Vitest** và **React Testing Library**.
+2. **Kiểm Thử Tích Hợp Toàn Trình (End-to-End Testing - P2)**:
+   - Cần kịch bản kiểm thử tự động E2E (Playwright) chạy qua luồng:
      *Admin tạo giáo viên và lớp học → Giáo viên giao bài tập → Học viên vào làm bài và nộp bài → AI phân tích và sinh gợi ý → Giáo viên duyệt điểm → Học viên xem kết quả*.
 
 ---
 
-## 5. Lộ Trình Hành Động Hoàn Thiện Dự Án (Action Roadmap)
+## 5. Lộ Trình Hành Động Tiếp Theo (Action Roadmap)
 
 ```mermaid
 gantt
-    title Lộ Trình Tinh Gọn & Hoàn Thiện Dự Án EnglishHub
+    title Lộ Trình Hoàn Thiện Dự Án EnglishHub (Cập nhật 16/10/2026)
     dateFormat  YYYY-MM-DD
-    section Sprint 1: Dọn Dẹp & Chuẩn Hóa
-    Ẩn các tính năng thừa khỏi Sidebar (Exam Bank, Workspace, Roles) :done, s1, 2026-10-08, 1d
-    Sửa lỗi redirect hardcode (/progress, /reports) trong App.tsx     :active, s2, 2026-10-09, 1d
-    section Sprint 2: Hoàn Thiện Giao Diện Cốt Lõi
-    Xây dựng StudentAssignmentRunner (Multi-Module Exam)             :crit, s3, 2026-10-10, 2d
-    Xây dựng TeacherAnnotationReviewPanel (Duyệt AI Suggestions)     :crit, s4, 2026-10-12, 2d
-    Tích hợp Web Audio & Presigned S3 Upload cho Speaking            :crit, s5, 2026-10-14, 2d
-    section Sprint 3: Kết Nối Real API Teacher & Admin
-    Nối API cho TeacherAssignments & TeacherSubmissionDetails        :s6, 2026-10-16, 3d
-    Nối API cho Admin Classes, Teachers, Students, Accounts          :s7, 2026-10-19, 3d
-    section Sprint 4: QA, E2E & Nghiệm Thu
-    Viết kiểm thử Frontend Vitest & Playwright E2E                  :s8, 2026-10-22, 3d
-    Kiểm thử tải & Hoàn thiện báo cáo bảo vệ dự án                   :s9, 2026-10-25, 2d
+    section Giai đoạn 1: Đã Hoàn Thành
+    Kết nối Real API cho Admin (Accounts, Classes, Teachers, Students) :done, s1, 2026-10-14, 2d
+    Kết nối Real API cho Teacher (Assignments, Submissions, Grading)   :done, s2, 2026-10-15, 2d
+    Hoàn thiện tạo chuỗi Assignment -> Module -> Question (TASK-FE-20)  :done, s3, 2026-10-16, 1d
+    section Giai đoạn 2: Trải Nghiệm Cốt Lõi Còn Thiếu
+    Xây dựng StudentAssignmentRunner (Multi-Module Exam)             :crit, s4, 2026-10-17, 2d
+    Xây dựng TeacherAnnotationReviewPanel (Duyệt AI Suggestions)     :crit, s5, 2026-10-19, 2d
+    Tích hợp Web Audio & Presigned S3 Upload cho Speaking            :crit, s6, 2026-10-21, 2d
+    section Giai đoạn 3: QA, E2E & Nghiệm Thu
+    Viết kiểm thử Frontend Vitest & Playwright E2E                  :s7, 2026-10-23, 3d
+    Kiểm thử tải & Hoàn thiện hồ sơ nghiệm thu Project 1             :s8, 2026-10-26, 2d
 ```
-
-### Chi Tiết Phân Công Theo Vai Trò:
-
-- **`@fe-primary` & `@fe-secondary`**:
-  1. Tinh gọn Sidebar: Ẩn các mục thừa `TeacherExamBank`, `StudentWorkspace`, `StudentFeedback`, `AdminClassArchive`.
-  2. Sửa router trong `App.tsx`: Bỏ redirect hardcode `ENG-IELTS-6.5A`.
-  3. Xây dựng component `StudentAssignmentRunner.tsx` và `TeacherAnnotationReviewPanel.tsx`.
-  4. Thay thế mock data trong các trang Giáo viên (`TeacherAssignments`, `TeacherSubmissionDetails`) và Quản trị viên (`Accounts`, `Classes`, `Teachers`, `Students`) bằng các lệnh gọi API từ `@/api/services`.
-  5. Cài đặt Web Audio API recorder thật cho trang Speaking và upload file audio lên Presigned URL.
-- **`@be-primary` & `@be-secondary`**:
-  1. Duy trì tính ổn định của 62 endpoints và Auto-grading engine.
-  2. Hỗ trợ cấu hình CORS và kiểm tra kết nối trơn tru giữa Frontend và Backend.
-  3. Kiểm tra tính ổn định của `AiServiceClient` khi kết nối với `ai-service` dưới môi trường Docker.
-- **`@tester`**:
-  1. Xây dựng bộ test cases E2E từ lúc giáo viên tạo bài đến khi học viên nhận điểm bài chữa.
-  2. Thiết lập Vitest và viết unit test cho các component tương tác cốt lõi trên Frontend.
-- **`@devops-primary` & `@devops-secondary`**:
-  1. Cấu hình pipeline CI/CD cho `ai-service` chạy test tự động trên GitHub Actions.
-  2. Thiết lập biến môi trường production (`GEMINI_API_KEY`, DB credentials) an toàn và kích hoạt deploy lên VPS.

@@ -16,12 +16,12 @@ This file contains the general rules, conventions, Definition of Done (DoD), and
 ## 2. Agent Handoff Rules & Production Artifacts
 We use a shared `production_artifacts/` directory for passing deliverables between roles.
 - **@pm** creates requirement specs (`docs/features/*.md`) and drops summarized tasks into `production_artifacts/pm_to_dev/`.
-- **@be-primary** and **@be-secondary** read from `production_artifacts/pm_to_dev/`, implement APIs following DDD, and place backend testing instructions in `production_artifacts/be_to_tester/`. (Note: Formal `docs/api-contract.md` will be published once backend stabilizes).
+- **@be-primary** and **@be-secondary** read from `production_artifacts/pm_to_dev/`, implement APIs following DDD (`convention-be.md`), develop/integrate AI capabilities following `convention-ai.md`, and place backend testing instructions in `production_artifacts/be_to_tester/`. (Note: Formal `docs/api-contract.md` will be published once backend stabilizes).
 - **@fe-primary** and **@fe-secondary** implement UI/UX and integrate APIs following `convention-fe.md`, and drop build/test instructions in `production_artifacts/fe_to_tester/`.
 - **@tester** reads from `be_to_tester` and `fe_to_tester`, writes automated tests or manual test reports, and drops results in `production_artifacts/test_reports/`.
 - **@devops-primary** and **@devops-secondary** pick up verified code, manage staging/production environments, and handle CI/CD deployment logic.
 
-Always update the appropriate task tracking file in `.agents/tasks/{role}/active/`, `.agents/tasks/{role}/done/`, or `.agents/tasks/bugs/` (using the `task-board` skill). Member mapping is defined in [.agents/rules/git-user-mapping.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
+Always update the appropriate task tracking file in `.agents/tasks/{role}/active/`, `.agents/tasks/{role}/done/`, or `.agents/tasks/bugs/` (using the `task-board` skill). Member mapping is defined in [.agents/rules/git-user-mapping.md](file:///d:/Coding/EnglishHub/.agents/rules/git-user-mapping.md).
 
 ## 3. Git Flow
 - `main`: Production-ready code.

@@ -1,3 +1,5 @@
+from app.schemas.base import CamelModel
+from app.schemas.common import ErrorDetail, ErrorResponse, ApiResponse
 from app.schemas.speaking import (
     WordTimestamp,
     FluencyMetrics,
@@ -15,6 +17,10 @@ from app.schemas.writing import (
 )
 
 __all__ = [
+    "CamelModel",
+    "ErrorDetail",
+    "ErrorResponse",
+    "ApiResponse",
     "WordTimestamp",
     "FluencyMetrics",
     "CriteriaScores",

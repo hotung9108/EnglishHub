@@ -2,7 +2,7 @@
 import { createContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, Role, User } from '../types/auth';
-import { authService, userService, tokenStorage, AUTH_EVENTS } from '@/api';
+import { authService, userService, AUTH_EVENTS } from '@/api';
 import type { AuthUserData } from '@/api/services/auth.service';
 import type { UserProfile } from '@/api/services/user.service';
 import { environment } from '@/config/environment';
@@ -45,32 +45,53 @@ const profileToUser = (profile: UserProfile): User => {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      if (authService.isAuthenticated()) {
+        const saved = authService.getSavedUser();
+        return toUser(saved);
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const initAuth = async () => {
       try {
         if (authService.isAuthenticated()) {
           const savedUser = authService.getSavedUser();
-          if (savedUser) {
+          if (savedUser && isMounted) {
             setUser(toUser(savedUser));
           }
 
           // Fetch freshest user profile from backend
           try {
             const profile = await userService.getMyProfile();
-            const freshUser = profileToUser(profile);
-            setUser(freshUser);
-            localStorage.setItem(environment.auth.userKey, JSON.stringify(freshUser));
-          } catch {
-            // Keep savedUser if profile request fails
+            if (isMounted) {
+              const freshUser = profileToUser(profile);
+              setUser(freshUser);
+              localStorage.setItem(environment.auth.userKey, JSON.stringify(freshUser));
+            }
+          } catch (profileErr) {
+            // Keep savedUser if profile request fails (network error, transient failure)
+            console.warn('Could not fetch fresh user profile, using cached session:', profileErr);
+          }
+        } else {
+          if (isMounted) {
+            setUser(null);
           }
         }
-      } catch {
-        tokenStorage.clearTokens();
+      } catch (err) {
+        console.warn('initAuth error:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -78,11 +99,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const handleAuthExpired = () => {
       setUser(null);
-      tokenStorage.clearTokens();
+      authService.clearSession();
     };
 
     window.addEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
     return () => {
+      isMounted = false;
       window.removeEventListener(AUTH_EVENTS.EXPIRED, handleAuthExpired);
     };
   }, []);
@@ -107,8 +129,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.warn('Backend logout encountered error, local session cleared:', err);
+    } finally {
+      setUser(null);
+    }
   };
 
   const updateUser = (data: Partial<User>) => {

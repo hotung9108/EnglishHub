@@ -18,12 +18,18 @@ export interface ShortAnswerCorrectAnswerDto {
   correctAnswer: string;
 }
 
+export interface QuestionOptionResponse {
+  id: number;
+  content: string;
+}
+
 export interface QuestionResponse {
   id: number;
   content: string;
   questionType: QuestionType;
   score: number;
   orderIndex: number;
+  options?: QuestionOptionResponse[];
   correctAnswer?: Record<string, unknown> | null;
 }
 

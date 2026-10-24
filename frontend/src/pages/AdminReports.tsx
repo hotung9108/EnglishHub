@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Download, 
-  FileSpreadsheet,
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
   TrendingDown, User, ChevronDown
@@ -17,7 +15,7 @@ import type {
 } from '../types/report.types';
 import type { UserListItem } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
-import { Button, MetricCard, EmptyState } from '../components/common';
+import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
 
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
@@ -31,6 +29,30 @@ export const AdminReports: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | undefined>(undefined);
   const [selectedClassId, setSelectedClassId] = useState<number | undefined>(undefined);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const handleFromDateChange = (val: string) => {
+    setFromDate(val);
+    setCurrentPage(1);
+  };
+
+  const handleToDateChange = (val: string) => {
+    setToDate(val);
+    setCurrentPage(1);
+  };
+
+  const handleTeacherChange = (id: number | undefined) => {
+    setSelectedTeacherId(id);
+    setCurrentPage(1);
+  };
+
+  const handleClassChange = (id: number | undefined) => {
+    setSelectedClassId(id);
+    setCurrentPage(1);
+  };
 
   // Report Data
   const [overview, setOverview] = useState<ReportOverviewResponse | null>(null);
@@ -157,13 +179,6 @@ export const AdminReports: React.FC = () => {
     setSelectedClassId(undefined);
   };
 
-  const handleExport = (type: 'excel' | 'pdf') => {
-    alert(isVi 
-      ? `Đang kết xuất báo cáo ${type.toUpperCase()} theo bộ lọc hiện tại... File sẽ được tải xuống tự động.` 
-      : `Exporting ${type.toUpperCase()} report matching current filters... Download will begin shortly.`
-    );
-  };
-
   return (
     <div className="adm-container">
       {/* Header */}
@@ -172,24 +187,6 @@ export const AdminReports: React.FC = () => {
           <h1 className="adm-title">
             <span>{t('adminReports.title')}</span>
           </h1>
-        </div>
-
-        {/* Export Buttons */}
-        <div className="adm-actions flex items-center gap-3">
-          <Button 
-            variant="secondary"
-            icon={<FileSpreadsheet size={16} className="text-success" />}
-            onClick={() => handleExport('excel')}
-          >
-            {t('adminReports.exportExcel')}
-          </Button>
-          <Button 
-            variant="primary"
-            icon={<Download size={16} />}
-            onClick={() => handleExport('pdf')}
-          >
-            {t('adminReports.exportPdf')}
-          </Button>
         </div>
       </div>
 
@@ -227,7 +224,7 @@ export const AdminReports: React.FC = () => {
                 type="date" 
                 className={`adm-filter-input ${fromDate ? 'has-value' : ''}`}
                 value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
+                onChange={(e) => handleFromDateChange(e.target.value)}
               />
             </div>
           </div>
@@ -246,7 +243,7 @@ export const AdminReports: React.FC = () => {
                 type="date" 
                 className={`adm-filter-input ${toDate ? 'has-value' : ''}`}
                 value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
+                onChange={(e) => handleToDateChange(e.target.value)}
               />
             </div>
           </div>
@@ -264,7 +261,7 @@ export const AdminReports: React.FC = () => {
               <select
                 className={`adm-filter-select ${selectedTeacherId !== undefined ? 'has-value' : ''}`}
                 value={selectedTeacherId ?? ''}
-                onChange={(e) => setSelectedTeacherId(e.target.value ? Number(e.target.value) : undefined)}
+                onChange={(e) => handleTeacherChange(e.target.value ? Number(e.target.value) : undefined)}
               >
                 <option value="">{isVi ? 'Tất cả giảng viên' : 'All Instructors'}</option>
                 {teachers.map(tc => (
@@ -292,7 +289,7 @@ export const AdminReports: React.FC = () => {
               <select
                 className={`adm-filter-select ${selectedClassId !== undefined ? 'has-value' : ''}`}
                 value={selectedClassId ?? ''}
-                onChange={(e) => setSelectedClassId(e.target.value ? Number(e.target.value) : undefined)}
+                onChange={(e) => handleClassChange(e.target.value ? Number(e.target.value) : undefined)}
               >
                 <option value="">{isVi ? 'Tất cả lớp học' : 'All Classes'}</option>
                 {allClasses.map(c => (
@@ -330,25 +327,21 @@ export const AdminReports: React.FC = () => {
         <MetricCard
           title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
           value={loading ? '...' : (overview?.classCount ?? reportClasses.length)}
-          footerText={isVi ? 'Theo dõi sĩ số và điểm trung bình' : 'Tracking cohort progress'}
         />
 
         <MetricCard
           title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
           value={loading ? '...' : `${overview?.completionRatePercent ?? 0}%`}
-          footerText={isVi ? 'Tỷ lệ nộp bài trung bình toàn trung tâm' : 'Average submission completion'}
         />
 
         <MetricCard
           title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
           value={loading ? '...' : `${overview?.averageScorePercent ?? 0}%`}
-          footerText={isVi ? 'Thang đo chuẩn hóa' : 'Normalized scale'}
         />
 
         <MetricCard
           title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
           value={loading ? '...' : (overview?.pendingGradingCount ?? 0)}
-          footerText={isVi ? 'Bài tự luận chờ duyệt' : 'Awaiting instructor verification'}
         />
       </div>
 
@@ -366,48 +359,79 @@ export const AdminReports: React.FC = () => {
               description={isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.'}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="adm-table">
-                <thead>
-                  <tr>
-                    <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                    <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                    <th>{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'ASSIGNMENTS'}</th>
-                    <th>{isVi ? 'ĐIỂM TRUNG BÌNH' : 'AVERAGE SCORE'}</th>
-                    <th>{isVi ? 'TỶ LỆ NỘP BÀI' : 'COMPLETION'}</th>
-                    <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                    <th className="text-right">{isVi ? 'TIẾN ĐỘ' : 'ACTION'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportClasses.map((cls) => (
-                    <tr key={cls.classId}>
-                      <td className="font-semibold text-primary font-mono">ENG-{cls.classId}</td>
-                      <td className="font-medium">{cls.className}</td>
-                      <td>{cls.assignedAssignmentCount} {isVi ? 'bài' : 'hw'}</td>
-                      <td className="font-bold text-primary font-mono">{cls.averageScorePercent}%</td>
-                      <td>
-                        <span className="badge badge-active">{cls.completionRatePercent}%</span>
-                      </td>
-                      <td>
-                        <span className={`badge ${cls.completionRatePercent >= 70 ? 'badge-active' : 'badge-onleave'}`}>
-                          {cls.completionRatePercent >= 70 ? (isVi ? 'Đạt mục tiêu' : 'On Target') : (isVi ? 'Cần cải thiện' : 'Needs Focus')}
-                        </span>
-                      </td>
-                      <td className="text-right">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleOpenClassProgress(cls)}
-                        >
-                          {isVi ? 'Chi tiết' : 'Progress'}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            (() => {
+              const totalPages = Math.ceil(reportClasses.length / pageSize) || 1;
+              const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+              const paginatedClasses = reportClasses.slice(
+                (safeCurrentPage - 1) * pageSize,
+                safeCurrentPage * pageSize
+              );
+
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="adm-table">
+                      <thead>
+                        <tr>
+                          <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                          <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                          <th>{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'ASSIGNMENTS'}</th>
+                          <th>{isVi ? 'ĐIỂM TRUNG BÌNH' : 'AVERAGE SCORE'}</th>
+                          <th>{isVi ? 'TỶ LỆ NỘP BÀI' : 'COMPLETION'}</th>
+                          <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                          <th className="text-right">{isVi ? 'TIẾN ĐỘ' : 'ACTION'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedClasses.map((cls) => (
+                          <tr key={cls.classId}>
+                            <td className="font-semibold text-primary font-mono">ENG-{cls.classId}</td>
+                            <td className="font-medium">{cls.className}</td>
+                            <td>{cls.assignedAssignmentCount} {isVi ? 'bài' : 'hw'}</td>
+                            <td className="font-bold text-primary font-mono">{cls.averageScorePercent}%</td>
+                            <td>
+                              <span className="badge badge-active">{cls.completionRatePercent}%</span>
+                            </td>
+                            <td>
+                              <span className={`badge ${cls.completionRatePercent >= 70 ? 'badge-active' : 'badge-onleave'}`}>
+                                {cls.completionRatePercent >= 70 ? (isVi ? 'Đạt mục tiêu' : 'On Target') : (isVi ? 'Cần cải thiện' : 'Needs Focus')}
+                              </span>
+                            </td>
+                            <td className="text-right">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleOpenClassProgress(cls)}
+                              >
+                                {isVi ? 'Chi tiết' : 'Progress'}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {reportClasses.length > 0 && (
+                    <Pagination
+                      currentPage={safeCurrentPage}
+                      totalPages={totalPages}
+                      totalItems={reportClasses.length}
+                      itemLabel={isVi ? 'lớp học' : 'classes'}
+                      isVi={isVi}
+                      onPageChange={setCurrentPage}
+                      pageSize={pageSize}
+                      onPageSizeChange={(newSize) => {
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                      }}
+                      pageSizeOptions={[5, 10, 20]}
+                      variant="table"
+                    />
+                  )}
+                </>
+              );
+            })()
           )}
         </div>
       )}

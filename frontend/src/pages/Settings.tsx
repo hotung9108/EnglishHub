@@ -84,7 +84,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     bio: user?.bio || '',
     meetingUrl: user?.meetingUrl || '',
     currentClass: user?.currentClass || '',
-    targetBand: user?.targetBand || '',
     school: user?.school || '',
     dateOfBirth: user?.dateOfBirth || '',
   });
@@ -196,7 +195,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
         bio: formData.bio,
         meetingUrl: formData.meetingUrl,
         currentClass: formData.currentClass,
-        targetBand: formData.targetBand,
         school: formData.school,
         dateOfBirth: formData.dateOfBirth,
       });
@@ -554,7 +552,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                       bio: user.bio || '',
                       meetingUrl: user.meetingUrl || '',
                       currentClass: user.currentClass || '',
-                      targetBand: user.targetBand || '',
                       school: user.school || '',
                       dateOfBirth: user.dateOfBirth || '',
                     });

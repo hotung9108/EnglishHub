@@ -1,0 +1,34 @@
+id: BUG-08
+title: "[Bug] AI Service event loop blocked by synchronous Gemini SDK generate_content call"
+assignee: "@be-primary"
+status: "Fixed"
+priority: "Critical"
+description: |
+  **Issue Summary:**
+  Synchronous call `model.generate_content` inside `gemini_service.py` blocks the FastAPI single-threaded asyncio event loop during AI evaluation (Speaking & Writing). This causes Docker healthcheck requests to timeout, triggering automatic container restarts and resulting in mass 504 Gateway Timeout errors.
+
+  **Steps to Reproduce:**
+  1. Trigger a speaking evaluation request (`POST /api/v1/analyze/speaking`) with audio payload via direct Gemini SDK provider.
+  2. Concurrently send a health check request (`GET /health`) or wait for Docker's periodic healthcheck probe (10s interval, 5s timeout).
+  
+  **Actual Behavior:**
+  Event loop is blocked for 10-30s while `model.generate_content` waits for Google Gemini API response.
+  The `/health` endpoint is starved and fails to respond within 5s. Docker marks container unhealthy and restarts it. Upstream backend calls fail with 504 Gateway Timeout.
+
+  **Expected Behavior:**
+  The call to `model.generate_content` is offloaded to a worker thread via `asyncio.to_thread`.
+  The FastAPI event loop remains non-blocking, and `/health` responds immediately (<50ms).
+
+  **Definition of Done (DoD):**
+  - `model.generate_content` is wrapped with `asyncio.to_thread` or `run_in_threadpool` in `gemini_service.py`.
+  - Concurrent health check requests during grading respond immediately without delay.
+  - Docker container health check stays green without restarting.
+
+verification_results:
+  verified_at: "2026-10-18T22:51:13+07:00"
+  status: "PASSED"
+  evidence:
+    concurrency_test: "10/10 GET /health requests succeeded during active AI analysis with average latency 14.7ms (max 28.99ms < 50ms requirement)"
+    container_health: "healthy (0 restarts)"
+    ai_inference_status: "SUCCESS (score: 7.0, model: google/gemini-2.5-flash)"
+

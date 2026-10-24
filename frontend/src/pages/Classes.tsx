@@ -1,15 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, Search, 
-  User, Clock, ArrowRight,
-  LayoutGrid, List,
-  Archive, Loader2, AlertCircle, GraduationCap
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Loader2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import type { ClassSummary } from '../api/services/class.service';
-import { Button, EmptyState } from '../components/common';
+import { Button, EmptyState, Pagination } from '../components/common';
 
 export const Classes: React.FC = () => {
   const { t, language } = useLanguage();
@@ -17,18 +12,18 @@ export const Classes: React.FC = () => {
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [classesData, setClassesData] = useState<Array<{
     id: number;
     name: string;
     code: string;
     teacher: string;
-    students: number;
-    maxStudents: number;
-    schedule: string;
-    status: 'active' | 'completed';
+    status: 'active' | 'completed' | 'cancelled';
     level: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
@@ -44,17 +39,24 @@ export const Classes: React.FC = () => {
         const res = await classService.list({ page: 1, limit: 100 });
         if (!isMounted) return;
 
-        const mapped = (res.data || []).map((c: ClassSummary) => ({
-          id: c.id,
-          name: c.name,
-          code: `ENG-${c.id}`,
-          teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
-          students: (c as { studentCount?: number }).studentCount || 0,
-          maxStudents: 30,
-          schedule: isVi ? 'Thứ 2, 4, 6 (18:00 - 19:30)' : 'Mon, Wed, Fri (18:00 - 19:30)',
-          status: (c.status?.toLowerCase() === 'inactive' || c.status?.toLowerCase() === 'completed') ? 'completed' as const : 'active' as const,
-          level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'
-        }));
+        const mapped = (res.data || []).map((c: ClassSummary) => {
+          const rawStatus = (c.status || '').toUpperCase();
+          let status: 'active' | 'completed' | 'cancelled' = 'active';
+          if (rawStatus === 'COMPLETED' || rawStatus === 'INACTIVE') {
+            status = 'completed';
+          } else if (rawStatus === 'CANCELLED') {
+            status = 'cancelled';
+          }
+
+          return {
+            id: c.id,
+            name: c.name,
+            code: `ENG-${c.id}`,
+            teacher: (c as { teacherName?: string }).teacherName || (c.teacherId ? `GV #${c.teacherId}` : (isVi ? 'Chưa phân công' : 'Unassigned')),
+            status,
+            level: isVi ? 'Tiếng Anh Giao Tiếp' : 'Communication English'
+          };
+        });
 
         setClassesData(mapped);
       } catch (err: unknown) {
@@ -72,18 +74,38 @@ export const Classes: React.FC = () => {
     };
   }, [isVi]);
 
-  const filtered = classesData.filter(cls => {
-    if (statusFilter !== 'all' && cls.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        cls.name.toLowerCase().includes(q) ||
-        cls.code.toLowerCase().includes(q) ||
-        cls.teacher.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const handleStatusFilterChange = (status: 'all' | 'active' | 'completed' | 'cancelled') => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+  };
+
+  const filtered = useMemo(() => {
+    return classesData.filter(cls => {
+      if (statusFilter !== 'all' && cls.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          cls.name.toLowerCase().includes(q) ||
+          cls.code.toLowerCase().includes(q) ||
+          cls.teacher.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [classesData, statusFilter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedClasses = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safeCurrentPage, pageSize]);
 
   return (
     <div className="adm-container">
@@ -98,14 +120,12 @@ export const Classes: React.FC = () => {
         <div className="adm-actions flex items-center gap-3">
           <Button 
             variant="secondary"
-            icon={<Archive size={16} />}
             onClick={() => navigate('/admin/classes/archive')}
           >
             {t('classArchive.title')}
           </Button>
           <Button 
             variant="primary"
-            icon={<Plus size={16} />}
             onClick={() => navigate('/admin/classes/create')}
           >
             {t('adminClasses.createClass')}
@@ -119,54 +139,33 @@ export const Classes: React.FC = () => {
         <div className="adm-pills">
           {(
             [
-              { key: 'all', label: isVi ? 'Tất cả lớp học' : 'All Classes', count: classesData.length },
-              { key: 'active', label: isVi ? 'Đang mở' : 'Active', count: classesData.filter(c => c.status === 'active').length },
-              { key: 'completed', label: isVi ? 'Đã hoàn thành' : 'Completed', count: classesData.filter(c => c.status === 'completed').length },
+              { key: 'all', label: isVi ? 'Tất cả lớp học' : 'All Classes' },
+              { key: 'active', label: isVi ? 'Đang mở' : 'Active' },
+              { key: 'completed', label: isVi ? 'Đã hoàn thành' : 'Completed' },
+              { key: 'cancelled', label: isVi ? 'Đã hủy' : 'Cancelled' },
             ] as const
           ).map(p => (
             <button
               key={p.key}
               type="button"
-              onClick={() => setStatusFilter(p.key)}
+              onClick={() => handleStatusFilterChange(p.key)}
               className={`adm-pill ${statusFilter === p.key ? 'active' : ''}`}
             >
               <span>{p.label}</span>
-              <span className="adm-pill-badge">{p.count}</span>
             </button>
           ))}
         </div>
 
-        {/* Search & View Toggle */}
-        <div className="flex items-center gap-3">
-          <div className="adm-search-wrap">
-            <Search size={16} className="adm-search-icon" />
-            <input 
-              type="text" 
-              className="adm-search-input"
-              placeholder={isVi ? 'Tìm tên lớp, mã lớp, giảng viên...' : 'Search classes...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="flex border-subtle rounded-md overflow-hidden bg-surface">
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`p-2 cursor-pointer border-none ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-surface text-muted'}`}
-              title="Grid View"
-            >
-              <LayoutGrid size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`p-2 cursor-pointer border-none ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-surface text-muted'}`}
-              title="Table View"
-            >
-              <List size={16} />
-            </button>
-          </div>
+        {/* Search */}
+        <div className="adm-search-wrap">
+          <Search size={16} className="adm-search-icon" />
+          <input 
+            type="text" 
+            className="adm-search-input"
+            placeholder={isVi ? 'Tìm tên lớp, mã lớp, giảng viên...' : 'Search classes...'}
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+          />
         </div>
       </div>
 
@@ -184,7 +183,6 @@ export const Classes: React.FC = () => {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={<GraduationCap size={40} />}
           title={isVi ? 'Không tìm thấy lớp học nào' : 'No classes found'}
           description={searchQuery 
             ? (isVi ? 'Không có lớp học nào khớp với từ khóa tìm kiếm.' : 'No classes match your search query.')
@@ -193,7 +191,6 @@ export const Classes: React.FC = () => {
             <Button 
               variant="primary"
               size="sm"
-              icon={<Plus size={14} />}
               onClick={() => navigate('/admin/classes/create')}
             >
               {t('adminClasses.createClass')}
@@ -201,128 +198,65 @@ export const Classes: React.FC = () => {
           }
         />
       ) : (
-        <>
-          {/* Grid View Mode */}
-          {viewMode === 'grid' && (
-            <div className="adm-cards-grid">
-              {filtered.map(cls => {
-                const occupancyPct = Math.min(100, Math.round((cls.students / cls.maxStudents) * 100));
-                return (
-                  <div 
-                    key={cls.id} 
-                    className="eh-card p-5 flex flex-col justify-between gap-4"
-                  >
-                    <div>
-                      {/* Top Badges */}
-                      <div className="flex justify-between items-center mb-3">
-                        <div className="flex gap-2 items-center">
-                          <span className="font-mono text-xs font-bold text-muted">{cls.code}</span>
-                          <span className="badge badge-neutral text-xs">{cls.level}</span>
-                        </div>
-                        <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                          {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
-                        </span>
-                      </div>
+        <div className="adm-table-card">
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                <th>{isVi ? 'GIẢNG VIÊN' : 'INSTRUCTOR'}</th>
+                <th>{isVi ? 'TRÌNH ĐỘ' : 'LEVEL'}</th>
+                <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
+                <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedClasses.map(cls => (
+                <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
+                  <td className="font-semibold text-primary font-mono">{cls.code}</td>
+                  <td className="font-medium text-surface">{cls.name}</td>
+                  <td>{cls.teacher}</td>
+                  <td className="text-muted">{cls.level}</td>
+                  <td>
+                    {cls.status === 'active' 
+                      ? (isVi ? 'Đang mở' : 'Active') 
+                      : cls.status === 'completed' 
+                      ? (isVi ? 'Đã hoàn thành' : 'Completed') 
+                      : (isVi ? 'Đã hủy' : 'Cancelled')}
+                  </td>
+                  <td className="text-right">
+                    <Button 
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/classes/${cls.id}`);
+                      }}
+                    >
+                      {t('adminClasses.viewDetails')}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-                      <h3 className="text-base font-bold m-0 mb-3 leading-snug text-surface">
-                        {cls.name}
-                      </h3>
-
-                      {/* Instructor & Meta */}
-                      <div className="flex flex-col gap-2 text-sm text-muted mb-4">
-                        <div className="flex items-center gap-2">
-                          <User size={15} className="text-primary" />
-                          <span>{t('adminClasses.teacherPrefix')}<strong>{cls.teacher}</strong></span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock size={15} />
-                          <span>{cls.schedule}</span>
-                        </div>
-                      </div>
-
-                      {/* Enrollment Progress Bar */}
-                      <div className="p-3 rounded-md bg-surface-low border-subtle mb-1">
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-muted">
-                            {isVi ? 'Sĩ số' : 'Class Capacity'}: <strong>{cls.students}/{cls.maxStudents}</strong>
-                          </span>
-                          <span className="font-semibold text-primary">{occupancyPct}%</span>
-                        </div>
-                        <div className="w-full bg-surface-container rounded-sm overflow-hidden h-1.5">
-                          <div 
-                            className={`h-full rounded-sm ${occupancyPct > 90 ? 'bg-primary' : 'bg-secondary'}`}
-                            style={{ width: `${occupancyPct}%` }} 
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer Action */}
-                    <div className="flex gap-2 pt-3 border-t-subtle">
-                      <Button
-                        variant="secondary"
-                        className="flex-1 text-sm justify-between"
-                        onClick={() => navigate(`/admin/classes/${cls.id}`)}
-                      >
-                        <span>{t('adminClasses.manageClass')}</span>
-                        <ArrowRight size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Table View Mode */}
-          {viewMode === 'list' && (
-            <div className="adm-table-card">
-              <table className="adm-table">
-                <thead>
-                  <tr>
-                    <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                    <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                    <th>{isVi ? 'GIẢNG VIÊN' : 'INSTRUCTOR'}</th>
-                    <th>{isVi ? 'SĨ SỐ' : 'ENROLLED'}</th>
-                    <th>{isVi ? 'LỊCH HỌC' : 'SCHEDULE'}</th>
-                    <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
-                    <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(cls => (
-                    <tr key={cls.id} onClick={() => navigate(`/admin/classes/${cls.id}`)} className="cursor-pointer">
-                      <td className="font-semibold text-primary font-mono">{cls.code}</td>
-                      <td className="font-medium text-surface">{cls.name}</td>
-                      <td>{cls.teacher}</td>
-                      <td>
-                        <span className="font-semibold">{cls.students}/{cls.maxStudents}</span>
-                      </td>
-                      <td className="text-muted">{cls.schedule}</td>
-                      <td>
-                        <span className={`badge ${cls.status === 'active' ? 'badge-active' : 'badge-onleave'}`}>
-                          {cls.status === 'active' ? t('adminClasses.statusActive') : t('adminClasses.statusCompleted')}
-                        </span>
-                      </td>
-                      <td className="text-right">
-                        <Button 
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/admin/classes/${cls.id}`);
-                          }}
-                        >
-                          {t('adminClasses.viewDetails')}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
+          <Pagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+            pageSizeOptions={[10, 20, 50]}
+            itemLabel={isVi ? 'lớp học' : 'classes'}
+            isVi={isVi}
+            variant="table"
+          />
+        </div>
       )}
     </div>
   );

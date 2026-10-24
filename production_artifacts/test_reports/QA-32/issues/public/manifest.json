@@ -1,0 +1,56 @@
+﻿[
+    {
+        "key":  "FINALIZE",
+        "title":  "[FE][Student Writing] Báo nộp thành công và xóa nháp khi hoàn tất submission thất bại",
+        "file":  "FINALIZE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/207"
+    },
+    {
+        "key":  "ATTEMPT",
+        "title":  "[FE][Student Writing] Báo nộp thành công khi không tải được lượt nộp",
+        "file":  "ATTEMPT.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/208"
+    },
+    {
+        "key":  "CREATE",
+        "title":  "[FE][Teacher Create Assignment] Vẫn phát hành bài khi tạo module thất bại",
+        "file":  "CREATE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/209"
+    },
+    {
+        "key":  "SCHEDULE",
+        "title":  "[FE][Teacher Create Assignment] Cho gửi lịch đóng bài trước lịch mở",
+        "file":  "SCHEDULE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/210"
+    },
+    {
+        "key":  "TIMEZONE",
+        "title":  "[FE][Teacher Create Assignment] Giá trị datetime-local mặc định dùng giờ UTC",
+        "file":  "TIMEZONE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/211"
+    },
+    {
+        "key":  "GRADE",
+        "title":  "[FE][Grading] Lưu bản nháp nhận xét gọi endpoint hoàn tất chấm điểm",
+        "file":  "GRADE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/212"
+    },
+    {
+        "key":  "ROUTE",
+        "title":  "[FE][Student Writing] Assignment ID không hợp lệ âm thầm tải bài số 1",
+        "file":  "ROUTE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/213"
+    },
+    {
+        "key":  "ANNOTATION",
+        "title":  "[FE][Feature gap][QA-32] Bổ sung luồng duyệt annotation trên TeacherSubmissionDetails",
+        "file":  "ANNOTATION.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/214"
+    },
+    {
+        "key":  "SCORE",
+        "title":  "[Spec][QA-32] Làm rõ bước điểm 0.5 hay điểm thập phân bất kỳ trong thang 0–10",
+        "file":  "SCORE.md",
+        "url":  "https://github.com/hotung9108/EnglishHub/issues/215"
+    }
+]

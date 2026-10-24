@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,19 +15,20 @@ import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.assignment.application.command.CreateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentListResult;
 import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
-import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
-import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
-import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepository;
+import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
+import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,9 +49,6 @@ class AssignmentServiceTest {
 	private ClassRepository classRepository;
 
 	@Mock
-	private ClassMemberRepository classMemberRepository;
-
-	@Mock
 	private CurrentUserProvider currentUserProvider;
 
 	private AssignmentService assignmentService;
@@ -59,28 +58,97 @@ class AssignmentServiceTest {
 		assignmentService = new AssignmentService(
 				assignmentRepository,
 				classRepository,
-				classMemberRepository,
 				currentUserProvider);
 	}
 
 	@Test
 	void teacherCanListAssignmentsForOwnedClassWithStatusFilter() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		AssignmentPage expected = new AssignmentPage(List.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)), 1, 20, 1);
 		when(assignmentRepository.findPage(eq(3L), eq(AssignmentStatus.PUBLISHED), any())).thenReturn(expected);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L)))
+				.thenReturn(Map.of(5L, List.of(ModuleSkill.READING)));
 
-		AssignmentPage actual = assignmentService.listAssignments("PUBLISHED", 3L, 1, 20);
+		AssignmentListResult actual = assignmentService.listAssignments("PUBLISHED", 3L, 1, 20);
 
-		assertThat(actual).isSameAs(expected);
+		assertThat(actual.assignmentPage()).isSameAs(expected);
+		assertThat(actual.skillsFor(5L)).containsExactly(ModuleSkill.READING);
 		verify(assignmentRepository).findPage(eq(3L), eq(AssignmentStatus.PUBLISHED), any());
+	}
+
+	@Test
+	void listAssignmentsLoadsSkillsInOneBatchForCurrentPage() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(List.of(
+				assignment(6L, 3L, AssignmentStatus.PUBLISHED),
+				assignment(5L, 3L, AssignmentStatus.PUBLISHED)), 2, 2, 5);
+		when(assignmentRepository.findPage(eq(3L), eq(AssignmentStatus.PUBLISHED), any())).thenReturn(page);
+		Map<Long, List<ModuleSkill>> skills = Map.of(
+				6L, List.of(ModuleSkill.READING, ModuleSkill.WRITING),
+				5L, List.of(ModuleSkill.LISTENING));
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(6L, 5L))).thenReturn(skills);
+
+		AssignmentListResult result = assignmentService.listAssignments("PUBLISHED", 3L, 2, 2);
+
+		assertThat(result.skillsByAssignmentId()).isEqualTo(skills);
+		assertThat(result.skillsFor(6L)).containsExactly(ModuleSkill.READING, ModuleSkill.WRITING);
+		assertThat(result.skillsFor(5L)).containsExactly(ModuleSkill.LISTENING);
+		verify(assignmentRepository, times(1)).findSkillsByAssignmentIds(List.of(6L, 5L));
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+	}
+
+	@Test
+	void emptyPageDoesNotLoadSkills() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(List.of(), 3, 2, 4);
+		when(assignmentRepository.findPage(eq(3L), eq(null), any())).thenReturn(page);
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 3, 2);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		assertThat(result.skillsByAssignmentId()).isEmpty();
+		verify(assignmentRepository, never()).findSkillsByAssignmentIds(any());
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+	}
+
+	@Test
+	void assignmentWithoutModulesHasEmptySkills() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(
+				List.of(assignment(5L, 3L, AssignmentStatus.DRAFT)), 1, 20, 1);
+		when(assignmentRepository.findPage(eq(3L), eq(null), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L))).thenReturn(Map.of());
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 1, 20);
+
+		assertThat(result.skillsFor(5L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	void listAssignmentsPreservesPageMetadata() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(
+				List.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)), 2, 1, 7);
+		when(assignmentRepository.findPage(eq(3L), eq(null), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L))).thenReturn(Map.of());
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 2, 1);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		assertThat(result.assignmentPage().page()).isEqualTo(2);
+		assertThat(result.assignmentPage().limit()).isEqualTo(1);
+		assertThat(result.assignmentPage().total()).isEqualTo(7);
 	}
 
 	@Test
 	void studentCanListAssignmentsForAClassTheyAttend() {
 		givenCaller(user(41L, UserRole.STUDENT));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
-		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
 		when(assignmentRepository.findPage(eq(3L), eq(null), any()))
 				.thenReturn(new AssignmentPage(List.of(), 1, 20, 0));
 
@@ -92,7 +160,7 @@ class AssignmentServiceTest {
 	@Test
 	void adminIsForbiddenFromListingClassAssignments() {
 		givenCaller(user(1L, UserRole.ADMIN));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.listAssignments(null, 3L, 1, 20),
@@ -103,7 +171,7 @@ class AssignmentServiceTest {
 	@Test
 	void teacherCannotListAnotherTeachersClass() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 99L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 99L, false)));
 
 		assertApiException(
 				() -> assignmentService.listAssignments(null, 3L, 1, 20),
@@ -113,7 +181,7 @@ class AssignmentServiceTest {
 	@Test
 	void rejectsUnknownAssignmentStatusFilter() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.listAssignments("OPEN", 3L, 1, 20),
@@ -124,8 +192,7 @@ class AssignmentServiceTest {
 	@Test
 	void studentCannotListAClassTheyDoNotAttend() {
 		givenCaller(user(41L, UserRole.STUDENT));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
-		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(false);
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.listAssignments(null, 3L, 1, 20),
@@ -135,7 +202,7 @@ class AssignmentServiceTest {
 	@Test
 	void teacherCreatesDraftAssignmentForOwnedClass() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(any(Assignment.class))).thenAnswer(invocation -> {
 			Assignment saved = invocation.getArgument(0);
 			saved.setId(5L);
@@ -174,7 +241,7 @@ class AssignmentServiceTest {
 	@Test
 	void teacherCannotCreateAssignmentForUnassignedClass() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, null)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, null, false)));
 
 		assertApiException(
 				() -> assignmentService.createAssignment(3L, validCreateCommand()),
@@ -184,7 +251,7 @@ class AssignmentServiceTest {
 	@Test
 	void rejectsInvalidAssignmentWindowAndSubmissionLimit() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.createAssignment(3L, new CreateAssignmentCommand(
@@ -201,7 +268,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.findModuleSummaries(5L))
 				.thenReturn(List.of(new AssignmentModuleSummary(9L, "READING")));
 
@@ -216,8 +283,7 @@ class AssignmentServiceTest {
 		givenCaller(user(41L, UserRole.STUDENT));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
-		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
 		when(assignmentRepository.findModuleSummaries(5L)).thenReturn(List.of());
 
 		assertThat(assignmentService.getAssignmentDetail(5L).modules()).isEmpty();
@@ -228,7 +294,7 @@ class AssignmentServiceTest {
 		givenCaller(user(1L, UserRole.ADMIN));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.getAssignmentDetail(5L),
@@ -240,7 +306,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
 
 		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
@@ -258,7 +324,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
 
 		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
@@ -282,7 +348,7 @@ class AssignmentServiceTest {
 				savedAssignment.closeAt(),
 				5);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenReturn(savedAssignment);
 
 		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(
@@ -311,7 +377,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 99L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 99L, false)));
 
 		assertApiException(
 				() -> assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(
@@ -324,7 +390,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.CLOSED)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(
@@ -338,7 +404,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assignmentService.deleteAssignment(5L);
 
@@ -370,7 +436,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
 		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertThat(assignmentService.updateStatus(5L,
 				new UpdateAssignmentStatusCommand("PUBLISHED"))).isEqualTo(AssignmentStatus.PUBLISHED);
@@ -386,7 +452,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("DRAFT")),
@@ -417,7 +483,7 @@ class AssignmentServiceTest {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
-		when(classRepository.findById(3L)).thenReturn(Optional.of(englishClass(3L, 10L)));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertApiException(
 				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("OPEN")),
@@ -445,19 +511,6 @@ class AssignmentServiceTest {
 				false,
 				null,
 				null);
-	}
-
-	private EnglishClass englishClass(Long id, Long teacherId) {
-		EnglishClass englishClass = new EnglishClass(
-				"IELTS 6.5 - K12",
-				"Intermediate",
-				"Luyện IELTS",
-				java.time.LocalDate.of(2026, 9, 15),
-				null,
-				ClassStatus.ACTIVE,
-				teacherId);
-		englishClass.setId(id);
-		return englishClass;
 	}
 
 	private User user(Long id, UserRole role) {

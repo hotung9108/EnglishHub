@@ -95,11 +95,38 @@
 | 29 | PUT /modules/{id} | Sửa module (đổi `ai_instruction`, `max_score`...) |
 | 30 | DELETE /modules/{id} | Xoá module (cascade luôn questions) |
 | 31 | POST /modules/{id}/audio | Upload file audio đề bài (Listening) lên R2 |
-| 32 | GET /modules/{id}/questions | Danh sách câu hỏi trong module (kèm `correct_answer` nếu là trắc nghiệm) |
+| 32 | GET /modules/{id}/questions | Danh sách câu hỏi trong module; MCQ có `options` riêng, `correctAnswer` chỉ dành cho giáo viên phụ trách lớp |
 | 33 | POST /modules/{id}/questions | Tạo câu hỏi mới — gửi `content` (plain text) + `correctAnswer` (đối tượng đã định kiểu, xem bên dưới) |
-| 34 | GET /questions/{id} | Xem chi tiết câu hỏi (kèm `correctAnswer`) |
+| 34 | GET /questions/{id} | Xem chi tiết câu hỏi; cùng hợp đồng `options` và phân quyền `correctAnswer` như #32 |
 | 35 | PUT /questions/{id} | Sửa câu hỏi — sửa/thêm/xoá option = gửi lại toàn bộ `correctAnswer` |
 | 36 | DELETE /questions/{id} | Xoá câu hỏi |
+
+### Hợp đồng response câu hỏi (GET #32, #34 — module question)
+
+GET `/modules/{id}/questions` trả `{ "data": [QuestionResponse, ...] }`; GET
+`/questions/{id}` trả trực tiếp `QuestionResponse`. Cả hai endpoint có cùng quy tắc:
+
+- Câu `MULTIPLE_CHOICE` có dữ liệu options hợp lệ trả thêm trường `options` ở cấp câu hỏi,
+  gồm đúng 4 phần tử `{ "id": number, "content": string }`, cho cả giáo viên phụ trách
+  lớp và học sinh thành viên lớp. Mỗi phần tử **chỉ có `id` và `content`**, không có
+  `isCorrect`, `is_correct` hoặc trường đáp án bổ sung. Giữ nguyên ID, nội dung và thứ tự nguồn.
+- Học sinh không nhận trường `correctAnswer` và không nhận cờ đúng/sai của phương án.
+- Giáo viên phụ trách lớp vẫn nhận đầy đủ `correctAnswer` như trước, bao gồm
+  `correctAnswer.options` và các cờ `isCorrect`; trường `options` riêng không thay thế
+  dữ liệu này, để giữ tương thích màn hình tạo/sửa/xem đáp án.
+- Câu `SHORT_ANSWER` không có trường `options`.
+- Nếu options trong dữ liệu lưu trữ không hợp lệ sau khi đã đọc được thành map, chỉ bỏ
+  **toàn bộ trường `options` của câu đó**, không trả danh sách một phần và không tự bù
+  ID/nội dung. Việc chiếu options không ném lỗi hay trả 400; các câu khác vẫn trả bình
+  thường. `correctAnswer` của giáo viên vẫn giữ nguyên và server ghi WARN chỉ gồm
+  question ID, loại lỗi. Quy tắc này không thay đổi lỗi đọc JSON/root ở persistence mapper.
+
+Options không hợp lệ khi: không phải danh sách; số phần tử khác 4; phần tử không phải
+map; thiếu ID hoặc ID không phải số; ID trùng nhau; content không phải chuỗi, rỗng hoặc
+chỉ có khoảng trắng. Trường bị bỏ khỏi JSON, không trả `options: null` hay `options: []`.
+
+Thay đổi response này không đổi request tạo/sửa, cấu trúc lưu trữ `correct_answer`,
+hoặc DTO câu hỏi trong module submission (luồng xem bài nộp đã chấm).
 
 ### Hợp đồng `correctAnswer` (endpoint #33, #35)
 

@@ -2,10 +2,16 @@ try:
     import pytest
 except ImportError:
     pytest = None
+import os
+os.environ["MOCK_MODE"] = "true"
 import base64
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
+from app.core.config import settings
 from app.main import app
+from app.services.audio_processor import AudioProcessor
 
+settings.MOCK_MODE = True
 client = TestClient(app)
 
 
@@ -20,7 +26,8 @@ def test_health_check():
     assert "openrouterModel" in data
 
 
-def test_analyze_speaking_qa21_benchmark():
+@patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+def test_analyze_speaking_qa21_benchmark(converter: AsyncMock):
     mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
 
     payload = {
@@ -29,10 +36,12 @@ def test_analyze_speaking_qa21_benchmark():
         "audioStorageKey": "submissions/speaking_14.mp3",
         "moduleInstructions": "Describe a book you enjoyed reading recently.",
         "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
-        "maxScore": 9.0
+        "maxScore": 9.0,
+        "aiProvider": "mock"
     }
 
     response = client.post("/api/v1/analyze/speaking", json=payload)
+    converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
     assert response.status_code == 200, f"Expected 200, got: {response.text}"
     
     data = response.json()

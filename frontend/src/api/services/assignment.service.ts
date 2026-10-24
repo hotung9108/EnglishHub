@@ -13,6 +13,9 @@ export interface AssignmentSummary {
   title: string;
   status: AssignmentStatus;
   closeAt: string;
+  skills: AssignmentSkill[];
+  openAt?: string | null;
+  maxSubmissions?: number | null;
 }
 
 export interface AssignmentModuleSummary {
@@ -24,6 +27,10 @@ export interface AssignmentDetail {
   id: AssignmentId;
   title: string;
   status: AssignmentStatus;
+  description?: string | null;
+  openAt?: string | null;
+  closeAt?: string | null;
+  maxSubmissions?: number | null;
   modules: AssignmentModuleSummary[];
 }
 

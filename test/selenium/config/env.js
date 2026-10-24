@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 export const root = fileURLToPath(new URL('../', import.meta.url));
 
 export function loadConfig(env = process.env) {
+  env = { ...env };
+  for (const [key, value] of Object.entries(env)) {
+    if (key.startsWith('QA28_')) env[key.replace('QA28_', 'SELENIUM_')] ??= value;
+  }
   const defaultUrl = env.TEST_ENV === 'dev' ? 'http://localhost:5173' : 'https://staging.hotung9108.me';
   const base = new URL(env.SELENIUM_BASE_URL || defaultUrl);
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) {

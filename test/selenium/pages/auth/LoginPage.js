@@ -17,6 +17,7 @@ export class LoginPage extends BasePage {
     // Enter through the deployed root; the SPA may navigate to login itself.
     await this.driver.get(`${this.config.baseUrl}/`);
     await this.visible(email);
+    await this.step('Mở trang đăng nhập');
     return this;
   }
 
@@ -35,15 +36,15 @@ export class LoginPage extends BasePage {
 
   async selectRole(role) {
     assert.ok(Object.hasOwn(roleLabels, role), 'Login role must be admin, teacher or student');
+    // Current staging derives the role from the account and has no role tabs.
+    // Older FE builds expose tabs. In both builds waitForRole verifies the
+    // authenticated role; absence of tabs does not bypass that assertion.
+    if (!(await this.driver.findElements(By.css('.login-role-tabs'))).length) return;
     const labels = roleLabels[role].map(label => `normalize-space(.)="${label}"`).join(' or ');
     const locator = By.xpath(`//div[contains(concat(' ', normalize-space(@class), ' '), ' login-role-tabs ')]//button[${labels}]`);
-    const tabs = await this.driver.findElements(locator);
-    if (tabs.length === 0) {
-      return;
-    }
-    const tab = tabs[0];
+    const tab = await this.visible(locator);
     await this.driver.wait(until.elementIsEnabled(tab), this.config.timeout);
-    await tab.click();
+    await this.clickElement(tab, `Chọn vai trò ${role}`);
     await this.driver.wait(async () => {
       const selected = await this.driver.findElement(locator);
       const classes = (await selected.getAttribute('class') || '').split(/\s+/);
@@ -56,9 +57,11 @@ export class LoginPage extends BasePage {
     await this.selectRole(role);
     const mail = await this.visible(email);
     const pass = await this.visible(password);
+    await this.step('Nhập email tài khoản test', mail);
     await mail.clear(); await mail.sendKeys(user.email);
+    await this.step('Nhập mật khẩu test', pass);
     await pass.clear(); await pass.sendKeys(user.password);
-    await (await this.visible(submit)).click();
+    await this.clickElement(await this.visible(submit), 'Đăng nhập');
   }
 
   async waitForRole(role) {

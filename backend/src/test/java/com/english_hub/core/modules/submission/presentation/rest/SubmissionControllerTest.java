@@ -154,6 +154,7 @@ class SubmissionControllerTest {
 				1,
 				List.of(new SubmissionListItemResult(
 						88L,
+						5L,
 						41L,
 						1,
 						SubmissionStatus.GRADED,
@@ -165,9 +166,9 @@ class SubmissionControllerTest {
 								ModuleTaskType.QUIZ,
 								SubmissionStatus.GRADED,
 								new GradingSummaryResult(BigDecimal.valueOf(8), BigDecimal.TEN, GradingStatus.COMPLETED))))));
-		when(submissionService.list(5L, 41L, "GRADED", 2, 10)).thenReturn(result);
+		when(submissionService.list(3L, 5L, 41L, "GRADED", 2, 10)).thenReturn(result);
 
-		ResponseEntity<SubmissionListResponse> response = submissionController.listSubmissions(5L, 41L, "GRADED", 2, 10);
+		ResponseEntity<SubmissionListResponse> response = submissionController.listSubmissions(3L, 5L, 41L, "GRADED", 2, 10);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		SubmissionListResponse body = response.getBody();
@@ -175,6 +176,7 @@ class SubmissionControllerTest {
 		assertThat(body.pagination().limit()).isEqualTo(20);
 		assertThat(body.pagination().total()).isEqualTo(1);
 		assertThat(body.data()).hasSize(1);
+		assertThat(body.data().getFirst().assignmentId()).isEqualTo(5L);
 		assertThat(body.data().getFirst().studentId()).isEqualTo(41L);
 		assertThat(body.data().getFirst().status()).isEqualTo("GRADED");
 		assertThat(body.data().getFirst().modules().getFirst().grading().finalScore()).isEqualByComparingTo("8");

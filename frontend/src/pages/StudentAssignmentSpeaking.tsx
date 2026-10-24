@@ -1,34 +1,35 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
-  ChevronRight, 
   Play, 
   Pause, 
   RotateCcw, 
   Mic, 
   MicOff, 
-  FileText, 
-  Send, 
-  CheckCircle2, 
-  Music,
   AlertCircle,
   RefreshCw,
   Loader2
 } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
+import { ExamStepper } from '../components/assignments/ExamStepper';
+import {
+  getSkillRoute,
+  getNextIncompleteModule,
+  getSkillLabel
+} from '../utils/examStepper.utils';
 import '../styles/student-speaking.css';
 
 const StudentAssignmentSpeaking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -40,14 +41,27 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
-  // Recording State
+  // Real Audio Recorder Hook
+  const {
+    isRecording,
+    recordingDuration,
+    audioBlob,
+    audioUrl,
+    backendMimeType,
+    permissionError,
+    startRecording,
+    stopRecording,
+    resetRecording,
+  } = useAudioRecorder();
+
+  // Audio Playback State
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const [recordedAudioReady, setRecordedAudioReady] = useState(false);
+  const [playbackSeconds, setPlaybackSeconds] = useState(0);
+
+  // Personal Notes
   const [personalNotes, setPersonalNotes] = useState('');
   const [isNotesSaved, setIsNotesSaved] = useState(false);
-  const [hasPdfScript, setHasPdfScript] = useState(true);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -57,6 +71,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => setReloadKey((k) => k + 1);
 
+  // Load assignment and submission data
   useEffect(() => {
     let isMounted = true;
 
@@ -79,8 +94,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
           if (isMounted) setAssignment(currentAssignment);
         }
 
-        // 2. Fetch module details
-        const moduleId = currentAssignment?.modules?.[0]?.id;
+        // 2. Fetch speaking module details
+        const speakingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+        const moduleId = speakingMod?.id || currentAssignment?.modules?.[0]?.id;
         if (moduleId) {
           try {
             const mod = await moduleService.getModule(moduleId);
@@ -96,8 +112,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
             if (isMounted) setSubmission(sub);
-          } catch {
-            // Fallback
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+            }
           }
         } else if (user?.id) {
           try {
@@ -110,13 +129,21 @@ const StudentAssignmentSpeaking: React.FC = () => {
             if (subList.data && subList.data.length > 0) {
               const sub = await submissionService.getSubmission(subList.data[0].id);
               if (isMounted) setSubmission(sub);
-            } else {
+            } else if (currentAssignment?.status === 'PUBLISHED') {
               const startRes = await submissionService.startAttempt(numericId);
               const sub = await submissionService.getSubmission(startRes.id);
               if (isMounted) setSubmission(sub);
+            } else if (currentAssignment?.status) {
+              if (isMounted) {
+                const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+              }
             }
-          } catch {
-            // Fallback
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
           }
         }
       } catch (err: unknown) {
@@ -137,32 +164,56 @@ const StudentAssignmentSpeaking: React.FC = () => {
     };
   }, [numericId, id, searchParams, user?.id, reloadKey]);
 
-  // Timer effect while recording
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRecording]);
-
+  // Handle Play/Pause for recorded audio
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (!audioPlayerRef.current || !audioUrl) return;
+
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioPlayerRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((playErr) => {
+        console.warn('Playback error:', playErr);
+        setIsPlaying(false);
+      });
+    }
   };
 
-  const toggleRecording = () => {
+  // Toggle Recording with real MediaRecorder
+  const toggleRecording = async () => {
+    setError(null);
     if (!isRecording) {
-      setIsRecording(true);
-      setIsPlaying(false);
-      setRecordingSeconds(0);
+      if (assignment?.status && assignment.status !== 'PUBLISHED') {
+        const statusLabel = assignment.status === 'DRAFT' ? 'Nháp (DRAFT)' : assignment.status;
+        setError(`Bài tập này đang ở trạng thái ${statusLabel}, chưa thể thực hiện ghi âm làm bài.`);
+        return;
+      }
+      if (isPlaying && audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        setIsPlaying(false);
+      }
+      try {
+        await startRecording();
+      } catch (recErr: unknown) {
+        const msg = recErr instanceof Error ? recErr.message : 'Không thể kích hoạt microphone.';
+        setError(msg);
+      }
     } else {
-      setIsRecording(false);
-      setRecordedAudioReady(true);
+      stopRecording();
     }
+  };
+
+  // Reset recording to re-record
+  const handleResetRecording = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setPlaybackSeconds(0);
+    resetRecording();
   };
 
   const handleSaveNotes = () => {
@@ -170,39 +221,95 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setTimeout(() => setIsNotesSaved(false), 3000);
   };
 
+  // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
+    if (assignment?.status === 'CLOSED') {
+      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      return;
+    }
+    if (!audioBlob) {
+      setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
+      return;
+    }
+
+    if (isRecording) {
+      stopRecording();
+    }
+
+    if (!submission) {
+      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
+
     try {
       const subId = submission?.id;
-      const subModuleId = submission?.modules?.[0]?.id;
+      const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {});
-        } catch {
-          // Continue
-        }
+      if (!subModuleId) {
+        throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
       }
 
-      if (subId) {
+      // Step 1: Request presigned PUT URL from backend
+      // Backend validates MIME against: 'audio/webm', 'audio/wav', 'audio/mpeg'
+      const { uploadUrl, storageKey } = await submissionService.getAudioUploadUrl(
+        subModuleId,
+        backendMimeType
+      );
+
+      // Step 2: Upload audio blob directly to S3 / MinIO storage
+      await submissionService.uploadDirectToStorage(uploadUrl, audioBlob, backendMimeType);
+
+      // Step 3: Submit module with audioStorageKey (backend probes storage and marks READY)
+      await submissionService.submitModule(subModuleId, {
+        audioStorageKey: storageKey,
+      });
+
+      // Step 4: Check if other modules in submission are already completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+
+      if (subId && allOthersDone) {
         try {
           await submissionService.submitSubmission(subId);
         } catch {
-          // Continue
+          // Fallback continue
         }
       }
 
-      setSuccessMessage('Nộp bài thu âm thành công! AI đang xử lý âm phổ & ngữ điệu...');
-      setTimeout(() => {
-        if (subId) {
-          navigate(`/student/submissions/${subId}`);
+      if (allOthersDone) {
+        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+        setTimeout(() => {
+          if (subId) {
+            navigate(`/student/submissions/${subId}`);
+          } else {
+            navigate(`/student/assignments/${id}/result`);
+          }
+        }, 1200);
+      } else {
+        const currentSubModules = (submission?.modules || []).map((m) =>
+          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+        );
+        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          setSuccessMessage(`Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          setTimeout(() => {
+            navigate(nextRoute);
+          }, 1500);
         } else {
-          navigate(`/student/assignments/${id}/result`);
+          setSuccessMessage('Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...');
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`);
+          }, 1200);
         }
-      }, 1200);
+      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi khi nộp bài. Vui lòng thử lại.';
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -215,8 +322,28 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const recordedAudioReady = Boolean(audioBlob && audioUrl);
+  const activeError = permissionError || error;
+
   return (
     <div className="speaking-container">
+      {/* Hidden audio element for previewing the recorded sound */}
+      <audio
+        ref={audioPlayerRef}
+        src={audioUrl || undefined}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setPlaybackSeconds(0);
+        }}
+        onTimeUpdate={() => {
+          if (audioPlayerRef.current) {
+            setPlaybackSeconds(Math.floor(audioPlayerRef.current.currentTime));
+          }
+        }}
+      />
+
       {/* Breadcrumbs & Navigation */}
       <div className="speaking-breadcrumbs">
         <button 
@@ -225,36 +352,42 @@ const StudentAssignmentSpeaking: React.FC = () => {
           type="button"
         >
           <ArrowLeft size={14} />
-          <span>{t('studentSpeaking.backToList')}</span>
+          <span>Quay lại danh sách bài tập</span>
         </button>
-        <span className="speaking-breadcrumb-divider">/</span>
-        <span>Hệ thống</span>
-        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
-        <span 
-          className="speaking-breadcrumb-link"
-          onClick={() => navigate('/student/classes')}
-          role="button"
-          tabIndex={0}
-        >
-          Lớp học của tôi
-        </span>
-        <ChevronRight size={12} className="speaking-breadcrumb-divider" />
-        <span className="speaking-breadcrumb-link">
+        <span className="speaking-breadcrumb-sep">/</span>
+        <span className="speaking-breadcrumb-current">
           {assignment?.title || `Speaking Practice #${id}`}
         </span>
+        {assignment?.modules && assignment.modules.length > 1 && (
+          <div className="speaking-stepper-wrapper">
+            <ExamStepper
+              variant="compact"
+              modules={assignment.modules}
+              submissionModules={submission?.modules}
+              currentSkill="SPEAKING"
+              assignmentId={numericId}
+              submissionId={submission?.id}
+              onSelectModule={(skill, step) => {
+                if (step.isCompleted || step.isAccessible) {
+                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="p-16 mb-16 rounded-lg bg-red-50 border border-red-200 flex items-center justify-between">
-          <div className="flex items-center gap-8 text-red-700">
+      {activeError && (
+        <div className="speaking-error-banner">
+          <div className="speaking-error-msg">
             <AlertCircle size={18} />
-            <span className="text-sm">{error}</span>
+            <span>{activeError}</span>
           </div>
           <Button
             variant="danger"
             size="sm"
             onClick={handleRetry}
-            icon={<RefreshCw size={13} />}
+            icon={RefreshCw}
           >
             Thử lại
           </Button>
@@ -263,25 +396,22 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
       {successMessage && (
         <div className="speaking-success-banner">
-          <CheckCircle2 size={20} />
-          <span className="text-sm font-semibold">{successMessage}</span>
+          <span>{successMessage}</span>
         </div>
       )}
 
       {/* Main 2-Column Grid */}
       <div className="speaking-grid">
         {/* Left Column (Main Stage) */}
-        <div>
+        <div className="speaking-main-col">
           {/* Card 1: Cue Card / Prompt */}
           <section className="speaking-card">
             <div className="speaking-card-header">
-              <div className="speaking-badge-row">
-                <span className="speaking-cue-badge">{t('studentSpeaking.cueBadge')}</span>
-                <span className="speaking-cue-timing">{t('studentSpeaking.cueTiming')}</span>
+              <div className="speaking-card-header-main">
+                <h1 className="speaking-cue-title">
+                  {isLoading ? 'Đang tải đề thi...' : (assignment?.title || 'Describe a difficult environmental issue')}
+                </h1>
               </div>
-              <h1 className="speaking-cue-title">
-                {isLoading ? 'Đang tải đề thi...' : (assignment?.title || 'Describe a difficult environmental issue')}
-              </h1>
             </div>
 
             <div className="speaking-card-body">
@@ -296,28 +426,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   </>
                 )}
               </div>
-
-              {/* Collapsible Sample / Reference Script */}
-              {hasPdfScript && (
-                <div className="speaking-sample-script-box">
-                  <div className="speaking-sample-header">
-                    <span className="flex items-center gap-6">
-                      <FileText size={16} color="var(--primary)" />
-                      <strong>{t('studentSpeaking.cueCardReference')}</strong>
-                    </span>
-                    <button 
-                      type="button"
-                      className="speaking-btn-link"
-                      onClick={() => setHasPdfScript(!hasPdfScript)}
-                    >
-                      {t('studentSpeaking.btnHideScript')}
-                    </button>
-                  </div>
-                  <p className="speaking-sample-body">
-                    {t('studentSpeaking.sampleScriptExcerpt')}
-                  </p>
-                </div>
-              )}
             </div>
           </section>
 
@@ -325,10 +433,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
           <section className="speaking-card">
             <div className="speaking-card-header">
               <h2 className="speaking-card-title">
-                {t('studentSpeaking.studioTitle')}
+                Ghi âm
               </h2>
-              <span className="speaking-cue-timing">
-                {isRecording ? `Đang thu âm: ${formatTime(recordingSeconds)}` : 'Sẵn sàng thu âm'}
+              <span className={`speaking-card-timing ${isRecording ? 'recording' : ''}`}>
+                {isRecording 
+                  ? `Đang thu âm: ${formatTime(recordingDuration)}` 
+                  : recordedAudioReady 
+                    ? `Đã thu âm: ${formatTime(recordingDuration)}` 
+                    : ''}
               </span>
             </div>
 
@@ -350,8 +462,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   <button 
                     type="button"
                     className="speaking-btn-icon" 
-                    onClick={() => { setRecordedAudioReady(false); setRecordingSeconds(0); }}
-                    title={t('studentSpeaking.btnResetRecording')}
+                    onClick={handleResetRecording}
+                    disabled={isRecording || !recordedAudioReady}
+                    title="Thu âm lại từ đầu"
                   >
                     <RotateCcw size={18} />
                   </button>
@@ -359,17 +472,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   <button 
                     type="button"
                     className={`speaking-btn-record ${isRecording ? 'active' : ''}`}
-                    onClick={toggleRecording}
+                    onClick={() => void toggleRecording()}
+                    title={isRecording ? 'Dừng thu âm' : 'Bắt đầu thu âm'}
                   >
                     {isRecording ? <MicOff size={28} /> : <Mic size={28} />}
                   </button>
 
                   <button 
                     type="button"
-                    className={`speaking-btn-icon ${!recordedAudioReady ? 'opacity-50' : ''}`}
+                    className="speaking-btn-icon"
                     onClick={togglePlay}
-                    disabled={!recordedAudioReady}
-                    title="Phát lại bản ghi"
+                    disabled={!recordedAudioReady || isRecording}
+                    title={isPlaying ? 'Tạm dừng phát' : 'Phát lại bản ghi'}
                   >
                     {isPlaying ? <Pause size={18} /> : <Play size={18} />}
                   </button>
@@ -377,77 +491,81 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
                 <div className="speaking-recorder-hint">
                   {isRecording ? (
-                    <span className="speaking-status-recording">● Đang ghi âm trực tiếp qua Microphone...</span>
+                    <span className="speaking-status-recording">
+                      Đang ghi âm... ({formatTime(recordingDuration)})
+                    </span>
                   ) : recordedAudioReady ? (
-                    <span className="speaking-status-ready inline-flex items-center gap-1.5">
-                      <CheckCircle2 size={14} />
-                      <span>Đã ghi âm xong ({formatTime(recordingSeconds)}). Bấm nút nộp bài bên dưới.</span>
+                    <span className="speaking-status-ready">
+                      {isPlaying
+                        ? `Đang phát lại (${formatTime(playbackSeconds)} / ${formatTime(recordingDuration)})`
+                        : `Đã ghi âm (${formatTime(recordingDuration)}) • Bấm Play để nghe lại hoặc Nộp bài`}
                     </span>
                   ) : (
-                    'Bấm nút Micro để bắt đầu ghi âm bài nói của bạn.'
+                    <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
                   )}
                 </div>
               </div>
 
               {/* Personal Notes Box */}
               <div className="speaking-notes-section">
-                <div className="flex justify-between items-center mb-8">
+                <div className="speaking-notes-header">
                   <label htmlFor="speaking-prep-notes" className="speaking-notes-label">
-                    {t('studentSpeaking.prepNotesLabel')}
+                    Ghi chú chuẩn bị
                   </label>
                   {isNotesSaved && (
-                    <span className="text-xs text-emerald-600 font-semibold inline-flex items-center gap-1">
-                      <CheckCircle2 size={13} />
-                      <span>{t('studentSpeaking.notesSaved')}</span>
+                    <span className="speaking-notes-saved-msg">
+                      Đã lưu ghi chú thành công!
                     </span>
                   )}
                 </div>
                 <textarea 
                   id="speaking-prep-notes"
                   className="speaking-notes-textarea"
-                  placeholder={t('studentSpeaking.prepNotesPlaceholder')}
+                  placeholder="Nhập dàn ý chuẩn bị..."
                   value={personalNotes}
                   onChange={(e) => setPersonalNotes(e.target.value)}
                   rows={4}
                 />
-                <Button 
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSaveNotes}
-                >
-                  {t('studentSpeaking.btnSaveNotes')}
-                </Button>
+                <div className="speaking-notes-action">
+                  <Button 
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSaveNotes}
+                  >
+                    Lưu ghi chú
+                  </Button>
+                </div>
               </div>
             </div>
           </section>
         </div>
 
         {/* Right Column: Submission & Grading */}
-        <div>
+        <div className="speaking-side-col">
           {/* Card 1: Submission */}
           <section className="speaking-card">
             <div className="speaking-card-header">
               <h2 className="speaking-card-title">
-                {t('studentSpeaking.submissionTitle')}
+                Bài nộp
               </h2>
             </div>
 
             <div className="speaking-card-body">
               {/* Audio file block */}
               <div className="submission-file-box">
-                <div className="submission-file-icon">
-                  <Music size={20} />
-                </div>
-                <div className="flex-1">
+                <div className="submission-file-info">
                   <div className="submission-file-title">
-                    {recordedAudioReady ? `speaking_attempt_${numericId}.mp3` : 'chua_co_ban_ghi.mp3'}
+                    {recordedAudioReady 
+                      ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}` 
+                      : 'chua_co_ban_ghi.webm'}
                   </div>
                   <div className="submission-file-meta">
-                    {recordedAudioReady ? `${formatTime(recordingSeconds)} • Audio WebM/MPEG` : 'Chưa có tệp'}
+                    {recordedAudioReady && audioBlob
+                      ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB` 
+                      : 'Chưa có bản ghi âm'}
                   </div>
                 </div>
-                <span className={`text-xs font-semibold flex items-center gap-4 ${recordedAudioReady ? 'text-emerald-600' : 'text-slate-400'}`}>
-                  <CheckCircle2 size={14} />
+                <span className={`submission-file-status ${recordedAudioReady ? 'ready' : 'pending'}`}>
                   {recordedAudioReady ? 'Sẵn sàng nộp' : 'Chưa ghi âm'}
                 </span>
               </div>
@@ -456,24 +574,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <button 
                 className="btn-submit-speaking"
                 onClick={handleSubmitAssignment}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !recordedAudioReady}
                 type="button"
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" /> Đang gửi bài...
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Đang tải lên &amp; gửi bài...</span>
                   </>
                 ) : (
-                  <>
-                    <Send size={16} />
-                    {t('studentSpeaking.btnSubmitAssignment')}
-                  </>
+                  <span>Nộp bài</span>
                 )}
               </button>
-
-              <div className="speaking-submit-note">
-                Bài nói sẽ được gửi trực tiếp đến pipeline Speaking AI để đánh giá độ trôi chảy (Fluency), phát âm (Pronunciation), và ngữ pháp.
-              </div>
             </div>
           </section>
 
@@ -481,44 +593,38 @@ const StudentAssignmentSpeaking: React.FC = () => {
           <section className="speaking-card">
             <div className="speaking-card-header">
               <h2 className="speaking-card-title">
-                {t('studentSpeaking.gradingTitle')}
+                Tiêu chí chấm điểm
               </h2>
-              <span className="speaking-cue-timing">{t('studentSpeaking.gradingScale')}</span>
             </div>
 
-            <div className="speaking-card-body gap-12">
+            <div className="speaking-card-body">
               <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.totalPoints')}</span>
-                <span className="grading-val-total">100 (Band 9.0)</span>
+                <span className="grading-label">Tổng điểm</span>
+                <span className="grading-val-total">100</span>
               </div>
 
               {/* Criteria breakdown */}
               <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaPronunciation')}</span>
-                <span className="speaking-weight-badge">25%</span>
+                <span className="grading-label">Phát âm</span>
+                <span className="grading-val-weight">25%</span>
               </div>
               <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaFluency')}</span>
-                <span className="speaking-weight-badge">25%</span>
+                <span className="grading-label">Độ trôi chảy &amp; Mạch lạc</span>
+                <span className="grading-val-weight">25%</span>
               </div>
               <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaLexical')}</span>
-                <span className="speaking-weight-badge">25%</span>
+                <span className="grading-label">Từ vựng</span>
+                <span className="grading-val-weight">25%</span>
               </div>
               <div className="grading-row">
-                <span className="grading-label">{t('studentSpeaking.criteriaGrammar')}</span>
-                <span className="speaking-weight-badge">25%</span>
+                <span className="grading-label">Ngữ pháp</span>
+                <span className="grading-val-weight">25%</span>
               </div>
 
               {/* Current Score Display */}
               <div className="grading-current-grade">
-                <div>
-                  <div className="speaking-eval-title">
-                    {t('studentSpeaking.currentGrade')}
-                  </div>
-                  <div className="speaking-eval-subtitle">
-                    Lần {submission?.attemptNumber ?? 1}
-                  </div>
+                <div className="speaking-eval-title">
+                  Điểm số
                 </div>
                 <div className="grading-score-display">-- / 100</div>
               </div>

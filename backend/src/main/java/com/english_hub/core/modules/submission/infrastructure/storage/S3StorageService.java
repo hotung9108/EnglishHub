@@ -12,6 +12,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -114,6 +115,14 @@ public class S3StorageService implements StorageService, AutoCloseable {
 			}
 			throw exception;
 		}
+	}
+
+	@Override
+	public void deleteObject(String storageKey) {
+		s3Client.deleteObject(DeleteObjectRequest.builder()
+				.bucket(bucket)
+				.key(storageKey)
+				.build());
 	}
 
 	@Override

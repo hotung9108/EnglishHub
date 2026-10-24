@@ -1,0 +1,9 @@
+id: BE-TASK-17
+title: "Migrate Module Listening Audio Storage to S3 with Presigned Direct Upload & Streaming Endpoint"
+assignee: "@be-secondary"
+status: "Done"
+priority: "High"
+description: "Resolve audit items BE-STO-01 (BUG-02, ephemeral local disk audio storage) and BE-AUD-01 (BUG-06, missing GET/stream audio endpoint). Replace the multipart POST /api/v1/modules/{moduleId}/audio with a presigned direct-upload flow (POST request JSON {mimeType} -> presigned PUT URL -> POST /audio/confirm), add GET /api/v1/modules/{moduleId}/audio streaming for the owning teacher and class-member students, and delete the LocalAudioStorageAdapter/AudioStoragePort (S3StorageService only). Add deleteObject to StorageService with best-effort after-commit cleanup on re-upload and module delete. Backend only; frontend changes out of scope."
+artifacts:
+  - "production_artifacts/be_to_tester/file-upload-api-testing-instructions.md"
+  - "docs/api/file-upload-guide-module-audio-and-submission-files.md"

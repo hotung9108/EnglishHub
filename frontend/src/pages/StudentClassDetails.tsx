@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowLeft, CheckCircle2, Clock, AlertCircle, RotateCcw, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, AlertCircle, RotateCcw, FileText } from 'lucide-react';
 import { classService, type ClassDetail } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import { Button, EmptyState, Skeleton } from '../components/common';
 import '../styles/student-ecosystem.css';
 
@@ -14,7 +14,7 @@ interface EnrichedClassAssignment {
   title: string;
   dueDate?: string;
   skill: string;
-  status: 'not_started' | 'pending' | 'graded';
+  status: 'not_started' | 'in_progress' | 'pending' | 'graded';
   score?: number;
   submissionId?: string;
 }
@@ -30,6 +30,7 @@ const StudentClassDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [assignments, setAssignments] = useState<EnrichedClassAssignment[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'pending' | 'graded'>('all');
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleReload = () => setReloadKey((k) => k + 1);
@@ -49,7 +50,7 @@ const StudentClassDetails: React.FC = () => {
         const [classRes, assignmentsRes, submissionsRes] = await Promise.allSettled([
           isNum ? classService.getDetail(numericId) : Promise.reject('Invalid ID'),
           assignmentService.listAssignments(targetClassId),
-          submissionService.listSubmissions({ studentId: user?.id })
+          submissionService.listSubmissions({ classId: targetClassId, studentId: user?.id, limit: 100 })
         ]);
 
         if (!isMounted) return;
@@ -72,16 +73,42 @@ const StudentClassDetails: React.FC = () => {
           ? (assignmentsRes.value?.data || (Array.isArray(assignmentsRes.value) ? assignmentsRes.value : []))
           : [];
 
-        const rawSubmissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
+        let rawSubmissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled'
           ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
           : [];
 
+        if (rawSubmissions.length === 0 && user?.id) {
+          try {
+            const fallbackSubs = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
+            rawSubmissions = fallbackSubs.data || [];
+          } catch {
+            // Keep empty
+          }
+        }
+
         if (rawAssignments.length > 0) {
           const mapped = rawAssignments.map(a => {
-            const sub = rawSubmissions.find(s => String(s.assignmentId) === String(a.id) || String(s.id) === String(a.id));
-            let status: 'not_started' | 'pending' | 'graded' = 'not_started';
-            if (sub) {
-              status = sub.status === 'GRADED' ? 'graded' : 'pending';
+            const subsForAssignment = rawSubmissions.filter(s => String(s.assignmentId) === String(a.id));
+            let bestSub: SubmissionListItem | undefined = subsForAssignment.find(s => isSubmissionGraded(s));
+            if (!bestSub) {
+              bestSub = subsForAssignment.find(s => s.status === 'SUBMITTED');
+            }
+            if (!bestSub) {
+              bestSub = subsForAssignment.find(s => s.status === 'IN_PROGRESS');
+            }
+            if (!bestSub && subsForAssignment.length > 0) {
+              bestSub = subsForAssignment[0];
+            }
+
+            let status: 'not_started' | 'in_progress' | 'pending' | 'graded' = 'not_started';
+            if (bestSub) {
+              if (isSubmissionGraded(bestSub)) {
+                status = 'graded';
+              } else if (bestSub.status === 'SUBMITTED') {
+                status = 'pending';
+              } else if (bestSub.status === 'IN_PROGRESS') {
+                status = 'in_progress';
+              }
             }
 
             let skill = 'Writing';
@@ -90,7 +117,8 @@ const StudentClassDetails: React.FC = () => {
             else if (titleLower.includes('read')) skill = 'Reading';
             else if (titleLower.includes('listen')) skill = 'Listening';
 
-            const scoreVal = sub?.modules?.[0]?.grading?.finalScore ?? undefined;
+            const finalSc = bestSub ? getSubmissionFinalScore(bestSub) : null;
+            const scoreVal = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
 
             return {
               id: String(a.id),
@@ -99,7 +127,7 @@ const StudentClassDetails: React.FC = () => {
               skill,
               status,
               score: scoreVal !== undefined && scoreVal !== null ? scoreVal : undefined,
-              submissionId: sub?.id ? String(sub.id) : undefined
+              submissionId: bestSub?.id ? String(bestSub.id) : undefined
             };
           });
           setAssignments(mapped);
@@ -127,10 +155,18 @@ const StudentClassDetails: React.FC = () => {
   const stats = useMemo(() => {
     const total = assignments.length;
     const notStarted = assignments.filter(a => a.status === 'not_started').length;
-    const pending = assignments.filter(a => a.status === 'pending').length;
+    const pending = assignments.filter(a => a.status === 'pending' || a.status === 'in_progress').length;
     const graded = assignments.filter(a => a.status === 'graded').length;
     return { total, notStarted, pending, graded };
   }, [assignments]);
+
+  const filteredAssignments = useMemo(() => {
+    if (statusFilter === 'all') return assignments;
+    if (statusFilter === 'not_started') return assignments.filter(a => a.status === 'not_started');
+    if (statusFilter === 'pending') return assignments.filter(a => a.status === 'pending' || a.status === 'in_progress');
+    if (statusFilter === 'graded') return assignments.filter(a => a.status === 'graded');
+    return assignments;
+  }, [assignments, statusFilter]);
 
   const handleAssignmentClick = (assignment: EnrichedClassAssignment) => {
     if (assignment.status === 'graded') {
@@ -145,10 +181,11 @@ const StudentClassDetails: React.FC = () => {
       <div className="std-eco-container pb-48">
         <Skeleton height="24px" width="180px" borderRadius="4px" className="mb-24" />
         <Skeleton height="70px" borderRadius="12px" className="mb-28" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-32">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} height="64px" borderRadius="8px" />
-          ))}
+        <div className="flex gap-8 mb-24">
+          <Skeleton height="34px" width="84px" borderRadius="17px" />
+          <Skeleton height="34px" width="96px" borderRadius="17px" />
+          <Skeleton height="34px" width="96px" borderRadius="17px" />
+          <Skeleton height="34px" width="96px" borderRadius="17px" />
         </div>
         <Skeleton height="240px" borderRadius="12px" />
       </div>
@@ -220,28 +257,42 @@ const StudentClassDetails: React.FC = () => {
         </div>
 
         <div className="std-eco-card-body">
-          {/* Status Summary Boxes */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-16 mb-28">
-            <div className="p-16 rounded-lg border border-slate-200 flex justify-between items-center bg-slate-50">
-              <span className="text-sm font-medium text-slate-600">{t('studentAssignments.statusNotStarted')}</span>
-              <span className="bg-slate-200 px-2 py-0.5 rounded-full text-xs font-semibold text-slate-700">{stats.notStarted}</span>
-            </div>
-            <div className="p-16 rounded-lg border border-amber-300 flex justify-between items-center bg-amber-50">
-              <span className="text-sm font-semibold text-amber-700 flex items-center gap-6">
-                <span className="std-asg-dot" />
-                {t('studentAssignments.statusPending')}
-              </span>
-              <span className="bg-amber-200 px-2 py-0.5 rounded-full text-xs font-semibold text-amber-800">{stats.pending}</span>
-            </div>
-            <div className="p-16 rounded-lg border border-emerald-300 flex justify-between items-center bg-emerald-50">
-              <span className="text-sm font-medium text-emerald-700">{t('studentAssignments.statusGraded')}</span>
-              <span className="bg-emerald-200 px-2 py-0.5 rounded-full text-xs font-semibold text-emerald-800">{stats.graded}</span>
-            </div>
+
+          {/* Filter Pills: Tất cả, Chưa làm, Chờ chấm, Đã có điểm */}
+          <div className="std-eco-pills mb-20">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`std-eco-pill ${statusFilter === 'all' ? 'active' : ''}`}
+            >
+              {t('studentAssignments.tabAll')} <span className="std-eco-pill-badge">{stats.total}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('not_started')}
+              className={`std-eco-pill ${statusFilter === 'not_started' ? 'active' : ''}`}
+            >
+              {t('studentAssignments.tabNotStarted')} <span className="std-eco-pill-badge">{stats.notStarted}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('pending')}
+              className={`std-eco-pill ${statusFilter === 'pending' ? 'active' : ''}`}
+            >
+              {t('studentAssignments.tabGrading')} <span className="std-eco-pill-badge">{stats.pending}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('graded')}
+              className={`std-eco-pill ${statusFilter === 'graded' ? 'active' : ''}`}
+            >
+              {t('studentAssignments.tabGraded')} <span className="std-eco-pill-badge">{stats.graded}</span>
+            </button>
           </div>
 
           {/* Assignments List */}
           <div className="std-asg-list">
-            {assignments.map(a => (
+            {filteredAssignments.map(a => (
               <div 
                 key={a.id}
                 onClick={() => handleAssignmentClick(a)}
@@ -284,7 +335,6 @@ const StudentClassDetails: React.FC = () => {
                   {a.status === 'pending' && (
                     <>
                       <div className="std-asg-status-badge grading">
-                        <Clock size={14} />
                         {t('studentAssignments.statusPending')}
                       </div>
                       <Button 
@@ -293,6 +343,21 @@ const StudentClassDetails: React.FC = () => {
                         onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
                       >
                         {t('studentAssignments.btnReview')}
+                      </Button>
+                    </>
+                  )}
+
+                  {a.status === "in_progress" && (
+                    <>
+                      <div className="std-asg-status-badge in_progress">
+                        {t("studentAssignments.statusInProgress")}
+                      </div>
+                      <Button 
+                        variant="primary" 
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleAssignmentClick(a); }}
+                      >
+                        {t("studentAssignments.btnContinue")}
                       </Button>
                     </>
                   )}
@@ -315,7 +380,7 @@ const StudentClassDetails: React.FC = () => {
               </div>
             ))}
 
-            {assignments.length === 0 && (
+            {filteredAssignments.length === 0 && (
               <EmptyState
                 icon={<FileText size={40} />}
                 title={isVi ? 'Chưa có bài tập' : 'No assignments'}

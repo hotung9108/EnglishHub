@@ -2,6 +2,7 @@ package com.english_hub.core.modules.auth.application.service;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.common.email.EmailService;
 import com.english_hub.core.modules.auth.application.command.LoginCommand;
 import com.english_hub.core.modules.auth.application.command.LogoutCommand;
 import com.english_hub.core.modules.auth.application.command.RefreshCommand;
@@ -30,6 +31,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class AuthService {
@@ -37,13 +39,16 @@ public class AuthService {
 	private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
 	private static final int USER_AGENT_MAX_LENGTH = 255;
 	private static final int IP_ADDRESS_MAX_LENGTH = 45;
+	private static final long PASSWORD_RESET_TTL_SECONDS = 900; // 15 minutes
 
 	private final AuthUserRepository authUserRepository;
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenService jwtTokenService;
 	private final PasswordResetStore passwordResetStore;
+	private final EmailService emailService;
 	private final long refreshTokenTtlSeconds;
+	private final String resetPasswordUrl;
 
 	@Autowired
 	public AuthService(
@@ -52,13 +57,17 @@ public class AuthService {
 			PasswordEncoder passwordEncoder,
 			JwtTokenService jwtTokenService,
 			PasswordResetStore passwordResetStore,
-			@Value("${app.security.refresh-token-ttl-seconds}") long refreshTokenTtlSeconds) {
+			EmailService emailService,
+			@Value("${app.security.refresh-token-ttl-seconds}") long refreshTokenTtlSeconds,
+			@Value("${app.frontend.reset-password-url:http://localhost:5173/reset-password}") String resetPasswordUrl) {
 		this.authUserRepository = authUserRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenService = jwtTokenService;
 		this.passwordResetStore = passwordResetStore;
+		this.emailService = emailService;
 		this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
+		this.resetPasswordUrl = resetPasswordUrl;
 	}
 
 	@Transactional
@@ -129,7 +138,11 @@ public class AuthService {
 		return new LogoutResponse("Đăng xuất thành công.");
 	}
 
-	@Transactional(readOnly = true)
+	/**
+	 * Issues a reset challenge and delivers it by email. Deliberately not wrapped in a
+	 * transaction: the EmailJS call is external I/O and must not hold a JDBC connection
+	 * for the length of the round trip.
+	 */
 	public ForgotPasswordResponse forgotPassword(ForgotPasswordCommand command) {
 		if (command == null || !hasText(command.email())) {
 			throw ApiException.badRequest("Vui lòng cung cấp địa chỉ email.");
@@ -145,11 +158,17 @@ public class AuthService {
 
 		String otp = String.format("%06d", ThreadLocalRandom.current().nextInt(1_000_000));
 		String token = UUID.randomUUID().toString();
-		long ttlSeconds = 900; // 15 mins
-		passwordResetStore.store(cleanEmail, otp, token, ttlSeconds);
+		passwordResetStore.store(cleanEmail, otp, token, PASSWORD_RESET_TTL_SECONDS);
 
-		LOGGER.info("Generated password reset OTP for [{}]: OTP={}, token={}", cleanEmail, otp, token);
-		return new ForgotPasswordResponse("Mã xác thực đã được gửi đến email của bạn.", cleanEmail, otp);
+		String resetUrl = UriComponentsBuilder.fromUriString(resetPasswordUrl)
+				.queryParam("email", cleanEmail)
+				.queryParam("token", token)
+				.build()
+				.toUriString();
+		emailService.sendPasswordResetOtp(cleanEmail, otp, resetUrl, (int) (PASSWORD_RESET_TTL_SECONDS / 60));
+
+		LOGGER.info("Password reset email dispatched for [{}]", cleanEmail);
+		return new ForgotPasswordResponse("Mã xác thực đã được gửi đến email của bạn.", cleanEmail);
 	}
 
 	@Transactional
@@ -184,7 +203,9 @@ public class AuthService {
 		user.setPasswordHash(passwordEncoder.encode(command.newPassword().trim()));
 		authUserRepository.save(user);
 
-		LOGGER.info("Password successfully reset for user [{}]", cleanEmail);
+		int revokedSessions = refreshTokenRepository.revokeAllByUserId(user.getId());
+
+		LOGGER.info("Password reset for [{}]; revoked {} active session(s)", cleanEmail, revokedSessions);
 		return new ResetPasswordResponse("Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.");
 	}
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.english_hub.core.modules.auth.domain.model.RefreshToken;
 import com.english_hub.core.modules.auth.domain.repository.RefreshTokenRepository;
@@ -61,6 +62,15 @@ public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
 				entity.getIpAddress());
 		jpaRepository.save(entity);
 		return 1;
+	}
+
+	@Override
+	@Transactional
+	public int revokeAllByUserId(Long userId) {
+		if (userId == null) {
+			return 0;
+		}
+		return jpaRepository.revokeAllActiveByUserId(userId, Instant.now().atOffset(ZoneOffset.UTC));
 	}
 
 	@Override

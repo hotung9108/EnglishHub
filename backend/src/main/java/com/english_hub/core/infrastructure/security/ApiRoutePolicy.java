@@ -47,9 +47,9 @@ public final class ApiRoutePolicy {
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
-			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN")),
+			new RouteRule(HttpMethod.POST, "/api/v1/classes/{id}/members", List.of("ADMIN", "TEACHER")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
-			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN")),
+			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN", "TEACHER")),
 
 			// Reports
 			new RouteRule(HttpMethod.GET, "/api/v1/reports/**", List.of("ADMIN", "TEACHER")),
@@ -118,6 +118,14 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.PUT, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/modules/{moduleId}", List.of("TEACHER")),
 			new RouteRule(HttpMethod.POST, "/api/v1/modules/{moduleId}/audio", List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.POST,
+					"/api/v1/modules/{moduleId}/audio/confirm",
+					List.of("TEACHER")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/modules/{moduleId}/audio",
+					List.of("TEACHER", "STUDENT")),
 
 			// Submission
 			new RouteRule(
@@ -149,6 +157,10 @@ public final class ApiRoutePolicy {
 					HttpMethod.GET,
 					"/api/v1/submission-modules/{id}/grading",
 					List.of("TEACHER", "STUDENT")),
+				new RouteRule(
+						HttpMethod.GET,
+						"/api/v1/submission-modules/{id}/grading/ai-suggestion",
+						List.of("TEACHER")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/submission-modules/{id}/grading/ai-analyze",

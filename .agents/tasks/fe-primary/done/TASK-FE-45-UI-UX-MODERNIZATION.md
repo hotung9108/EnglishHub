@@ -5,17 +5,17 @@ role: fe-primary
 assignee: Maloque18705
 status: "Done"
 created_at: 2026-10-13T10:00:00+07:00
-updated_at: 2026-10-14T11:00:00+07:00
-completed_at: 2026-10-14T11:00:00+07:00
+updated_at: 2026-10-17T00:50:00+07:00
+completed_at: 2026-10-17T00:50:00+07:00
 priority: P0
-tags: [frontend, ui-ux, modernization, minimal-saas, design-brief, fe-45, zero-inline-styles, decluttering]
+tags: [frontend, ui-ux, modernization, minimal-saas, design-brief, fe-45, zero-inline-styles, decluttering, pagination, spa-fallback]
 ---
 
 # TASK-FE-45-UI-UX-MODERNIZATION: UI/UX Modernization for Entire Frontend Application
 
 ## 1. Context & Objective
 Nâng cấp giao diện tổng thể của Frontend EnglishHub theo hướng hiện đại (Minimal SaaS e-learning platform lấy cảm hứng từ Linear/Notion/Vercel) theo tài liệu `docs/minimal_saas_elearning_design_brief.md`, tạo tính nhất quán thị giác trên cả 3 vai trò Admin, Giáo viên và Học viên, không phá vỡ luồng nghiệp vụ API/DB.
-Triệt tiêu hoàn toàn CSS inline tĩnh theo đúng quy định tại `.agents/rules/convention-fe.md` (Mục 5: "Tuyệt đối tránh inline style..."), tinh gọn các thành phần thừa, và chuẩn hóa thẩm mỹ toàn diện.
+Triệt tiêu hoàn toàn CSS inline tĩnh theo đúng quy định tại `.agents/rules/convention-fe.md` (Mục 5: "Tuyệt đối tránh inline style..."), tinh gọn các thành phần thừa, chuẩn hóa thẩm mỹ toàn diện, xây dựng hệ thống phân trang tái sử dụng cho toàn bộ các bảng dữ liệu, và hoàn thiện cấu hình routing hosting SPA.
 
 ---
 
@@ -61,16 +61,30 @@ Triệt tiêu hoàn toàn CSS inline tĩnh theo đúng quy định tại `.agent
    - Thu gọn khu vực hàng đợi bài nộp để tối ưu không gian hiển thị tổng quát dashboard.
    - Giới hạn hiển thị 4 bài nộp mới nhất kèm nút toggle "Xem thêm / Thu gọn" (`isQueueExpanded`), hiển thị badge đếm số lượng còn lại.
    - Thêm bộ lọc nhanh theo kỹ năng (Tất cả, Writing, Speaking) và tính toán thời gian chờ chấm trực quan (`2 giờ trước`, `Hôm qua`,...).
+6. **Tinh gọn `Dashboard.tsx` Quản trị viên**:
+   - Loại bỏ các nút tác vụ nhanh và card đo lường hệ thống dư thừa; quy chuẩn thành cụm 3 thẻ KPI trên 1 hàng dùng `MetricCard`: Tỉ lệ nộp bài trung bình, Điểm trung bình toàn khóa, và Bài tập chờ chấm.
+   - Bảng "Tiến độ lớp học gần đây" (Recent Cohort Progress) được tái thiết kế tối giản, sạch sẽ với link chuyển nhanh đến chi tiết lớp.
+7. **Đơn giản hóa Drawer Chỉnh sửa Tài khoản (`Accounts.tsx`)**:
+   - Khóa trường Email và Quyền (Role) ở chế độ chỉ đọc để ngăn chặn việc sửa sai quyền/tài khoản trên hệ thống.
+   - Bỏ trường nhập mật khẩu ban đầu và khối cảnh báo thừa, chuyển đổi thành form cập nhật thông tin cá nhân và số điện thoại nhanh chóng.
 
-### 2.4. Trải Nghiệm Điều Hướng & Lỗi (Navigation & Error Pages)
+### 2.4. Trải Nghiệm Điều Hướng, Phân Quyền & Sửa Lỗi Hosting (Navigation, RBAC & SPA Fallback)
 1. **Dynamic Browser Tab Titles theo từng trang truy cập**:
    - Tạo tiện ích `frontend/src/utils/pageTitle.ts` với hàm `getPageTitle(pathname, language)` hỗ trợ đầy đủ song ngữ (VI / EN), xử lý mọi routes (Admin, Teacher, Student, Auth, Profile) kèm parametric routes (`/teacher/assignments/:id`, `/student/assignments/:id`,...).
    - Component `frontend/src/components/PageTitleUpdater.tsx` tự động cập nhật `document.title` khi chuyển route hoặc đổi ngôn ngữ (`document.title = "${title} | EnglishHub"`).
-   - Bộ test suite chuyên dụng `frontend/src/__tests__/pageTitle.test.ts` (100% passing).
 2. **Hiện đại hóa Trang Lỗi 404 & 403 (Zero Card, Bold Neutral Numbers)**:
    - Loại bỏ hoàn toàn bọc card (`card`, border hộp), in hẳn thông tin trực tiếp lên canvas phẳng (`Canvas: #FAF8F5`).
-   - Xóa bỏ huy hiệu (badge) nhỏ chứa mã lỗi; thay bằng con số "404" / "403" in màu xám trung tính to nổi bật (`text-[120px] font-extrabold tracking-tighter text-on-surface-variant/40`).
+   - Xóa bỏ huy hiệu (badge) nhỏ chứa mã lỗi; thay bằng con số "404" / "403" in màu xám trung tính to nổi bật.
    - Tối giản hóa thông điệp lỗi và nút điều hướng rõ ràng, sang trọng theo chuẩn thiết kế Modernist SaaS.
+3. **Củng cố An toàn Điều hướng sau Đăng nhập (`Login.tsx`)**:
+   - Bổ sung xác thực đích đến (`isAuthorizedDestination`) sau khi đăng nhập thành công. Đảm bảo người dùng chỉ được chuyển hướng đến các trang thuộc đúng vai trò được cấp phép (`/admin/*`, `/teacher/*`, `/student/*`), loại bỏ nguy cơ chuyển hướng sai quyền sau khi phiên hết hạn.
+4. **Chuẩn hóa Điều hướng Báo cáo trong `App.tsx`**:
+   - `ReportsRedirect` cho học viên được định tuyến chính xác về `/student/grades`.
+   - Đường dẫn `/student/analytics` được cấu hình chuyển hướng an toàn về `/unauthorized`.
+5. **Cấu hình SPA Routing Fallback trên Hosting Vercel (`frontend/vercel.json`)**:
+   - Thêm file cấu hình `frontend/vercel.json` định nghĩa rule `rewrites: [{ source: "/(.*)", destination: "/index.html" }]`.
+   - Khắc phục triệt để lỗi QA-29 (`QA29-039`, `QA29-042`): Hosting trả về `404: NOT_FOUND This page could not be found` khi người dùng F5 hoặc gõ URL trực tiếp các đường dẫn con (`/teacher/profile`, `/teacher/classes/:id/progress`).
+   - Bảo toàn phân phối static assets (`/assets/*.js`, `/assets/*.css`, images) và không can thiệp vào subdomain API.
 
 ### 2.5. Nâng Cấp Thẩm Mỹ Bộ Lọc & Dropdown (Modernist Filters & Controls)
 1. **Bộ lọc lớp học trong `StudentAssignments.tsx`**:
@@ -83,6 +97,28 @@ Triệt tiêu hoàn toàn CSS inline tĩnh theo đúng quy định tại `.agent
    - Triệt tiêu viền bao quanh từng nút lọc, chuyển sang nền trong suốt ở trạng thái nghỉ (`border: none; background: transparent`), hover êm dịu (`var(--surface-dim)`), và active khối Royal Sovereign Green (`var(--primary)`) kèm bóng đổ nhẹ.
    - Áp dụng đồng bộ: `.adm-pill`, `.teacher-pill`, `.std-eco-pill`, `.student-classes-tab-btn`, `.tcd-pill-btn`, `.teacher-dash-skill-tab-btn`, `.tad-subtab-btn`.
 
+### 2.6. Hệ Thống Phân Trang Dùng Chung (Universal Pagination System)
+1. **Component `frontend/src/components/common/Pagination.tsx`**:
+   - Thiết kế tinh gọn, chuẩn Accessibility (ARIA labels, keyboard navigation, disabled state prevention).
+   - Hỗ trợ 2 biến thể hiển thị: `table` (dành cho chân bảng với thông tin tổng số dòng, chọn kích thước trang `10, 20, 50, 100`) và `standalone` (dành cho danh sách dạng thẻ/cards).
+   - Cơ chế cửa sổ số trang trượt (sliding window) thông minh: hiển thị gọn gàng các trang đầu, trang cuối và dấu ba chấm khi số trang lớn hơn 7.
+2. **Module Toán Học `frontend/src/components/common/pagination.utils.ts`**:
+   - Cung cấp các hàm thuần túy: `getPageNumbers`, `computePaginationRange`, `calculateTotalPages`, `clampPage`.
+   - Được kiểm thử đơn vị độc lập 100% trong `frontend/src/api/__tests__/pagination.test.ts`.
+3. **Tích hợp Đồng bộ Toàn diện vào các Phân hệ**:
+   - **Admin Portal**: `Accounts.tsx`, `Classes.tsx`, `Students.tsx`, `Teachers.tsx`, `AdminReports.tsx`, `AdminClassArchive.tsx`.
+   - **Teacher Portal**: `TeacherAssignments.tsx`, `TeacherClasses.tsx`, `TeacherExamBank.tsx`, `TeacherClassProgress.tsx` (danh sách học viên Roster).
+   - **Student Portal**: `StudentClasses.tsx`, `StudentFeedback.tsx`, `StudentGrades.tsx`.
+
+### 2.7. Tái Thiết Kế & Đại Tu Màn Hình Chi Tiết Tiến Độ Lớp Học (`TeacherClassProgress.tsx`)
+1. **Loại bỏ tab Giáo trình (Syllabus) mock**:
+   - Thu gọn bố cục màn hình về 3 tab cốt lõi: Danh sách học viên (`roster`), Bài tập lớp (`assignments`), và Phân tích kỹ năng (`analytics`).
+2. **Bổ sung tìm kiếm, lọc trạng thái và phân trang**:
+   - Tích hợp thanh tìm kiếm học viên và bộ lọc tiến độ (`all`, `exceed`, `ontime`, `support`) tự động reset về trang 1 khi thay đổi điều kiện lọc.
+   - Bổ sung `<Pagination />` cho bảng học viên, mang lại trải nghiệm duyệt danh sách mượt mà kể cả với lớp sĩ số đông.
+3. **Lược bỏ hơn 700 dòng mã dư thừa**:
+   - Tối ưu hóa việc gọi API song song, chuẩn hóa CSS trong `teacher-class-details.css`, loại bỏ hoàn toàn các cấu trúc lồng nhau phức tạp và các modal không sử dụng.
+
 ---
 
 ## 3. Rà Soát & Triệt Tiêu Static Inline CSS (Tuân Thủ convention-fe.md)
@@ -90,13 +126,14 @@ Triệt tiêu hoàn toàn CSS inline tĩnh theo đúng quy định tại `.agent
 Tuân thủ nghiêm ngặt **Mục 5 của `.agents/rules/convention-fe.md`**:
 > *"Tuyệt đối tránh inline style: Không viết style={{ margin: 20, color: 'red' }} trừ trường hợp giá trị động bắt buộc tính bằng JavaScript."*
 
-### 3.1. Bổ sung các Scoped CSS Utility Classes trong `frontend/src/styles/admin-modern.css`
+### 3.1. Bổ sung các Scoped CSS Utility Classes trong `frontend/src/styles/admin-modern.css`, `components.css`, `teacher-class-details.css`
 - **Grid & Layouts**:
   - `.adm-bento-grid`: Bento layout 2 cột linh hoạt (`grid-template-columns: repeat(auto-fit, minmax(360px, 1fr))`).
   - `.adm-cards-grid`: Card grid tự co giãn (`grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))`).
   - `.adm-drawer-wide`: Slide-over drawer chiều rộng rộng rãi (`max-width: 680px !important`).
   - `.adm-drawer-metrics-grid`, `.adm-drawer-metric-item`, `.adm-drawer-metric-val`: Khối tóm tắt thông số kiểm toán trong drawer.
   - `.adm-settings-grid-2`, `.adm-settings-grid-security`: Grid 2 cột cho các form cấu hình hệ thống.
+  - `.eh-pagination-wrap`, `.eh-pagination-controls`, `.eh-pagination-btn`: Lớp điều khiển phân trang dùng chung.
 - **Controls & Buttons**:
   - `.adm-search-clear-btn`: Nút xóa tìm kiếm căn chỉnh tuyệt đối trong search input.
   - `.adm-btn-back`: Nút quay lại chuẩn hóa padding và icon gap.
@@ -115,7 +152,7 @@ Tuân thủ nghiêm ngặt **Mục 5 của `.agents/rules/convention-fe.md`**:
   - `.adm-settings-section-card`, `.adm-settings-row`, `.adm-settings-divider`, `.adm-settings-info-box`: Khối section, switch row, đường phân cách và hộp thông tin CSDL.
 
 ### 3.2. Danh sách các file được Refactor sạch static inline CSS
-1. **`Dashboard.tsx`**: Thay thế inline grid style bằng class `.adm-bento-grid`.
+1. **`Dashboard.tsx`**: Thay thế inline grid style bằng class `.adm-bento-grid`, chuyển đổi sang 3 KPI cards tinh gọn và bảng cohort progress.
 2. **`Teachers.tsx`**: Thay thế inline grid style bằng class `.adm-cards-grid`.
 3. **`AdminGradingAuditLogs.tsx`**: Loại bỏ toàn bộ static inline CSS (Alert banner, search clear button, loading/empty states, drawer dimensions, metric items, feedback cards, change logs table).
 4. **`AdminSettings.tsx`**: Thay thế toàn bộ static inline CSS bằng các class `.adm-alert-success`, `.adm-settings-section-card`, `.adm-settings-grid-2`, `.adm-settings-row`, `.adm-settings-divider`, `.adm-range-input`, `.adm-settings-info-box`.
@@ -123,6 +160,7 @@ Tuân thủ nghiêm ngặt **Mục 5 của `.agents/rules/convention-fe.md`**:
 6. **`AdminClassArchive.tsx`**: Loại bỏ toàn bộ static inline styles trong back button, error alert, KPI icon wrappers, KPI values, search input, filter pills, table header, loading/empty states, status badges, action buttons.
 7. **`Classes.tsx`**: Thay thế static inline grid và height style bằng class `.adm-cards-grid` và `h-1.5`.
 8. **`StudentGrades.tsx`**: Thay thế static inline style `minWidth: 240px` bằng class Tailwind `min-w-[240px]`.
+9. **`TeacherClassProgress.tsx`**: Xóa bỏ các style inline tĩnh trong bảng tiến độ học viên và thẻ chỉ số kỹ năng, thay bằng cấu trúc CSS kế thừa từ design tokens.
 
 > **Lưu ý bảo toàn**: Các style inline có giá trị động runtime được giữ lại theo đúng cho phép của convention (ví dụ: thanh tiến độ `width: ${occupancyPct}%`, đếm ngược redirect `width: ${progress}%`, sóng âm thanh `height: ${h}%`, màu sắc rubric `borderColor: color`).
 
@@ -140,18 +178,19 @@ Tuân thủ nghiêm ngặt **Mục 5 của `.agents/rules/convention-fe.md`**:
    ```bash
    npm run build
    ```
-   - **Kết quả**: Vite build production thành công, bundled hoàn hảo trong ~1.5s.
+   - **Kết quả**: Vite build production thành công, bundled hoàn hảo trong ~1.2s.
 
 3. **Unit Test Suite**:
    ```bash
    npm test -- --run
    ```
-   - **Kết quả**: 91/91 unit test vượt qua thành công 100% (`pass 91, fail 0, cancelled 0, skipped 0`), bảo toàn toàn bộ nghiệp vụ từ Auth, Submission, Grading đến PageTitle.
+   - **Kết quả**: **99/99 unit test vượt qua thành công 100%** (`pass 99, fail 0, cancelled 0, skipped 0`), bao gồm toàn bộ test phân trang mới, bảo toàn 100% các nghiệp vụ Auth, Submission, Question, Grading và Report.
 
 ---
 
 ## 5. Artifacts & Hand-off
-- Các thay đổi CSS tập trung tại: `frontend/src/styles/admin-modern.css`, `frontend/src/styles/student-modern.css`, `frontend/src/styles/teacher-modern.css`.
-- Không phát sinh breaking changes về API hay cơ sở dữ liệu.
-- Sẵn sàng bàn giao cho `@tester` kiểm thử hồi quy và `@devops-primary` chuẩn bị triển khai.
-
+- **Cấu hình Hosting**: `frontend/vercel.json` hỗ trợ SPA fallback cho Vercel Edge.
+- **Hướng dẫn kiểm thử**:
+  - `production_artifacts/fe_to_tester/FE_SPA_ROUTING_FALLBACK_TEST_GUIDE.md`: Hướng dẫn retest lỗi routing QA-29.
+  - `production_artifacts/fe_to_tester/FE_TEACHER_CLASS_DETAILS_TEST_GUIDE.md`: Hướng dẫn kiểm thử màn hình tiến độ lớp học.
+- Sẵn sàng bàn giao cho `@tester` kiểm thử hồi quy và chuẩn bị deploy lên Staging/Production.

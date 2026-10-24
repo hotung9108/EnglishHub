@@ -50,6 +50,20 @@ services:
       # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
       AI_SERVICE_MODEL: ${AI_SERVICE_MODEL:-}
       AI_SERVICE_PROVIDER: ${AI_SERVICE_PROVIDER:-}
+      # ===== Outbound Email (EmailJS REST) - khớp với application.properties =====
+      # Dùng để gửi OTP/mã đặt lại mật khẩu. Đặt EMAIL_ENABLED=false để tắt (API sẽ báo 500).
+      # LƯU Ý: bật "Allow non-browser applications" trong EmailJS Dashboard
+      #         (Account -> Security) để gọi được từ server.
+      # EMAILJS_PRIVATE_KEY là thông tin mật -> chỉ khai báo trong .env, KHÔNG commit.
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-true}
+      EMAILJS_BASE_URL: ${EMAILJS_BASE_URL:-https://api.emailjs.com}
+      EMAILJS_SERVICE_ID: ${EMAILJS_SERVICE_ID:-}
+      EMAILJS_PASSWORD_RESET_TEMPLATE_ID: ${EMAILJS_PASSWORD_RESET_TEMPLATE_ID:-}
+      EMAILJS_PUBLIC_KEY: ${EMAILJS_PUBLIC_KEY:-}
+      EMAILJS_PRIVATE_KEY: ${EMAILJS_PRIVATE_KEY:-}
+      EMAILJS_TIMEOUT_SECONDS: ${EMAILJS_TIMEOUT_SECONDS:-10}
+      # Link đặt lại mật khẩu nhúng trong email (trỏ tới trang /reset-password của frontend staging)
+      FRONTEND_RESET_PASSWORD_URL: ${FRONTEND_RESET_PASSWORD_URL:-https://staging.hotung9108.me/reset-password}
       # OpenAPI servers
       APP_OPENAPI_SERVER_URL: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}
       app.openapi.server-url: ${APP_OPENAPI_SERVER_URL:-https://api-staging.hotung9108.me}

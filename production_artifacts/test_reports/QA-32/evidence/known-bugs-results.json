@@ -1,0 +1,56 @@
+[
+  {
+    "file": "StudentWriting.known-bugs.test.tsx",
+    "test": "BUG-QA32-WRITING: preserves draft and does not finalize when saving answers fails",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+  },
+  {
+    "file": "StudentWriting.known-bugs.test.tsx",
+    "test": "BUG-QA32-WRITING: preserves draft and reports failure when finalization fails",
+    "status": "failed",
+    "assertion": "AssertionError: expected null to be 'Unsaved essay' // Object.is equality"
+  },
+  {
+    "file": "StudentWriting.known-bugs.test.tsx",
+    "test": "BUG-QA32-WRITING: must not report success without a submission attempt",
+    "status": "failed",
+    "assertion": "Error: expect(element).not.toBeInTheDocument()"
+  },
+  {
+    "file": "StudentWriting.known-bugs.test.tsx",
+    "test": "BUG-QA32-WRITING: resolves the actual question ID instead of assuming question 1",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to be called once with arguments: [ 50, { answers: [ { …(2) } ] } ]"
+  },
+  {
+    "file": "StudentWriting.known-bugs.test.tsx",
+    "test": "BUG-QA32-ROUTE: invalid assignment IDs must not silently load assignment 1",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+  },
+  {
+    "file": "TeacherCreate.known-bugs.test.tsx",
+    "test": "BUG-QA32-CREATE: does not publish an assignment whose module failed to save",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+  },
+  {
+    "file": "TeacherCreate.known-bugs.test.tsx",
+    "test": "BUG-QA32-SCHEDULE: rejects a closing date before the opening date",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+  },
+  {
+    "file": "TeacherCreate.known-bugs.test.tsx",
+    "test": "BUG-QA32-TIMEZONE: initializes datetime-local defaults with local time rather than UTC clock text",
+    "status": "failed",
+    "assertion": "Error: expect(element).toHaveValue(2026-10-22T10:00)"
+  },
+  {
+    "file": "TeacherGrade.known-bugs.test.tsx",
+    "test": "BUG-QA32-GRADE: saving a draft must not call the endpoint that completes grading",
+    "status": "failed",
+    "assertion": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+  }
+]

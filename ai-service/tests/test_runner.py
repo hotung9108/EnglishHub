@@ -2,6 +2,7 @@ import unittest
 import base64
 import os
 import sys
+from unittest.mock import AsyncMock, patch
 
 # Ensure app package is in python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -9,7 +10,14 @@ os.environ["MOCK_MODE"] = "true"
 os.environ["GEMINI_API_KEY"] = ""
 
 from fastapi.testclient import TestClient
+from app.core.config import settings
+
+settings.MOCK_MODE = True
+settings.GEMINI_API_KEY = ""
+settings.OPENROUTER_API_KEY = ""
+
 from app.main import app
+from app.services.audio_processor import AudioProcessor
 
 
 class TestSpeakingApi(unittest.TestCase):
@@ -26,7 +34,8 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertIn("openrouterConfigured", data)
         self.assertIn("openrouterModel", data)
 
-    def test_analyze_speaking_qa21_benchmark(self):
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_qa21_benchmark(self, converter: AsyncMock):
         mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
         payload = {
             "submissionModuleId": 14,
@@ -38,6 +47,7 @@ class TestSpeakingApi(unittest.TestCase):
         }
 
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
 
         data = response.json()
@@ -92,7 +102,8 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertEqual(res_json["submissionModuleId"], 14)
         self.assertGreaterEqual(res_json["overallScore"], 6.5)
 
-    def test_analyze_speaking_dynamic_model_and_provider(self):
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_dynamic_model_and_provider(self, converter: AsyncMock):
         mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
         payload = {
             "submissionModuleId": 15,
@@ -103,6 +114,7 @@ class TestSpeakingApi(unittest.TestCase):
             "aiProvider": "openrouter"
         }
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         data = response.json()
         self.assertEqual(data["submissionModuleId"], 15)

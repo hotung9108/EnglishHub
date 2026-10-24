@@ -18,4 +18,12 @@ public interface RefreshTokenRepository extends IRepository<RefreshToken, Long> 
 	long create(Long userId, String tokenHash, Instant expiresAt, String userAgent, String ipAddress);
 
 	int revokeByTokenHash(String tokenHash);
+
+	/**
+	 * Revokes every refresh session that is still active for the user, e.g. after a
+	 * password reset. Already-revoked tokens are left untouched.
+	 *
+	 * @return the number of sessions that were revoked
+	 */
+	int revokeAllByUserId(Long userId);
 }

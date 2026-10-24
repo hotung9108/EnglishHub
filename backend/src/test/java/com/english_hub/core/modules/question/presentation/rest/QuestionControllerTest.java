@@ -10,6 +10,7 @@ import com.english_hub.core.modules.question.application.service.QuestionService
 import com.english_hub.core.modules.question.domain.model.Question;
 import com.english_hub.core.modules.question.domain.model.QuestionType;
 import com.english_hub.core.modules.question.presentation.rest.dto.CreateQuestionRequest;
+import com.english_hub.core.modules.question.presentation.rest.dto.QuestionResponse;
 import com.english_hub.core.modules.question.presentation.rest.dto.UpdateQuestionRequest;
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer;
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer.QuestionOption;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import tools.jackson.databind.json.JsonMapper;
 
 @ExtendWith(MockitoExtension.class)
 class QuestionControllerTest {
@@ -132,6 +134,92 @@ class QuestionControllerTest {
 				21L,
 				new UpdateQuestionCommand("Updated", null, BigDecimal.valueOf(2), 2));
 		verify(questionService).deleteQuestion(21L);
+	}
+
+	@Test
+	void exposesPublicOptionsInListsForBothRoles() {
+		Question source = question(21L, QuestionType.MULTIPLE_CHOICE);
+		for (boolean includeCorrectAnswer : List.of(true, false)) {
+			when(questionService.listQuestions(9L)).thenReturn(
+					new QuestionService.QuestionListResult(List.of(source), includeCorrectAnswer));
+
+			var response = questionController.listQuestions(9L);
+
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+			assertPublicOptions(response.getBody().data().getFirst(), source, includeCorrectAnswer);
+		}
+	}
+
+	@Test
+	void exposesPublicOptionsInDetailsForBothRoles() {
+		Question source = question(21L, QuestionType.MULTIPLE_CHOICE);
+		for (boolean includeCorrectAnswer : List.of(true, false)) {
+			when(questionService.getQuestion(21L)).thenReturn(
+					new QuestionService.QuestionResult(source, includeCorrectAnswer));
+
+			var response = questionController.getQuestion(21L);
+
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+			assertPublicOptions(response.getBody(), source, includeCorrectAnswer);
+		}
+	}
+
+	@Test
+	void omitsShortAnswerOptionsInListsAndDetailsForBothRoles() {
+		Question source = question(22L, QuestionType.SHORT_ANSWER);
+		JsonMapper mapper = JsonMapper.builder().build();
+		for (boolean includeCorrectAnswer : List.of(true, false)) {
+			when(questionService.listQuestions(9L)).thenReturn(
+					new QuestionService.QuestionListResult(List.of(source), includeCorrectAnswer));
+			when(questionService.getQuestion(22L)).thenReturn(
+					new QuestionService.QuestionResult(source, includeCorrectAnswer));
+
+			var list = questionController.listQuestions(9L);
+			var detail = questionController.getQuestion(22L);
+
+			assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
+			assertThat(detail.getStatusCode()).isEqualTo(HttpStatus.OK);
+			for (QuestionResponse response : List.of(list.getBody().data().getFirst(), detail.getBody())) {
+				assertThat(response.options()).isNull();
+				assertThat(mapper.valueToTree(response).has("options")).isFalse();
+				assertThat(response.correctAnswer()).isEqualTo(includeCorrectAnswer ? source.correctAnswer() : null);
+			}
+		}
+	}
+
+	@Test
+	void malformedOptionsDoNotPreventReturningOtherQuestionsForEitherRole() {
+		Question valid = question(21L, QuestionType.MULTIPLE_CHOICE);
+		Map<String, Object> malformedAnswer = Map.of("options", List.of(Map.of("id", 1)));
+		Question malformed = new Question(
+				22L, 9L, "Question", QuestionType.MULTIPLE_CHOICE, malformedAnswer, BigDecimal.ONE, 2);
+		for (boolean includeCorrectAnswer : List.of(true, false)) {
+			when(questionService.listQuestions(9L)).thenReturn(
+					new QuestionService.QuestionListResult(List.of(valid, malformed), includeCorrectAnswer));
+
+			var response = questionController.listQuestions(9L);
+
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+			assertThat(response.getBody().data()).hasSize(2);
+			assertPublicOptions(response.getBody().data().getFirst(), valid, includeCorrectAnswer);
+			QuestionResponse malformedResponse = response.getBody().data().get(1);
+			assertThat(malformedResponse.options()).isNull();
+			assertThat(JsonMapper.builder().build().valueToTree(malformedResponse).has("options")).isFalse();
+			assertThat(malformedResponse.correctAnswer()).isEqualTo(includeCorrectAnswer ? malformedAnswer : null);
+		}
+	}
+
+	private void assertPublicOptions(QuestionResponse response, Question source, boolean includeCorrectAnswer) {
+		assertThat(response.options()).hasSize(4);
+		assertThat(response.options()).extracting(option -> option.id()).containsExactly(1, 2, 3, 4);
+		assertThat(response.options()).extracting(option -> option.content()).containsExactly("A", "B", "C", "D");
+		assertThat(response.correctAnswer()).isEqualTo(includeCorrectAnswer ? source.correctAnswer() : null);
+		var json = JsonMapper.builder().build().valueToTree(response);
+		for (var option : json.get("options")) {
+			assertThat(option.size()).isEqualTo(2);
+			assertThat(option.has("isCorrect")).isFalse();
+			assertThat(option.has("is_correct")).isFalse();
+		}
 	}
 
 	private Question question(Long id, QuestionType type) {

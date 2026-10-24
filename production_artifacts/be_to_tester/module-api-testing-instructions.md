@@ -9,13 +9,17 @@ Module API được implement theo DDD bounded context riêng:
 - JPA adapter/entity/mapper: `backend/src/main/java/com/english_hub/core/modules/module/infrastructure/`
 - REST controller/DTO: `backend/src/main/java/com/english_hub/core/modules/module/presentation/`
 
-Không tích hợp Cloudflare R2. Audio được lưu local bằng storage key dạng:
+Audio bài nghe được lưu trên kho lưu trữ tương thích S3 (không còn lưu disk local) bằng storage
+key dạng:
 
 ```text
 modules/{moduleId}/audio/{uuid}.{extension}
 ```
 
-Trong Docker, storage dùng named volume `englishhub_backend_storage` tại `/app/storage`.
+> **Cập nhật (task `BE-41`):** `LocalAudioStorageAdapter` và property `app.storage.local-root` đã bị
+> xóa. Nếu `app.storage.s3.enabled=false`, các API audio trả `500` với message
+> `"Lưu trữ chưa được cấu hình."`. Hướng dẫn kiểm thử đầy đủ cho luồng upload mới nằm ở
+> `production_artifacts/be_to_tester/file-upload-api-testing-instructions.md`.
 
 ## API cần test
 
@@ -50,13 +54,17 @@ Trong Docker, storage dùng named volume `englishhub_backend_storage` tại `/ap
    - Nếu module đã được tham chiếu bởi `submission_modules`, trả `400`:
      `Không thể xoá module đã có bài nộp.`
 
-6. `POST /api/v1/modules/{moduleId}/audio`
-   - `multipart/form-data`, field `file`.
-   - Chỉ module `LISTENING` và Teacher owner được upload.
-   - Hỗ trợ `.mp3`, `.wav`, `.m4a`, tối đa 25 MB.
-   - Kiểm tra cả extension/content type và file signature.
-   - Upload local đồng bộ nhưng response/DB status hiện là `PROCESSING` theo quyết định tạm thời.
-   - Response không trả absolute filesystem path, chỉ trả `sourceAudioStorageKey`.
+6. Audio bài nghe của module — luồng presigned upload 3 bước (không còn `multipart/form-data`):
+   - `POST /api/v1/modules/{moduleId}/audio` — JSON `{ "mimeType": "audio/mpeg" }`, chỉ module
+     `LISTENING` và Teacher owner. Trả `{ uploadUrl, storageKey, expiresAt, sourceAudioUploadStatus }`
+     với status `UPLOADING`. Mime hợp lệ: `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`,
+     `audio/wave`, `audio/mp4`, `audio/m4a`, `audio/x-m4a`.
+   - `PUT <uploadUrl>` với `Content-Type` trùng `mimeType` để upload bytes trực tiếp lên storage.
+   - `POST /api/v1/modules/{moduleId}/audio/confirm` — JSON `{ "storageKey": "..." }`; probe object
+     và trả `sourceAudioUploadStatus` = `READY` (đã upload) hoặc `FAILED` (chưa upload, HTTP vẫn `200`).
+   - `GET /api/v1/modules/{moduleId}/audio` — stream bytes audio; Teacher owner và Student thành viên
+     lớp được phép; `ADMIN` và user ngoài lớp nhận `403`; `404` khi chưa có audio.
+   - Đã bỏ giới hạn 25 MB và kiểm tra file signature phía server (backend không còn nhận bytes).
 
 ## Test commands
 

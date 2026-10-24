@@ -27,8 +27,6 @@ export const AddStudent: React.FC = () => {
     password: '',
     parentPhone: '',
     dob: '',
-    entryBand: 'Thang 10: 6.0',
-    targetBand: 'Thang 10: 8.0+',
     assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
@@ -53,8 +51,7 @@ export const AddStudent: React.FC = () => {
 
   const steps = [
     { num: 1 as const, title: isVi ? 'Thông tin cá nhân' : 'Personal Info' },
-    { num: 2 as const, title: isVi ? 'Trình độ & Mục tiêu' : 'Level & Target' },
-    { num: 3 as const, title: isVi ? 'Ghi danh lớp học' : 'Class Enrollment' },
+    { num: 2 as const, title: isVi ? 'Ghi danh lớp học' : 'Class Enrollment' },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,7 +291,7 @@ export const AddStudent: React.FC = () => {
                       setCurrentStep(2);
                     }}
                   >
-                    <span>{t('addStudent.btnNextStep3')}</span>
+                    <span>{isVi ? 'Tiếp theo: Ghi danh lớp học' : 'Next: Class Enrollment'}</span>
                     <ArrowRight size={16} />
                   </button>
                 </div>
@@ -303,59 +300,6 @@ export const AddStudent: React.FC = () => {
 
             {/* Step 2 */}
             {currentStep === 2 && (
-              <div className="adm-multistep-pane">
-                <div className="adm-form-grid">
-                  <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Trình độ đầu vào' : 'Entry Level'}</label>
-                    <select 
-                      className="input"
-                      value={formData.entryBand}
-                      onChange={(e) => setFormData({ ...formData, entryBand: e.target.value })}
-                    >
-                      <option value="Thang 10: 5.0">Thang 10: 5.0</option>
-                      <option value="Thang 10: 6.0">Thang 10: 6.0</option>
-                      <option value="Thang 10: 7.0">Thang 10: 7.0</option>
-                      <option value="Sơ cấp (A2-B1)">Sơ cấp (A2 - B1)</option>
-                    </select>
-                  </div>
-
-                  <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mục tiêu học tập' : 'Target Goal'}</label>
-                    <select 
-                      className="input"
-                      value={formData.targetBand}
-                      onChange={(e) => setFormData({ ...formData, targetBand: e.target.value })}
-                    >
-                      <option value="Thang 10: 7.0+">Thang 10: 7.0+</option>
-                      <option value="Thang 10: 8.0+">Thang 10: 8.0+</option>
-                      <option value="Thang 10: 8.5+">Thang 10: 8.5+</option>
-                      <option value="Thang 10: 9.0+">Thang 10: 9.0+</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="adm-form-actions-between">
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary"
-                    onClick={() => setCurrentStep(1)}
-                  >
-                    {isVi ? 'Quay lại' : 'Back'}
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-primary adm-btn-with-icon"
-                    onClick={() => setCurrentStep(3)}
-                  >
-                    <span>{t('addStudent.btnNextStep4')}</span>
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3 */}
-            {currentStep === 3 && (
               <div className="adm-multistep-pane">
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Đăng ký vào lớp học' : 'Select Cohort'}</label>
@@ -383,7 +327,7 @@ export const AddStudent: React.FC = () => {
                   <button 
                     type="button" 
                     className="btn btn-secondary"
-                    onClick={() => setCurrentStep(2)}
+                    onClick={() => setCurrentStep(1)}
                     disabled={submitting}
                   >
                     {isVi ? 'Quay lại' : 'Back'}
@@ -423,12 +367,13 @@ export const AddStudent: React.FC = () => {
               </div>
             </div>
 
-            <div className="adm-preview-cohort-box">
-              <div className="adm-preview-cohort-row">
-                <span>{isVi ? 'Đầu vào: ' : 'Entry: '}<strong>{formData.entryBand}</strong></span>
-                <span className="text-primary font-bold">{formData.targetBand}</span>
+            {formData.assignedClassId && (
+              <div className="adm-preview-cohort-box">
+                <div className="adm-preview-cohort-row">
+                  <span>{isVi ? 'Lớp ghi danh: ' : 'Class: '}<strong>{classes.find(c => c.id === Number(formData.assignedClassId))?.name || `ENG-${formData.assignedClassId}`}</strong></span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="adm-preview-details">
               <div><strong>Email:</strong> {formData.email || '—'}</div>

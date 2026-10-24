@@ -6,6 +6,8 @@ export interface TeacherPendingSubmission {
   assignmentTitle: string;
   studentId: string;
   studentName: string;
+  studentEmail?: string;
+  studentCode?: string;
   studentAvatar: string;
   className: string;
   skill: TeacherSkill;
@@ -31,7 +33,6 @@ export interface TeacherSkillPerformance {
   skill: TeacherSkill;
   skillName: string;
   avgScore: number;
-  benchmark: number;
   submissionRate: number;
   needsReviewCount: number;
 }

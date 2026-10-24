@@ -13,6 +13,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.english_hub.core.common.config.CacheConfig;
 
 /** JPA adapter for the User domain repository port. */
 @Repository
@@ -74,6 +77,7 @@ public class JpaUserRepository implements UserRepository {
 
 	@Override
 	@Transactional
+	@CacheEvict(cacheNames = CacheConfig.USERS, key = "#result.id()")
 	public User save(User source) {
 		com.english_hub.core.modules.user.infrastructure.persistence.entity.User target = source.id() == null
 				? new com.english_hub.core.modules.user.infrastructure.persistence.entity.User(
@@ -106,6 +110,7 @@ public class JpaUserRepository implements UserRepository {
 
 	@Override
 	@Transactional
+	@CacheEvict(cacheNames = CacheConfig.USERS, key = "#id")
 	public void deleteById(Long id) {
 		userJpaRepository.findByIdAndDeletedFalse(id).ifPresent(entity -> {
 			entity.updateFrom(
