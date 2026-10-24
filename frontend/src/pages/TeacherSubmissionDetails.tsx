@@ -141,7 +141,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           if (detail.finalFeedback) {
             setFeedbackText(detail.finalFeedback);
           } else if (detail.aiFeedback) {
-            setFeedbackText((prev) => prev || detail.aiFeedback || '');
+            setFeedbackText(detail.aiFeedback);
           }
         } catch {
           // ignore
@@ -472,11 +472,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return studentAnswerText.trim().split(/\s+/).filter(Boolean).length;
   }, [studentAnswerText]);
 
-  const isOnTime = useMemo(() => {
-    if (!assignment?.closeAt || !submission?.submittedAt) return null;
-    return new Date(submission.submittedAt).getTime() <= new Date(assignment.closeAt).getTime();
-  }, [assignment, submission]);
-
   if (isLoading) {
     return (
       <div className="tsd-loading-container">
@@ -613,13 +608,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
               {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'Vừa xong'}
             </div>
           </div>
-          {isOnTime !== null && (
+          {!isSpeaking && (
             <>
               <div className="tsd-time-divider" />
-              <StatusBadge
-                status={isOnTime ? 'success' : 'warning'}
-                label={isOnTime ? t('submissionDetails.statusOnTime') : (isVi ? 'Nộp muộn' : 'Late')}
-              />
+              <div className="tsd-ontime-indicator">
+                <span className="tsd-ontime-dot" />
+                <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
+              </div>
             </>
           )}
         </div>
@@ -658,12 +653,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   ? String(aiSuggestion.suggestedScore) 
                   : '--')}
             suffix="/ 10"
-          />
-
-          <MetricCard 
-            title={isVi ? 'Độ dài bài nộp' : 'Word Count'}
-            value={wordCount > 0 ? String(wordCount) : (attachedDocAnswers.length > 0 ? (isVi ? 'Tệp nộp' : 'File') : '0')}
-            suffix={wordCount > 0 ? (isVi ? 'từ' : 'words') : (attachedDocAnswers.length > 0 ? (attachedDocAnswers[0].docMimeType?.includes('pdf') ? 'PDF' : 'DOCX') : (isVi ? 'từ' : 'words'))}
           />
         </div>
       )}

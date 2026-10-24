@@ -78,6 +78,9 @@ describe('TeacherSubmissionDetails', () => {
     fireEvent.change(score, { target: { value: '10' } });
     await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
     expect(await screen.findByText('Grade finalized and published to student!')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    await user.click(screen.getByRole('button', { name: /Back to submissions list/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments/12');
   });
 
   it('shows English empty and error states and recovers on retry', async () => {
