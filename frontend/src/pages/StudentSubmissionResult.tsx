@@ -33,16 +33,9 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { gradingService, type AiGradingSuggestionResponse, type GradingDetailResponse } from '../api/services/grading.service';
-import { MarkdownView } from '../components/common';
+import { Button, MarkdownView } from '../components/common';
+import { resolveAudioUrl } from '../utils/audioUrl.utils';
 import '../styles/student-result.css';
-
-const resolveAudioUrl = (storageKey?: string | null): string => {
-  if (!storageKey) return '';
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-  return `/s3-upload/${storageKey}`;
-};
 
 interface DisplayAnnotation {
   id: number;
@@ -111,6 +104,7 @@ export const StudentSubmissionResult: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'positive' | 'cohesion'>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -514,6 +508,8 @@ export const StudentSubmissionResult: React.FC = () => {
   }, [moduleDetail?.answers]);
 
   const audioUrl = useMemo(() => resolveAudioUrl(audioStorageKey), [audioStorageKey]);
+
+  const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
 
   const teacherFeedbackText = useMemo(() => {
     return gradingDetail?.finalFeedback || gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback || '';
@@ -1033,11 +1029,36 @@ export const StudentSubmissionResult: React.FC = () => {
 
                 <div className="result-card-body">
                   {audioUrl ? (
-                    <div className="result-audio-player-wrap">
-                      <audio controls src={audioUrl} className="result-audio-player">
-                        {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
-                      </audio>
-                    </div>
+                    audioError ? (
+                      <div className="result-audio-error">
+                        <div className="result-audio-error-msg">
+                          <AlertCircle size={16} />
+                          <span>
+                            {isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại.' : 'Failed to load audio recording.'}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          icon={RefreshCw}
+                          onClick={() => setAudioErrorUrl(null)}
+                        >
+                          {isVi ? 'Thử lại' : 'Retry'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="result-audio-player-wrap">
+                        <audio 
+                          controls 
+                          src={audioUrl} 
+                          className="result-audio-player"
+                          onError={() => setAudioErrorUrl(audioUrl)}
+                        >
+                          {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                        </audio>
+                      </div>
+                    )
                   ) : (
                     <div className="result-audio-empty">
                       {isVi ? 'Chưa tìm thấy bản ghi âm của bài nộp này.' : 'No audio recording found for this submission.'}

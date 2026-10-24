@@ -9,14 +9,20 @@ import {
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import {
+  submissionService,
+  isSubmissionGraded,
+  type SubmissionDetail,
+} from '../api/services/submission.service';
+import { parseApiError } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getExamPageRedirectRoute,
 } from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
@@ -104,37 +110,86 @@ const StudentAssignmentWriting: React.FC = () => {
           }
         }
 
-        // 3. Resolve or start submission attempt
+        // 3. Resolve or start submission attempt with Route Guard
         const urlSubmissionId = searchParams.get('submissionId');
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (isMounted) setSubmission(sub);
-          } catch {
-            // Fallback
+            if (!isMounted) return;
+            const redirectRoute = getExamPageRedirectRoute(
+              sub,
+              'WRITING',
+              numericId,
+              currentAssignment?.modules
+            );
+            if (redirectRoute) {
+              navigate(redirectRoute, { replace: true });
+              return;
+            }
+            setSubmission(sub);
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+            }
           }
         } else if (user?.id) {
           try {
             const subList = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1
+              limit: 10
             });
-            if (subList.data && subList.data.length > 0) {
-              const sub = await submissionService.getSubmission(subList.data[0].id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'PUBLISHED') {
-              const startRes = await submissionService.startAttempt(numericId);
-              const sub = await submissionService.getSubmission(startRes.id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'CLOSED') {
-              if (isMounted) {
-                setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+            const subs = subList.data || [];
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              const redirectRoute = getExamPageRedirectRoute(
+                sub,
+                'WRITING',
+                numericId,
+                currentAssignment?.modules
+              );
+              if (redirectRoute) {
+                navigate(redirectRoute, { replace: true });
+                return;
+              }
+              setSubmission(sub);
+            } else {
+              const completedItem =
+                subs.find((s) => isSubmissionGraded(s)) ||
+                subs.find((s) => s.status === 'SUBMITTED') ||
+                subs[0];
+
+              if (completedItem) {
+                if (isMounted) {
+                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
+                }
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (isMounted) setSubmission(sub);
+              } else if (currentAssignment?.status === 'CLOSED') {
+                if (isMounted) {
+                  setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+                }
+              } else if (currentAssignment?.status) {
+                if (isMounted) {
+                  const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                  setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+                }
               }
             }
-          } catch {
-            // Fallback if unable to start or list
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
           }
         }
       } catch (err: unknown) {
@@ -237,60 +292,67 @@ const StudentAssignmentWriting: React.FC = () => {
       setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
       return;
     }
+    if (!submission) {
+      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
+
+    const subId = submission.id;
+    const writingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+    const subModuleId = writingSubMod?.id || submission.modules?.[0]?.id;
+
+    if (!subModuleId) {
+      setError('Không tìm thấy thông tin phần làm bài viết trong bài nộp.');
+      return;
+    }
+
+    if (writingSubMod && (writingSubMod.status === 'SUBMITTED' || writingSubMod.status === 'GRADED')) {
+      navigate(`/student/submissions/${subId}`, { replace: true });
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
     try {
-      const subId = submission?.id;
-      const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
-      const subModuleId = writingSubMod?.id || submission?.modules?.[0]?.id;
-
       // 1. Upload document file if selected
-      if (uploadedFile && subModuleId) {
-        try {
-          const { uploadUrl } = await submissionService.getDocumentUploadUrl(
-            subModuleId,
-            uploadedFile.type || 'application/pdf'
-          );
-          if (uploadUrl) {
-            await fetch(uploadUrl, {
-              method: 'PUT',
-              body: uploadedFile,
-              headers: {
-                'Content-Type': uploadedFile.type || 'application/octet-stream',
-              },
-            });
-          }
-        } catch (uploadErr) {
-          console.warn('Document storage upload skipped or failed, proceeding with module submission:', uploadErr);
+      if (uploadedFile) {
+        const docMimeType = uploadedFile.name.toLowerCase().endsWith('.docx')
+          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          : uploadedFile.type || 'application/pdf';
+        const { uploadUrl } = await submissionService.getDocumentUploadUrl(
+          subModuleId,
+          docMimeType
+        );
+        if (uploadUrl) {
+          await submissionService.uploadDirectToStorage(uploadUrl, uploadedFile, docMimeType);
         }
       }
 
-      if (subModuleId) {
-        try {
-          await submissionService.submitModule(subModuleId, {
-            answers: [
-              {
-                questionId: 1,
-                content: { text: editorText }
-              }
-            ]
-          });
-        } catch (err) {
-          // Continue if already submitted
-          console.warn('Writing submit module notice:', err);
-        }
-      }
+      // 2. Submit module (do not swallow HTTP 400 errors)
+      const trimmedText = editorText.trim();
+      await submissionService.submitModule(
+        subModuleId,
+        trimmedText
+          ? {
+              answers: [
+                {
+                  questionId: 1,
+                  content: { text: trimmedText }
+                }
+              ]
+            }
+          : {}
+      );
 
-      // Check if all modules in this submission are now completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      // 3. Check if all modules in this submission are now completed
+      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
         try {
           await submissionService.submitSubmission(subId);
         } catch {
-          // Continue
+          // Continue if parent submission was auto-finalized
         }
       }
 
@@ -307,7 +369,7 @@ const StudentAssignmentWriting: React.FC = () => {
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission?.modules || []).map((m) =>
+        const currentSubModules = (submission.modules || []).map((m) =>
           m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
         );
         const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
@@ -326,8 +388,8 @@ const StudentAssignmentWriting: React.FC = () => {
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -360,7 +422,7 @@ const StudentAssignmentWriting: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (step.isCompleted || step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible) {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}
@@ -542,7 +604,7 @@ const StudentAssignmentWriting: React.FC = () => {
               <Button 
                 variant="primary"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !submission}
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >

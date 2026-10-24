@@ -9,6 +9,8 @@ import {
   getNextIncompleteModule,
   isAllModulesCompleted,
   calculateExamSteps,
+  getStudentAssignmentActionRoute,
+  getExamPageRedirectRoute,
   type ExamModuleItem,
   type SubmissionModuleItem
 } from '../../utils/examStepper.utils';
@@ -231,4 +233,161 @@ test('calculateExamSteps: when no attempt has been started yet (hasActiveAttempt
   assert.strictEqual(steps[2].status, 'LOCKED');
   assert.strictEqual(steps[3].status, 'LOCKED');
   assert.strictEqual(steps.some((s) => s.status === 'ACTIVE'), false);
+});
+
+test('getStudentAssignmentActionRoute routes pending, ai_processing, and graded to submission result page', () => {
+  // Pending (Chờ chấm) with submissionId -> /student/submissions/:submissionId
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'pending',
+      submissionId: 501,
+      skill: 'speaking'
+    }),
+    '/student/submissions/501'
+  );
+
+  // Pending without submissionId -> fallback result route
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'pending',
+      skill: 'writing'
+    }),
+    '/student/assignments/12/result'
+  );
+
+  // AI Processing -> /student/submissions/:submissionId
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'ai_processing',
+      submissionId: 502,
+      skill: 'writing'
+    }),
+    '/student/submissions/502'
+  );
+
+  // Graded -> /student/submissions/:submissionId
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'graded',
+      submissionId: 503,
+      skill: 'reading'
+    }),
+    '/student/submissions/503'
+  );
+
+  // In Progress with activeSkill -> skill exam route with submissionId
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'in_progress',
+      submissionId: 504,
+      skill: 'listening',
+      activeSkill: 'reading'
+    }),
+    '/student/assignments/reading/12?submissionId=504'
+  );
+
+  // In Progress when all modules are done (activeSkill = null) -> overview page
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'in_progress',
+      submissionId: 504,
+      skill: 'listening',
+      activeSkill: null
+    }),
+    '/student/assignments/12/overview'
+  );
+
+  // Not started -> overview page
+  assert.strictEqual(
+    getStudentAssignmentActionRoute({
+      id: 12,
+      status: 'not_started',
+      skill: 'speaking'
+    }),
+    '/student/assignments/12/overview'
+  );
+});
+
+test('getExamPageRedirectRoute redirects completed submissions and completed modules away from exam pages', () => {
+  const singleModule: ExamModuleItem[] = [{ id: 10, skill: 'SPEAKING', orderIndex: 1 }];
+  const multiModules: ExamModuleItem[] = [
+    { id: 10, skill: 'LISTENING', orderIndex: 1 },
+    { id: 20, skill: 'WRITING', orderIndex: 2 }
+  ];
+
+  // 1. Parent submission is SUBMITTED -> redirect to /student/submissions/:id
+  assert.strictEqual(
+    getExamPageRedirectRoute(
+      { id: 777, status: 'SUBMITTED', modules: [{ id: 1, moduleId: 10, skill: 'SPEAKING', status: 'SUBMITTED' }] },
+      'SPEAKING',
+      42,
+      singleModule
+    ),
+    '/student/submissions/777'
+  );
+
+  // 2. Parent submission is GRADED -> redirect to /student/submissions/:id
+  assert.strictEqual(
+    getExamPageRedirectRoute(
+      { id: 778, status: 'GRADED', modules: [{ id: 1, moduleId: 10, skill: 'SPEAKING', status: 'GRADED' }] },
+      'SPEAKING',
+      42,
+      singleModule
+    ),
+    '/student/submissions/778'
+  );
+
+  // 3. Parent is IN_PROGRESS, current module is SUBMITTED in a multi-module exam -> redirect to next incomplete module
+  assert.strictEqual(
+    getExamPageRedirectRoute(
+      {
+        id: 779,
+        status: 'IN_PROGRESS',
+        modules: [
+          { id: 1, moduleId: 10, skill: 'LISTENING', status: 'SUBMITTED' },
+          { id: 2, moduleId: 20, skill: 'WRITING', status: 'IN_PROGRESS' }
+        ]
+      },
+      'LISTENING',
+      42,
+      multiModules
+    ),
+    '/student/assignments/writing/42?submissionId=779'
+  );
+
+  // 4. Parent is IN_PROGRESS, current module is SUBMITTED in a single-module exam -> redirect to result page
+  assert.strictEqual(
+    getExamPageRedirectRoute(
+      {
+        id: 780,
+        status: 'IN_PROGRESS',
+        modules: [{ id: 1, moduleId: 10, skill: 'SPEAKING', status: 'SUBMITTED' }]
+      },
+      'SPEAKING',
+      42,
+      singleModule
+    ),
+    '/student/submissions/780'
+  );
+
+  // 5. Parent is IN_PROGRESS and current module is IN_PROGRESS -> returns null (allowed to take exam)
+  assert.strictEqual(
+    getExamPageRedirectRoute(
+      {
+        id: 781,
+        status: 'IN_PROGRESS',
+        modules: [{ id: 1, moduleId: 10, skill: 'SPEAKING', status: 'IN_PROGRESS' }]
+      },
+      'SPEAKING',
+      42,
+      singleModule
+    ),
+    null
+  );
 });

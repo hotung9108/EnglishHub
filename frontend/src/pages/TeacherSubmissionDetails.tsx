@@ -3,9 +3,10 @@ import { useNavigate, useParams, useSearchParams, useLocation } from 'react-rout
 import { 
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
-  Save, Send, RefreshCw, AlertCircle, CheckCircle2
+  Save, Send, RefreshCw, AlertCircle, CheckCircle2,
+  XCircle
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { parseApiError } from '../api';
 import {
@@ -20,16 +21,13 @@ import {
   type SubmissionModuleGradingResponse,
   type GradingDetailResponse 
 } from '../api/services/grading.service';
+import { 
+  answerAnnotationService, 
+  type GradingAnnotation 
+} from '../api/services/answer-annotation.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { classService, type ClassMember } from '../api/services/class.service';
-
-const resolveAudioUrl = (storageKey?: string | null): string => {
-  if (!storageKey) return '';
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-  return `/s3-upload/englishhub-dev/${storageKey.replace(/^\/+/, '')}`;
-};
+import { resolveAudioUrl } from '../utils/audioUrl.utils';
 
 export const TeacherSubmissionDetails: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +41,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
+  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
@@ -59,6 +58,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
+  const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
+  const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
+  const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
   const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
     if (routeState?.studentName) {
       return {
@@ -90,9 +93,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   const loadModuleData = useCallback(async (targetModuleId: number) => {
+    let currentModDetail: SubmissionModuleDetailResponse | null = null;
+    let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
+
     try {
       const modDetailRes = await submissionService.getSubmissionModuleDetail(targetModuleId);
       setModuleDetail(modDetailRes);
+      currentModDetail = modDetailRes;
     } catch {
       setModuleDetail(null);
     }
@@ -127,6 +134,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     try {
       const aiRes = await gradingService.getAiSuggestion(targetModuleId);
       setAiSuggestion(aiRes);
+      currentAiSuggestion = aiRes;
       if (aiRes.aiFeedback) {
         setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
       }
@@ -135,6 +143,72 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     } catch {
       setAiSuggestion(null);
+    }
+
+    // Fetch Annotations for current module answer
+    try {
+      setIsLoadingAnnotations(true);
+      const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
+      if (targetAns?.id) {
+        try {
+          const annRes = await answerAnnotationService.listAnnotations(targetAns.id);
+          const fetchedAnns = annRes.data || [];
+          if (fetchedAnns.length > 0) {
+            setAnnotations(fetchedAnns);
+          } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setAnnotations(
+              currentAiSuggestion.annotations.map((a) => ({
+                id: a.id,
+                source: a.source,
+                startOffset: a.startOffset,
+                endOffset: a.endOffset,
+                errorType: a.errorType || null,
+                comment: a.comment || null,
+                suggestedFix: a.suggestedFix || null,
+                reviewStatus: a.reviewStatus,
+              }))
+            );
+          } else {
+            setAnnotations([]);
+          }
+        } catch {
+          if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setAnnotations(
+              currentAiSuggestion.annotations.map((a) => ({
+                id: a.id,
+                source: a.source,
+                startOffset: a.startOffset,
+                endOffset: a.endOffset,
+                errorType: a.errorType || null,
+                comment: a.comment || null,
+                suggestedFix: a.suggestedFix || null,
+                reviewStatus: a.reviewStatus,
+              }))
+            );
+          } else {
+            setAnnotations([]);
+          }
+        }
+      } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+        setAnnotations(
+          currentAiSuggestion.annotations.map((a) => ({
+            id: a.id,
+            source: a.source,
+            startOffset: a.startOffset,
+            endOffset: a.endOffset,
+            errorType: a.errorType || null,
+            comment: a.comment || null,
+            suggestedFix: a.suggestedFix || null,
+            reviewStatus: a.reviewStatus,
+          }))
+        );
+      } else {
+        setAnnotations([]);
+      }
+    } catch {
+      setAnnotations([]);
+    } finally {
+      setIsLoadingAnnotations(false);
     }
   }, []);
 
@@ -415,6 +489,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const audioStorageKey = audioAnswer?.audioStorageKey;
   const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
 
+  const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
+
   // Extract student text answer
   const studentAnswerText = useMemo(() => {
     if (!moduleDetail?.answers || moduleDetail.answers.length === 0) {
@@ -438,6 +514,214 @@ export const TeacherSubmissionDetails: React.FC = () => {
     if (!studentAnswerText) return 0;
     return studentAnswerText.trim().split(/\s+/).filter(Boolean).length;
   }, [studentAnswerText]);
+
+  const handleReviewAnnotation = async (annotationId: number, status: 'ACCEPTED' | 'REJECTED') => {
+    setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.reviewAnnotation(annotationId, { reviewStatus: status });
+      setAnnotations((prev) =>
+        prev.map((ann) => (ann.id === annotationId ? { ...ann, reviewStatus: status } : ann))
+      );
+      showToast(
+        isVi
+          ? (status === 'ACCEPTED' ? 'Đã duyệt gợi ý của AI.' : 'Đã từ chối gợi ý của AI.')
+          : (status === 'ACCEPTED' ? 'AI annotation accepted.' : 'AI annotation rejected.')
+      );
+    } catch (err) {
+      console.error('Failed to review annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể cập nhật trạng thái duyệt.' : 'Failed to update review status.'));
+    } finally {
+      setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+    }
+  };
+
+  const filteredAnnotations = useMemo(() => {
+    if (annotationFilter === 'ALL') return annotations;
+    return annotations.filter((a) => a.reviewStatus === annotationFilter);
+  }, [annotations, annotationFilter]);
+
+  const annotationCounts = useMemo(() => {
+    return {
+      all: annotations.length,
+      pending: annotations.filter((a) => a.reviewStatus === 'PENDING').length,
+      accepted: annotations.filter((a) => a.reviewStatus === 'ACCEPTED').length,
+      rejected: annotations.filter((a) => a.reviewStatus === 'REJECTED').length,
+    };
+  }, [annotations]);
+
+  const transcriptText = useMemo(() => {
+    if (!aiSuggestion?.transcript) return null;
+    if (typeof aiSuggestion.transcript === 'string') return aiSuggestion.transcript;
+    if (Array.isArray(aiSuggestion.transcript)) {
+      return aiSuggestion.transcript
+        .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
+        .join(' ');
+    }
+    return null;
+  }, [aiSuggestion]);
+
+  const extractSnippet = (start?: number, end?: number): string | null => {
+    if (start === undefined || end === undefined || start < 0 || end <= start) return null;
+    const baseText = transcriptText || (studentAnswerText && studentAnswerText !== (isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.') ? studentAnswerText : null);
+    if (!baseText) return null;
+    if (start < baseText.length) {
+      const slice = baseText.slice(start, Math.min(end, baseText.length)).trim();
+      return slice.length > 0 ? slice : null;
+    }
+    return null;
+  };
+
+  const renderAnnotationsSection = () => {
+    return (
+      <div className="tsd-annotations-section">
+        <div className="tsd-annotations-header">
+          <div className="tsd-annotations-title-wrap">
+            <h4 className="tsd-annotations-title">
+              {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'AI Segment Annotations'}
+            </h4>
+            <span className="tsd-annotations-counter">{annotations.length}</span>
+          </div>
+
+          {annotations.length > 0 && (
+            <div className="tsd-annotations-filter-bar">
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ALL')}
+              >
+                {isVi ? 'Tất cả' : 'All'} ({annotationCounts.all})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'PENDING' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('PENDING')}
+              >
+                {isVi ? 'Chờ duyệt' : 'Pending'} ({annotationCounts.pending})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ACCEPTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ACCEPTED')}
+              >
+                {isVi ? 'Đã duyệt' : 'Accepted'} ({annotationCounts.accepted})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'REJECTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('REJECTED')}
+              >
+                {isVi ? 'Đã từ chối' : 'Rejected'} ({annotationCounts.rejected})
+              </button>
+            </div>
+          )}
+        </div>
+
+        {isLoadingAnnotations ? (
+          <div className="tsd-annotations-loading">
+            <RefreshCw size={18} className="animate-spin text-slate-400" />
+            <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
+          </div>
+        ) : filteredAnnotations.length === 0 ? (
+          <EmptyState
+            title={
+              annotations.length === 0
+                ? (isVi ? 'Chưa có gợi ý sửa lỗi từ AI' : 'No AI annotations available')
+                : (isVi ? 'Không có gợi ý trong bộ lọc này' : 'No annotations in this filter')
+            }
+            description={
+              annotations.length === 0
+                ? (isVi ? 'AI chưa phát hiện lỗi cần chú thích hoặc bài làm chưa được phân tích bằng AI.' : 'AI has not identified segment errors or submission has not been analyzed.')
+                : undefined
+            }
+            className="tsd-annotations-empty"
+          />
+        ) : (
+          <div className="tsd-annotations-list">
+            {filteredAnnotations.map((ann) => {
+              const isReviewing = !!reviewingAnnotationIds[ann.id];
+              const snippet = extractSnippet(ann.startOffset, ann.endOffset);
+              const badgeStatus =
+                ann.reviewStatus === 'ACCEPTED' ? 'success' : ann.reviewStatus === 'REJECTED' ? 'error' : 'warning';
+              const badgeLabel =
+                ann.reviewStatus === 'ACCEPTED'
+                  ? (isVi ? 'Đã duyệt' : 'Accepted')
+                  : ann.reviewStatus === 'REJECTED'
+                  ? (isVi ? 'Đã từ chối' : 'Rejected')
+                  : (isVi ? 'Chờ duyệt' : 'Pending');
+
+              return (
+                <div key={ann.id} className={`tsd-annotation-item ${ann.reviewStatus.toLowerCase()}`}>
+                  <div className="tsd-ann-item-header">
+                    <div className="tsd-ann-type-group">
+                      <span className="tsd-ann-type-pill">
+                        {ann.errorType || (isVi ? 'Gợi ý' : 'Suggestion')}
+                      </span>
+                      <span className="tsd-ann-range">
+                        [{ann.startOffset} - {ann.endOffset}]
+                      </span>
+                    </div>
+                    <StatusBadge status={badgeStatus} label={badgeLabel} showDot />
+                  </div>
+
+                  <div className="tsd-ann-item-body">
+                    {snippet && (
+                      <div className="tsd-ann-snippet">
+                        <span className="tsd-ann-quote-mark">&ldquo;</span>
+                        {snippet}
+                        <span className="tsd-ann-quote-mark">&rdquo;</span>
+                      </div>
+                    )}
+
+                    {ann.suggestedFix && (
+                      <div className="tsd-ann-fix-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Gợi ý sửa:' : 'Suggested fix:'}</span>
+                        <span className="tsd-ann-fix-val">{ann.suggestedFix}</span>
+                      </div>
+                    )}
+
+                    {ann.comment && (
+                      <div className="tsd-ann-comment-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Nhận xét:' : 'Comment:'}</span>
+                        <span className="tsd-ann-comment-val">{ann.comment}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="tsd-ann-item-actions">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
+                      icon={CheckCircle2}
+                      loading={isReviewing}
+                      disabled={isReviewing}
+                      onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
+                      className="tsd-btn-review-accept"
+                    >
+                      {ann.reviewStatus === 'ACCEPTED' ? (isVi ? 'Đã duyệt' : 'Accepted') : (isVi ? 'Duyệt' : 'Accept')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
+                      icon={XCircle}
+                      loading={isReviewing}
+                      disabled={isReviewing}
+                      onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
+                      className="tsd-btn-review-reject"
+                    >
+                      {ann.reviewStatus === 'REJECTED' ? (isVi ? 'Đã từ chối' : 'Rejected') : (isVi ? 'Từ chối' : 'Reject')}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -678,11 +962,36 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
               <div className="tsd-speaking-audio-bar">
                 {audioUrl ? (
-                  <div className="tsd-speaking-audio-wrap">
-                    <audio controls src={audioUrl} className="tsd-audio-player">
-                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
-                    </audio>
-                  </div>
+                  audioError ? (
+                    <div className="tsd-audio-error">
+                      <div className="tsd-audio-error-msg">
+                        <AlertCircle size={16} />
+                        <span>
+                          {isVi ? 'Không thể tải bản ghi âm.' : 'Failed to load audio.'}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={() => setAudioErrorUrl(null)}
+                      >
+                        {isVi ? 'Thử lại' : 'Retry'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="tsd-speaking-audio-wrap">
+                      <audio 
+                        controls 
+                        src={audioUrl} 
+                        className="tsd-audio-player"
+                        onError={() => setAudioErrorUrl(audioUrl)}
+                      >
+                        {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                      </audio>
+                    </div>
+                  )
                 ) : (
                   <div className="tsd-audio-empty">
                     {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
@@ -734,6 +1043,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                     : 'No AI feedback available. Click "Grade with AI" to analyze the submission.'}
                   className="tsd-speaking-ai-markdown"
                 />
+                {renderAnnotationsSection()}
               </div>
             </div>
 
@@ -845,6 +1155,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   : 'No AI feedback available.'}
                 className="tsd-ai-markdown"
               />
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
             </div>
 
             {/* Feedback Editor */}

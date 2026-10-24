@@ -686,6 +686,26 @@
   outline: none;
 }
 
+.result-audio-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm, 8px);
+  padding: 10px 14px;
+  background-color: var(--color-danger-light, #fbebeb);
+  border: 1px solid var(--color-danger, #8f2222);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.result-audio-error-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-danger, #8f2222);
+  font-weight: 500;
+}
+
 .result-audio-empty {
   padding: 16px;
   background-color: var(--surface-container-low, #f4efe6);

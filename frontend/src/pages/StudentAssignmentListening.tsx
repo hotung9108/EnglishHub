@@ -6,10 +6,11 @@ import {
   Play, Pause, Volume2, SkipBack, SkipForward,
   AlertCircle, RefreshCw, Lightbulb
 } from 'lucide-react';
+import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { questionService, extractMcqOptions, type QuestionResponse } from '../api/services/question.service';
-import { submissionService, type SubmissionDetail, type SubmitModuleAnswerPayload } from '../api/services/submission.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmitModuleAnswerPayload } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
@@ -17,7 +18,8 @@ import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getExamPageRedirectRoute
 } from '../utils/examStepper.utils';
 import '../styles/student-exam.css';
 
@@ -115,32 +117,74 @@ const StudentAssignmentListening: React.FC = () => {
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (isMounted) setSubmission(sub);
-          } catch {
-            // Fallback
+            if (!isMounted) return;
+            const redirectRoute = getExamPageRedirectRoute(
+              sub,
+              'LISTENING',
+              numericId,
+              currentAssignment?.modules
+            );
+            if (redirectRoute) {
+              navigate(redirectRoute, { replace: true });
+              return;
+            }
+            setSubmission(sub);
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
+            }
           }
         } else if (user?.id) {
           try {
             const subList = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1
+              limit: 10
             });
-            if (subList.data && subList.data.length > 0) {
-              const sub = await submissionService.getSubmission(subList.data[0].id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'PUBLISHED') {
-              const startRes = await submissionService.startAttempt(numericId);
-              const sub = await submissionService.getSubmission(startRes.id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'CLOSED') {
-              if (isMounted) {
-                setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+            const subs = subList.data || [];
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              const redirectRoute = getExamPageRedirectRoute(
+                sub,
+                'LISTENING',
+                numericId,
+                currentAssignment?.modules
+              );
+              if (redirectRoute) {
+                navigate(redirectRoute, { replace: true });
+                return;
+              }
+              setSubmission(sub);
+            } else {
+              const completedItem = subs.find(
+                (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
+              );
+              if (completedItem) {
+                if (isMounted) {
+                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
+                }
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (isMounted) setSubmission(sub);
+              } else if (currentAssignment?.status === 'CLOSED') {
+                if (isMounted) {
+                  setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
+                }
               }
             }
-          } catch {
-            // Fallback
+          } catch (subErr: unknown) {
+            if (isMounted) {
+              const apiErr = parseApiError(subErr);
+              setError(apiErr.message || 'Không thể bắt đầu phiên làm bài.');
+            }
           }
         }
       } catch (err: unknown) {
@@ -159,7 +203,7 @@ const StudentAssignmentListening: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
   const totalQuestions = questions.length;
   const answeredCount = useMemo(() => {
@@ -182,6 +226,10 @@ const StudentAssignmentListening: React.FC = () => {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
+    if (!submission) {
+      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      return;
+    }
     if (answeredCount === 0) {
       if (!confirm('Bạn chưa trả lời câu hỏi nào. Bạn có chắc chắn muốn nộp bài?')) {
         return;
@@ -191,52 +239,57 @@ const StudentAssignmentListening: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const subId = submission?.id;
-      const listeningSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'LISTENING');
-      const subModuleId = listeningSubMod?.id || submission?.modules?.[0]?.id;
+      const subId = submission.id;
+      const listeningSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'LISTENING');
+      const subModuleId = listeningSubMod?.id || submission.modules?.[0]?.id;
 
-      if (subModuleId) {
-        const optionKeyToId: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
-        const answersPayload: SubmitModuleAnswerPayload[] = [];
-
-        questions.forEach((q, idx) => {
-          const qIndex = idx + 1;
-          const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
-          if (chosenVal === undefined || chosenVal === null || !String(chosenVal).trim()) return;
-
-          const qType = (q.questionType || '').toUpperCase();
-          if (qType === 'SHORT_ANSWER') {
-            answersPayload.push({
-              questionId: q.id,
-              content: { text: String(chosenVal).trim() },
-            });
-            return;
-          }
-
-          let optId: number;
-          if (typeof chosenVal === 'number') {
-            optId = chosenVal;
-          } else {
-            const upper = String(chosenVal).trim().toUpperCase();
-            optId = optionKeyToId[upper] ?? parseInt(upper, 10);
-            if (isNaN(optId) || optId < 1 || optId > 4) {
-              optId = 1;
-            }
-          }
-
-          answersPayload.push({
-            questionId: q.id,
-            content: { selectedOptionIds: [optId] },
-          });
-        });
-
-        if (answersPayload.length > 0) {
-          await submissionService.submitModule(subModuleId, { answers: answersPayload });
-        }
+      if (!subModuleId) {
+        throw new Error('Không tìm thấy thông tin phần làm bài nghe trong bài nộp.');
       }
 
+      if (listeningSubMod && (listeningSubMod.status === 'SUBMITTED' || listeningSubMod.status === 'GRADED')) {
+        navigate(`/student/submissions/${subId}`, { replace: true });
+        return;
+      }
+
+      const optionKeyToId: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
+      const answersPayload: SubmitModuleAnswerPayload[] = [];
+
+      questions.forEach((q, idx) => {
+        const qIndex = idx + 1;
+        const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
+        if (chosenVal === undefined || chosenVal === null || !String(chosenVal).trim()) return;
+
+        const qType = (q.questionType || '').toUpperCase();
+        if (qType === 'SHORT_ANSWER') {
+          answersPayload.push({
+            questionId: q.id,
+            content: { text: String(chosenVal).trim() },
+          });
+          return;
+        }
+
+        let optId: number;
+        if (typeof chosenVal === 'number') {
+          optId = chosenVal;
+        } else {
+          const upper = String(chosenVal).trim().toUpperCase();
+          optId = optionKeyToId[upper] ?? parseInt(upper, 10);
+          if (isNaN(optId) || optId < 1 || optId > 4) {
+            optId = 1;
+          }
+        }
+
+        answersPayload.push({
+          questionId: q.id,
+          content: { selectedOptionIds: [optId] },
+        });
+      });
+
+      await submissionService.submitModule(subModuleId, { answers: answersPayload });
+
       // Check if all modules in this submission are now completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
@@ -257,7 +310,7 @@ const StudentAssignmentListening: React.FC = () => {
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission?.modules || []).map((m) =>
+        const currentSubModules = (submission.modules || []).map((m) =>
           m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
         );
         const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
@@ -276,8 +329,8 @@ const StudentAssignmentListening: React.FC = () => {
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -318,7 +371,7 @@ const StudentAssignmentListening: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (step.isCompleted || step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible) {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}
@@ -609,6 +662,7 @@ const StudentAssignmentListening: React.FC = () => {
               variant="primary"
               size="md"
               loading={isSubmitting}
+              disabled={isSubmitting || !submission}
               onClick={handleSubmit}
             >
               Hoàn thành & Nộp bài

@@ -15,14 +15,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail } from '../api/services/submission.service';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getExamPageRedirectRoute
 } from '../utils/examStepper.utils';
 import '../styles/student-speaking.css';
 
@@ -111,7 +112,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (isMounted) setSubmission(sub);
+            if (!isMounted) return;
+            const redirectRoute = getExamPageRedirectRoute(
+              sub,
+              'SPEAKING',
+              numericId,
+              currentAssignment?.modules
+            );
+            if (redirectRoute) {
+              navigate(redirectRoute, { replace: true });
+              return;
+            }
+            setSubmission(sub);
           } catch (subErr: unknown) {
             if (isMounted) {
               const apiErr = parseApiError(subErr);
@@ -123,20 +135,45 @@ const StudentAssignmentSpeaking: React.FC = () => {
             const subList = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1
+              limit: 10
             });
-            if (subList.data && subList.data.length > 0) {
-              const sub = await submissionService.getSubmission(subList.data[0].id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'PUBLISHED') {
-              const startRes = await submissionService.startAttempt(numericId);
-              const sub = await submissionService.getSubmission(startRes.id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status) {
-              if (isMounted) {
-                const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
-                setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+            const subs = subList.data || [];
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              const redirectRoute = getExamPageRedirectRoute(
+                sub,
+                'SPEAKING',
+                numericId,
+                currentAssignment?.modules
+              );
+              if (redirectRoute) {
+                navigate(redirectRoute, { replace: true });
+                return;
+              }
+              setSubmission(sub);
+            } else {
+              const completedItem = subs.find(
+                (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
+              );
+              if (completedItem) {
+                if (isMounted) {
+                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
+                }
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (isMounted) setSubmission(sub);
+              } else if (currentAssignment?.status) {
+                if (isMounted) {
+                  const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                  setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+                }
               }
             }
           } catch (subErr: unknown) {
@@ -162,7 +199,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
   // Handle Play/Pause for recorded audio
   const togglePlay = () => {
@@ -245,12 +282,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setError(null);
 
     try {
-      const subId = submission?.id;
-      const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
-      const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
+      const subId = submission.id;
+      const speakingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const subModuleId = speakingSubMod?.id || submission.modules?.[0]?.id;
 
       if (!subModuleId) {
         throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
+      }
+
+      if (speakingSubMod && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED')) {
+        navigate(`/student/submissions/${subId}`, { replace: true });
+        return;
       }
 
       // Step 1: Request presigned PUT URL from backend
@@ -269,7 +311,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
       });
 
       // Step 4: Check if other modules in submission are already completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
@@ -290,7 +332,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission?.modules || []).map((m) =>
+        const currentSubModules = (submission.modules || []).map((m) =>
           m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
         );
         const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
@@ -309,8 +351,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -368,7 +410,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (step.isCompleted || step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible) {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}
@@ -574,7 +616,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <button 
                 className="btn-submit-speaking"
                 onClick={handleSubmitAssignment}
-                disabled={isSubmitting || !recordedAudioReady}
+                disabled={isSubmitting || !recordedAudioReady || !submission}
                 type="button"
               >
                 {isSubmitting ? (
