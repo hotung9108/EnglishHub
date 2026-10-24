@@ -109,7 +109,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast(isVi ? 'Đang bắt đầu tải tài liệu...' : 'Downloading document...');
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
   };
 
   const showToast = (msg: string) => {
@@ -373,17 +373,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
     const targetModuleId = activeModule?.id;
     if (!targetModuleId) return;
 
-    const skill = activeModule?.skill?.toUpperCase();
-    const isSpeakingSkill = skill === 'SPEAKING' || isSpeaking;
-    const skillLabel = isSpeakingSkill
-      ? (isVi ? 'bài nói' : 'speaking submission')
-      : (isVi ? 'bài viết' : 'writing submission');
-
     setIsAnalyzingAi(true);
     try {
-      showToast(isVi ? `Đang gửi yêu cầu chấm điểm ${skillLabel} bằng AI...` : `Requesting AI grading for ${skillLabel}...`);
+      showToast(isVi ? 'Đang gửi yêu cầu chấm điểm bằng AI...' : 'Requesting AI grading...');
       await gradingService.requestAiAnalysis(targetModuleId);
-      showToast(isVi ? `AI đang phân tích và chấm điểm ${skillLabel}...` : `AI is analyzing and grading the ${skillLabel}...`);
+      showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
       setTimeout(async () => {
         try {
@@ -466,7 +460,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
     if (typeof firstAnswer.content === 'object' && firstAnswer.content !== null) {
       const obj = firstAnswer.content as Record<string, unknown>;
-      const textVal = (obj.text || obj.essay || obj.answer || obj.content || '') as string;
+      const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
       if (typeof textVal === 'string') return textVal.trim();
       return JSON.stringify(obj);
     }
@@ -860,7 +854,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 </div>
               ) : (
                 <p className="tsd-file-only-note">
-                  {isVi ? 'Chưa có nội dung bài làm của học viên.' : 'No submission answer available.'}
+                  {isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.'}
                 </p>
               )}
             </div>

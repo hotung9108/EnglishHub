@@ -51,5 +51,11 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Typecheck UI Tests
+        run: npm run test:ui:types
+
+      - name: Run UI Component Tests and Coverage
+        run: npm run test:ui
+
       - name: Build Production Bundle (Typecheck & Vite)
         run: npm run build

@@ -1,0 +1,7 @@
+id: BUG-QA32-ROUTE
+title: "[FE][Student Writing] Assignment ID không hợp lệ âm thầm tải bài số 1"
+assignee: "@fe-primary"
+status: "To Do"
+issue: "https://github.com/hotung9108/EnglishHub/issues/213"
+source: "QA-32 / develop e8e85a4 / component jsdom"
+description: "Chi tiết và retest: production_artifacts/test_reports/QA-32/issues/public/ROUTE.md"
