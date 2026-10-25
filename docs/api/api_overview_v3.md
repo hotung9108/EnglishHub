@@ -53,7 +53,7 @@
 | 5 | PUT /users/me | Sửa thông tin cá nhân (tên, phone, avatar...) |
 | 6 | PATCH /users/me/password | Đổi mật khẩu riêng (tách khỏi sửa thông tin) |
 | 7 | GET /admin/users | Admin xem danh sách + search user |
-| 8 | POST /admin/users | Admin tạo tài khoản giáo viên/học viên |
+| 8 | POST /admin/users | Admin tạo tài khoản với role ADMIN, TEACHER, STUDENT |
 | 9 | PUT /admin/users/{id} | Admin sửa thông tin 1 user |
 | 10 | DELETE /admin/users/{id} | Admin xoá (hoặc soft-delete) user |
 | 11 | PATCH /admin/users/{id}/status | Admin khoá/mở khoá tài khoản |

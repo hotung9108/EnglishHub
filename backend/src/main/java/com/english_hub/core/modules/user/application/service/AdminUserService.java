@@ -71,9 +71,6 @@ public class AdminUserService {
 		} catch (IllegalArgumentException exception) {
 			throw invalidCreateRequest();
 		}
-		if (role == UserRole.ADMIN) {
-			throw invalidCreateRequest();
-		}
 		if (userRepository.existsByEmail(email)) {
 			throw ApiException.conflict("Email đã được sử dụng.");
 		}
