@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
@@ -37,6 +37,7 @@ const getFileNameFromKey = (storageKey: string): string => {
 };
 
 export const TeacherSubmissionDetails: React.FC = () => {
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = location.state as { studentName?: string; studentEmail?: string; studentCode?: string } | null;
@@ -125,8 +126,24 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+
+    if (toastTimeoutRef.current !== null) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 3500);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const loadModuleData = useCallback(async (targetModuleId: number) => {
     let currentModDetail: SubmissionModuleDetailResponse | null = null;
