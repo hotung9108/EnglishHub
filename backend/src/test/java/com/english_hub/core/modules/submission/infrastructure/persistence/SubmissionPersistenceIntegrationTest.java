@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
+import com.english_hub.core.infrastructure.persistence.entity.Answer;
 import com.english_hub.core.infrastructure.persistence.entity.Assignment;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentModule;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus;
@@ -29,6 +30,7 @@ import com.english_hub.core.infrastructure.persistence.entity.ClassStatus;
 import com.english_hub.core.infrastructure.persistence.entity.EnglishClass;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.infrastructure.persistence.entity.ModuleTaskType;
+import com.english_hub.core.infrastructure.persistence.entity.UploadStatus;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentModuleRepository;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository;
 import com.english_hub.core.infrastructure.persistence.repository.EnglishClassRepository;
@@ -58,6 +60,9 @@ import jakarta.persistence.EntityManager;
 @SpringBootTest
 @Transactional
 class SubmissionPersistenceIntegrationTest {
+
+	private static final String DOCX_MIME_TYPE =
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 	@Container
 	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -121,6 +126,55 @@ class SubmissionPersistenceIntegrationTest {
 		assertThat(loaded.getStudentId()).isEqualTo(seed.studentId());
 		assertThat(loaded.getAttemptNumber()).isEqualTo(1);
 		assertThat(loaded.getStatus()).isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void persistsDocxMimeTypeWithoutTruncation() {
+		Seed seed = seedBase();
+		Submission submission = submissionRepository.create(seed.assignmentId(), seed.studentId(), 1);
+		SubmissionModule submissionModule = submissionModuleRepository
+				.bulkCreate(submission.getId(), List.of(seed.module2Id())).getFirst();
+		String storageKey = "submissions/" + submission.getId()
+				+ "/module-" + submissionModule.getId() + "/essay.docx";
+		assertThat(DOCX_MIME_TYPE).hasSize(71);
+
+		Answer answer = new Answer(
+				submissionModule.getId(), null, null,
+				null, null, null, null, null,
+				storageKey, DOCX_MIME_TYPE, null, UploadStatus.READY);
+		entityManager.persist(answer);
+		entityManager.flush();
+		Long answerId = answer.getId();
+		entityManager.clear();
+
+		Answer loaded = entityManager.find(Answer.class, answerId);
+		assertThat(loaded).isNotNull();
+		assertThat(loaded.getDocMimeType()).isEqualTo(DOCX_MIME_TYPE);
+		assertThat(loaded.getDocStorageKey()).isEqualTo(storageKey);
+		assertThat(loaded.getDocUploadStatus()).isEqualTo(UploadStatus.READY);
+	}
+
+	@Test
+	void persistsDocMimeTypeAtMaximumLength() {
+		Seed seed = seedBase();
+		Submission submission = submissionRepository.create(seed.assignmentId(), seed.studentId(), 1);
+		SubmissionModule submissionModule = submissionModuleRepository
+				.bulkCreate(submission.getId(), List.of(seed.module2Id())).getFirst();
+		String mimeType = "x".repeat(127) + "/" + "x".repeat(127);
+		assertThat(mimeType).hasSize(255);
+
+		Answer answer = new Answer(
+				submissionModule.getId(), null, null,
+				null, null, null, null, null,
+				null, mimeType, null, UploadStatus.READY);
+		entityManager.persist(answer);
+		entityManager.flush();
+		Long answerId = answer.getId();
+		entityManager.clear();
+
+		Answer loaded = entityManager.find(Answer.class, answerId);
+		assertThat(loaded).isNotNull();
+		assertThat(loaded.getDocMimeType()).isEqualTo(mimeType);
 	}
 
 	@Test
