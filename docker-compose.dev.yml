@@ -43,6 +43,7 @@ services:
       STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-englishhub-dev}
       STORAGE_S3_PATH_STYLE: ${STORAGE_S3_PATH_STYLE:-true}
       AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
       # ===== Outbound Email (EmailJS REST) - khớp với application.properties =====
       # Gửi OTP/mã đặt lại mật khẩu qua email. Cần EMAILJS_* bên dưới, nếu không
       # /auth/forgot-password sẽ trả lỗi (502 khi gửi thất bại).
@@ -86,8 +87,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       MOCK_MODE: ${AI_SERVICE_MOCK_MODE:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
-    ports:
-      - "${AI_SERVICE_PORT:-8001}:8001"
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
     networks:
       - englishhub_dev_network
 

@@ -4,6 +4,7 @@ except ImportError:
     pytest = None
 import os
 os.environ["MOCK_MODE"] = "true"
+os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
 import base64
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
@@ -12,7 +13,8 @@ from app.main import app
 from app.services.audio_processor import AudioProcessor
 
 settings.MOCK_MODE = True
-client = TestClient(app)
+INTERNAL_SECRET_HEADERS = {"X-Internal-Secret": os.environ.get("INTERNAL_SECRET", "test-internal-secret")}
+client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
 
 
 def test_health_check():
