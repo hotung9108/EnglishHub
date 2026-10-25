@@ -16,13 +16,20 @@ import com.english_hub.core.modules.user.domain.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -31,11 +38,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminUserServiceTest {
+
+	private static final String ADMIN_FULL_NAME = "Hoàng Thanh Ngân";
+	private static final String ADMIN_EMAIL = "hoang.thanh.ngan@utc-polyglot.edu.vn";
+	private static final long CREATED_ADMIN_ID = 43L;
 
 	@Mock
 	private UserRepository userRepository;
@@ -133,14 +145,63 @@ class AdminUserServiceTest {
 		assertThat(captor.getValue().studentCode()).isNull();
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = {"ADMIN", " admin "})
+	void adminCanCreateAnAdminAccountWithNormalizedRole(String role) {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.existsByEmail(ADMIN_EMAIL)).thenReturn(false);
+		when(userRepository.save(any(User.class)))
+				.thenAnswer(invocation -> withId(invocation.getArgument(0), CREATED_ADMIN_ID));
+		String password = newTestPassword();
+		CreateUserCommand request = createCommand(ADMIN_FULL_NAME, ADMIN_EMAIL, password, role);
+
+		AdminUserService.CreatedUserData created = adminUserService.createUser(request);
+
+		assertThat(created.id()).isEqualTo(CREATED_ADMIN_ID);
+		assertThat(created.email()).isEqualTo(ADMIN_EMAIL);
+		assertThat(created.role()).isEqualTo(UserRole.ADMIN.name());
+		ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+		verify(userRepository, times(1)).save(captor.capture());
+		User savedUser = captor.getValue();
+		assertThat(savedUser.role()).isEqualTo(UserRole.ADMIN);
+		assertThat(savedUser.status()).isEqualTo(UserStatus.ACTIVE);
+		assertThat(savedUser.passwordHash()).isNotEqualTo(password);
+		assertThat(passwordEncoder.matches(password, savedUser.passwordHash())).isTrue();
+	}
+
 	@Test
-	void refusesToCreateAnAdminAccountThroughTheAdminUserApi() {
+	void refusesDuplicateEmailWhenCreatingAnAdminAccount() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.existsByEmail(ADMIN_EMAIL)).thenReturn(true);
+		CreateUserCommand request = createCommand(ADMIN_FULL_NAME, ADMIN_EMAIL, newTestPassword(), "ADMIN");
+
+		assertThatThrownBy(() -> adminUserService.createUser(request))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(exception.getMessage()).isEqualTo("Email đã được sử dụng.");
+				});
+		verify(userRepository, never()).save(any(User.class));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidAdminRequests")
+	void refusesInvalidDataWhenCreatingAnAdminAccount(String description, CreateUserCommand request) {
 		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
 
-		assertThatThrownBy(() -> adminUserService.createUser(new CreateUserCommand(
-				"Other Admin", "admin2@example.com", "Admin005", "ADMIN", null, null, null, null)))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Vui lòng nhập đầy đủ và đúng định dạng thông tin.");
+		assertThatThrownBy(() -> adminUserService.createUser(request))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(userRepository, never()).save(any(User.class));
+	}
+
+	@Test
+	void refusesUnknownRoleWhenCreatingAnAccount() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		CreateUserCommand request = createCommand(ADMIN_FULL_NAME, ADMIN_EMAIL, newTestPassword(), "PARENT");
+
+		assertThatThrownBy(() -> adminUserService.createUser(request))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 		verify(userRepository, never()).save(any(User.class));
 	}
 
@@ -303,6 +364,35 @@ class AdminUserServiceTest {
 		assertThatThrownBy(() -> adminUserService.listUsers("", "", 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	private static Stream<Arguments> invalidAdminRequests() {
+		String password = newTestPassword();
+		return Stream.of(
+				Arguments.of("missing full name", createCommand(null, ADMIN_EMAIL, password, "ADMIN")),
+				Arguments.of("missing email", createCommand(ADMIN_FULL_NAME, null, password, "ADMIN")),
+				Arguments.of("missing password", createCommand(ADMIN_FULL_NAME, ADMIN_EMAIL, null, "ADMIN")),
+				Arguments.of("missing role", createCommand(ADMIN_FULL_NAME, ADMIN_EMAIL, password, null)),
+				Arguments.of("invalid email", createCommand(
+						ADMIN_FULL_NAME, ADMIN_EMAIL.replace("@", "_"), password, "ADMIN")),
+				Arguments.of("password too short", createCommand(
+						ADMIN_FULL_NAME, ADMIN_EMAIL, password.substring(0, 5), "ADMIN")),
+				Arguments.of("password without uppercase", createCommand(
+						ADMIN_FULL_NAME, ADMIN_EMAIL, password.toLowerCase(java.util.Locale.ROOT), "ADMIN")),
+				Arguments.of("password without digit", createCommand(
+						ADMIN_FULL_NAME, ADMIN_EMAIL, password.replaceAll("\\d", ""), "ADMIN")),
+				Arguments.of("full name with digit", createCommand(
+						ADMIN_FULL_NAME + " 1", ADMIN_EMAIL, password, "ADMIN")),
+				Arguments.of("full name with invalid character", createCommand(
+						ADMIN_FULL_NAME + "@", ADMIN_EMAIL, password, "ADMIN")));
+	}
+
+	private static CreateUserCommand createCommand(String fullName, String email, String password, String role) {
+		return new CreateUserCommand(fullName, email, password, role, null, null, null, null);
+	}
+
+	private static String newTestPassword() {
+		return "Test1!" + UUID.randomUUID();
 	}
 
 	private User user(long id, UserRole role) {

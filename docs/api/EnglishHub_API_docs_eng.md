@@ -122,11 +122,22 @@ Retrieve a paginated list of all users with optional search and filtering.
 ---
 
 ### POST `/api/v1/admin/users`
-Create a new user.
+Create a new user with role `ADMIN`, `TEACHER`, or `STUDENT`.
+
+**Authorization:** The caller must be an active `ADMIN` with a valid Bearer token.
 
 **Request Body:** `CreateUserRequest`
 
-**Response:** `CreatedUserResponse`
+**Response:** `201 Created` — `CreatedUserResponse` with the created user's ID, email, and role.
+
+| Status | Description |
+|--------|-------------|
+| 400 | Malformed request, missing required fields, or invalid full name, email, password, or role |
+| 409 | Email is already in use |
+| 401 | Missing or invalid authentication, or the caller is no longer active |
+| 403 | The authenticated caller does not have ADMIN permissions |
+
+Read back the created user using `GET /api/v1/admin/users?q=<email>`; the returned user has the same role that was stored, including `ADMIN`.
 
 ---
 
