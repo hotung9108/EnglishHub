@@ -47,6 +47,7 @@ services:
       # external "englishhub_shared" -> gọi qua http://ai-service:8001
       # Nếu AI service chạy ở máy khác: AI_SERVICE_BASE_URL=http://<host-ai>:8001
       AI_SERVICE_BASE_URL: ${AI_SERVICE_BASE_URL:-http://ai-service:8001}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-}
       AI_SERVICE_CONNECT_TIMEOUT_SECONDS: ${AI_SERVICE_CONNECT_TIMEOUT_SECONDS:-5}
       AI_SERVICE_READ_TIMEOUT_SECONDS: ${AI_SERVICE_READ_TIMEOUT_SECONDS:-60}
       # Override model/provider gửi sang AI service (để trống = dùng mặc định của AI service)
