@@ -93,22 +93,34 @@ class TextAnalyzer:
         if not target_phrase or not full_text:
             return (0, 0)
 
+        cleaned_phrase = target_phrase.strip()
+        if not cleaned_phrase:
+            return (0, 0)
+
         # Tìm kiếm chính xác quanh estimated_start nếu hợp lệ
-        if estimated_start is not None and estimated_start >= 0 and estimated_start < len(full_text):
-            found_idx = full_text.find(target_phrase, max(0, estimated_start - 30))
+        if estimated_start is not None and 0 <= estimated_start < len(full_text):
+            found_idx = full_text.find(cleaned_phrase, max(0, estimated_start - 30))
             if found_idx != -1 and abs(found_idx - estimated_start) <= 50:
-                return (found_idx, found_idx + len(target_phrase))
+                return (found_idx, found_idx + len(cleaned_phrase))
 
         # Tìm kiếm từ đầu văn bản
-        idx = full_text.find(target_phrase)
+        idx = full_text.find(cleaned_phrase)
         if idx != -1:
-            return (idx, idx + len(target_phrase))
+            return (idx, idx + len(cleaned_phrase))
 
         # Thử tìm kiếm không phân biệt hoa thường
         lower_full = full_text.lower()
-        idx_lower = lower_full.find(target_phrase.lower())
+        idx_lower = lower_full.find(cleaned_phrase.lower())
         if idx_lower != -1:
-            return (idx_lower, idx_lower + len(target_phrase))
+            return (idx_lower, idx_lower + len(cleaned_phrase))
+
+        # Thử tìm kiếm linh hoạt khoảng trắng / xuống dòng
+        tokens = [re.escape(t) for t in cleaned_phrase.split() if t]
+        if tokens:
+            ws_pattern = r"\s+".join(tokens)
+            match = re.search(ws_pattern, full_text, flags=re.IGNORECASE)
+            if match and match.end() > match.start():
+                return (match.start(), match.end())
 
         return (0, 0)
 
@@ -146,4 +158,3 @@ class TextAnalyzer:
             return file_bytes.decode("utf-8").strip()
         except Exception:
             raise ValueError(f"Định dạng tệp '.{ext}' không được hỗ trợ. Vui lòng tải lên file .txt, .docx, .pdf hoặc .md.")
-

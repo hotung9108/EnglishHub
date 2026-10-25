@@ -5,6 +5,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
+import {
+  getNextIncompleteModule,
+  getStudentAssignmentActionRoute,
+  isModuleSubmittedOrGraded,
+} from '../utils/examStepper.utils';
 import { 
   PenTool, 
   Mic, 
@@ -22,7 +27,6 @@ import {
   X
 } from 'lucide-react';
 import { Button, MetricCard, EmptyState, Skeleton, Pagination } from '../components/common';
-import { getStudentAssignmentActionRoute } from '../utils/examStepper.utils';
 import '../styles/student-ecosystem.css';
 
 type AssignmentDisplayStatus = 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
@@ -33,6 +37,7 @@ interface StudentAssignmentDisplay {
   className: string;
   title: string;
   type: string; // e.g. 'Writing', 'Speaking', 'Reading', 'Listening'
+  activeSkill?: string | null;
   status: AssignmentDisplayStatus;
   submissionId?: number;
   submittedOn?: string;
@@ -162,6 +167,22 @@ const StudentAssignments: React.FC = () => {
                   else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
                 }
 
+                // Determine active incomplete module skill when attempt is in_progress
+                let activeSkill: string | null = null;
+                if (displayStatus === 'in_progress') {
+                  if (detail?.modules && detail.modules.length > 0) {
+                    const nextMod = getNextIncompleteModule(detail.modules, matchedSub?.modules);
+                    activeSkill = nextMod?.skill ?? null;
+                  } else if (matchedSub?.modules && matchedSub.modules.length > 0) {
+                    const nextSubMod = matchedSub.modules.find(
+                      (sm) => !isModuleSubmittedOrGraded(sm)
+                    );
+                    activeSkill = nextSubMod?.skill ?? null;
+                  } else if (skillType !== 'General Task') {
+                    activeSkill = skillType;
+                  }
+                }
+
                 // Calculate days left
                 let daysLeft = 3;
                 if (a.closeAt) {
@@ -175,6 +196,7 @@ const StudentAssignments: React.FC = () => {
                   className: cls.name,
                   title: a.title,
                   type: skillType,
+                  activeSkill,
                   status: displayStatus,
                   submissionId: matchedSub?.id,
                   submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
@@ -453,7 +475,15 @@ const StudentAssignments: React.FC = () => {
           paginatedAssignments.map((assignment) => {
             const badge = getTypeBadge(assignment.type);
             const handleAction = () => {
-              navigate(getStudentAssignmentActionRoute(assignment));
+navigate(
+                getStudentAssignmentActionRoute({
+                  id: assignment.id,
+                  status: assignment.status,
+                  submissionId: assignment.submissionId,
+                  activeSkill: assignment.activeSkill,
+                  type: assignment.type,
+                })
+              );
             };
 
             return (

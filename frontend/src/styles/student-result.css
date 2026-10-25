@@ -709,6 +709,26 @@
   outline: none;
 }
 
+.result-audio-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm, 8px);
+  padding: 10px 14px;
+  background-color: var(--color-danger-light, #fbebeb);
+  border: 1px solid var(--color-danger, #8f2222);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.result-audio-error-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-danger, #8f2222);
+  font-weight: 500;
+}
+
 .result-audio-empty {
   padding: 16px;
   background-color: var(--surface-container-low, #f4efe6);
@@ -1307,6 +1327,33 @@
   font-weight: 700;
   margin-bottom: 4px;
   color: var(--on-surface);
+}
+
+.result-speaking-ann-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--unit);
+  margin-bottom: var(--unit);
+}
+
+.result-speaking-ann-header .result-ann-header-title {
+  margin-bottom: 0;
+}
+
+.result-ann-type-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--primary-container);
+  color: var(--primary);
+  border: 1px solid var(--primary-fixed-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 .result-ann-item-row {

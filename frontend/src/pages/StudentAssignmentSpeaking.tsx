@@ -15,14 +15,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail } from '../api/services/submission.service';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  getSkillLabel
+  getSkillLabel,
+  getExamPageRedirectRoute,
+  resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import '../styles/student-speaking.css';
 
@@ -111,7 +113,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (isMounted) setSubmission(sub);
+            if (!isMounted) return;
+            const redirectRoute = getExamPageRedirectRoute(
+              sub,
+              'SPEAKING',
+              numericId,
+              currentAssignment?.modules
+            );
+            if (redirectRoute) {
+              navigate(redirectRoute, { replace: true });
+              return;
+            }
+            setSubmission(sub);
           } catch (subErr: unknown) {
             if (isMounted) {
               const apiErr = parseApiError(subErr);
@@ -123,20 +136,56 @@ const StudentAssignmentSpeaking: React.FC = () => {
             const subList = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1
+              limit: 10
             });
-            if (subList.data && subList.data.length > 0) {
-              const sub = await submissionService.getSubmission(subList.data[0].id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status === 'PUBLISHED') {
-              const startRes = await submissionService.startAttempt(numericId);
-              const sub = await submissionService.getSubmission(startRes.id);
-              if (isMounted) setSubmission(sub);
-            } else if (currentAssignment?.status) {
-              if (isMounted) {
-                const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
-                setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+            const subs = subList.data || [];
+            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+
+            if (inProgressItem) {
+              const sub = await submissionService.getSubmission(inProgressItem.id);
+              if (!isMounted) return;
+              const redirectRoute = getExamPageRedirectRoute(
+                sub,
+                'SPEAKING',
+                numericId,
+                currentAssignment?.modules
+              );
+              if (redirectRoute) {
+                navigate(redirectRoute, { replace: true });
+                return;
+              }
+              setSubmission(sub);
+            } else {
+              const completedItem = subs.find(
+                (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
+              );
+              if (completedItem) {
+                if (isMounted) {
+                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
+                }
+                return;
+              }
+
+              if (currentAssignment?.status === 'PUBLISHED') {
+                const startRes = await submissionService.startAttempt(numericId);
+                const sub = await submissionService.getSubmission(startRes.id);
+                if (!isMounted) return;
+                const redirectRoute = getExamPageRedirectRoute(
+                  sub,
+                  'SPEAKING',
+                  numericId,
+                  currentAssignment?.modules
+                );
+                if (redirectRoute) {
+                  navigate(redirectRoute, { replace: true });
+                  return;
+                }
+                setSubmission(sub);
+              } else if (currentAssignment?.status) {
+                if (isMounted) {
+                  const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
+                  setError(`Bài tập này hiện không mở để làm bài (Trạng thái: ${statusLabel}). Vui lòng liên hệ giáo viên để công bố bài tập.`);
+                }
               }
             }
           } catch (subErr: unknown) {
@@ -162,7 +211,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
   // Handle Play/Pause for recorded audio
   const togglePlay = () => {
@@ -221,6 +270,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setTimeout(() => setIsNotesSaved(false), 3000);
   };
 
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
   // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
     if (assignment?.status === 'CLOSED') {
@@ -245,12 +299,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setError(null);
 
     try {
-      const subId = submission?.id;
-      const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
-      const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
+      const subId = submission.id;
+      const speakingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const subModuleId = speakingSubMod?.id || submission.modules?.[0]?.id;
 
       if (!subModuleId) {
         throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
+      }
+
+      if (speakingSubMod && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED')) {
+        navigate(`/student/submissions/${subId}`, { replace: true });
+        return;
       }
 
       // Step 1: Request presigned PUT URL from backend
@@ -268,8 +327,13 @@ const StudentAssignmentSpeaking: React.FC = () => {
         audioStorageKey: storageKey,
       });
 
+      const currentSubModules = (submission.modules || []).map((m) =>
+        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+      );
+      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
+
       // Step 4: Check if other modules in submission are already completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
@@ -284,33 +348,31 @@ const StudentAssignmentSpeaking: React.FC = () => {
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
-            navigate(`/student/submissions/${subId}`);
+            navigate(`/student/submissions/${subId}`, { replace: true });
           } else {
-            navigate(`/student/assignments/${id}/result`);
+            navigate(`/student/assignments/${id}/result`, { replace: true });
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission?.modules || []).map((m) =>
-          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
-        );
-        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
           setSuccessMessage(`Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
           setTimeout(() => {
-            navigate(nextRoute);
-          }, 1500);
+            navigate(nextRoute, { replace: true });
+          }, 1200);
         } else {
           setSuccessMessage('Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...');
           setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`);
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
-      setError(msg);
+      const apiErr = parseApiError(err);
+      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -358,17 +420,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
         <span className="speaking-breadcrumb-current">
           {assignment?.title || `Speaking Practice #${id}`}
         </span>
-        {assignment?.modules && assignment.modules.length > 1 && (
+        {effectiveModules.length > 1 && (
           <div className="speaking-stepper-wrapper">
             <ExamStepper
               variant="compact"
-              modules={assignment.modules}
+              modules={effectiveModules}
               submissionModules={submission?.modules}
               currentSkill="SPEAKING"
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (step.isCompleted || step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}
@@ -574,7 +636,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <button 
                 className="btn-submit-speaking"
                 onClick={handleSubmitAssignment}
-                disabled={isSubmitting || !recordedAudioReady}
+                disabled={isSubmitting || !recordedAudioReady || !submission}
                 type="button"
               >
                 {isSubmitting ? (
