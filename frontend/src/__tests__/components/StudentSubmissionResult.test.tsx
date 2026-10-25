@@ -8,7 +8,7 @@ import {
   type SubmissionDetail,
   type SubmissionModuleDetailResponse,
 } from '../../api/services/submission.service';
-import { gradingService, type AiGradingSuggestionResponse } from '../../api/services/grading.service';
+import { gradingService, type AiGradingAnnotation, type AiGradingSuggestionResponse } from '../../api/services/grading.service';
 import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 
@@ -59,10 +59,12 @@ const mockSubmission: SubmissionDetail = {
       status: 'GRADED',
       grading: {
         id: 80,
-        submissionModuleId: 50,
-        method: 'AI',
-        status: 'FINAL',
+        method: 'AUTO',
+        status: 'COMPLETED',
         finalScore: 8.0,
+        maxScoreSnapshot: 10,
+        aiFeedback: null,
+        finalFeedback: null,
       },
     },
   ],
@@ -78,10 +80,12 @@ const mockModuleDetail: SubmissionModuleDetailResponse = {
   status: 'GRADED',
   grading: {
     id: 80,
-    submissionModuleId: 50,
-    method: 'AI',
-    status: 'FINAL',
+    method: 'AUTO',
+    status: 'COMPLETED',
     finalScore: 8.0,
+    maxScoreSnapshot: 10,
+    aiFeedback: null,
+    finalFeedback: null,
   },
   questions: [],
   answers: [
@@ -100,7 +104,6 @@ const mockModuleDetail: SubmissionModuleDetailResponse = {
 const mockAnnotations: GradingAnnotation[] = [
   {
     id: 101,
-    answerId: 60,
     source: 'AI',
     startOffset: 0,
     endOffset: 10,
@@ -111,7 +114,6 @@ const mockAnnotations: GradingAnnotation[] = [
   },
   {
     id: 102,
-    answerId: 60,
     source: 'TEACHER',
     startOffset: 20,
     endOffset: 29,
@@ -122,7 +124,6 @@ const mockAnnotations: GradingAnnotation[] = [
   },
   {
     id: 103,
-    answerId: 60,
     source: 'AI',
     startOffset: 9999,
     endOffset: 10050,
@@ -132,6 +133,11 @@ const mockAnnotations: GradingAnnotation[] = [
     reviewStatus: 'ACCEPTED',
   },
 ];
+
+const mockAiAnnotations: AiGradingAnnotation[] = mockAnnotations.map((ann) => ({
+  ...ann,
+  answerId: 60,
+}));
 
 const mockAiSuggestion: AiGradingSuggestionResponse = {
   submissionModuleId: 50,
@@ -143,7 +149,7 @@ const mockAiSuggestion: AiGradingSuggestionResponse = {
   aiFeedback: 'Well structured essay with appropriate academic tone.',
   criteriaScores: null,
   metrics: null,
-  annotations: mockAnnotations,
+  annotations: mockAiAnnotations,
   transcript: null,
   modelUsed: 'gemini-1.5-flash',
   providerUsed: 'GOOGLE',
@@ -171,10 +177,17 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     vi.mocked(gradingService.getById).mockResolvedValue({
       id: 80,
       submissionModuleId: 50,
-      method: 'AI',
-      status: 'FINAL',
+      method: 'AUTO',
+      status: 'COMPLETED',
       finalScore: 8.0,
       finalFeedback: 'Well structured essay.',
+      aiFeedback: null,
+      aiTranscript: null,
+      maxScoreSnapshot: 10,
+      reviewedBy: null,
+      reviewedAt: null,
+      gradedAt: null,
+      aiInstructionSnapshot: null,
     });
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({
       data: mockAnnotations,
