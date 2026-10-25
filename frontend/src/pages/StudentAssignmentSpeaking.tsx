@@ -26,6 +26,7 @@ import {
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-speaking.css';
 
 const StudentAssignmentSpeaking: React.FC = () => {
@@ -61,9 +62,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
 
-  // Personal Notes
-  const [personalNotes, setPersonalNotes] = useState('');
-  const [isNotesSaved, setIsNotesSaved] = useState(false);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -265,10 +263,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
     resetRecording();
   };
 
-  const handleSaveNotes = () => {
-    setIsNotesSaved(true);
-    setTimeout(() => setIsNotesSaved(false), 3000);
-  };
 
   const effectiveModules = useMemo(
     () => resolveEffectiveModules(assignment?.modules, submission?.modules),
@@ -345,6 +339,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
       }
 
       if (allOthersDone) {
+        notifyAssignmentSubmitted();
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
@@ -565,37 +560,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   ) : (
                     <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
                   )}
-                </div>
-              </div>
-
-              {/* Personal Notes Box */}
-              <div className="speaking-notes-section">
-                <div className="speaking-notes-header">
-                  <label htmlFor="speaking-prep-notes" className="speaking-notes-label">
-                    Ghi chú chuẩn bị
-                  </label>
-                  {isNotesSaved && (
-                    <span className="speaking-notes-saved-msg">
-                      Đã lưu ghi chú thành công!
-                    </span>
-                  )}
-                </div>
-                <textarea 
-                  id="speaking-prep-notes"
-                  className="speaking-notes-textarea"
-                  placeholder="Nhập dàn ý chuẩn bị..."
-                  value={personalNotes}
-                  onChange={(e) => setPersonalNotes(e.target.value)}
-                  rows={4}
-                />
-                <div className="speaking-notes-action">
-                  <Button 
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleSaveNotes}
-                  >
-                    Lưu ghi chú
-                  </Button>
                 </div>
               </div>
             </div>

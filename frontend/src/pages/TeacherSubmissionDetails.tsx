@@ -28,6 +28,7 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { classService, type ClassMember } from '../api/services/class.service';
 import { resolveAudioUrl } from '../utils/audioUrl.utils';
+import { extractTranscriptText, extractAnnotationSnippet } from '../utils/annotationSnippet.utils';
 
 const resolveStorageUrl = resolveAudioUrl;
 
@@ -95,7 +96,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // Form State
   const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
-  const [teacherNote, setTeacherNote] = useState<string>('');
+
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -160,14 +161,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
     try {
       const gradingRes = await gradingService.getBySubmissionModuleId(targetModuleId);
       setGradingSummary(gradingRes);
-      if (gradingRes.finalScore !== null && gradingRes.finalScore !== undefined) {
+      if (gradingRes.finalScore != null) {
         setFinalScoreInput(String(gradingRes.finalScore));
       }
       if (gradingRes.id) {
         try {
           const detail = await gradingService.getById(gradingRes.id);
           setGradingDetail(detail);
-          if (detail.finalScore !== null && detail.finalScore !== undefined) {
+          if (detail.finalScore != null) {
             setFinalScoreInput(String(detail.finalScore));
           }
           if (detail.finalFeedback) {
@@ -191,7 +192,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (aiRes.aiFeedback) {
         setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
       }
-      if (aiRes.suggestedScore !== null && aiRes.suggestedScore !== undefined) {
+      if (aiRes.suggestedScore != null) {
         setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
       }
     } catch {
@@ -514,8 +515,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
     try {
       await gradingService.submitGrade(gradingId, {
         finalScore: scoreNum,
-        finalFeedback: feedbackText,
-        note: teacherNote
+        finalFeedback: feedbackText
+
       });
 
       showToast(isVi
@@ -675,33 +676,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [annotations]);
 
   const transcriptText = useMemo(() => {
-    const rawTranscript =
-      aiSuggestion?.transcript ??
-      (gradingDetail?.aiTranscript &&
-      typeof gradingDetail.aiTranscript === 'object' &&
-      'transcript' in (gradingDetail.aiTranscript as Record<string, unknown>)
-        ? (gradingDetail.aiTranscript as Record<string, unknown>).transcript
-        : gradingDetail?.aiTranscript);
-
-    if (!rawTranscript) return null;
-    if (typeof rawTranscript === 'string') return rawTranscript;
-    if (Array.isArray(rawTranscript)) {
-      return rawTranscript
-        .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
-        .join(' ');
-    }
-    return null;
+    const rawTranscript = aiSuggestion?.transcript ?? gradingDetail?.aiTranscript;
+    const text = extractTranscriptText(rawTranscript);
+    return text.length > 0 ? text : null;
   }, [aiSuggestion, gradingDetail]);
 
   const extractSnippet = (start?: number, end?: number): string | null => {
-    if (start === undefined || end === undefined || start < 0 || end <= start) return null;
     const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
     if (!baseText) return null;
-    if (start < baseText.length) {
-      const slice = baseText.slice(start, Math.min(end, baseText.length)).trim();
-      return slice.length > 0 ? slice : null;
-    }
-    return null;
+    const res = extractAnnotationSnippet(baseText, start, end, '');
+    return res.length > 0 ? res : null;
   };
 
   const renderAnnotationsSection = () => {
@@ -1162,9 +1146,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
         <div className="tsd-metrics-grid">
           <MetricCard
             title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
-            value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined
+            value={gradingDetail?.finalScore != null
               ? String(gradingDetail.finalScore)
-              : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined
+              : (aiSuggestion?.suggestedScore != null
                   ? String(aiSuggestion.suggestedScore)
                   : '--')}
             suffix="/ 10"
@@ -1252,12 +1236,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <span className="tsd-speaking-panel-title">
                   {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
                 </span>
-                {(gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined) ||
-                 (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined) ? (
+                {(gradingDetail?.finalScore != null) ||
+                 (aiSuggestion?.suggestedScore != null) ? (
                   <span className="tsd-speaking-ai-score">
                     {isVi ? 'Điểm đề xuất: ' : 'Suggested: '}
                     <strong>
-                      {gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined
+                      {gradingDetail?.finalScore != null
                         ? String(gradingDetail.finalScore)
                         : String(aiSuggestion?.suggestedScore)}
                     </strong> / 10
@@ -1468,18 +1452,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 onChange={(e) => setFeedbackText(e.target.value)}
               />
 
-              <div className="tsd-internal-note-wrap">
-                <label className="tsd-note-label">
-                  {isVi ? 'Ghi chú nội bộ' : 'Private Notes'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
-                  value={teacherNote}
-                  onChange={(e) => setTeacherNote(e.target.value)}
-                  className="tsd-internal-note-input"
-                />
-              </div>
             </div>
           </div>
         </div>

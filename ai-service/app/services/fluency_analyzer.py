@@ -102,12 +102,15 @@ class FluencyAnalyzer:
         full_transcript: str,
         word_offsets: List[Dict[str, Any]],
         target_text: str,
+        context: Optional[str] = None,
+        comment: Optional[str] = None,
         used_ranges: Optional[List[Tuple[int, int]]] = None
     ) -> Tuple[int, int]:
         """
         Aligns a target word or multi-word phrase with exact character offsets
-        in `full_transcript`, ignoring attached punctuation (e.g. 'mischievous,', 'life,')
-        and avoiding duplicate overlaps when `used_ranges` is provided.
+        in `full_transcript`, prioritizing sentence context (from LLM or comment)
+        to disambiguate duplicate words (e.g. repeated 'is', 'have', 'the'),
+        ignoring attached punctuation and avoiding duplicate overlaps in `used_ranges`.
         """
         if not target_text or not full_transcript:
             return (0, 0)
@@ -133,6 +136,54 @@ class FluencyAnalyzer:
                     return True
             return False
 
+        # =========================================================================
+        # TẦNG 1 & 2: CONTEXT-BASED MATCHING (Ưu tiên ngữ cảnh câu để chống trùng lặp)
+        # =========================================================================
+        candidate_contexts: List[str] = []
+        if context and context.strip():
+            candidate_contexts.append(context.strip())
+
+        # Fallback: Trích xuất cụm mỏ neo từ dấu ngoặc kép hoặc ngoặc đơn trong comment
+        if comment and ("'" in comment or '"' in comment or '“' in comment):
+            matches = re.findall(r"['\"“]([^'\"”\n]{3,100})['\"”]", comment)
+            for m in matches:
+                clean_m = m.strip().strip(_EDGE_PUNCTUATION)
+                if cleaned_target.lower() in clean_m.lower() and clean_m not in candidate_contexts:
+                    candidate_contexts.append(clean_m)
+
+        pattern = r"\b" + r"[\s,.;:!?\"'“”‘’()\-]+".join(re.escape(t) for t in target_tokens) + r"\b"
+
+        for ctx in candidate_contexts:
+            ctx_clean = ctx.strip().strip(_EDGE_PUNCTUATION)
+            if not ctx_clean:
+                continue
+            # Regex match context allowing flexible whitespace & punctuation
+            ctx_escaped = re.escape(ctx_clean)
+            ctx_regex = re.sub(r"\\\s+", r"[\\s,.;:!?\"'“”‘’()\\-]+", ctx_escaped)
+            try:
+                for m_ctx in re.finditer(ctx_regex, full_transcript, flags=re.IGNORECASE):
+                    ctx_start, ctx_end = m_ctx.start(), m_ctx.end()
+                    ctx_sub = full_transcript[ctx_start:ctx_end]
+                    # Find target token within this isolated context substring
+                    for m_word in re.finditer(pattern, ctx_sub, flags=re.IGNORECASE):
+                        cand_start = ctx_start + m_word.start()
+                        cand_end = ctx_start + m_word.end()
+                        if cand_end > cand_start and not is_overlapping(cand_start, cand_end):
+                            return (cand_start, cand_end)
+            except re.error:
+                # If regex fails on special symbols, fall back to simple substring search
+                idx_c = full_transcript.lower().find(ctx_clean.lower())
+                if idx_c >= 0:
+                    ctx_sub = full_transcript[idx_c: idx_c + len(ctx_clean)]
+                    for m_word in re.finditer(pattern, ctx_sub, flags=re.IGNORECASE):
+                        cand_start = idx_c + m_word.start()
+                        cand_end = idx_c + m_word.end()
+                        if cand_end > cand_start and not is_overlapping(cand_start, cand_end):
+                            return (cand_start, cand_end)
+
+        # =========================================================================
+        # TẦNG 3: SO KHỚP TỪ ĐƠN LẺ TRONG WORD_OFFSETS (Duyệt tuần tự, tránh trùng)
+        # =========================================================================
         wo_cleaned = [
             cls._strip_edge_punctuation(str(wo.get("word", "")))
             for wo in word_offsets
@@ -140,7 +191,6 @@ class FluencyAnalyzer:
 
         first_fallback: Optional[Tuple[int, int]] = None
 
-        # 1. Single-word match against word_offsets
         if len(target_tokens) == 1:
             target_word = target_tokens[0]
             for idx, wo in enumerate(word_offsets):
@@ -159,7 +209,9 @@ class FluencyAnalyzer:
             if first_fallback is not None:
                 return first_fallback
 
-        # 2. Multi-word phrase match across consecutive word_offsets
+        # =========================================================================
+        # TẦNG 4: SO KHỚP CỤM NHIỀU TỪ QUA CÁC WORD_OFFSETS LIÊN TIẾP
+        # =========================================================================
         if len(target_tokens) > 1 and len(word_offsets) >= len(target_tokens):
             k = len(target_tokens)
             for i in range(len(word_offsets) - k + 1):
@@ -181,8 +233,9 @@ class FluencyAnalyzer:
             if first_fallback is not None:
                 return first_fallback
 
-        # 3. Regex word-boundary search on full_transcript
-        pattern = r"\b" + r"[\s,.;:!?\"'“”‘’()\-]+".join(re.escape(t) for t in target_tokens) + r"\b"
+        # =========================================================================
+        # TẦNG 5: REGEX WORD-BOUNDARY SEARCH TRÊN TOÀN BỘ TRANSCRIPT
+        # =========================================================================
         for match in re.finditer(pattern, full_transcript, flags=re.IGNORECASE):
             cand_start, cand_end = match.start(), match.end()
             if cand_end > cand_start:
@@ -194,9 +247,14 @@ class FluencyAnalyzer:
         if first_fallback is not None:
             return first_fallback
 
-        # 4. Case-insensitive direct substring search fallback
+        # =========================================================================
+        # TẦNG 6: SUBSTRING FALLBACK CUỐI CÙNG
+        # =========================================================================
         idx = full_transcript.lower().find(cleaned_target.lower())
         if idx >= 0:
-            return (idx, idx + len(cleaned_target))
+            cand_start = idx
+            cand_end = idx + len(cleaned_target)
+            if not is_overlapping(cand_start, cand_end) or first_fallback is None:
+                return (cand_start, cand_end)
 
         return (0, 0)

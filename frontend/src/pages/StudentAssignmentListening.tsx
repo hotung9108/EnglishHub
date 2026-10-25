@@ -22,6 +22,7 @@ import {
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-exam.css';
 
 const StudentAssignmentListening: React.FC = () => {
@@ -322,6 +323,7 @@ const StudentAssignmentListening: React.FC = () => {
       }
 
       if (allOthersDone) {
+        notifyAssignmentSubmitted();
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {

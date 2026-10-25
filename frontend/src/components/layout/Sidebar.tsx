@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
+import { useStudentAssignmentBadge } from '../../hooks';
 
 export interface MenuItem {
   path: string;
@@ -50,6 +51,10 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
   
   // Default to admin if no user is found for some reason
   const role = user?.role || 'admin';
+  const { badge: studentAssignmentBadge } = useStudentAssignmentBadge(
+    role === 'student' ? user?.id : undefined,
+    role
+  );
 
   const roleLabels: Record<string, { vi: string; en: string }> = {
     admin: { vi: 'Quản trị viên', en: 'Admin' },
@@ -118,7 +123,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         title: t('sectionLearning'),
         items: [
           { path: '/student/classes', label: t('menuMyClasses'), icon: BookOpen },
-          { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList, badge: '7' },
+          { path: '/student/assignments', label: t('menuStudentAssignments'), icon: ClipboardList, badge: studentAssignmentBadge },
         ]
       },
       {

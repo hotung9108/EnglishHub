@@ -310,57 +310,6 @@
   font-weight: 600;
 }
 
-/* Personal Notes Section */
-.speaking-notes-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--outline-variant);
-}
-
-.speaking-notes-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.speaking-notes-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--on-surface);
-}
-
-.speaking-notes-saved-msg {
-  font-size: 12px;
-  color: var(--secondary, #17523f);
-  font-weight: 600;
-}
-
-.speaking-notes-textarea {
-  width: 100%;
-  font-size: 13px;
-  color: var(--on-surface);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius-md, 8px);
-  padding: 12px 14px;
-  font-family: inherit;
-  resize: vertical;
-  background-color: var(--surface);
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  line-height: 1.5;
-}
-
-.speaking-notes-textarea:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-container);
-}
-
-.speaking-notes-action {
-  align-self: flex-start;
-}
 
 /* Card 3: Submission Box */
 .submission-file-box {
