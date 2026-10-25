@@ -23,7 +23,8 @@ import {
   getSkillRoute,
   getNextIncompleteModule,
   getSkillLabel,
-  getExamPageRedirectRoute
+  getExamPageRedirectRoute,
+  resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import '../styles/student-speaking.css';
 
@@ -168,7 +169,18 @@ const StudentAssignmentSpeaking: React.FC = () => {
               if (currentAssignment?.status === 'PUBLISHED') {
                 const startRes = await submissionService.startAttempt(numericId);
                 const sub = await submissionService.getSubmission(startRes.id);
-                if (isMounted) setSubmission(sub);
+                if (!isMounted) return;
+                const redirectRoute = getExamPageRedirectRoute(
+                  sub,
+                  'SPEAKING',
+                  numericId,
+                  currentAssignment?.modules
+                );
+                if (redirectRoute) {
+                  navigate(redirectRoute, { replace: true });
+                  return;
+                }
+                setSubmission(sub);
               } else if (currentAssignment?.status) {
                 if (isMounted) {
                   const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
@@ -258,6 +270,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
     setTimeout(() => setIsNotesSaved(false), 3000);
   };
 
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
   // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
     if (assignment?.status === 'CLOSED') {
@@ -310,6 +327,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
         audioStorageKey: storageKey,
       });
 
+      const currentSubModules = (submission.modules || []).map((m) =>
+        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+      );
+      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
+
       // Step 4: Check if other modules in submission are already completed
       const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
@@ -326,27 +348,25 @@ const StudentAssignmentSpeaking: React.FC = () => {
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
-            navigate(`/student/submissions/${subId}`);
+            navigate(`/student/submissions/${subId}`, { replace: true });
           } else {
-            navigate(`/student/assignments/${id}/result`);
+            navigate(`/student/assignments/${id}/result`, { replace: true });
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission.modules || []).map((m) =>
-          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
-        );
-        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
           setSuccessMessage(`Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
           setTimeout(() => {
-            navigate(nextRoute);
-          }, 1500);
+            navigate(nextRoute, { replace: true });
+          }, 1200);
         } else {
           setSuccessMessage('Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...');
           setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`);
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
         }
       }
@@ -400,17 +420,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
         <span className="speaking-breadcrumb-current">
           {assignment?.title || `Speaking Practice #${id}`}
         </span>
-        {assignment?.modules && assignment.modules.length > 1 && (
+        {effectiveModules.length > 1 && (
           <div className="speaking-stepper-wrapper">
             <ExamStepper
               variant="compact"
-              modules={assignment.modules}
+              modules={effectiveModules}
               submissionModules={submission?.modules}
               currentSkill="SPEAKING"
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

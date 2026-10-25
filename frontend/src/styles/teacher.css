@@ -1848,11 +1848,17 @@
 
 .tsd-annotations-header {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.tsd-ann-header-top {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 
 .tsd-annotations-title-wrap {
@@ -2054,4 +2060,85 @@
   padding: 18px 20px;
   margin-top: 16px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.tsd-ann-create-form {
+  background-color: var(--bg-canvas, #faf8f5);
+  border: 1px solid var(--border-color, #e6dfd5);
+  border-radius: var(--radius-sm, 8px);
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tsd-ann-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .tsd-ann-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tsd-ann-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tsd-ann-label {
+  font-family: var(--font-sans, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #736b63);
+}
+
+.tsd-ann-select,
+.tsd-ann-input,
+.tsd-ann-textarea {
+  font-family: var(--font-sans, 'Plus Jakarta Sans', sans-serif);
+  font-size: 13px;
+  color: var(--text-primary, #262320);
+  background-color: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e6dfd5);
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.tsd-ann-select:focus,
+.tsd-ann-input:focus,
+.tsd-ann-textarea:focus {
+  border-color: var(--primary, #1b4d3e);
+}
+
+.tsd-ann-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.tsd-ann-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.tsd-ann-source-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.tsd-btn-delete-ann {
+  color: var(--color-danger, #8F2222);
 }

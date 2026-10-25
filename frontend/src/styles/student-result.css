@@ -1306,6 +1306,33 @@
   color: var(--on-surface);
 }
 
+.result-speaking-ann-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--unit);
+  margin-bottom: var(--unit);
+}
+
+.result-speaking-ann-header .result-ann-header-title {
+  margin-bottom: 0;
+}
+
+.result-ann-type-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background-color: var(--primary-container);
+  color: var(--primary);
+  border: 1px solid var(--primary-fixed-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
 .result-ann-item-row {
   display: flex;
   align-items: center;

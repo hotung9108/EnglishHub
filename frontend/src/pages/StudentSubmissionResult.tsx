@@ -33,21 +33,42 @@ import {
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { gradingService, type AiGradingSuggestionResponse, type GradingDetailResponse } from '../api/services/grading.service';
+import { answerAnnotationService, type GradingAnnotation } from '../api/services/answer-annotation.service';
 import { Button, MarkdownView } from '../components/common';
 import { resolveAudioUrl } from '../utils/audioUrl.utils';
+import {
+  formatAnnotationBadgeLabel,
+  normalizeAnnotationCategory,
+  type StudentAnnotationCategory,
+} from '../utils/annotationCategory.utils';
 import '../styles/student-result.css';
 
 interface DisplayAnnotation {
   id: number;
-  type: 'grammar' | 'vocabulary' | 'positive' | 'cohesion';
+  type: StudentAnnotationCategory;
+  badgeLabel: string;
   original: string;
-  suggestion: string;
+  suggestion: string | null;
   explanation: string;
   teacherNote?: string;
   approved: boolean;
   startOffset?: number;
   endOffset?: number;
 }
+
+const ANNOTATION_FILTER_OPTIONS: ReadonlyArray<{
+  category: StudentAnnotationCategory;
+  labelKey: string;
+}> = [
+  { category: 'grammar', labelKey: 'studentResult.filterGrammar' },
+  { category: 'vocabulary', labelKey: 'studentResult.filterVocab' },
+  { category: 'cohesion', labelKey: 'studentResult.filterCohesion' },
+  { category: 'punctuation', labelKey: 'studentResult.filterPunctuation' },
+  { category: 'spelling', labelKey: 'studentResult.filterSpelling' },
+  { category: 'pronunciation', labelKey: 'studentResult.filterPronunciation' },
+  { category: 'fluency', labelKey: 'studentResult.filterFluency' },
+  { category: 'positive', labelKey: 'studentResult.filterPositive' },
+];
 
 interface QuestionDisplayItem {
   id: number;
@@ -64,6 +85,7 @@ interface QuestionDisplayItem {
 function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
   if (!answers || answers.length === 0) return '';
   const first = answers[0];
+  if (first.content === null || first.content === undefined) return '';
   if (typeof first.content === 'string') return first.content;
   if (first.content && typeof first.content === 'object') {
     const obj = first.content as Record<string, unknown>;
@@ -71,6 +93,23 @@ function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
     if (typeof obj.essay === 'string') return obj.essay;
     if (typeof obj.answer === 'string') return obj.answer;
     return JSON.stringify(first.content);
+  }
+  return '';
+}
+
+function extractTranscriptFromGrading(rawTranscript: unknown): string {
+  if (!rawTranscript) return '';
+  const node =
+    typeof rawTranscript === 'object' &&
+    rawTranscript !== null &&
+    'transcript' in (rawTranscript as Record<string, unknown>)
+      ? (rawTranscript as Record<string, unknown>).transcript
+      : rawTranscript;
+  if (typeof node === 'string') return node;
+  if (Array.isArray(node)) {
+    return node
+      .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
+      .join(' ');
   }
   return '';
 }
@@ -101,7 +140,7 @@ export const StudentSubmissionResult: React.FC = () => {
   // Tab & skill selection
   const [activeTab, setActiveTab] = useState<'review' | 'rubrics'>('review');
   const [selectedSkill, setSelectedSkill] = useState<SubmissionSkill>('WRITING');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'grammar' | 'vocabulary' | 'positive' | 'cohesion'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | StudentAnnotationCategory>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
   const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
@@ -123,8 +162,12 @@ export const StudentSubmissionResult: React.FC = () => {
         gradingService.getAiSuggestion(subModuleId)
       ]);
 
+      let loadedModDetail: SubmissionModuleDetailResponse | null = null;
+      let loadedGradingDetail: GradingDetailResponse | null = null;
+
       if (modRes.status === 'fulfilled') {
         const modValue = modRes.value;
+        loadedModDetail = modValue;
         if ((!modValue.questions || modValue.questions.length === 0) && modValue.moduleId) {
           try {
             const qRes = await questionService.listQuestions(modValue.moduleId);
@@ -140,6 +183,7 @@ export const StudentSubmissionResult: React.FC = () => {
         if (modValue.grading?.id) {
           try {
             const gd = await gradingService.getById(modValue.grading.id);
+            loadedGradingDetail = gd;
             setGradingDetail(gd);
           } catch {
             // Non-critical
@@ -149,30 +193,75 @@ export const StudentSubmissionResult: React.FC = () => {
 
       if (sugRes.status === 'fulfilled') {
         setAiSuggestion(sugRes.value);
-        if (sugRes.value.annotations && sugRes.value.annotations.length > 0) {
-          const mapped: DisplayAnnotation[] = sugRes.value.annotations.map((ann, idx) => ({
-            id: ann.id || idx + 1,
-            type: ann.errorType?.toLowerCase().includes('vocab') 
-              ? 'vocabulary' 
-              : ann.errorType?.toLowerCase().includes('cohesion')
-              ? 'cohesion'
-              : 'grammar',
-            original: `Đoạn ký tự [${ann.startOffset} - ${ann.endOffset}]`,
-            suggestion: ann.suggestedFix || 'Gợi ý chuẩn hóa từ AI',
-            explanation: ann.comment || 'Nhận xét từ hệ thống AI',
-            teacherNote: ann.source === 'TEACHER' ? 'Ghi chú từ giáo viên' : undefined,
-            approved: ann.reviewStatus === 'ACCEPTED',
-            startOffset: ann.startOffset,
-            endOffset: ann.endOffset
-          }));
-          setAnnotations(mapped);
-          setSelectedAnnotationId(mapped[0]?.id ?? null);
-        } else {
-          setAnnotations([]);
-          setSelectedAnnotationId(null);
-        }
       } else {
         setAiSuggestion(null);
+      }
+
+      // Fetch annotations via answerAnnotationService (allowed for both TEACHER and STUDENT)
+      let rawAnnotations: GradingAnnotation[] = [];
+      const targetAnswer =
+        loadedModDetail?.answers?.find((a) => !!a.audioStorageKey) ||
+        loadedModDetail?.answers?.[0];
+
+      if (targetAnswer?.id) {
+        try {
+          const annRes = await answerAnnotationService.listAnnotations(targetAnswer.id);
+          rawAnnotations = annRes.data || [];
+        } catch {
+          rawAnnotations = [];
+        }
+      }
+
+      if (rawAnnotations.length === 0 && sugRes.status === 'fulfilled' && sugRes.value.annotations?.length) {
+        rawAnnotations = sugRes.value.annotations.map((a) => ({
+          id: a.id,
+          source: a.source,
+          startOffset: a.startOffset,
+          endOffset: a.endOffset,
+          errorType: a.errorType || null,
+          comment: a.comment || null,
+          suggestedFix: a.suggestedFix || null,
+          reviewStatus: a.reviewStatus,
+        }));
+      }
+
+      // Only show ACCEPTED annotations to students
+      const acceptedAnnotations = rawAnnotations.filter((ann) => ann.reviewStatus === 'ACCEPTED');
+      const rawText =
+        extractAnswerText(loadedModDetail?.answers) ||
+        extractTranscriptFromGrading(
+          sugRes.status === 'fulfilled' ? sugRes.value.transcript : loadedGradingDetail?.aiTranscript
+        );
+
+      if (acceptedAnnotations.length > 0) {
+        const mapped: DisplayAnnotation[] = acceptedAnnotations.map((ann, idx) => {
+          const hasValidRange =
+            ann.endOffset > ann.startOffset &&
+            ann.startOffset >= 0 &&
+            rawText.length > ann.startOffset;
+          const slicedSnippet = hasValidRange
+            ? rawText.slice(ann.startOffset, Math.min(ann.endOffset, rawText.length)).trim()
+            : '';
+
+          const category = normalizeAnnotationCategory(ann.errorType);
+          const trimmedFix = ann.suggestedFix?.trim() || null;
+
+          return {
+            id: ann.id || idx + 1,
+            type: category,
+            badgeLabel: formatAnnotationBadgeLabel(ann.errorType, category),
+            original: slicedSnippet || `Đoạn ký tự [${ann.startOffset} - ${ann.endOffset}]`,
+            suggestion: trimmedFix,
+            explanation: ann.comment?.trim() || 'Nhận xét từ hệ thống AI',
+            teacherNote: ann.source === 'TEACHER' ? 'Ghi chú từ giáo viên' : undefined,
+            approved: true,
+            startOffset: ann.startOffset,
+            endOffset: ann.endOffset
+          };
+        });
+        setAnnotations(mapped);
+        setSelectedAnnotationId(mapped[0]?.id ?? null);
+      } else {
         setAnnotations([]);
         setSelectedAnnotationId(null);
       }
@@ -287,6 +376,7 @@ export const StudentSubmissionResult: React.FC = () => {
   // Handle switching attempts
   const handleSelectAttempt = async (attemptId: number) => {
     setIsLoading(true);
+    setActiveFilter('all');
     try {
       const sub = await submissionService.getSubmission(attemptId);
       setSubmission(sub);
@@ -305,6 +395,7 @@ export const StudentSubmissionResult: React.FC = () => {
   // Handle switching skill tabs
   const handleSelectSkill = async (skill: SubmissionSkill) => {
     setSelectedSkill(skill);
+    setActiveFilter('all');
     const targetModule = submission?.modules?.find(m => m.skill === skill);
     if (targetModule) {
       setIsLoading(true);
@@ -362,15 +453,22 @@ export const StudentSubmissionResult: React.FC = () => {
   }, [submission, activeSubModule, moduleDetail, gradingDetail, rawScore]);
 
   // Annotations
-  const selectedAnnotation = useMemo(() => {
-    if (annotations.length === 0) return null;
-    return annotations.find(a => a.id === selectedAnnotationId) || annotations[0];
-  }, [annotations, selectedAnnotationId]);
-
   const filteredAnnotations = useMemo(() => {
     if (activeFilter === 'all') return annotations;
     return annotations.filter(a => a.type === activeFilter);
   }, [annotations, activeFilter]);
+
+  const selectedAnnotation = useMemo(() => {
+    if (filteredAnnotations.length === 0) return null;
+    return filteredAnnotations.find(a => a.id === selectedAnnotationId) || filteredAnnotations[0];
+  }, [filteredAnnotations, selectedAnnotationId]);
+
+  const availableAnnotationFilters = useMemo(() => {
+    return ANNOTATION_FILTER_OPTIONS.map((opt) => ({
+      ...opt,
+      count: annotations.filter((a) => a.type === opt.category).length,
+    })).filter((opt) => opt.count > 0);
+  }, [annotations]);
 
   // Questions derivation for Reading or Listening
   const questionsList = useMemo<QuestionDisplayItem[]>(() => {
@@ -847,30 +945,16 @@ export const StudentSubmissionResult: React.FC = () => {
                     >
                       {t('studentResult.filterAll')} ({annotations.length})
                     </button>
-                    <button 
-                      type="button" 
-                      className={`annotation-filter-btn ${activeFilter === 'grammar' ? 'active' : ''}`}
-                      onClick={() => setActiveFilter('grammar')}
-                    >
-                      <span className="result-dot-indicator result-dot-red" />
-                      {t('studentResult.filterGrammar')} ({annotations.filter(a => a.type === 'grammar').length})
-                    </button>
-                    <button 
-                      type="button" 
-                      className={`annotation-filter-btn ${activeFilter === 'vocabulary' ? 'active' : ''}`}
-                      onClick={() => setActiveFilter('vocabulary')}
-                    >
-                      <span className="result-dot-indicator result-dot-amber" />
-                      {t('studentResult.filterVocab')} ({annotations.filter(a => a.type === 'vocabulary').length})
-                    </button>
-                    <button 
-                      type="button" 
-                      className={`annotation-filter-btn ${activeFilter === 'positive' ? 'active' : ''}`}
-                      onClick={() => setActiveFilter('positive')}
-                    >
-                      <span className="result-dot-indicator result-dot-green" />
-                      {t('studentResult.filterPositive')} ({annotations.filter(a => a.type === 'positive').length})
-                    </button>
+                    {availableAnnotationFilters.map((opt) => (
+                      <button
+                        key={opt.category}
+                        type="button"
+                        className={`annotation-filter-btn ${activeFilter === opt.category ? 'active' : ''}`}
+                        onClick={() => setActiveFilter(opt.category)}
+                      >
+                        {t(opt.labelKey)} ({opt.count})
+                      </button>
+                    ))}
                   </div>
                 )}
 
@@ -906,7 +990,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     </h3>
                     {selectedAnnotation && (
                       <span className={`question-status-badge ${selectedAnnotation.type === 'positive' ? 'correct' : 'incorrect'}`}>
-                        {selectedAnnotation.type.toUpperCase()}
+                        {selectedAnnotation.badgeLabel}
                       </span>
                     )}
                   </div>
@@ -923,14 +1007,16 @@ export const StudentSubmissionResult: React.FC = () => {
                           </div>
                         </div>
 
-                        <div>
-                          <div className="result-ann-section-label">
-                            {t('studentResult.suggestedFix')}
+                        {selectedAnnotation.suggestion && (
+                          <div>
+                            <div className="result-ann-section-label">
+                              {t('studentResult.suggestedFix')}
+                            </div>
+                            <div className="diff-box suggestion">
+                              &quot;{selectedAnnotation.suggestion}&quot;
+                            </div>
                           </div>
-                          <div className="diff-box suggestion">
-                            &quot;{selectedAnnotation.suggestion}&quot;
-                          </div>
-                        </div>
+                        )}
 
                         <div className="explanation-card">
                           <div className="result-ann-header-title">
@@ -968,9 +1054,9 @@ export const StudentSubmissionResult: React.FC = () => {
                             key={ann.id}
                             type="button"
                             onClick={() => setSelectedAnnotationId(ann.id)}
-                            className={`result-ann-chip ${selectedAnnotationId === ann.id ? 'is-active' : ''}`}
+                            className={`result-ann-chip ${selectedAnnotation?.id === ann.id ? 'is-active' : ''}`}
                           >
-                            <span className="result-ann-summary-text">#{ann.id} {ann.type}</span>: {ann.suggestion}
+                            <span className="result-ann-summary-text">#{ann.id} {ann.badgeLabel}</span>: {ann.suggestion || ann.original}
                           </button>
                         ))}
                       </div>
@@ -1066,6 +1152,38 @@ export const StudentSubmissionResult: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Accepted Speaking Annotations */}
+              {annotations.length > 0 && (
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3 className="result-card-title">
+                      {isVi ? 'Chi tiết điểm sửa lỗi đã duyệt' : 'Approved Annotations'}
+                    </h3>
+                    <span className="result-filter-badge-text">
+                      <strong>{annotations.length}</strong> {t('studentResult.annotationsCount')}
+                    </span>
+                  </div>
+                  <div className="result-card-body annotation-inspect-box">
+                    {annotations.map((ann) => (
+                      <div key={ann.id} className="explanation-card">
+                        <div className="result-speaking-ann-header">
+                          <span className="result-ann-type-pill">{ann.badgeLabel}</span>
+                          <div className="result-ann-header-title">
+                            <span>&ldquo;{ann.original}&rdquo;</span>
+                            {ann.suggestion && (
+                              <>
+                                {' '}&rarr; <strong>{ann.suggestion}</strong>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div>{ann.explanation}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Teacher Feedback */}
               <div className="result-card">

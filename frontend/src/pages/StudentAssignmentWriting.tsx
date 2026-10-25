@@ -23,6 +23,7 @@ import {
   getNextIncompleteModule,
   getSkillLabel,
   getExamPageRedirectRoute,
+  resolveEffectiveModules,
 } from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
@@ -173,7 +174,18 @@ const StudentAssignmentWriting: React.FC = () => {
               if (currentAssignment?.status === 'PUBLISHED') {
                 const startRes = await submissionService.startAttempt(numericId);
                 const sub = await submissionService.getSubmission(startRes.id);
-                if (isMounted) setSubmission(sub);
+                if (!isMounted) return;
+                const redirectRoute = getExamPageRedirectRoute(
+                  sub,
+                  'WRITING',
+                  numericId,
+                  currentAssignment?.modules
+                );
+                if (redirectRoute) {
+                  navigate(redirectRoute, { replace: true });
+                  return;
+                }
+                setSubmission(sub);
               } else if (currentAssignment?.status === 'CLOSED') {
                 if (isMounted) {
                   setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
@@ -275,6 +287,11 @@ const StudentAssignmentWriting: React.FC = () => {
     }
   };
 
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
   const wordCount = editorText.trim() === '' ? 0 : editorText.trim().split(/\s+/).length;
 
   const handleSaveDraft = () => {
@@ -344,6 +361,11 @@ const StudentAssignmentWriting: React.FC = () => {
           : {}
       );
 
+      const currentSubModules = (submission.modules || []).map((m) =>
+        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+      );
+      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
+
       // 3. Check if all modules in this submission are now completed
       const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
@@ -363,27 +385,25 @@ const StudentAssignmentWriting: React.FC = () => {
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
-            navigate(`/student/submissions/${subId}`);
+            navigate(`/student/submissions/${subId}`, { replace: true });
           } else {
-            navigate(`/student/assignments/${id}/result`);
+            navigate(`/student/assignments/${id}/result`, { replace: true });
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission.modules || []).map((m) =>
-          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
-        );
-        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
           setSuccessMessage(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
           setTimeout(() => {
-            navigate(nextRoute);
-          }, 1500);
+            navigate(nextRoute, { replace: true });
+          }, 1200);
         } else {
           setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
           setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`);
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
         }
       }
@@ -412,17 +432,17 @@ const StudentAssignmentWriting: React.FC = () => {
         <span className="writing-crumb-active">
           {assignment?.title || `Writing #${id}`}
         </span>
-        {assignment?.modules && assignment.modules.length > 1 && (
+        {effectiveModules.length > 1 && (
           <div className="writing-stepper-wrapper">
             <ExamStepper
               variant="compact"
-              modules={assignment.modules}
+              modules={effectiveModules}
               submissionModules={submission?.modules}
               currentSkill="WRITING"
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

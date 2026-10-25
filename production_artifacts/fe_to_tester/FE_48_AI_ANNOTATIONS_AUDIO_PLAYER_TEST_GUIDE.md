@@ -4,12 +4,13 @@
 - **Task ID**: `[FE-48]` (GitHub Issue `#151`, Resolves `BUG-09`, `[TASK-FE-24]`)
 - **Assignee**: `@fe-primary` (`Maloque18705`)
 - **Recipient**: `@tester` (`Zawn-Tsu`)
-- **Target Component**:
+- **Target Components**:
   - `frontend/src/pages/TeacherSubmissionDetails.tsx`
+  - `frontend/src/pages/StudentSubmissionResult.tsx`
   - `frontend/src/styles/teacher.css`
   - `frontend/src/api/services/answer-annotation.service.ts`
   - `frontend/src/api/__tests__/teacher-annotation-review.test.ts`
-- **Dependencies**: Backend endpoints `[BE-42]` for S3 audio resolution and answer annotations (`GET /answers/{id}/annotations`, `PATCH /annotations/{id}/review`).
+- **Dependencies**: Backend endpoints `[BE-42]` for S3 audio resolution and answer annotations (`GET /answers/{id}/annotations`, `POST /answers/{id}/annotations`, `PATCH /annotations/{id}/review`, `DELETE /annotations/{id}`).
 
 ---
 
@@ -22,16 +23,18 @@
   - Declarative `audioError` state shows an error alert with a **Thử lại (Retry)** button.
   - Displays a clean empty state (`tsd-audio-empty`) if the student has not uploaded an audio file.
 
-### 2.2. Full Integration with `answerAnnotationService`
-- **API Fetching**: Calls `answerAnnotationService.listAnnotations(answerId)` when loading submission module data.
-- **AI Annotations Display by Segment**:
-  - Lists segment-level AI errors and suggestions with character range offsets (`[startOffset - endOffset]`).
-  - Displays original snippet from student text or speech-to-text transcript.
-  - Displays error category badge (e.g. `GRAMMAR`, `VOCABULARY`, `PRONUNCIATION`, `COHESION`), suggested correction (`suggestedFix`), and pedagogical explanation (`comment`).
-- **Interactive Review Flow**:
-  - **Duyệt (Accept)** button: Calls `PATCH /api/v1/annotations/{id}/review` with `{ reviewStatus: 'ACCEPTED' }`. Updates badge to green `StatusBadge` (`success`).
-  - **Từ chối (Reject)** button: Calls `PATCH /api/v1/annotations/{id}/review` with `{ reviewStatus: 'REJECTED' }`. Updates badge to red `StatusBadge` (`error`).
-  - Status indicator starts at yellow `StatusBadge` (`warning`) for `PENDING`.
+### 2.2. Full Integration with `answerAnnotationService` (Teacher & Student Flows)
+- **API Fetching (`listAnnotations`)**:
+  - `TeacherSubmissionDetails.tsx` calls `answerAnnotationService.listAnnotations(answerId)` to load all AI and teacher annotations.
+  - `StudentSubmissionResult.tsx` calls `answerAnnotationService.listAnnotations(answerId)` (accessible to both `TEACHER` and `STUDENT` roles) and filters to display only `ACCEPTED` annotations.
+- **Safe Text & Transcript Excerpt Slicing**:
+  - Prevents `null` answer content (in Speaking or document upload modules) from being stringified into `"null"`.
+  - Extracts snippets from either student text or speech-to-text transcript (`aiSuggestion.transcript` / `gradingDetail.aiTranscript`).
+- **Interactive Review, Creation & Deletion Flows**:
+  - **Duyệt (Accept)** button (`ann.source === 'AI'`): Calls `PATCH /api/v1/annotations/{id}/review` with `{ reviewStatus: 'ACCEPTED' }`. Updates badge to green `StatusBadge` (`success`).
+  - **Từ chối (Reject)** button (`ann.source === 'AI'`): Calls `PATCH /api/v1/annotations/{id}/review` with `{ reviewStatus: 'REJECTED' }`. Updates badge to red `StatusBadge` (`error`).
+  - **Thêm chú thích (Add Annotation)**: Inline form calling `POST /api/v1/answers/{id}/annotations` (`createAnnotation`), immediately adding the teacher annotation with `ACCEPTED` status (without showing redundant Accept/Reject buttons).
+  - **Xóa (Delete)**: Button calling `DELETE /api/v1/annotations/{id}` (`deleteAnnotation`).
 - **Filtering & Navigation**:
   - Minimalistic filter buttons: `Tất cả (All)`, `Chờ duyệt (Pending)`, `Đã duyệt (Accepted)`, `Đã từ chối (Rejected)` with dynamic counter badges.
   - Displays `EmptyState` component when no annotations match the selected filter.
@@ -51,52 +54,38 @@
   - Top hero section displays the audio bar with the `<audio controls>` player.
   - Clicking Play successfully streams and plays the student's voice recording.
   - No fake toast messages appear when playing audio.
-  - If the audio fails to load (e.g. network disconnect), an error message appears with a "Thử lại" button.
+  - If the audio fails to load, an error message appears with a "Thử lại" button.
 
-### TC-FE48-02: Displaying AI Annotations by Segment
+### TC-FE48-02: Displaying AI Annotations by Segment (Without `"null"` Snippets)
 - **Preconditions**: A speaking or writing submission has been analyzed by AI (`ai-analyze`).
 - **Steps**:
   1. Open the submission grading details page.
   2. Inspect the **"Nhận xét từ AI"** panel (in Speaking layout) or the sidebar (in Writing layout).
 - **Expected Result**:
   - The section **"Gợi ý sửa lỗi theo đoạn"** appears with the total annotation count badge.
-  - Each annotation card shows:
-    - Error type tag (e.g., `GRAMMAR`, `PRONUNCIATION`, `VOCABULARY`).
-    - Range offsets `[start - end]`.
-    - Current review status (`Chờ duyệt`, `Đã duyệt`, or `Đã từ chối`).
-    - Student text excerpt (in quotes).
-    - AI suggested fix and explanation comment.
+  - Each annotation card shows error type tag, range offsets `[start - end]`, review status, student excerpt (when available, never `"null"`), AI suggested fix, and explanation comment.
 
-### TC-FE48-03: Teacher Accepts (Duyệt) an AI Annotation
+### TC-FE48-03: Teacher Accepts (Duyệt) & Rejects (Từ chối) AI Annotations
 - **Steps**:
-  1. Locate an annotation with `Chờ duyệt` (Pending) status.
-  2. Click the **"Duyệt" (Accept)** button.
-- **Expected Result**:
-  - Button enters loading state briefly.
-  - Network request `PATCH /api/v1/annotations/:id/review` is sent with `{ reviewStatus: "ACCEPTED" }`.
-  - Notification toast appears: *"Đã duyệt gợi ý của AI."*.
-  - Status badge immediately switches to green **"Đã duyệt"**.
-  - The "Chờ duyệt" counter decreases by 1, and "Đã duyệt" counter increases by 1.
+  1. Locate an AI annotation (`source === 'AI'`) with `Chờ duyệt` status.
+  2. Click **"Duyệt" (Accept)** -> verifies `PATCH /api/v1/annotations/:id/review` with `{ reviewStatus: "ACCEPTED" }` and green badge.
+  3. Click **"Từ chối" (Reject)** -> verifies `PATCH /api/v1/annotations/:id/review` with `{ reviewStatus: "REJECTED" }` and red badge.
 
-### TC-FE48-04: Teacher Rejects (Từ chối) an AI Annotation
+### TC-FE48-04: Teacher Creates & Deletes Manual Annotation
 - **Steps**:
-  1. Locate an annotation with `Chờ duyệt` (Pending) or `Đã duyệt` (Accepted) status.
-  2. Click the **"Từ chối" (Reject)** button.
+  1. Click **"Thêm chú thích"** in the annotations header.
+  2. Select error type, enter suggested fix and comment, then click **"Lưu chú thích"**.
+  3. Click **"Xóa"** on an annotation card.
 - **Expected Result**:
-  - Button enters loading state briefly.
-  - Network request `PATCH /api/v1/annotations/:id/review` is sent with `{ reviewStatus: "REJECTED" }`.
-  - Notification toast appears: *"Đã từ chối gợi ý của AI."*.
-  - Status badge immediately switches to red **"Đã từ chối"**.
+  - `POST /api/v1/answers/:id/annotations` creates the teacher annotation with `Đã duyệt` status and `Giáo viên` badge (Accept/Reject buttons are hidden for teacher-authored annotations).
+  - Clicking **"Xóa"** sends `DELETE /api/v1/annotations/:id` and removes the item from the list.
 
-### TC-FE48-05: Annotation Filtering Bar
+### TC-FE48-05: Student Views Approved Annotations on Result Page
 - **Steps**:
-  1. Click **"Chờ duyệt"**: Only pending annotations are displayed.
-  2. Click **"Đã duyệt"**: Only accepted annotations are displayed.
-  3. Click **"Đã từ chối"**: Only rejected annotations are displayed.
-  4. Click **"Tất cả"**: All annotations are displayed.
+  1. Log in as the Student who submitted the assignment.
+  2. Open `/student/submissions/:id` or `/student/assignments/:id/result`.
 - **Expected Result**:
-  - Filter button active state highlights with Sovereign Green background (`--primary-light`).
-  - EmptyState component appears gracefully if a filter contains zero items.
+  - Page calls `GET /api/v1/answers/:id/annotations` (`200 OK`) and displays all annotations with `reviewStatus === 'ACCEPTED'` for both Writing and Speaking skills.
 
 ---
 
@@ -107,5 +96,5 @@ npm test --prefix frontend
 ```
 **Verification Evidence**:
 - Test file: `frontend/src/api/__tests__/teacher-annotation-review.test.ts`
-- 148/148 unit tests passing (100% pass rate).
+- 153/153 unit tests passing (100% pass rate).
 - TypeScript check (`tsc -b`) and ESLint check passed with 0 errors.

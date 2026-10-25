@@ -18,7 +18,8 @@ import {
   getSkillRoute,
   getNextIncompleteModule,
   getSkillLabel,
-  getExamPageRedirectRoute
+  getExamPageRedirectRoute,
+  resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import '../styles/student-exam.css';
 
@@ -170,7 +171,18 @@ const StudentAssignmentReading: React.FC = () => {
               if (currentAssignment?.status === 'PUBLISHED') {
                 const startRes = await submissionService.startAttempt(numericId);
                 const sub = await submissionService.getSubmission(startRes.id);
-                if (isMounted) setSubmission(sub);
+                if (!isMounted) return;
+                const redirectRoute = getExamPageRedirectRoute(
+                  sub,
+                  'READING',
+                  numericId,
+                  currentAssignment?.modules
+                );
+                if (redirectRoute) {
+                  navigate(redirectRoute, { replace: true });
+                  return;
+                }
+                setSubmission(sub);
               } else if (currentAssignment?.status === 'CLOSED') {
                 if (isMounted) {
                   setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
@@ -202,6 +214,11 @@ const StudentAssignmentReading: React.FC = () => {
     };
   }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, submission?.modules),
+    [assignment?.modules, submission?.modules]
+  );
+
   const totalQuestions = questions.length;
   const answeredCount = useMemo(() => {
     return questions.filter((q, idx) => {
@@ -227,10 +244,9 @@ const StudentAssignmentReading: React.FC = () => {
       setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
       return;
     }
-    if (answeredCount === 0) {
-      if (!confirm('Bạn chưa trả lời câu hỏi nào. Bạn có chắc chắn muốn nộp bài?')) {
-        return;
-      }
+    if (questions.length > 0 && answeredCount === 0) {
+      setError('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
+      return;
     }
 
     setIsSubmitting(true);
@@ -285,6 +301,11 @@ const StudentAssignmentReading: React.FC = () => {
 
       await submissionService.submitModule(subModuleId, { answers: answersPayload });
 
+      const currentSubModules = (submission.modules || []).map((m) =>
+        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
+      );
+      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
+
       // Check if all modules in this submission are now completed
       const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
@@ -301,27 +322,25 @@ const StudentAssignmentReading: React.FC = () => {
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
-            navigate(`/student/submissions/${subId}`);
+            navigate(`/student/submissions/${subId}`, { replace: true });
           } else {
-            navigate(`/student/assignments/${id}/result`);
+            navigate(`/student/assignments/${id}/result`, { replace: true });
           }
         }, 1200);
       } else {
-        const currentSubModules = (submission.modules || []).map((m) =>
-          m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
-        );
-        const nextMod = getNextIncompleteModule(assignment?.modules || [], currentSubModules);
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
           setSuccessMessage(`Đã hoàn thành phần thi Reading! Đang chuyển tiếp sang ${nextSkillLabel}...`);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
           setTimeout(() => {
-            navigate(nextRoute);
-          }, 1500);
+            navigate(nextRoute, { replace: true });
+          }, 1200);
         } else {
           setSuccessMessage('Đã hoàn thành phần thi Reading! Đang quay lại trang tổng quan bài tập...');
           setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`);
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
         }
       }
@@ -358,17 +377,17 @@ const StudentAssignmentReading: React.FC = () => {
           </div>
         </div>
 
-        {assignment?.modules && assignment.modules.length > 1 && (
+        {effectiveModules.length > 1 && (
           <div className="exam-header-right">
             <ExamStepper
               variant="compact"
-              modules={assignment.modules}
+              modules={effectiveModules}
               submissionModules={submission?.modules}
               currentSkill="READING"
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible) {
+                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

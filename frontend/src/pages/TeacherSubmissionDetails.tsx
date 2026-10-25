@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2,
-  XCircle
+  XCircle, Plus, Trash2
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -61,7 +61,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
   const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [deletingAnnotationIds, setDeletingAnnotationIds] = useState<Record<number, boolean>>({});
   const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
+  const [isCreatingAnnotation, setIsCreatingAnnotation] = useState<boolean>(false);
+  const [isSubmittingAnnotation, setIsSubmittingAnnotation] = useState<boolean>(false);
+  const [newAnnErrorType, setNewAnnErrorType] = useState<string>('GRAMMAR');
+  const [newAnnSuggestedFix, setNewAnnSuggestedFix] = useState<string>('');
+  const [newAnnComment, setNewAnnComment] = useState<string>('');
+  const [newAnnStartOffset, setNewAnnStartOffset] = useState<string>('0');
+  const [newAnnEndOffset, setNewAnnEndOffset] = useState<string>('0');
   const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
     if (routeState?.studentName) {
       return {
@@ -491,27 +499,33 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
 
-  // Extract student text answer
+  const targetAnswer = useMemo(() => {
+    return moduleDetail?.answers?.find((a) => !!a.audioStorageKey) || moduleDetail?.answers?.[0] || null;
+  }, [moduleDetail]);
+
+  // Extract student text answer safely (returns '' when content is null/undefined)
   const studentAnswerText = useMemo(() => {
     if (!moduleDetail?.answers || moduleDetail.answers.length === 0) {
-      return isVi 
-        ? 'Học viên đã nộp bài tập trực tuyến.' 
-        : 'Student submitted the online assignment.';
+      return '';
     }
 
     const firstAnswer = moduleDetail.answers[0];
+    if (firstAnswer.content === null || firstAnswer.content === undefined) {
+      return '';
+    }
     if (typeof firstAnswer.content === 'string') {
       return firstAnswer.content;
     }
-    if (typeof firstAnswer.content === 'object' && firstAnswer.content !== null) {
+    if (typeof firstAnswer.content === 'object') {
       const obj = firstAnswer.content as Record<string, unknown>;
-      return (obj.text || obj.essay || obj.answer || obj.content || JSON.stringify(obj)) as string;
+      const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
+      return typeof textVal === 'string' ? textVal : JSON.stringify(obj);
     }
     return String(firstAnswer.content);
-  }, [moduleDetail, isVi]);
+  }, [moduleDetail]);
 
   const wordCount = useMemo(() => {
-    if (!studentAnswerText) return 0;
+    if (!studentAnswerText.trim()) return 0;
     return studentAnswerText.trim().split(/\s+/).filter(Boolean).length;
   }, [studentAnswerText]);
 
@@ -536,6 +550,65 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
   };
 
+  const handleCreateAnnotation = async () => {
+    if (!targetAnswer?.id) return;
+    if (!newAnnComment.trim()) {
+      showToast(isVi ? 'Vui lòng nhập nhận xét cho chú thích.' : 'Please enter a comment.');
+      return;
+    }
+    const startNum = Math.max(0, parseInt(newAnnStartOffset, 10) || 0);
+    const endNum = Math.max(startNum, parseInt(newAnnEndOffset, 10) || startNum);
+
+    setIsSubmittingAnnotation(true);
+    try {
+      const res = await answerAnnotationService.createAnnotation(targetAnswer.id, {
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+      });
+      const createdItem: GradingAnnotation = {
+        id: res.id,
+        source: 'TEACHER',
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+        reviewStatus: 'ACCEPTED',
+      };
+      setAnnotations((prev) => [...prev, createdItem]);
+      setNewAnnComment('');
+      setNewAnnSuggestedFix('');
+      setNewAnnStartOffset('0');
+      setNewAnnEndOffset('0');
+      setIsCreatingAnnotation(false);
+      showToast(isVi ? 'Đã thêm chú thích mới.' : 'Annotation added.');
+    } catch (err) {
+      console.error('Failed to create annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.'));
+    } finally {
+      setIsSubmittingAnnotation(false);
+    }
+  };
+
+  const handleDeleteAnnotation = async (annotationId: number) => {
+    setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.deleteAnnotation(annotationId);
+      setAnnotations((prev) => prev.filter((ann) => ann.id !== annotationId));
+      showToast(isVi ? 'Đã xóa chú thích.' : 'Annotation deleted.');
+    } catch (err) {
+      console.error('Failed to delete annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể xóa chú thích.' : 'Failed to delete annotation.'));
+    } finally {
+      setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+    }
+  };
+
   const filteredAnnotations = useMemo(() => {
     if (annotationFilter === 'ALL') return annotations;
     return annotations.filter((a) => a.reviewStatus === annotationFilter);
@@ -551,19 +624,27 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [annotations]);
 
   const transcriptText = useMemo(() => {
-    if (!aiSuggestion?.transcript) return null;
-    if (typeof aiSuggestion.transcript === 'string') return aiSuggestion.transcript;
-    if (Array.isArray(aiSuggestion.transcript)) {
-      return aiSuggestion.transcript
+    const rawTranscript =
+      aiSuggestion?.transcript ??
+      (gradingDetail?.aiTranscript &&
+      typeof gradingDetail.aiTranscript === 'object' &&
+      'transcript' in (gradingDetail.aiTranscript as Record<string, unknown>)
+        ? (gradingDetail.aiTranscript as Record<string, unknown>).transcript
+        : gradingDetail?.aiTranscript);
+
+    if (!rawTranscript) return null;
+    if (typeof rawTranscript === 'string') return rawTranscript;
+    if (Array.isArray(rawTranscript)) {
+      return rawTranscript
         .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
         .join(' ');
     }
     return null;
-  }, [aiSuggestion]);
+  }, [aiSuggestion, gradingDetail]);
 
   const extractSnippet = (start?: number, end?: number): string | null => {
     if (start === undefined || end === undefined || start < 0 || end <= start) return null;
-    const baseText = transcriptText || (studentAnswerText && studentAnswerText !== (isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.') ? studentAnswerText : null);
+    const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
     if (!baseText) return null;
     if (start < baseText.length) {
       const slice = baseText.slice(start, Math.min(end, baseText.length)).trim();
@@ -576,11 +657,25 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return (
       <div className="tsd-annotations-section">
         <div className="tsd-annotations-header">
-          <div className="tsd-annotations-title-wrap">
-            <h4 className="tsd-annotations-title">
-              {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'AI Segment Annotations'}
-            </h4>
-            <span className="tsd-annotations-counter">{annotations.length}</span>
+          <div className="tsd-ann-header-top">
+            <div className="tsd-annotations-title-wrap">
+              <h4 className="tsd-annotations-title">
+                {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'Segment Annotations'}
+              </h4>
+              <span className="tsd-annotations-counter">{annotations.length}</span>
+            </div>
+
+            {targetAnswer?.id && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={Plus}
+                onClick={() => setIsCreatingAnnotation((prev) => !prev)}
+              >
+                {isVi ? 'Thêm chú thích' : 'Add annotation'}
+              </Button>
+            )}
           </div>
 
           {annotations.length > 0 && (
@@ -617,6 +712,102 @@ export const TeacherSubmissionDetails: React.FC = () => {
           )}
         </div>
 
+        {isCreatingAnnotation && (
+          <div className="tsd-ann-create-form">
+            <div className="tsd-ann-form-grid">
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Loại lỗi' : 'Error type'}
+                </label>
+                <select
+                  className="tsd-ann-select"
+                  value={newAnnErrorType}
+                  onChange={(e) => setNewAnnErrorType(e.target.value)}
+                >
+                  <option value="GRAMMAR">GRAMMAR</option>
+                  <option value="VOCABULARY">VOCABULARY</option>
+                  <option value="PRONUNCIATION">PRONUNCIATION</option>
+                  <option value="COHESION">COHESION</option>
+                  <option value="SPELLING">SPELLING</option>
+                  <option value="PUNCTUATION">PUNCTUATION</option>
+                </select>
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Từ ký tự' : 'Start offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnStartOffset}
+                  onChange={(e) => setNewAnnStartOffset(e.target.value)}
+                />
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Đến ký tự' : 'End offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnEndOffset}
+                  onChange={(e) => setNewAnnEndOffset(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Gợi ý sửa' : 'Suggested fix'}
+              </label>
+              <input
+                type="text"
+                className="tsd-ann-input"
+                placeholder={isVi ? 'Nhập câu/từ gợi ý sửa...' : 'Enter suggested correction...'}
+                value={newAnnSuggestedFix}
+                onChange={(e) => setNewAnnSuggestedFix(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Nhận xét chi tiết' : 'Comment'}
+              </label>
+              <textarea
+                rows={2}
+                className="tsd-ann-textarea"
+                placeholder={isVi ? 'Giải thích lỗi hoặc hướng dẫn sửa...' : 'Explain the issue or feedback...'}
+                value={newAnnComment}
+                onChange={(e) => setNewAnnComment(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-actions">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={isSubmittingAnnotation}
+                onClick={() => setIsCreatingAnnotation(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                loading={isSubmittingAnnotation}
+                disabled={isSubmittingAnnotation}
+                onClick={handleCreateAnnotation}
+              >
+                {isVi ? 'Lưu chú thích' : 'Save annotation'}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {isLoadingAnnotations ? (
           <div className="tsd-annotations-loading">
             <RefreshCw size={18} className="animate-spin text-slate-400" />
@@ -640,6 +831,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <div className="tsd-annotations-list">
             {filteredAnnotations.map((ann) => {
               const isReviewing = !!reviewingAnnotationIds[ann.id];
+              const isDeleting = !!deletingAnnotationIds[ann.id];
               const snippet = extractSnippet(ann.startOffset, ann.endOffset);
               const badgeStatus =
                 ann.reviewStatus === 'ACCEPTED' ? 'success' : ann.reviewStatus === 'REJECTED' ? 'error' : 'warning';
@@ -657,6 +849,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
                       <span className="tsd-ann-type-pill">
                         {ann.errorType || (isVi ? 'Gợi ý' : 'Suggestion')}
                       </span>
+                      {ann.source === 'TEACHER' && (
+                        <span className="tsd-ann-source-badge">
+                          {isVi ? 'Giáo viên' : 'Teacher'}
+                        </span>
+                      )}
                       <span className="tsd-ann-range">
                         [{ann.startOffset} - {ann.endOffset}]
                       </span>
@@ -689,29 +886,45 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   </div>
 
                   <div className="tsd-ann-item-actions">
+                    {ann.source === 'AI' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
+                          icon={CheckCircle2}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting}
+                          onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
+                          className="tsd-btn-review-accept"
+                        >
+                          {ann.reviewStatus === 'ACCEPTED' ? (isVi ? 'Đã duyệt' : 'Accepted') : (isVi ? 'Duyệt' : 'Accept')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
+                          icon={XCircle}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting}
+                          onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
+                          className="tsd-btn-review-reject"
+                        >
+                          {ann.reviewStatus === 'REJECTED' ? (isVi ? 'Đã từ chối' : 'Rejected') : (isVi ? 'Từ chối' : 'Reject')}
+                        </Button>
+                      </>
+                    )}
                     <Button
                       type="button"
                       size="sm"
-                      variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
-                      icon={CheckCircle2}
-                      loading={isReviewing}
-                      disabled={isReviewing}
-                      onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
-                      className="tsd-btn-review-accept"
+                      variant="ghost"
+                      icon={Trash2}
+                      loading={isDeleting}
+                      disabled={isReviewing || isDeleting}
+                      onClick={() => handleDeleteAnnotation(ann.id)}
+                      className="tsd-btn-delete-ann"
                     >
-                      {ann.reviewStatus === 'ACCEPTED' ? (isVi ? 'Đã duyệt' : 'Accepted') : (isVi ? 'Duyệt' : 'Accept')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
-                      icon={XCircle}
-                      loading={isReviewing}
-                      disabled={isReviewing}
-                      onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
-                      className="tsd-btn-review-reject"
-                    >
-                      {ann.reviewStatus === 'REJECTED' ? (isVi ? 'Đã từ chối' : 'Rejected') : (isVi ? 'Từ chối' : 'Reject')}
+                      {isVi ? 'Xóa' : 'Delete'}
                     </Button>
                   </div>
                 </div>
@@ -1111,7 +1324,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
 
               <p className="m-0 whitespace-pre-line">
-                {studentAnswerText}
+                {studentAnswerText.trim().length > 0
+                  ? studentAnswerText
+                  : moduleDetail?.answers?.some((a) => a.docStorageKey)
+                  ? (isVi ? 'Học viên đã nộp bài làm qua tệp tài liệu đính kèm.' : 'Student submitted the answer via attached document.')
+                  : (isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.')}
               </p>
             </div>
 

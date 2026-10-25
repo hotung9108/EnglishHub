@@ -18,7 +18,8 @@ import {
   getSkillRoute,
   getNextIncompleteModule,
   isModuleAccessible,
-  getSkillLabel
+  getSkillLabel,
+  resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import '../styles/student-overview.css';
 
@@ -153,12 +154,19 @@ const StudentAssignmentOverview: React.FC = () => {
     ? null
     : (getRemainingAttempts(maxSubmissions, completedAttemptsCount) ?? Math.max(0, maxSubmissions - completedAttemptsCount));
 
-  const modules = assignment?.modules;
+  const displaySub = inProgressSub || latestCompletedSub;
+  const hasActiveAttempt = Boolean(inProgressSub);
+
+  const effectiveModules = useMemo(
+    () => resolveEffectiveModules(assignment?.modules, displaySub?.modules),
+    [assignment?.modules, displaySub?.modules]
+  );
+
   const skillsListText = useMemo(() => {
-    if (!modules || modules.length === 0) {
+    if (!effectiveModules || effectiveModules.length === 0) {
       return 'Writing';
     }
-    return modules
+    return effectiveModules
       .map((m) => {
         if (!m.skill) return '';
         const s = m.skill.toUpperCase();
@@ -170,7 +178,7 @@ const StudentAssignmentOverview: React.FC = () => {
       })
       .filter(Boolean)
       .join(', ');
-  }, [modules]);
+  }, [effectiveModules]);
 
   const handleStartSkill = async (targetSkill: string, targetIndex?: number) => {
     if (isStarting) return;
@@ -185,8 +193,8 @@ const StudentAssignmentOverview: React.FC = () => {
     }
 
     // Verify sequential unlocking: If targetIndex > 0, make sure previous modules are completed
-    if (targetIndex !== undefined && targetIndex > 0 && assignment?.modules) {
-      const accessible = isModuleAccessible(targetIndex, assignment.modules, inProgressSub?.modules);
+    if (targetIndex !== undefined && targetIndex > 0 && effectiveModules.length > 0) {
+      const accessible = isModuleAccessible(targetIndex, effectiveModules, inProgressSub?.modules);
       if (!accessible) {
         setError(`Vui lòng hoàn thành phần thi trước (Phần ${targetIndex}) để tiếp tục.`);
         return;
@@ -270,7 +278,8 @@ const StudentAssignmentOverview: React.FC = () => {
       }
 
       // Find first uncompleted module or first module in assignment sequence
-      const nextMod = getNextIncompleteModule(assignment?.modules || [], activeModules) || assignment?.modules?.[0];
+      const resolvedMods = resolveEffectiveModules(assignment?.modules, activeModules);
+      const nextMod = getNextIncompleteModule(resolvedMods, activeModules) || resolvedMods[0];
       const targetSkill = nextMod?.skill || 'WRITING';
       const idParam = id || '1';
       const targetRoute = getSkillRoute(targetSkill, idParam, submissionId);
@@ -283,9 +292,7 @@ const StudentAssignmentOverview: React.FC = () => {
     }
   };
 
-  const displaySub = inProgressSub || latestCompletedSub;
-  const hasActiveAttempt = Boolean(inProgressSub);
-  const nextIncompleteModule = getNextIncompleteModule(assignment?.modules || [], inProgressSub?.modules);
+  const nextIncompleteModule = getNextIncompleteModule(effectiveModules, inProgressSub?.modules);
   const nextSkillName = nextIncompleteModule ? getSkillLabel(nextIncompleteModule.skill) : '';
 
   const isAllSubModulesCompleted = Boolean(
@@ -394,11 +401,11 @@ const StudentAssignmentOverview: React.FC = () => {
         </div>
 
         {/* Multi-skill Sections / Modules List */}
-        {assignment?.modules && assignment.modules.length > 1 && (
+        {effectiveModules.length > 1 && (
           <div className="overview-sections-container">
             <div className="overview-sections-header">
               <h2 className="overview-section-title">
-                Tiến trình các phần thi ({assignment.modules.length} kỹ năng)
+                Tiến trình các phần thi ({effectiveModules.length} kỹ năng)
               </h2>
               <span className="overview-section-subtitle">
                 Học viên hoàn thành lần lượt từng kỹ năng theo thứ tự trước khi nộp toàn bộ bài tập
@@ -406,19 +413,22 @@ const StudentAssignmentOverview: React.FC = () => {
             </div>
 
             <ExamStepper
-              modules={assignment.modules}
+              modules={effectiveModules}
               submissionModules={displaySub?.modules}
               assignmentId={numericAssignmentId}
               submissionId={displaySub?.id}
               hasActiveAttempt={hasActiveAttempt}
+              canReviewCompleted={!hasActiveAttempt && Boolean(displaySub?.id || bestAttempt?.id)}
               variant="overview"
               onSelectModule={(skill, step) => {
                 if (step.isCompleted) {
-                  const targetSubId = displaySub?.id || bestAttempt?.id;
-                  if (targetSubId) {
-                    navigate(`/student/submissions/${targetSubId}`);
-                    return;
+                  if (!hasActiveAttempt) {
+                    const targetSubId = displaySub?.id || bestAttempt?.id;
+                    if (targetSubId) {
+                      navigate(`/student/submissions/${targetSubId}`);
+                    }
                   }
+                  return;
                 }
                 void handleStartSkill(skill, step.index);
               }}
