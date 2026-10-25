@@ -193,7 +193,7 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
-    const allSkills: AssignmentSkill[] = ['writing', 'speaking', 'reading', 'listening'];
+    const allSkills: AssignmentSkill[] = ['listening', 'reading', 'writing', 'speaking'];
     const configuredSkills = allSkills.filter(isSkillConfigured);
     const targetSkills = configuredSkills.length > 0 ? configuredSkills : [assignmentData.skill];
 

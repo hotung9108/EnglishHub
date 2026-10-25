@@ -84,6 +84,38 @@ export function getSkillRoute(
 }
 
 /**
+ * Resolves the authoritative ordered list of modules by combining assignmentModules
+ * and submissionModules. Ensures that if assignmentModules fell back to a single
+ * placeholder module on network error, all modules from submissionModules are preserved.
+ */
+export function resolveEffectiveModules(
+  assignmentModules?: ExamModuleItem[],
+  submissionModules?: SubmissionModuleItem[]
+): ExamModuleItem[] {
+  const aMods = assignmentModules || [];
+  const sMods = (submissionModules || []).filter((sm) => Boolean(sm.skill));
+
+  if (sMods.length === 0) {
+    return aMods;
+  }
+
+  if (aMods.length === 0 || aMods.length < sMods.length) {
+    return sMods.map((sm, idx) => {
+      const matched = aMods.find(
+        (am) => am.id === sm.moduleId || normalizeSkill(am.skill) === normalizeSkill(sm.skill)
+      );
+      return {
+        id: matched?.id ?? sm.moduleId ?? sm.id,
+        skill: matched?.skill ?? (sm.skill || 'WRITING'),
+        orderIndex: matched?.orderIndex ?? idx + 1,
+      };
+    });
+  }
+
+  return aMods;
+}
+
+/**
  * Checks if a submission module is completed (SUBMITTED or GRADED)
  */
 export function isModuleSubmittedOrGraded(subModule?: SubmissionModuleItem): boolean {
@@ -100,9 +132,12 @@ export function isModuleAccessible(
   assignmentModules: ExamModuleItem[],
   submissionModules?: SubmissionModuleItem[]
 ): boolean {
+  const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
   if (targetIndex <= 0) return true;
+  if (targetIndex >= effectiveModules.length) return false;
+
   for (let i = 0; i < targetIndex; i++) {
-    const prevMod = assignmentModules[i];
+    const prevMod = effectiveModules[i];
     const prevSubMod = submissionModules?.find(
       (sm) => sm.moduleId === prevMod.id || normalizeSkill(sm.skill) === normalizeSkill(prevMod.skill)
     );
@@ -120,10 +155,11 @@ export function getNextIncompleteModule(
   assignmentModules: ExamModuleItem[],
   submissionModules?: SubmissionModuleItem[]
 ): ExamModuleItem | null {
-  if (!assignmentModules || assignmentModules.length === 0) return null;
+  const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
+  if (!effectiveModules || effectiveModules.length === 0) return null;
 
-  for (let i = 0; i < assignmentModules.length; i++) {
-    const m = assignmentModules[i];
+  for (let i = 0; i < effectiveModules.length; i++) {
+    const m = effectiveModules[i];
     const subMod = submissionModules?.find(
       (sm) => sm.moduleId === m.id || normalizeSkill(sm.skill) === normalizeSkill(m.skill)
     );
@@ -142,10 +178,11 @@ export function isAllModulesCompleted(
   assignmentModules: ExamModuleItem[],
   submissionModules?: SubmissionModuleItem[]
 ): boolean {
-  if (!assignmentModules || assignmentModules.length === 0) return false;
+  const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
+  if (!effectiveModules || effectiveModules.length === 0) return false;
   if (!submissionModules || submissionModules.length === 0) return false;
 
-  return assignmentModules.every((m) => {
+  return effectiveModules.every((m) => {
     const subMod = submissionModules.find(
       (sm) => sm.moduleId === m.id || normalizeSkill(sm.skill) === normalizeSkill(m.skill)
     );
@@ -164,18 +201,19 @@ export function calculateExamSteps(
   submissionId?: number,
   hasActiveAttempt?: boolean
 ): ExamStepInfo[] {
-  if (!assignmentModules || assignmentModules.length === 0) return [];
+  const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
+  if (!effectiveModules || effectiveModules.length === 0) return [];
 
   const currentCode = currentSkill ? normalizeSkill(currentSkill) : null;
-  const firstIncomplete = getNextIncompleteModule(assignmentModules, submissionModules);
+  const firstIncomplete = getNextIncompleteModule(effectiveModules, submissionModules);
   const isActive = hasActiveAttempt ?? Boolean(currentCode);
 
-  return assignmentModules.map((module, index) => {
+  return effectiveModules.map((module, index) => {
     const subMod = submissionModules?.find(
       (sm) => sm.moduleId === module.id || normalizeSkill(sm.skill) === normalizeSkill(module.skill)
     );
     const isCompleted = isModuleSubmittedOrGraded(subMod);
-    const isAccessible = isModuleAccessible(index, assignmentModules, submissionModules);
+    const isAccessible = isModuleAccessible(index, effectiveModules, submissionModules);
     const skillCode = normalizeSkill(module.skill);
 
     let status: ExamStepStatus;
@@ -210,10 +248,6 @@ export function calculateExamSteps(
   });
 }
 
-
-/**
- * Normalizes document MIME types for backend storage (PDF and DOCX).
- */
 export function getBackendDocumentMimeType(file: { name?: string; type?: string }): string {
   const fileName = (file.name || '').toLowerCase();
   const fileType = (file.type || '').toLowerCase();
@@ -228,31 +262,103 @@ export function getBackendDocumentMimeType(file: { name?: string; type?: string 
   return 'application/pdf';
 }
 
-/**
- * Resolves the target route for a student assignment card based on its status.
- * - Graded / pending / ai_processing: routes to review results (/student/submissions/:subId or /result).
- * - Not started: routes to assignment overview.
- * - In progress: routes to current test-taking skill module with submissionId.
- */
-export function getStudentAssignmentActionRoute(assignment: {
+export interface StudentAssignmentActionTarget {
   id: number | string;
-  status: 'not_started' | 'in_progress' | 'pending' | 'graded' | 'ai_processing';
-  type: string;
-  submissionId?: number;
-}): string {
-  const isCompletedOrGrading =
-    assignment.status === 'graded' ||
-    assignment.status === 'pending' ||
-    assignment.status === 'ai_processing';
-
-  if (isCompletedOrGrading) {
-    return assignment.submissionId
-      ? `/student/submissions/${assignment.submissionId}`
-      : `/student/assignments/${assignment.id}/result`;
-  }
-  if (assignment.status === 'not_started') {
-    return `/student/assignments/${assignment.id}/overview`;
-  }
-  return getSkillRoute(assignment.type, assignment.id, assignment.submissionId);
+  status: 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
+  submissionId?: number | string;
+  activeSkill?: string | null;
+  type?: string;
 }
 
+/**
+ * Resolves the navigation route when a student clicks an assignment card or action button
+ * in StudentAssignments or StudentClassDetails.
+ */
+export function getStudentAssignmentActionRoute(target: StudentAssignmentActionTarget): string {
+  const { id, status, submissionId, activeSkill, type } = target;
+  const subIdStr =
+    submissionId !== undefined && submissionId !== null && String(submissionId).trim() !== ''
+      ? String(submissionId)
+      : undefined;
+
+  if (status === 'graded' || status === 'pending' || status === 'ai_processing') {
+    return subIdStr ? `/student/submissions/${subIdStr}` : `/student/assignments/${id}/result`;
+  }
+
+  if (status === 'in_progress') {
+    const numericSubId =
+      subIdStr && Number.isFinite(Number(subIdStr)) ? Number(subIdStr) : undefined;
+    if (activeSkill !== undefined) {
+      return activeSkill
+        ? getSkillRoute(activeSkill, id, numericSubId)
+        : `/student/assignments/${id}/overview`;
+    }
+    if (type && normalizeSkill(type) !== 'unknown') {
+      return getSkillRoute(type, id, numericSubId);
+    }
+    return `/student/assignments/${id}/overview`;
+  }
+
+  return `/student/assignments/${id}/overview`;
+}
+
+/**
+ * Determines whether an exam taking page should redirect the student away
+ * because:
+ * 1. The parent submission is already SUBMITTED or GRADED,
+ * 2. The current skill does not exist in the assignment,
+ * 3. The current skill module is already completed (SUBMITTED or GRADED), or
+ * 4. The current skill module is LOCKED (previous modules in sequence are incomplete).
+ * Returns the target redirect route, or null if the student is allowed to take this module.
+ */
+export function getExamPageRedirectRoute(
+  submission: { id: number; status: string; modules?: SubmissionModuleItem[] },
+  currentSkill: string,
+  assignmentId: number | string,
+  assignmentModules?: ExamModuleItem[]
+): string | null {
+  const parentStatus = submission.status?.toUpperCase();
+  if (parentStatus === 'SUBMITTED' || parentStatus === 'GRADED') {
+    return `/student/submissions/${submission.id}`;
+  }
+
+  const effectiveModules = resolveEffectiveModules(assignmentModules, submission.modules);
+  const targetCode = normalizeSkill(currentSkill);
+  const currentIndex = effectiveModules.findIndex(
+    (m) => normalizeSkill(m.skill) === targetCode
+  );
+  const currentSubMod = submission.modules?.find(
+    (m) => normalizeSkill(m.skill) === targetCode
+  );
+
+  // If current skill is not part of this assignment at all, redirect to first incomplete module
+  if (effectiveModules.length > 0 && currentIndex === -1 && !currentSubMod) {
+    const nextMod = getNextIncompleteModule(effectiveModules, submission.modules) || effectiveModules[0];
+    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
+      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
+    }
+  }
+
+  // If current module is already completed, advance to next incomplete module or submission result
+  if (isModuleSubmittedOrGraded(currentSubMod)) {
+    const nextMod = getNextIncompleteModule(effectiveModules, submission.modules);
+    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
+      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
+    }
+    const totalMods = Math.max(effectiveModules.length, submission.modules?.length ?? 0);
+    if (totalMods <= 1) {
+      return `/student/submissions/${submission.id}`;
+    }
+    return `/student/assignments/${assignmentId}/overview`;
+  }
+
+  // If current module is locked (previous modules in sequence are not completed yet), redirect to first incomplete module
+  if (currentIndex > 0 && !isModuleAccessible(currentIndex, effectiveModules, submission.modules)) {
+    const nextMod = getNextIncompleteModule(effectiveModules, submission.modules);
+    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
+      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
+    }
+  }
+
+  return null;
+}

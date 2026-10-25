@@ -2,13 +2,16 @@ try:
     import pytest
 except ImportError:
     pytest = None
+import os
 from pathlib import Path
 from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.main import app
 
+os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
 settings.MOCK_MODE = True
-client = TestClient(app)
+INTERNAL_SECRET_HEADERS = {"X-Internal-Secret": os.environ.get("INTERNAL_SECRET", "test-internal-secret")}
+client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
 
 _benchmark_file = Path(__file__).parent / "benchmark_data" / "writing_qa21_essay.txt"
 if _benchmark_file.exists():

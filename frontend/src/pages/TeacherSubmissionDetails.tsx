@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { 
+import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
-  Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles
+  Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
+  XCircle, Plus, Trash2
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -14,24 +15,21 @@ import {
   type SubmissionModuleDetailResponse,
   isModuleGraded
 } from '../api/services/submission.service';
-import { 
-  gradingService, 
-  type AiGradingSuggestionResponse, 
+import {
+  gradingService,
+  type AiGradingSuggestionResponse,
   type SubmissionModuleGradingResponse,
-  type GradingDetailResponse 
+  type GradingDetailResponse
 } from '../api/services/grading.service';
+import {
+  answerAnnotationService,
+  type GradingAnnotation
+} from '../api/services/answer-annotation.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { classService, type ClassMember } from '../api/services/class.service';
+import { resolveAudioUrl } from '../utils/audioUrl.utils';
 
-const resolveStorageUrl = (storageKey?: string | null): string => {
-  if (!storageKey) return '';
-  if (storageKey.startsWith('http://') || storageKey.startsWith('https://')) {
-    return storageKey;
-  }
-  return `/s3-upload/englishhub-dev/${storageKey.replace(/^\/+/, '')}`;
-};
-
-const resolveAudioUrl = resolveStorageUrl;
+const resolveStorageUrl = resolveAudioUrl;
 
 const getFileNameFromKey = (storageKey: string): string => {
   const baseName = storageKey.split('/').pop();
@@ -50,6 +48,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
+  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
@@ -66,6 +65,18 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
+  const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
+  const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
+  const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [deletingAnnotationIds, setDeletingAnnotationIds] = useState<Record<number, boolean>>({});
+  const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
+  const [isCreatingAnnotation, setIsCreatingAnnotation] = useState<boolean>(false);
+  const [isSubmittingAnnotation, setIsSubmittingAnnotation] = useState<boolean>(false);
+  const [newAnnErrorType, setNewAnnErrorType] = useState<string>('GRAMMAR');
+  const [newAnnSuggestedFix, setNewAnnSuggestedFix] = useState<string>('');
+  const [newAnnComment, setNewAnnComment] = useState<string>('');
+  const [newAnnStartOffset, setNewAnnStartOffset] = useState<string>('0');
+  const [newAnnEndOffset, setNewAnnEndOffset] = useState<string>('0');
   const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
     if (routeState?.studentName) {
       return {
@@ -118,9 +129,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   const loadModuleData = useCallback(async (targetModuleId: number) => {
+    let currentModDetail: SubmissionModuleDetailResponse | null = null;
+    let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
+
     try {
       const modDetailRes = await submissionService.getSubmissionModuleDetail(targetModuleId);
       setModuleDetail(modDetailRes);
+      currentModDetail = modDetailRes;
     } catch {
       setModuleDetail(null);
     }
@@ -155,6 +170,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     try {
       const aiRes = await gradingService.getAiSuggestion(targetModuleId);
       setAiSuggestion(aiRes);
+      currentAiSuggestion = aiRes;
       if (aiRes.aiFeedback) {
         setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
       }
@@ -163,6 +179,72 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     } catch {
       setAiSuggestion(null);
+    }
+
+    // Fetch Annotations for current module answer
+    try {
+      setIsLoadingAnnotations(true);
+      const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
+      if (targetAns?.id) {
+        try {
+          const annRes = await answerAnnotationService.listAnnotations(targetAns.id);
+          const fetchedAnns = annRes.data || [];
+          if (fetchedAnns.length > 0) {
+            setAnnotations(fetchedAnns);
+          } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setAnnotations(
+              currentAiSuggestion.annotations.map((a) => ({
+                id: a.id,
+                source: a.source,
+                startOffset: a.startOffset,
+                endOffset: a.endOffset,
+                errorType: a.errorType || null,
+                comment: a.comment || null,
+                suggestedFix: a.suggestedFix || null,
+                reviewStatus: a.reviewStatus,
+              }))
+            );
+          } else {
+            setAnnotations([]);
+          }
+        } catch {
+          if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setAnnotations(
+              currentAiSuggestion.annotations.map((a) => ({
+                id: a.id,
+                source: a.source,
+                startOffset: a.startOffset,
+                endOffset: a.endOffset,
+                errorType: a.errorType || null,
+                comment: a.comment || null,
+                suggestedFix: a.suggestedFix || null,
+                reviewStatus: a.reviewStatus,
+              }))
+            );
+          } else {
+            setAnnotations([]);
+          }
+        }
+      } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+        setAnnotations(
+          currentAiSuggestion.annotations.map((a) => ({
+            id: a.id,
+            source: a.source,
+            startOffset: a.startOffset,
+            endOffset: a.endOffset,
+            errorType: a.errorType || null,
+            comment: a.comment || null,
+            suggestedFix: a.suggestedFix || null,
+            reviewStatus: a.reviewStatus,
+          }))
+        );
+      } else {
+        setAnnotations([]);
+      }
+    } catch {
+      setAnnotations([]);
+    } finally {
+      setIsLoadingAnnotations(false);
     }
   }, []);
 
@@ -357,7 +439,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   const handleNavigateSibling = (direction: 'prev' | 'next') => {
     if (classSubmissions.length <= 1) return;
-    const targetIdx = direction === 'prev' 
+    const targetIdx = direction === 'prev'
       ? (currentIndex - 1 + classSubmissions.length) % classSubmissions.length
       : (currentIndex + 1) % classSubmissions.length;
     const nextStudent = classSubmissions[targetIdx];
@@ -419,8 +501,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
         note: teacherNote
       });
 
-      showToast(isVi 
-        ? (isFinalize ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Đã lưu bản nháp nhận xét!') 
+      showToast(isVi
+        ? (isFinalize ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Đã lưu bản nháp nhận xét!')
         : (isFinalize ? 'Grade finalized and published to student!' : 'Grading draft saved!'));
 
       if (isFinalize) {
@@ -436,16 +518,22 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   // Check if current active module is speaking
-  const isSpeaking = activeModule?.skill === 'SPEAKING' || 
+  const isSpeaking = activeModule?.skill === 'SPEAKING' ||
     moduleDetail?.answers?.some(a => !!a.audioStorageKey);
 
   const audioAnswer = moduleDetail?.answers?.find(a => !!a.audioStorageKey);
   const audioStorageKey = audioAnswer?.audioStorageKey;
   const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
 
+  const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
+
+  const targetAnswer = useMemo(() => {
+    return moduleDetail?.answers?.find((a) => !!a.audioStorageKey) || moduleDetail?.answers?.[0] || null;
+  }, [moduleDetail]);
+
   // Extract attached documents (for Writing or file uploads)
   const attachedDocAnswers = useMemo(() => {
-    return moduleDetail?.answers?.filter(a => !!a.docStorageKey) || [];
+    return moduleDetail?.answers?.filter((a) => !!a.docStorageKey) || [];
   }, [moduleDetail?.answers]);
 
   // Extract student text answer
@@ -455,10 +543,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
 
     const firstAnswer = moduleDetail.answers[0];
+    if (firstAnswer.content === null || firstAnswer.content === undefined) {
+      return '';
+    }
     if (typeof firstAnswer.content === 'string') {
       return firstAnswer.content.trim();
     }
-    if (typeof firstAnswer.content === 'object' && firstAnswer.content !== null) {
+    if (typeof firstAnswer.content === 'object') {
       const obj = firstAnswer.content as Record<string, unknown>;
       const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
       if (typeof textVal === 'string') return textVal.trim();
@@ -468,9 +559,416 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [moduleDetail]);
 
   const wordCount = useMemo(() => {
-    if (!studentAnswerText) return 0;
+    if (!studentAnswerText.trim()) return 0;
     return studentAnswerText.trim().split(/\s+/).filter(Boolean).length;
   }, [studentAnswerText]);
+
+  const handleReviewAnnotation = async (annotationId: number, status: 'ACCEPTED' | 'REJECTED') => {
+    setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.reviewAnnotation(annotationId, { reviewStatus: status });
+      setAnnotations((prev) =>
+        prev.map((ann) => (ann.id === annotationId ? { ...ann, reviewStatus: status } : ann))
+      );
+      showToast(
+        isVi
+          ? (status === 'ACCEPTED' ? 'Đã duyệt gợi ý của AI.' : 'Đã từ chối gợi ý của AI.')
+          : (status === 'ACCEPTED' ? 'AI annotation accepted.' : 'AI annotation rejected.')
+      );
+    } catch (err) {
+      console.error('Failed to review annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể cập nhật trạng thái duyệt.' : 'Failed to update review status.'));
+    } finally {
+      setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+    }
+  };
+
+  const handleCreateAnnotation = async () => {
+    if (!targetAnswer?.id) return;
+    if (!newAnnComment.trim()) {
+      showToast(isVi ? 'Vui lòng nhập nhận xét cho chú thích.' : 'Please enter a comment.');
+      return;
+    }
+    const startNum = Math.max(0, parseInt(newAnnStartOffset, 10) || 0);
+    const endNum = Math.max(startNum, parseInt(newAnnEndOffset, 10) || startNum);
+
+    setIsSubmittingAnnotation(true);
+    try {
+      const res = await answerAnnotationService.createAnnotation(targetAnswer.id, {
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+      });
+      const createdItem: GradingAnnotation = {
+        id: res.id,
+        source: 'TEACHER',
+        startOffset: startNum,
+        endOffset: endNum,
+        errorType: newAnnErrorType,
+        comment: newAnnComment.trim(),
+        suggestedFix: newAnnSuggestedFix.trim() || null,
+        reviewStatus: 'ACCEPTED',
+      };
+      setAnnotations((prev) => [...prev, createdItem]);
+      setNewAnnComment('');
+      setNewAnnSuggestedFix('');
+      setNewAnnStartOffset('0');
+      setNewAnnEndOffset('0');
+      setIsCreatingAnnotation(false);
+      showToast(isVi ? 'Đã thêm chú thích mới.' : 'Annotation added.');
+    } catch (err) {
+      console.error('Failed to create annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.'));
+    } finally {
+      setIsSubmittingAnnotation(false);
+    }
+  };
+
+  const handleDeleteAnnotation = async (annotationId: number) => {
+    setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
+    try {
+      await answerAnnotationService.deleteAnnotation(annotationId);
+      setAnnotations((prev) => prev.filter((ann) => ann.id !== annotationId));
+      showToast(isVi ? 'Đã xóa chú thích.' : 'Annotation deleted.');
+    } catch (err) {
+      console.error('Failed to delete annotation:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Không thể xóa chú thích.' : 'Failed to delete annotation.'));
+    } finally {
+      setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+    }
+  };
+
+  const filteredAnnotations = useMemo(() => {
+    if (annotationFilter === 'ALL') return annotations;
+    return annotations.filter((a) => a.reviewStatus === annotationFilter);
+  }, [annotations, annotationFilter]);
+
+  const annotationCounts = useMemo(() => {
+    return {
+      all: annotations.length,
+      pending: annotations.filter((a) => a.reviewStatus === 'PENDING').length,
+      accepted: annotations.filter((a) => a.reviewStatus === 'ACCEPTED').length,
+      rejected: annotations.filter((a) => a.reviewStatus === 'REJECTED').length,
+    };
+  }, [annotations]);
+
+  const transcriptText = useMemo(() => {
+    const rawTranscript =
+      aiSuggestion?.transcript ??
+      (gradingDetail?.aiTranscript &&
+      typeof gradingDetail.aiTranscript === 'object' &&
+      'transcript' in (gradingDetail.aiTranscript as Record<string, unknown>)
+        ? (gradingDetail.aiTranscript as Record<string, unknown>).transcript
+        : gradingDetail?.aiTranscript);
+
+    if (!rawTranscript) return null;
+    if (typeof rawTranscript === 'string') return rawTranscript;
+    if (Array.isArray(rawTranscript)) {
+      return rawTranscript
+        .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
+        .join(' ');
+    }
+    return null;
+  }, [aiSuggestion, gradingDetail]);
+
+  const extractSnippet = (start?: number, end?: number): string | null => {
+    if (start === undefined || end === undefined || start < 0 || end <= start) return null;
+    const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
+    if (!baseText) return null;
+    if (start < baseText.length) {
+      const slice = baseText.slice(start, Math.min(end, baseText.length)).trim();
+      return slice.length > 0 ? slice : null;
+    }
+    return null;
+  };
+
+  const renderAnnotationsSection = () => {
+    return (
+      <div className="tsd-annotations-section">
+        <div className="tsd-annotations-header">
+          <div className="tsd-ann-header-top">
+            <div className="tsd-annotations-title-wrap">
+              <h4 className="tsd-annotations-title">
+                {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'Segment Annotations'}
+              </h4>
+              <span className="tsd-annotations-counter">{annotations.length}</span>
+            </div>
+
+            {targetAnswer?.id && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={Plus}
+                onClick={() => setIsCreatingAnnotation((prev) => !prev)}
+              >
+                {isVi ? 'Thêm chú thích' : 'Add annotation'}
+              </Button>
+            )}
+          </div>
+
+          {annotations.length > 0 && (
+            <div className="tsd-annotations-filter-bar">
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ALL')}
+              >
+                {isVi ? 'Tất cả' : 'All'} ({annotationCounts.all})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'PENDING' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('PENDING')}
+              >
+                {isVi ? 'Chờ duyệt' : 'Pending'} ({annotationCounts.pending})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'ACCEPTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('ACCEPTED')}
+              >
+                {isVi ? 'Đã duyệt' : 'Accepted'} ({annotationCounts.accepted})
+              </button>
+              <button
+                type="button"
+                className={`tsd-ann-filter-btn ${annotationFilter === 'REJECTED' ? 'active' : ''}`}
+                onClick={() => setAnnotationFilter('REJECTED')}
+              >
+                {isVi ? 'Đã từ chối' : 'Rejected'} ({annotationCounts.rejected})
+              </button>
+            </div>
+          )}
+        </div>
+
+        {isCreatingAnnotation && (
+          <div className="tsd-ann-create-form">
+            <div className="tsd-ann-form-grid">
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Loại lỗi' : 'Error type'}
+                </label>
+                <select
+                  className="tsd-ann-select"
+                  value={newAnnErrorType}
+                  onChange={(e) => setNewAnnErrorType(e.target.value)}
+                >
+                  <option value="GRAMMAR">GRAMMAR</option>
+                  <option value="VOCABULARY">VOCABULARY</option>
+                  <option value="PRONUNCIATION">PRONUNCIATION</option>
+                  <option value="COHESION">COHESION</option>
+                  <option value="SPELLING">SPELLING</option>
+                  <option value="PUNCTUATION">PUNCTUATION</option>
+                </select>
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Từ ký tự' : 'Start offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnStartOffset}
+                  onChange={(e) => setNewAnnStartOffset(e.target.value)}
+                />
+              </div>
+              <div className="tsd-ann-form-field">
+                <label className="tsd-ann-label">
+                  {isVi ? 'Đến ký tự' : 'End offset'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="tsd-ann-input"
+                  value={newAnnEndOffset}
+                  onChange={(e) => setNewAnnEndOffset(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Gợi ý sửa' : 'Suggested fix'}
+              </label>
+              <input
+                type="text"
+                className="tsd-ann-input"
+                placeholder={isVi ? 'Nhập câu/từ gợi ý sửa...' : 'Enter suggested correction...'}
+                value={newAnnSuggestedFix}
+                onChange={(e) => setNewAnnSuggestedFix(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-field">
+              <label className="tsd-ann-label">
+                {isVi ? 'Nhận xét chi tiết' : 'Comment'}
+              </label>
+              <textarea
+                rows={2}
+                className="tsd-ann-textarea"
+                placeholder={isVi ? 'Giải thích lỗi hoặc hướng dẫn sửa...' : 'Explain the issue or feedback...'}
+                value={newAnnComment}
+                onChange={(e) => setNewAnnComment(e.target.value)}
+              />
+            </div>
+
+            <div className="tsd-ann-form-actions">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={isSubmittingAnnotation}
+                onClick={() => setIsCreatingAnnotation(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                loading={isSubmittingAnnotation}
+                disabled={isSubmittingAnnotation}
+                onClick={handleCreateAnnotation}
+              >
+                {isVi ? 'Lưu chú thích' : 'Save annotation'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isLoadingAnnotations ? (
+          <div className="tsd-annotations-loading">
+            <RefreshCw size={18} className="animate-spin" />
+            <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
+          </div>
+        ) : filteredAnnotations.length === 0 ? (
+          <EmptyState
+            title={
+              annotations.length === 0
+                ? (isVi ? 'Chưa có gợi ý sửa lỗi từ AI' : 'No AI annotations available')
+                : (isVi ? 'Không có gợi ý trong bộ lọc này' : 'No annotations in this filter')
+            }
+            description={
+              annotations.length === 0
+                ? (isVi ? 'AI chưa phát hiện lỗi cần chú thích hoặc bài làm chưa được phân tích bằng AI.' : 'AI has not identified segment errors or submission has not been analyzed.')
+                : undefined
+            }
+            className="tsd-annotations-empty"
+          />
+        ) : (
+          <div className="tsd-annotations-list">
+            {filteredAnnotations.map((ann) => {
+              const isReviewing = !!reviewingAnnotationIds[ann.id];
+              const isDeleting = !!deletingAnnotationIds[ann.id];
+              const snippet = extractSnippet(ann.startOffset, ann.endOffset);
+              const badgeStatus =
+                ann.reviewStatus === 'ACCEPTED' ? 'success' : ann.reviewStatus === 'REJECTED' ? 'error' : 'warning';
+              const badgeLabel =
+                ann.reviewStatus === 'ACCEPTED'
+                  ? (isVi ? 'Đã duyệt' : 'Accepted')
+                  : ann.reviewStatus === 'REJECTED'
+                  ? (isVi ? 'Đã từ chối' : 'Rejected')
+                  : (isVi ? 'Chờ duyệt' : 'Pending');
+
+              return (
+                <div key={ann.id} className={`tsd-annotation-item ${ann.reviewStatus.toLowerCase()}`}>
+                  <div className="tsd-ann-item-header">
+                    <div className="tsd-ann-type-group">
+                      <span className="tsd-ann-type-pill">
+                        {ann.errorType || (isVi ? 'Gợi ý' : 'Suggestion')}
+                      </span>
+                      {ann.source === 'TEACHER' && (
+                        <span className="tsd-ann-source-badge">
+                          {isVi ? 'Giáo viên' : 'Teacher'}
+                        </span>
+                      )}
+                      <span className="tsd-ann-range">
+                        [{ann.startOffset} - {ann.endOffset}]
+                      </span>
+                    </div>
+                    <StatusBadge status={badgeStatus} label={badgeLabel} showDot />
+                  </div>
+
+                  <div className="tsd-ann-item-body">
+                    {snippet && (
+                      <div className="tsd-ann-snippet">
+                        <span className="tsd-ann-quote-mark">&ldquo;</span>
+                        {snippet}
+                        <span className="tsd-ann-quote-mark">&rdquo;</span>
+                      </div>
+                    )}
+
+                    {ann.suggestedFix && (
+                      <div className="tsd-ann-fix-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Gợi ý sửa:' : 'Suggested fix:'}</span>
+                        <span className="tsd-ann-fix-val">{ann.suggestedFix}</span>
+                      </div>
+                    )}
+
+                    {ann.comment && (
+                      <div className="tsd-ann-comment-row">
+                        <span className="tsd-ann-field-label">{isVi ? 'Nhận xét:' : 'Comment:'}</span>
+                        <span className="tsd-ann-comment-val">{ann.comment}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="tsd-ann-item-actions">
+                    {ann.source === 'AI' && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
+                          icon={CheckCircle2}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting}
+                          onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
+                          className="tsd-btn-review-accept"
+                        >
+                          {ann.reviewStatus === 'ACCEPTED' ? (isVi ? 'Đã duyệt' : 'Accepted') : (isVi ? 'Duyệt' : 'Accept')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
+                          icon={XCircle}
+                          loading={isReviewing}
+                          disabled={isReviewing || isDeleting}
+                          onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
+                          className="tsd-btn-review-reject"
+                        >
+                          {ann.reviewStatus === 'REJECTED' ? (isVi ? 'Đã từ chối' : 'Rejected') : (isVi ? 'Từ chối' : 'Reject')}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      icon={Trash2}
+                      loading={isDeleting}
+                      disabled={isReviewing || isDeleting}
+                      onClick={() => handleDeleteAnnotation(ann.id)}
+                      className="tsd-btn-delete-ann"
+                    >
+                      {isVi ? 'Xóa' : 'Delete'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -493,7 +991,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <AlertCircle size={24} color="var(--error)" />
           <h3 className="tsd-error-title">{error}</h3>
         </div>
-        <Button 
+        <Button
           variant="secondary"
           size="sm"
           onClick={handleRetry}
@@ -539,16 +1037,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
       {/* Top Breadcrumbs & Actions */}
       <div className="tsd-nav-bar">
-        <button 
+        <button
           onClick={() => navigate(`/teacher/assignments/${id}`)}
           className="tsd-back-link"
         >
           <ArrowLeft size={16} /> {t('submissionDetails.backToList')}
         </button>
-        
+
         {classSubmissions.length > 0 && (
           <div className="tsd-pager-bar">
-            <button 
+            <button
               onClick={() => handleNavigateSibling('prev')}
               className="tsd-pager-btn"
             >
@@ -557,7 +1055,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
             <span className="tsd-pager-count">
               {currentIndex + 1} / {classSubmissions.length}
             </span>
-            <button 
+            <button
               onClick={() => handleNavigateSibling('next')}
               className="tsd-pager-btn next"
             >
@@ -613,7 +1111,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <div className="tsd-time-divider" />
               <div className="tsd-ontime-indicator">
                 <span className="tsd-ontime-dot" />
-                <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
+                <span className="tsd-ontime-text">{t('submissionDetails.statusOnTime')}</span>
               </div>
             </>
           )}
@@ -645,12 +1143,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
       {/* Metrics Row (Only for non-speaking modules) */}
       {!isSpeaking && (
         <div className="tsd-metrics-grid">
-          <MetricCard 
+          <MetricCard
             title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
-            value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
-              ? String(gradingDetail.finalScore) 
-              : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined 
-                  ? String(aiSuggestion.suggestedScore) 
+            value={gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined
+              ? String(gradingDetail.finalScore)
+              : (aiSuggestion?.suggestedScore !== null && aiSuggestion?.suggestedScore !== undefined
+                  ? String(aiSuggestion.suggestedScore)
                   : '--')}
             suffix="/ 10"
           />
@@ -675,11 +1173,36 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
               <div className="tsd-speaking-audio-bar">
                 {audioUrl ? (
-                  <div className="tsd-speaking-audio-wrap">
-                    <audio controls src={audioUrl} className="tsd-audio-player">
-                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
-                    </audio>
-                  </div>
+                  audioError ? (
+                    <div className="tsd-audio-error">
+                      <div className="tsd-audio-error-msg">
+                        <AlertCircle size={16} />
+                        <span>
+                          {isVi ? 'Không thể tải bản ghi âm.' : 'Failed to load audio.'}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={() => setAudioErrorUrl(null)}
+                      >
+                        {isVi ? 'Thử lại' : 'Retry'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="tsd-speaking-audio-wrap">
+                      <audio
+                        controls
+                        src={audioUrl}
+                        className="tsd-audio-player"
+                        onError={() => setAudioErrorUrl(audioUrl)}
+                      >
+                        {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                      </audio>
+                    </div>
+                  )
                 ) : (
                   <div className="tsd-audio-empty">
                     {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
@@ -694,8 +1217,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   onClick={handleTriggerAiAnalyze}
                   icon={Sparkles}
                 >
-                  {isAnalyzingAi 
-                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
+                  {isAnalyzingAi
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...')
                     : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
                         ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
                         : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
@@ -717,8 +1240,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <span className="tsd-speaking-ai-score">
                     {isVi ? 'Điểm đề xuất: ' : 'Suggested: '}
                     <strong>
-                      {gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined 
-                        ? String(gradingDetail.finalScore) 
+                      {gradingDetail?.finalScore !== null && gradingDetail?.finalScore !== undefined
+                        ? String(gradingDetail.finalScore)
                         : String(aiSuggestion?.suggestedScore)}
                     </strong> / 10
                   </span>
@@ -726,13 +1249,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
 
               <div className="tsd-speaking-ai-content">
-                <MarkdownView 
+                <MarkdownView
                   content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
-                  fallbackText={isVi 
-                    ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.' 
+                  fallbackText={isVi
+                    ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.'
                     : 'No AI feedback available. Click "Grade with AI" to analyze the submission.'}
                   className="tsd-speaking-ai-markdown"
                 />
+                {renderAnnotationsSection()}
               </div>
             </div>
 
@@ -748,18 +1272,18 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <label className="tsd-card-label">
                   {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
                 </label>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <input 
-                    type="number" 
-                    step="0.5" 
-                    min="0" 
-                    max="10" 
+                <div className="tsd-score-input-wrap">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="10"
                     placeholder="0.0"
                     value={finalScoreInput}
                     onChange={(e) => setFinalScoreInput(e.target.value)}
                     className="tsd-score-input"
                   />
-                  <span className="text-sm font-semibold text-slate-500">/ 10</span>
+                  <span className="tsd-score-scale">/ 10</span>
                 </div>
               </div>
 
@@ -767,9 +1291,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <label className="tsd-card-label mb-2">
                   {t('submissionDetails.feedbackTitle')}
                 </label>
-                <textarea 
+                <textarea
                   className="tsd-feedback-textarea"
-                  placeholder={t('submissionDetails.feedbackPlaceholder')} 
+                  placeholder={t('submissionDetails.feedbackPlaceholder')}
                   rows={9}
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
@@ -791,8 +1315,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 </span>
               </div>
               <div className="tsd-answer-wordcount">
-                {wordCount > 0 
-                  ? `${wordCount} ${isVi ? 'từ' : 'words'}` 
+                {wordCount > 0
+                  ? `${wordCount} ${isVi ? 'từ' : 'words'}`
                   : (attachedDocAnswers.length > 0 ? (isVi ? 'Tệp đính kèm' : 'Attached file') : (isVi ? '0 từ' : '0 words'))}
               </div>
             </div>
@@ -817,7 +1341,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                       const fileName = getFileNameFromKey(docKey);
 
                       return (
-                        <FileItem 
+                        <FileItem
                           key={ans.id}
                           name={fileName}
                           extension={extension}
@@ -842,7 +1366,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <p>{isVi ? 'Học viên đã nộp bài hoàn chỉnh qua tệp đính kèm ở trên. Hãy bấm "Xem" hoặc "Tải xuống" để kiểm tra bài làm.' : 'Student submitted their assignment via the attached document above. Click "View" or "Download" to review.'}</p>
                 </div>
               ) : (
-                <p className="tsd-file-only-note">
+                <p className="tsd-online-answer-note">
                   {isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.'}
                 </p>
               )}
@@ -863,11 +1387,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
               </label>
               <div className="tsd-score-input-wrap">
-                <input 
-                  type="number" 
-                  step="0.5" 
-                  min="0" 
-                  max="10" 
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="10"
                   placeholder="0.0"
                   value={finalScoreInput}
                   onChange={(e) => setFinalScoreInput(e.target.value)}
@@ -892,20 +1416,25 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   onClick={handleTriggerAiAnalyze}
                   icon={Sparkles}
                 >
-                  {isAnalyzingAi 
-                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...') 
+                  {isAnalyzingAi
+                    ? (isVi ? 'Đang chấm điểm...' : 'Grading...')
                     : (gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback
                         ? (isVi ? 'Chấm lại bằng AI' : 'Re-grade with AI')
                         : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
                 </Button>
               </div>
-              <MarkdownView 
+              <MarkdownView
                 content={gradingDetail?.aiFeedback || aiSuggestion?.aiFeedback}
-                fallbackText={isVi 
-                  ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.' 
+                fallbackText={isVi
+                  ? 'Chưa có nhận xét từ AI. Hãy bấm nút "Chấm bài bằng AI" để hệ thống phân tích và đề xuất nhận xét.'
                   : 'No AI feedback available. Click "Grade with AI" to generate AI insights.'}
                 className="tsd-ai-markdown"
               />
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
             </div>
 
             {/* Feedback Editor */}
@@ -914,9 +1443,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {t('submissionDetails.feedbackTitle')}
               </h3>
 
-              <textarea 
+              <textarea
                 className="tsd-feedback-textarea"
-                placeholder={t('submissionDetails.feedbackPlaceholder')} 
+                placeholder={t('submissionDetails.feedbackPlaceholder')}
                 rows={5}
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
@@ -926,7 +1455,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <label className="tsd-note-label">
                   {isVi ? 'Ghi chú nội bộ' : 'Private Notes'}
                 </label>
-                <input 
+                <input
                   type="text"
                   placeholder={isVi ? 'Ghi chú thêm về học viên này...' : 'Internal note...'}
                   value={teacherNote}
@@ -939,17 +1468,17 @@ export const TeacherSubmissionDetails: React.FC = () => {
         </div>
       )}
 
-      <StickyActionBar 
+      <StickyActionBar
         leftActions={
           <>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate(`/teacher/assignments/${id}`)}
             >
               {isVi ? 'Quay lại' : 'Back'}
             </Button>
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               disabled={isSubmittingGrade}
               onClick={() => handleSaveGrade(false)}
               icon={Save}
@@ -959,8 +1488,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
           </>
         }
         rightActions={
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             disabled={isSubmittingGrade}
             onClick={() => handleSaveGrade(true)}
             icon={isSubmittingGrade ? RefreshCw : Send}

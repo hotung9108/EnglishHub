@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle2, AlertCircle, RotateCcw, FileText } from 'lucid
 import { classService, type ClassDetail } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
+import { getStudentAssignmentActionRoute } from '../utils/examStepper.utils';
 import { Button, EmptyState, Skeleton } from '../components/common';
 import '../styles/student-ecosystem.css';
 
@@ -31,43 +32,41 @@ const StudentClassDetails: React.FC = () => {
   const [classDetail, setClassDetail] = useState<ClassDetail | null>(null);
   const [assignments, setAssignments] = useState<EnrichedClassAssignment[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'not_started' | 'pending' | 'graded'>('all');
-
   const [reloadKey, setReloadKey] = useState(0);
+
   const handleReload = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
     let isMounted = true;
+    const numericClassId = Number(id);
 
     const fetchClassDetails = async () => {
+      if (!id || !Number.isFinite(numericClassId)) {
+        if (isMounted) {
+          setError('Mã lớp học không hợp lệ.');
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-
-        const numericId = Number(id);
-        const isNum = !isNaN(numericId);
-        const targetClassId = isNum ? numericId : 1;
-
         const [classRes, assignmentsRes, submissionsRes] = await Promise.allSettled([
-          isNum ? classService.getDetail(numericId) : Promise.reject('Invalid ID'),
-          assignmentService.listAssignments(targetClassId),
-          submissionService.listSubmissions({ classId: targetClassId, studentId: user?.id, limit: 100 })
+          classService.getDetail(numericClassId),
+          assignmentService.listAssignments(numericClassId, { limit: 50 }),
+          submissionService.listSubmissions({ classId: numericClassId, studentId: user?.id, limit: 100 })
         ]);
 
         if (!isMounted) return;
 
-        let detail: ClassDetail | null = null;
-        if (classRes.status === 'fulfilled' && classRes.value) {
-          detail = classRes.value;
+        if (classRes.status === 'fulfilled') {
+          setClassDetail(classRes.value);
         } else {
-          detail = {
-            id: targetClassId,
-            name: `Lớp học #${targetClassId}`,
-            status: 'ACTIVE',
-            teacher: undefined,
-            level: undefined
-          };
+          setError('Không thể tải thông tin chi tiết lớp học.');
+          setLoading(false);
+          return;
         }
-        setClassDetail(detail);
 
         const rawAssignments: AssignmentSummary[] = assignmentsRes.status === 'fulfilled'
           ? (assignmentsRes.value?.data || (Array.isArray(assignmentsRes.value) ? assignmentsRes.value : []))
@@ -169,11 +168,13 @@ const StudentClassDetails: React.FC = () => {
   }, [assignments, statusFilter]);
 
   const handleAssignmentClick = (assignment: EnrichedClassAssignment) => {
-    if (assignment.status === 'graded') {
-      navigate(`/student/submissions/${assignment.submissionId || assignment.id}`);
-    } else {
-      navigate(`/student/assignments/${assignment.id}/overview`);
-    }
+    navigate(
+      getStudentAssignmentActionRoute({
+        id: assignment.id,
+        status: assignment.status,
+        submissionId: assignment.submissionId,
+      })
+    );
   };
 
   if (loading) {

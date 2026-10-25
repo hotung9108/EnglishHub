@@ -16,6 +16,7 @@ export interface ExamStepperProps {
   assignmentId: number | string;
   submissionId?: number;
   hasActiveAttempt?: boolean;
+  canReviewCompleted?: boolean;
   variant?: 'overview' | 'compact';
   onSelectModule?: (skill: string, step: ExamStepInfo) => void;
   disabled?: boolean;
@@ -29,15 +30,12 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
   assignmentId,
   submissionId,
   hasActiveAttempt,
+  canReviewCompleted,
   variant = 'overview',
   onSelectModule,
   disabled = false,
   isClosed = false
 }) => {
-  if (!modules || modules.length === 0) {
-    return null;
-  }
-
   const steps = calculateExamSteps(
     modules,
     submissionModules,
@@ -47,12 +45,19 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
     hasActiveAttempt
   );
 
+  if (steps.length === 0) {
+    return null;
+  }
+
+  const allowReviewCompleted = canReviewCompleted ?? !hasActiveAttempt;
+
   if (variant === 'compact') {
     return (
       <nav className="eh-stepper-compact" aria-label="Tiến trình làm bài thi">
         {steps.map((step, idx) => {
+          const isCurrentSkill = step.status === 'ACTIVE';
           const isInteractive = Boolean(
-            onSelectModule && (step.isCompleted || step.isAccessible) && !disabled
+            onSelectModule && !step.isCompleted && step.isAccessible && !isCurrentSkill && !disabled
           );
 
           const handleClick = () => {
@@ -60,6 +65,15 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
               onSelectModule(step.module.skill, step);
             }
           };
+
+          const stepTitle =
+            step.status === 'LOCKED'
+              ? `Phần ${step.index + 1}: Cần hoàn thành phần thi trước`
+              : step.status === 'COMPLETED'
+              ? `Phần ${step.index + 1}: ${step.skillName} (Đã hoàn thành)`
+              : step.status === 'ACTIVE'
+              ? `Phần ${step.index + 1}: ${step.skillName} (Đang làm)`
+              : `Phần ${step.index + 1}: ${step.skillName}`;
 
           return (
             <React.Fragment key={step.module.id || idx}>
@@ -73,11 +87,7 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
                 className={`eh-stepper-compact-step ${step.status.toLowerCase()} ${isInteractive ? 'interactive' : ''}`}
                 onClick={handleClick}
                 disabled={!isInteractive}
-                title={
-                  step.status === 'LOCKED'
-                    ? `Phần ${step.index + 1}: Cần hoàn thành phần thi trước`
-                    : `Phần ${step.index + 1}: ${step.skillName}`
-                }
+                title={stepTitle}
               >
                 {step.status === 'COMPLETED' ? (
                   <CheckCircle2 size={14} />
@@ -104,7 +114,9 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
     <div className="eh-stepper-overview">
       <div className="eh-stepper-track">
         {steps.map((step) => {
-          const isInteractive = (step.isCompleted || step.isAccessible) && !disabled;
+          const isInteractive =
+            ((step.isCompleted && allowReviewCompleted) || (!step.isCompleted && step.isAccessible)) &&
+            !disabled;
           const isLocked = step.status === 'LOCKED';
 
           const handleAction = () => {
@@ -151,21 +163,34 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
                   {isLocked
                     ? `Mở sau khi hoàn thành Phần ${step.index}`
                     : step.isCompleted
-                    ? 'Có thể xem lại bài làm'
+                    ? allowReviewCompleted
+                      ? 'Có thể xem lại bài làm'
+                      : 'Đã nộp phần thi này'
                     : 'Bắt buộc hoàn thành để tiếp tục'}
                 </div>
               </div>
 
               <div className="eh-stepper-step-action">
                 {step.isCompleted ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleAction}
-                    disabled={disabled}
-                  >
-                    Xem lại
-                  </Button>
+                  allowReviewCompleted ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleAction}
+                      disabled={disabled}
+                    >
+                      Xem lại
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled
+                      icon={CheckCircle2}
+                    >
+                      Đã hoàn thành
+                    </Button>
+                  )
                 ) : isLocked ? (
                   <Button
                     variant="secondary"

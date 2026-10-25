@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 os.environ["MOCK_MODE"] = "true"
 os.environ["GEMINI_API_KEY"] = ""
+os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
 
 from fastapi.testclient import TestClient
 from app.core.config import settings
@@ -15,6 +16,7 @@ from app.core.config import settings
 settings.MOCK_MODE = True
 settings.GEMINI_API_KEY = ""
 settings.OPENROUTER_API_KEY = ""
+INTERNAL_SECRET_HEADERS = {"X-Internal-Secret": os.environ.get("INTERNAL_SECRET", "test-internal-secret")}
 
 from app.main import app
 from app.services.audio_processor import AudioProcessor
@@ -22,7 +24,7 @@ from app.services.audio_processor import AudioProcessor
 
 class TestSpeakingApi(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
 
     def test_health_check(self):
         response = self.client.get("/health")
@@ -175,7 +177,7 @@ class TestSpeakingApi(unittest.TestCase):
 
 class TestWritingApi(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = TestClient(app, headers=INTERNAL_SECRET_HEADERS)
         self.essay = (
             "Nowadays, many educators argue that unpaid community service should be compulsory in high school. "
             "In my opinion, I completely agree with this viewpoint because volunteering helps students develop essential life skills and broadens their social awareness.\n"

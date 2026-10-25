@@ -6,6 +6,7 @@ import { assignmentService } from '../../api/services/assignment.service';
 import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../../api/services/submission.service';
 import { gradingService, type AiGradingSuggestionResponse } from '../../api/services/grading.service';
 import { classService } from '../../api/services/class.service';
+import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 import { deferred } from '../deferred';
 
@@ -13,6 +14,7 @@ vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { g
 vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn() } }));
 vi.mock('../../api/services/grading.service', () => ({ gradingService: { getBySubmissionModuleId: vi.fn(), getAiSuggestion: vi.fn(), submitGrade: vi.fn(), requestAiAnalysis: vi.fn(), getById: vi.fn() } }));
 vi.mock('../../api/services/class.service', () => ({ classService: { list: vi.fn(), listMembers: vi.fn() } }));
+vi.mock('../../api/services/answer-annotation.service', () => ({ answerAnnotationService: { listAnnotations: vi.fn(), createAnnotation: vi.fn(), reviewAnnotation: vi.fn(), deleteAnnotation: vi.fn() } }));
 
 const submission: SubmissionDetail = {
   id: 40, assignmentId: 12, studentId: 5, attemptNumber: 1, status: 'SUBMITTED', submittedAt: '2026-10-21T10:00:00Z', createdAt: '2026-10-21T09:00:00Z',
@@ -24,7 +26,7 @@ const moduleDetail: SubmissionModuleDetailResponse = {
 };
 const ai: AiGradingSuggestionResponse = {
   submissionModuleId: 50, gradingId: 80, skill: 'WRITING', status: 'AI_GRADED', suggestedScore: 7.5, maxScore: 10,
-  aiFeedback: 'Add supporting examples.', criteriaScores: null, metrics: null, annotations: [], transcript: null, modelUsed: 'AI Model', providerUsed: null,
+  aiFeedback: 'Add supporting examples.', criteriaScores: null, metrics: null, annotations: [{ id: 91, answerId: 60, source: 'AI', startOffset: 0, endOffset: 5, errorType: 'SPELLING', comment: 'Fix spelling', suggestedFix: 'The', reviewStatus: 'PENDING' }], transcript: [{ word: 'Hello' }, { word: 'city' }, 'essay'], modelUsed: 'AI Model', providerUsed: null,
   canTriggerAi: true, fallbackManualGradingAvailable: true, fallbackMessage: '',
 };
 
@@ -39,6 +41,7 @@ beforeEach(() => {
   vi.mocked(gradingService.getById).mockRejectedValue(new Error('Optional grading detail unavailable'));
   vi.mocked(gradingService.submitGrade).mockResolvedValue({ message: 'Saved' });
   vi.mocked(gradingService.requestAiAnalysis).mockResolvedValue({ message: 'Queued' });
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [] });
 });
 
 async function setup(studentId = 5) {
@@ -242,7 +245,102 @@ describe('TeacherSubmissionDetails', () => {
   // Annotation approval is absent in the current page. Track the missing UI
   // in the QA-32 report; do not mock a button that the user cannot access.
   it.todo('defines scoring precision (0.5 IELTS bands versus arbitrary decimals) before asserting 0.1 policy');
-  it.todo('approves an annotation through the review button (UI not implemented)');
+  it('approves, rejects, creates, filters and deletes annotations', async () => {
+    const aiAnn: GradingAnnotation = {
+      id: 1,
+      source: 'AI',
+      startOffset: 0,
+      endOffset: 5,
+      errorType: 'GRAMMAR',
+      comment: 'Check tense',
+      suggestedFix: 'went',
+      reviewStatus: 'PENDING',
+    };
+    const teacherAnn: GradingAnnotation = {
+      id: 2,
+      source: 'TEACHER',
+      startOffset: 10,
+      endOffset: 15,
+      errorType: null,
+      comment: null,
+      suggestedFix: null,
+      reviewStatus: 'ACCEPTED',
+    };
+    const outOfBoundsAnn: GradingAnnotation = {
+      id: 99,
+      source: 'AI',
+      startOffset: 9999,
+      endOffset: 10000,
+      errorType: 'SPELLING',
+      comment: 'Out of bounds',
+      suggestedFix: null,
+      reviewStatus: 'PENDING',
+    };
+    vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [aiAnn, teacherAnn, outOfBoundsAnn] });
+    vi.mocked(answerAnnotationService.reviewAnnotation).mockResolvedValue({ message: 'Updated' });
+    vi.mocked(answerAnnotationService.createAnnotation).mockResolvedValue({ id: 3, message: 'Created' });
+    vi.mocked(answerAnnotationService.deleteAnnotation).mockResolvedValue({ message: 'Deleted' });
+
+    await setup();
+
+    // 1. Test review failure error toast
+    vi.mocked(answerAnnotationService.reviewAnnotation).mockRejectedValueOnce(new Error('Review failed'));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Duyệt' })[0]);
+    expect(await screen.findByText('Review failed')).toBeVisible();
+
+    // 2. Accept annotation
+    vi.mocked(answerAnnotationService.reviewAnnotation).mockResolvedValueOnce({ message: 'Updated' });
+    const acceptBtn = screen.getAllByRole('button', { name: 'Duyệt' })[0];
+    await userEvent.click(acceptBtn);
+    expect(answerAnnotationService.reviewAnnotation).toHaveBeenCalledWith(1, { reviewStatus: 'ACCEPTED' });
+
+    // 3. Reject annotation
+    const rejectBtn = screen.getAllByRole('button', { name: 'Từ chối' })[0];
+    await userEvent.click(rejectBtn);
+    expect(answerAnnotationService.reviewAnnotation).toHaveBeenCalledWith(1, { reviewStatus: 'REJECTED' });
+
+    // 4. Filter annotations
+    await userEvent.click(screen.getByRole('button', { name: /Chờ duyệt/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Đã duyệt/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Đã từ chối/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Tất cả/ }));
+
+    // 5. Create annotation: validation then fill
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm chú thích' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm chú thích' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu chú thích' }));
+    expect(screen.getByText('Vui lòng nhập nhận xét cho chú thích.')).toBeVisible();
+
+    // Test create failure
+    vi.mocked(answerAnnotationService.createAnnotation).mockRejectedValueOnce(new Error('Create failed'));
+    const commentInput0 = screen.getByPlaceholderText('Giải thích lỗi hoặc hướng dẫn sửa...');
+    fireEvent.change(commentInput0, { target: { value: 'Temp comment' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu chú thích' }));
+    expect(await screen.findByText('Create failed')).toBeVisible();
+
+    const typeSelect = screen.getByRole('combobox');
+    fireEvent.change(typeSelect, { target: { value: 'VOCABULARY' } });
+    const spinInputs = screen.getAllByRole('spinbutton');
+    spinInputs.forEach((input) => fireEvent.change(input, { target: { value: '5' } }));
+    const fixInput = screen.getByPlaceholderText('Nhập câu/từ gợi ý sửa...');
+    fireEvent.change(fixInput, { target: { value: 'better' } });
+    const commentInput = screen.getByPlaceholderText('Giải thích lỗi hoặc hướng dẫn sửa...');
+    fireEvent.change(commentInput, { target: { value: 'Good word choice' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu chú thích' }));
+    expect(answerAnnotationService.createAnnotation).toHaveBeenCalled();
+
+    // 6. Test delete failure error toast
+    vi.mocked(answerAnnotationService.deleteAnnotation).mockRejectedValueOnce(new Error('Delete failed'));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Xóa' })[0]);
+    expect(await screen.findByText('Delete failed')).toBeVisible();
+
+    // 7. Delete annotation successfully
+    vi.mocked(answerAnnotationService.deleteAnnotation).mockResolvedValueOnce({ message: 'Deleted' });
+    const deleteBtns = screen.getAllByRole('button', { name: 'Xóa' });
+    await userEvent.click(deleteBtns[0]);
+    expect(answerAnnotationService.deleteAnnotation).toHaveBeenCalled();
+  });
 });
 
 
@@ -262,7 +360,13 @@ it.each([
   });
   const { container } = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, language);
   const score = await screen.findByRole('spinbutton');
-  if (storageKey) expect(container.querySelector('audio')).toHaveAttribute('src', storageKey.startsWith('http') ? storageKey : '/s3-upload/englishhub-dev/recordings/audio.mp3');
+  if (storageKey) {
+    const audioEl = container.querySelector('audio')!;
+    expect(audioEl).toHaveAttribute('src', storageKey.startsWith('http') ? storageKey : '/s3-upload/englishhub-dev/recordings/audio.mp3');
+    fireEvent.error(audioEl);
+    expect(screen.getByText(language === 'vi' ? 'Không thể tải bản ghi âm.' : 'Failed to load audio.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: language === 'vi' ? 'Thử lại' : 'Retry' }));
+  }
   else expect(screen.getByText(language === 'vi' ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.')).toBeVisible();
   fireEvent.change(score, { target: { value: '8.5' } });
   const feedback = container.querySelector('textarea')!;
@@ -325,4 +429,87 @@ it('does not load grading or permit grading for an in-progress submission', asyn
   await userEvent.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
   expect(screen.getByText('Chưa tìm thấy bản ghi chấm điểm của bài này.')).toBeVisible();
   expect(gradingService.submitGrade).not.toHaveBeenCalled();
+});
+
+it('navigates between student siblings using pager controls', async () => {
+  await setup();
+  await userEvent.click(screen.getByRole('button', { name: /Trước/ }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments/12/submissions/7');
+  await userEvent.click(screen.getByRole('button', { name: /Tiếp/ }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments/12/submissions/5');
+});
+
+it('warns when grading record is not found on save', async () => {
+  vi.mocked(gradingService.getBySubmissionModuleId).mockRejectedValueOnce(new Error('No record'));
+  await setup();
+  await userEvent.click(screen.getByRole('button', { name: /Lưu bản nháp nhận xét/ }));
+  expect(screen.getByText('Chưa tìm thấy bản ghi chấm điểm của bài này.')).toBeVisible();
+});
+
+it('handles error when polling fails after AI analyze trigger', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementationOnce(() => Promise.reject(new Error('Module poll failed')));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+  await act(() => vi.advanceTimersByTimeAsync(3500));
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('falls back to AI suggestion annotations when answer annotation service fails', async () => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Annotation service down'));
+  await setup();
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+});
+
+it('shows empty state when no annotations exist', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({ ...ai, annotations: [] });
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValueOnce({ data: [] });
+  await setup();
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+});
+
+it('extracts transcript as plain string', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({
+    ...ai,
+    transcript: 'Plain string audio transcript.',
+  });
+  await setup();
+});
+
+it('extracts transcript from object format', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({
+    ...ai,
+    transcript: null,
+  });
+  vi.mocked(gradingService.getById).mockResolvedValueOnce({
+    id: 80,
+    submissionModuleId: 50,
+    method: 'AUTO',
+    status: 'AI_GRADED',
+    aiFeedback: 'Feedback',
+    aiTranscript: { transcript: 'Object transcript text' },
+    finalScore: 8,
+    finalFeedback: 'Final',
+    maxScoreSnapshot: 10,
+    reviewedBy: null,
+    reviewedAt: null,
+    gradedAt: null,
+    aiInstructionSnapshot: null,
+  });
+  await setup();
+});
+
+it('clears annotations when submission module has no answers', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({ ...ai, annotations: [] });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValueOnce({ ...moduleDetail, answers: [] });
+  await setup();
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+});
+
+it('clears annotations when listAnnotations fails and AI suggestion has no annotations', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({ ...ai, annotations: [] });
+  vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Network error'));
+  await setup();
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
 });

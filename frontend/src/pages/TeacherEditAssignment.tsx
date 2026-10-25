@@ -401,7 +401,7 @@ export const TeacherEditAssignment: React.FC = () => {
   const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
     if (!id) return;
 
-    const allSkills: AssignmentSkill[] = ['writing', 'speaking', 'reading', 'listening'];
+    const allSkills: AssignmentSkill[] = ['listening', 'reading', 'writing', 'speaking'];
     const skillsToSave = allSkills.filter(s => Boolean(moduleIdsBySkill[s]) || isSkillConfigured(s));
     const targetSkills = skillsToSave.length > 0 ? skillsToSave : [assignmentData.skill];
 

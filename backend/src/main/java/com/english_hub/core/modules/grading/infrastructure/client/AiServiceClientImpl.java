@@ -29,16 +29,22 @@ public class AiServiceClientImpl implements AiServiceClient {
 
 	private final RestClient restClient;
 	private final Sleeper sleeper;
+	private final String internalSecret;
 
 	@Autowired
 	public AiServiceClientImpl(
 			@Value("${app.ai-service.base-url:http://localhost:8001}") String baseUrl,
 			@Value("${app.ai-service.connect-timeout-seconds:5}") int connectTimeout,
-			@Value("${app.ai-service.read-timeout-seconds:60}") int readTimeout) {
-		this(baseUrl, connectTimeout, readTimeout, Thread::sleep);
+			@Value("${app.ai-service.read-timeout-seconds:60}") int readTimeout,
+			@Value("${app.ai-service.internal-secret:}") String internalSecret) {
+		this(baseUrl, connectTimeout, readTimeout, internalSecret, Thread::sleep);
 	}
 
 	AiServiceClientImpl(String baseUrl, int connectTimeout, int readTimeout, Sleeper sleeper) {
+		this(baseUrl, connectTimeout, readTimeout, "", sleeper);
+	}
+
+	AiServiceClientImpl(String baseUrl, int connectTimeout, int readTimeout, String internalSecret, Sleeper sleeper) {
 		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
 		requestFactory.setConnectTimeout(Duration.ofSeconds(connectTimeout));
 		requestFactory.setReadTimeout(Duration.ofSeconds(readTimeout));
@@ -48,6 +54,7 @@ public class AiServiceClientImpl implements AiServiceClient {
 				.requestFactory(requestFactory)
 				.build();
 		this.sleeper = sleeper;
+		this.internalSecret = internalSecret == null ? "" : internalSecret;
 	}
 
 	@Override
@@ -55,6 +62,7 @@ public class AiServiceClientImpl implements AiServiceClient {
 		return executeWithRetry("analyze speaking", () ->
 				restClient.post()
 						.uri("/api/v1/analyze/speaking")
+						.header("X-Internal-Secret", internalSecret)
 						.contentType(MediaType.APPLICATION_JSON)
 						.body(request)
 						.retrieve()
@@ -67,6 +75,7 @@ public class AiServiceClientImpl implements AiServiceClient {
 		return executeWithRetry("analyze writing", () ->
 				restClient.post()
 						.uri("/api/v1/analyze/writing")
+						.header("X-Internal-Secret", internalSecret)
 						.contentType(MediaType.APPLICATION_JSON)
 						.body(request)
 						.retrieve()
@@ -106,6 +115,7 @@ public class AiServiceClientImpl implements AiServiceClient {
 		return executeWithRetry("analyze writing upload (" + filename + ")", () ->
 				restClient.post()
 						.uri("/api/v1/analyze/writing/upload")
+						.header("X-Internal-Secret", internalSecret)
 						.contentType(MediaType.MULTIPART_FORM_DATA)
 						.body(parts)
 						.retrieve()

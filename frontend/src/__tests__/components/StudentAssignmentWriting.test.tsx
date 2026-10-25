@@ -249,3 +249,171 @@ it('opens picker by mouse or keyboard and supports replacing a selected file', a
   fireEvent.click(screen.getByText('Trang chủ'));
   expect(screen.getByTestId('location')).toHaveTextContent('/student/dashboard');
 });
+
+it('displays docx file metadata when word document is uploaded', async () => {
+  const { container } = await setup();
+  const file = new File(['docx content'], 'document.docx', {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+  fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+  expect(screen.getByText(/Tệp Word \(DOCX\)/)).toBeVisible();
+});
+
+it('displays error when loading url submission fails', async () => {
+  vi.mocked(submissionService.getSubmission).mockRejectedValue(new Error('Fetch submission error'));
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12?submissionId=99');
+  expect(await screen.findByText('Fetch submission error')).toBeVisible();
+});
+
+it('redirects to submission details if submission is already submitted or graded', async () => {
+  vi.mocked(submissionService.listSubmissions).mockImplementation(async (params) => {
+    if (params?.status === 'IN_PROGRESS') {
+      return { data: [], pagination: { page: 1, limit: 1, total: 0 } };
+    }
+    return {
+      data: [{ id: 45, assignmentId: 12, studentId: 5, attemptNumber: 1, status: 'GRADED', submittedAt: '2026-10-21', modules: [] }],
+      pagination: { page: 1, limit: 10, total: 1 },
+    };
+  });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/student/submissions/45'));
+});
+
+it('warns when assignment is in DRAFT status', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({
+    id: 12,
+    title: 'Draft Exam',
+    status: 'DRAFT',
+    modules: [{ id: 30, skill: 'WRITING' }],
+  });
+  vi.mocked(submissionService.listSubmissions).mockResolvedValue({
+    data: [],
+    pagination: { page: 1, limit: 1, total: 0 },
+  });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  expect(await screen.findByText(/Bài tập này hiện không mở để làm bài/)).toBeVisible();
+});
+
+it('handles storage upload failures and MinIO rewrites', async () => {
+  const { container, user } = await setup();
+  const file = new File(['essay'], 'essay.pdf', { type: 'application/pdf' });
+  fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+  vi.mocked(submissionService.getDocumentUploadUrl).mockResolvedValueOnce({
+    uploadUrl: 'http://minio:9000/test/essay.pdf',
+    storageKey: 'essay.pdf',
+    expiresAt: '2026-10-22T12:00:00Z',
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 500 }));
+  await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  expect(await screen.findByText(/Lỗi tải tệp đính kèm/)).toBeVisible();
+});
+
+it('reports failure when submitModule fails', async () => {
+  const { editor, user } = await setup();
+  fireEvent.change(editor, { target: { value: 'My good essay' } });
+  vi.mocked(submissionService.submitModule).mockRejectedValueOnce(new Error('Network error on submit'));
+  await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  expect(await screen.findByText('Network error on submit')).toBeVisible();
+});
+
+it('handles assignment with missing title and fallback instructions', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({ id: 12, title: '', status: 'PUBLISHED', modules: [{ id: 30, skill: 'WRITING' }] });
+  vi.mocked(moduleService.getModule).mockResolvedValue({ id: 30, skill: 'WRITING', taskType: 'ESSAY', instructions: '', orderIndex: 1, maxScore: null as unknown as number });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  expect(await screen.findByText(/Writing #12/)).toBeVisible();
+  expect(screen.getByText(/Yêu cầu: Hoàn thành bài viết/)).toBeVisible();
+});
+
+it('allows submitting with uploaded file even when editor text is empty', async () => {
+  const { container, user } = await setup();
+  const file = new File(['essay'], 'essay.pdf', { type: 'application/pdf' });
+  fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
+  vi.mocked(submissionService.getDocumentUploadUrl).mockResolvedValueOnce({
+    uploadUrl: 'https://storage.example.test/upload',
+    storageKey: 'essay.pdf',
+    expiresAt: '2026-10-22T12:00:00Z',
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 200 }));
+  await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  expect(submissionService.submitModule).toHaveBeenCalled();
+});
+
+it('navigates to assignment result when submission id is missing on final submit', async () => {
+  const original = await submissionService.getSubmission(40);
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...original,
+    id: undefined as unknown as number,
+  });
+  const { editor } = await setup();
+  fireEvent.change(editor, { target: { value: 'Valid essay content' } });
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  });
+  await act(() => vi.advanceTimersByTimeAsync(1200));
+  expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/12/result');
+});
+
+it('redirects to the earlier incomplete module via route guard on mount', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({
+    id: 12,
+    title: 'Reading and Writing',
+    status: 'PUBLISHED',
+    modules: [{ id: 29, skill: 'READING' }, { id: 30, skill: 'WRITING' }],
+  });
+  const original = await submissionService.getSubmission(40);
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...original,
+    modules: [
+      { id: 49, moduleId: 29, skill: 'READING', taskType: 'QUIZ', status: 'IN_PROGRESS', grading: null },
+      { id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'IN_PROGRESS', grading: null },
+    ],
+  });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/reading/12'));
+});
+
+
+
+it('navigates to assignments list when clicking breadcrumb', async () => {
+  await setup();
+  fireEvent.click(screen.getByText('Danh sách bài tập'));
+  expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments');
+});
+
+it('warns with status label when assignment is ARCHIVED', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({
+    id: 12,
+    title: 'Archived Exam',
+    status: 'ARCHIVED' as unknown as import('../../api/services/assignment.service').AssignmentStatus,
+    modules: [{ id: 30, skill: 'WRITING' }],
+  });
+  vi.mocked(submissionService.listSubmissions).mockResolvedValue({
+    data: [],
+    pagination: { page: 1, limit: 1, total: 0 },
+  });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  expect(await screen.findByText(/Trạng thái: ARCHIVED/)).toBeVisible();
+});
+
+it('displays error when startAttempt fails for published assignment', async () => {
+  vi.mocked(submissionService.listSubmissions).mockResolvedValue({
+    data: [],
+    pagination: { page: 1, limit: 1, total: 0 },
+  });
+  vi.mocked(submissionService.startAttempt).mockRejectedValueOnce(new Error('Cannot start attempt'));
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  expect(await screen.findByText('Cannot start attempt')).toBeVisible();
+});
+
+it('warns when subModuleId is missing in submission', async () => {
+  const original = await submissionService.getSubmission(40);
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...original,
+    modules: [],
+  });
+  const { editor } = await setup();
+  fireEvent.change(editor, { target: { value: 'Essay text' } });
+  await userEvent.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  expect(screen.getByText('Không tìm thấy thông tin phần làm bài viết trong bài nộp.')).toBeVisible();
+});
