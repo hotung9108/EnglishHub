@@ -275,3 +275,100 @@ def test_prompt_injection_sanitization():
     assert "</system>" not in prompt
     assert "<override>" not in prompt
     assert "VERBATIM SPOKEN ANNOTATION RULES" in prompt
+
+
+def test_duplicate_word_alignment_with_context_and_comments():
+    """
+    Kiểm chứng khả năng phân biệt từ lặp lại (ví dụ từ 'is' xuất hiện nhiều lần)
+    bằng cách tận dụng trường `context` và mỏ neo trong `comment`.
+    """
+    sample_data = {
+        "words": [
+            {"word": "My", "start": 0.0, "end": 0.2, "confidence": 0.99},
+            {"word": "family", "start": 0.2, "end": 0.6, "confidence": 0.99},
+            {"word": "is", "start": 0.6, "end": 0.8, "confidence": 0.99},  # index 10-12
+            {"word": "have", "start": 0.8, "end": 1.1, "confidence": 0.98},
+            {"word": "four", "start": 1.1, "end": 1.4, "confidence": 0.99},
+            {"word": "peoples.", "start": 1.4, "end": 2.0, "confidence": 0.95},
+            {"word": "My", "start": 2.1, "end": 2.3, "confidence": 0.99},
+            {"word": "father,", "start": 2.3, "end": 2.8, "confidence": 0.99},
+            {"word": "my", "start": 2.8, "end": 3.0, "confidence": 0.99},
+            {"word": "mother,", "start": 3.0, "end": 3.5, "confidence": 0.99},
+            {"word": "younger", "start": 3.5, "end": 3.9, "confidence": 0.99},
+            {"word": "sister,", "start": 3.9, "end": 4.4, "confidence": 0.99},
+            {"word": "and", "start": 4.4, "end": 4.6, "confidence": 0.99},
+            {"word": "me.", "start": 4.6, "end": 4.9, "confidence": 0.99},
+            {"word": "My", "start": 5.0, "end": 5.2, "confidence": 0.99},
+            {"word": "father", "start": 5.2, "end": 5.6, "confidence": 0.99},
+            {"word": "is", "start": 5.6, "end": 5.8, "confidence": 0.99},  # index 88-90
+            {"word": "work", "start": 5.8, "end": 6.2, "confidence": 0.99},
+            {"word": "as", "start": 6.2, "end": 6.4, "confidence": 0.99},
+            {"word": "a", "start": 6.4, "end": 6.5, "confidence": 0.99},
+            {"word": "engineer", "start": 6.5, "end": 7.2, "confidence": 0.99},
+        ],
+        "criteriaScores": {
+            "fluencyAndCoherence": 6.5,
+            "lexicalResource": 6.5,
+            "grammaticalRangeAndAccuracy": 6.0,
+            "pronunciation": 6.5,
+            "overallScore": 6.5,
+        },
+        "feedbackMarkdown": "### Đánh giá Tổng quan Kỹ năng Nói",
+        "annotations": [
+            {
+                "word": "is",
+                "context": "My family is have four peoples",
+                "errorType": "GRAMMAR",
+                "comment": "Trong câu 'My family is have', nên dùng 'has'.",
+                "suggestedFix": "has",
+            },
+            {
+                "word": "is",
+                "context": "My father is work as a engineer",
+                "errorType": "GRAMMAR",
+                "comment": "Trong câu 'My father is work', nên dùng thì hiện tại đơn 'works'.",
+                "suggestedFix": "works",
+            },
+            {
+                "word": "is",
+                # Không truyền context, dựa vào mỏ neo trong comment
+                "errorType": "GRAMMAR",
+                "comment": "Cấu trúc trong 'My father is work' không chuẩn xác.",
+                "suggestedFix": "works",
+            },
+        ],
+    }
+
+    res = GeminiService._build_response_from_json(
+        submission_module_id=933,
+        data=sample_data,
+        max_score=9.0,
+        model_used="google/gemini-2.5-flash",
+        provider_used="openrouter",
+    )
+
+    full_transcript, _ = FluencyAnalyzer.build_transcript_and_offsets(res.ai_transcript)
+    assert len(res.annotations) >= 2
+
+    # Annotation 0 trỏ đúng vào 'is' đầu tiên
+    ann0 = res.annotations[0]
+    assert ann0.start_offset == 10
+    assert ann0.end_offset == 12
+    assert full_transcript[ann0.start_offset:ann0.end_offset] == "is"
+    assert ann0.exact_text == "is"
+
+    # Annotation 1 trỏ đúng vào 'is' thứ hai (nhờ context)
+    ann1 = res.annotations[1]
+    assert ann1.start_offset == 88
+    assert ann1.end_offset == 90
+    assert full_transcript[ann1.start_offset:ann1.end_offset] == "is"
+    assert ann1.exact_text == "is"
+
+
+def test_speaking_prompt_enforces_vietnamese_and_context():
+    """Kiểm tra system prompt mới ràng buộc tiếng Việt và schema context."""
+    from app.prompts.speaking_prompts import SPEAKING_SYSTEM_PROMPT, SPEAKING_PROMPT_VERSION
+    assert SPEAKING_PROMPT_VERSION == "2026-10-v4"
+    assert "LANGUAGE ENFORCEMENT RULE (BẮT BUỘC - 100% TIẾNG VIỆT)" in SPEAKING_SYSTEM_PROMPT
+    assert '"context"' in SPEAKING_SYSTEM_PROMPT
+    assert "MUST BE WRITTEN STRICTLY IN VIETNAMESE" in SPEAKING_SYSTEM_PROMPT

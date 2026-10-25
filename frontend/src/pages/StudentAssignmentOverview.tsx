@@ -21,6 +21,7 @@ import {
   getSkillLabel,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-overview.css';
 
 interface AttemptRecord {
@@ -239,6 +240,7 @@ const StudentAssignmentOverview: React.FC = () => {
     setIsStarting(true);
     try {
       await submissionService.submitSubmission(inProgressSub.id);
+      notifyAssignmentSubmitted();
       navigate(`/student/submissions/${inProgressSub.id}`);
     } catch (err: unknown) {
       console.warn('Failed to finalize submission:', err);

@@ -127,10 +127,9 @@ describe('TeacherSubmissionDetails', () => {
     await user.type(score, value);
     expect(score).toBeValid();
     fireEvent.change(screen.getByPlaceholderText('Nhập nhận xét chi tiết, lời khuyên và hướng khắc phục cho bài viết...'), { target: { value: 'Good progress' } });
-    await user.type(screen.getByPlaceholderText('Ghi chú thêm về học viên này...'), 'Follow up');
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
     expect(await screen.findByText('Đã lưu điểm và trả bài cho học viên thành công!')).toBeVisible();
-    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: Number(value), finalFeedback: 'Good progress', note: 'Follow up' });
+    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: Number(value), finalFeedback: 'Good progress' });
   });
 
   it.each(['-0.1', '10.1', '10.01', '', 'abc'])('rejects out-of-range or missing numeric value after typing %j', async (value) => {
@@ -148,7 +147,7 @@ describe('TeacherSubmissionDetails', () => {
     await user.type(score, '1e1');
     expect(score).toHaveValue(10);
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
-    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: 10, finalFeedback: 'Add supporting examples.', note: '' });
+    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: 10, finalFeedback: 'Add supporting examples.' });
   });
 
   it('finalizes the grade and returns to the assignment', async () => {
@@ -157,10 +156,9 @@ describe('TeacherSubmissionDetails', () => {
     vi.mocked(gradingService.submitGrade).mockReturnValueOnce(pending.promise);
     await user.clear(score);
     await user.type(score, '8.5');
-    await user.type(screen.getByPlaceholderText('Ghi chú thêm về học viên này...'), 'Final review');
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
-    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: 8.5, finalFeedback: 'Add supporting examples.', note: 'Final review' });
+    expect(gradingService.submitGrade).toHaveBeenCalledExactlyOnceWith(80, { finalScore: 8.5, finalFeedback: 'Add supporting examples.' });
     expect(screen.getByRole('button', { name: 'Đang lưu...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Lưu bản nháp nhận xét' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Đang lưu...' }));
@@ -512,4 +510,32 @@ it('clears annotations when listAnnotations fails and AI suggestion has no annot
   vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Network error'));
   await setup();
   expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+});
+
+it('falls back to detail.aiFeedback when finalFeedback is absent', async () => {
+  vi.mocked(gradingService.getById).mockResolvedValueOnce({
+    id: 80,
+    submissionModuleId: 50,
+    method: 'AUTO',
+    status: 'AI_GRADED',
+    aiFeedback: 'Fallback AI detail feedback',
+    aiTranscript: null,
+    finalScore: 8,
+    finalFeedback: null,
+    maxScoreSnapshot: 10,
+    reviewedBy: null,
+    reviewedAt: null,
+    gradedAt: null,
+    aiInstructionSnapshot: null,
+  });
+  await setup();
+  expect(screen.getByDisplayValue('Fallback AI detail feedback')).toBeVisible();
+});
+
+it('returns null when rawTranscript is non-string and non-array', async () => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({
+    ...ai,
+    transcript: 12345,
+  });
+  await setup();
 });

@@ -1,0 +1,36 @@
+id: BUG-22
+title: "[Bug] Hiển thị chuỗi kỹ thuật thô [start-end] và cắt nhầm chuỗi JSON transcript trong highlight chấm điểm"
+assignee: "@fe-primary"
+status: "Fixed"
+priority: "High"
+description: |
+  **Issue Summary:**
+  1. Trên trang kết quả học sinh (StudentSubmissionResult.tsx), phần hiển thị đoạn văn bản gốc bị lỗi trước đây hiển thị chuỗi kỹ thuật thô "Đoạn ký tự [start - end]" thay vì đoạn text thực trích xuất từ bài làm.
+  2. Khi bài nộp là Speaking, trường `aiTranscript` từ backend Spring Boot trả về dạng chuỗi JSON serialized ('{"modelUsed":"...","transcript":[...]}'). Giao diện giáo viên (TeacherSubmissionDetails.tsx) và học sinh trước đây cắt lát trực tiếp vào chuỗi JSON thô, dẫn đến việc hiển thị các đoạn text vô nghĩa như `d":"goo` và `mini-2`.
+  3. Khi một từ xuất hiện nhiều lần trong bài nói (ví dụ từ "is"), AI Service trước đây không có cơ chế phân biệt ngữ cảnh, dẫn đến việc các annotation bị gán trùng tọa độ vào lần xuất hiện đầu tiên của từ.
+
+  **Root Causes:**
+  1. StudentSubmissionResult.tsx gán cứng nhãn `original: \`Đoạn ký tự [\${ann.startOffset} - \${ann.endOffset}]\``.
+  2. `transcriptText` trong TeacherSubmissionDetails.tsx và `extractTranscriptFromGrading` trong StudentSubmissionResult.tsx kiểm tra `typeof rawTranscript === 'string'` và trả về nguyên chuỗi JSON thô mà không parse.
+  3. AI Service prompt thiếu trường `context` và thuật toán `align_spoken_annotation_offset` chỉ tìm từ đầu tiên.
+
+  **Resolution:**
+  1. Bổ sung `extractAnnotationSnippet` và `extractAnswerContentText` trong `annotationSnippet.utils.ts` để trích xuất an toàn từ bài làm học sinh, xử lý triệt để out-of-bounds, negative, invalid offset với fallback thân thiện.
+  2. Bổ sung `extractTranscriptText` trong `annotationSnippet.utils.ts` tự động giải mã chuỗi JSON serialized và trích xuất danh sách từ của học sinh ghép thành bài nói thực tế.
+  3. Nâng cấp AI Service prompt lên version v4, bổ sung trường `context`, quy tắc bắt buộc 100% tiếng Việt, và thuật toán căn chỉnh offset đa tầng trong `fluency_analyzer.py`.
+  4. Sửa bản ghi ID 812 trong cơ sở dữ liệu PostgreSQL cho submission 270 (chuyển offset từ [10-12] thành [88-90]).
+
+  **Definition of Done (DoD):**
+  - Hiển thị đoạn text thực được cắt từ nội dung bài làm theo startOffset/endOffset.
+  - Xử lý đúng các trường hợp offset nằm ngoài phạm vi văn bản (không crash).
+  - Test case với ít nhất 3 annotation có vị trí khác nhau.
+  - Đã qua review bởi thành viên khác.
+
+verification_results:
+  verified_at: "2026-10-25T21:42:00+07:00"
+  status: "PASSED"
+  evidence:
+    unit_tests: "182/182 tests passed (frontend/src/api/__tests__/*.test.ts)"
+    speaking_api_tests: "8/8 passed in ai-service/tests/test_speaking_api.py"
+    build_status: "npm run build passed in 1.61s with zero TypeScript errors"
+    database_verification: "All 9 annotations for answer 3463 and 3464 slice 100% correct text"

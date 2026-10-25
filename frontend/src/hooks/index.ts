@@ -50,3 +50,5 @@ export type {
   UseAudioRecorderOptions,
   UseAudioRecorderResult,
 } from './useAudioRecorder';
+export { useStudentAssignmentBadge, formatAssignmentBadge } from './useStudentAssignmentBadge';
+export type { UseStudentAssignmentBadgeResult } from './useStudentAssignmentBadge';

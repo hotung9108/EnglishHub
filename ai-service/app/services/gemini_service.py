@@ -520,6 +520,8 @@ class GeminiService:
                         full_transcript=full_transcript,
                         word_offsets=word_offsets,
                         target_text=candidate_phrase,
+                        context=line,
+                        comment=line,
                         used_ranges=used_ranges
                     )
                     if end_off <= start_off or end_off > len(full_transcript):
@@ -642,10 +644,20 @@ class GeminiService:
                 or ""
             ).strip()
 
+            context = (
+                ann.get("context")
+                or ann.get("sentenceContext")
+                or ann.get("sentence")
+                or ""
+            ).strip()
+            comment_text = str(ann.get("comment", "")).strip()
+
             start_off, end_off = FluencyAnalyzer.align_spoken_annotation_offset(
                 full_transcript=full_transcript,
                 word_offsets=word_offsets,
                 target_text=target_text,
+                context=context if context else None,
+                comment=comment_text if comment_text else None,
                 used_ranges=used_ranges
             )
 
@@ -659,11 +671,14 @@ class GeminiService:
                 continue
 
             used_ranges.append((start_off, end_off))
+            extracted_exact = full_transcript[start_off:end_off] if full_transcript else target_text
             annotations.append(AnnotationItem(
                 startOffset=start_off,
                 endOffset=end_off,
+                exactText=extracted_exact,
+                context=context if context else None,
                 errorType=str(ann.get("errorType", "PRONUNCIATION")).upper(),
-                comment=str(ann.get("comment", "Phát âm cần lưu ý")),
+                comment=comment_text or "Phát âm cần lưu ý",
                 suggestedFix=ann.get("suggestedFix")
             ))
 

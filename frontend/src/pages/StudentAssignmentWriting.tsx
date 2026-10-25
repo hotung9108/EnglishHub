@@ -26,6 +26,7 @@ import {
   resolveEffectiveModules,
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
@@ -425,6 +426,7 @@ const StudentAssignmentWriting: React.FC = () => {
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
       if (allOthersDone) {
+        notifyAssignmentSubmitted();
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
