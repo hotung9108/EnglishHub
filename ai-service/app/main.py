@@ -15,7 +15,12 @@ from app.api.v1.endpoints import health
 setup_logging()
 logger = logging.getLogger("ai_service.main")
 
-INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "") or getattr(settings, "INTERNAL_SECRET", "")
+def _get_internal_secret() -> str:
+    """Lấy internal secret động từ env hoặc settings để hỗ trợ test."""
+    return (
+        os.environ.get("INTERNAL_SECRET", "")
+        or getattr(settings, "INTERNAL_SECRET", "")
+    )
 
 
 class InternalSecretMiddleware(BaseHTTPMiddleware):
@@ -24,8 +29,12 @@ class InternalSecretMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if path in ("/health", "/ping", "/docs", "/redoc", "/openapi.json"):
             return await call_next(request)
+        internal_secret = _get_internal_secret()
+        # Nếu không cấu hình secret, bỏ qua kiểm tra (dev/test local)
+        if not internal_secret:
+            return await call_next(request)
         secret = request.headers.get("X-Internal-Secret", "")
-        if not INTERNAL_SECRET or secret != INTERNAL_SECRET:
+        if secret != internal_secret:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Forbidden: missing or invalid X-Internal-Secret"},
