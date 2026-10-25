@@ -539,3 +539,86 @@ it('returns null when rawTranscript is non-string and non-array', async () => {
   });
   await setup();
 });
+
+it('falls back to AI annotations when listAnnotations fails but AI suggestion has annotations', async () => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Network error'));
+  await setup();
+  expect(screen.getByText(/Fix spelling/)).toBeVisible();
+});
+
+it('handles English annotation review (accept, reject, delete) and empty states', async () => {
+  const annItem: GradingAnnotation = {
+    id: 91,
+    source: 'AI',
+    startOffset: 0,
+    endOffset: 5,
+    errorType: 'SPELLING',
+    comment: 'Check spelling',
+    suggestedFix: 'Hello',
+    reviewStatus: 'PENDING',
+  };
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [annItem] });
+  vi.mocked(answerAnnotationService.reviewAnnotation).mockResolvedValue({ message: 'OK' });
+  vi.mocked(answerAnnotationService.deleteAnnotation).mockResolvedValue({ message: 'OK' });
+
+  renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, 'en');
+  await screen.findByRole('spinbutton');
+
+  // Accept in English -> 'AI annotation accepted.'
+  await userEvent.click(screen.getByRole('button', { name: 'Accept' }));
+  expect(await screen.findByText('AI annotation accepted.')).toBeVisible();
+
+  // Reject in English -> 'AI annotation rejected.'
+  await userEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  expect(await screen.findByText('AI annotation rejected.')).toBeVisible();
+
+  // Filter with no matches in English -> 'No annotations in this filter'
+  await userEvent.click(screen.getByRole('button', { name: /Pending/ }));
+  expect(screen.getByText('No annotations in this filter')).toBeVisible();
+  await userEvent.click(screen.getByRole('button', { name: /All/ }));
+
+  // Delete in English -> 'Annotation deleted.'
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  expect(await screen.findByText('Annotation deleted.')).toBeVisible();
+  expect(screen.getByText('No AI annotations available')).toBeVisible();
+
+  // Delete failure toast in English
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValueOnce({ data: [annItem] });
+  vi.mocked(answerAnnotationService.deleteAnnotation).mockRejectedValueOnce(new Error('Delete error'));
+  renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, 'en');
+  await screen.findByRole('spinbutton');
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  expect(await screen.findByText('Delete error')).toBeVisible();
+});
+
+it.each(['vi', 'en'] as const)('shows empty online submission message when answer text and files are empty (%s)', async (lang) => {
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValueOnce({
+    ...moduleDetail,
+    answers: [{ id: 60, questionId: 1, content: '' }],
+  });
+  renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, lang);
+  await screen.findByRole('spinbutton');
+  expect(screen.getAllByText(lang === 'vi' ? '0 từ' : '0 words')[0]).toBeVisible();
+  expect(screen.getByText(lang === 'vi' ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.')).toBeVisible();
+});
+
+it.each(['vi', 'en'] as const)('shows initial Grade with AI button label when no AI feedback exists (%s)', async (lang) => {
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({
+    ...ai,
+    aiFeedback: null,
+  });
+  renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, lang);
+  await screen.findByRole('spinbutton');
+  expect(screen.getByRole('button', { name: lang === 'vi' ? 'Chấm bài bằng AI' : 'Grade with AI' })).toBeVisible();
+});
+
+it('handles AI refresh polling error gracefully', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockRejectedValueOnce(new Error('Refresh failed'));
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+  await act(() => vi.advanceTimersByTimeAsync(3500));
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+  vi.useRealTimers();
+});
