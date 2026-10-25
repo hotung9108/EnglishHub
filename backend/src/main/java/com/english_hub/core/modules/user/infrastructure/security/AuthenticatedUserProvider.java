@@ -6,7 +6,7 @@ import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.security.JwtPrincipal;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
-import com.english_hub.core.modules.user.domain.repository.UserRepository;
+import com.english_hub.core.modules.user.infrastructure.cache.UserSnapshotCache;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,10 +18,10 @@ public class AuthenticatedUserProvider implements CurrentUserProvider {
 	private static final String UNAUTHENTICATED_MESSAGE = "Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.";
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 
-	private final UserRepository userRepository;
+	private final UserSnapshotCache userSnapshotCache;
 
-	public AuthenticatedUserProvider(UserRepository userRepository) {
-		this.userRepository = userRepository;
+	public AuthenticatedUserProvider(UserSnapshotCache userSnapshotCache) {
+		this.userSnapshotCache = userSnapshotCache;
 	}
 
 	/** Reads JWT identity only; does not query the database or check locked/deleted user state. */
@@ -41,8 +41,14 @@ public class AuthenticatedUserProvider implements CurrentUserProvider {
 		if (authentication == null || !(authentication.getPrincipal() instanceof JwtPrincipal principal)) {
 			throw ApiException.unauthorized(UNAUTHENTICATED_MESSAGE);
 		}
-		User user = userRepository.findById(principal.userId())
-				.orElseThrow(() -> ApiException.unauthorized(UNAUTHENTICATED_MESSAGE));
+		// Cached: one user lookup used to cost up to two round-trips to Singapore
+		// (user row + teacher/student profile) on every protected request.
+		User cachedUser = userSnapshotCache.find(principal.userId());
+		if (cachedUser == null) {
+			throw ApiException.unauthorized(UNAUTHENTICATED_MESSAGE);
+		}
+		// Hand out a copy so callers cannot mutate the shared cache entry.
+		User user = cachedUser.copy();
 		if (!user.isActive() || user.status() != UserStatus.ACTIVE) {
 			throw ApiException.unauthorized(UNAUTHENTICATED_MESSAGE);
 		}

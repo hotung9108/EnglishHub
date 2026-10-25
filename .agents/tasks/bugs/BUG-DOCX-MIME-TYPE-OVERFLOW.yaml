@@ -1,0 +1,19 @@
+id: "BUG-DOCX-MIME-TYPE-OVERFLOW"
+title: "[BE][Database] Lỗi HTTP 500 khi nộp bài Writing đính kèm file Word (.docx) do vượt quá độ dài cột doc_mime_type VARCHAR(50)"
+assignee: "@be-primary"
+status: "To Do"
+priority: "High"
+severity: "P1"
+affected_modules: ["backend/src/main/resources/db/migration/V1__init_schema.sql", "backend/src/main/java/com/english_hub/core/infrastructure/persistence/entity/Answer.java", "SubmissionService.java"]
+description: "Chuỗi MIME type của file Word docx là application/vnd.openxmlformats-officedocument.wordprocessingml.document dài 71 ký tự, vượt quá giới hạn VARCHAR(50) của cột doc_mime_type trong bảng answers ở PostgreSQL, làm ném lỗi 500 DataIntegrityViolationException khi học sinh submit bài viết đính kèm docx."
+root_cause:
+  database_column: "V1__init_schema.sql line 377: doc_mime_type VARCHAR(50)"
+  jpa_entity: "Answer.java line 69: @Column(name = \"doc_mime_type\", length = 50)"
+  backend_mime_constant: "SubmissionService.java line 371: application/vnd.openxmlformats-officedocument.wordprocessingml.document (length = 71)"
+reproduction_steps:
+  - "1. Đăng nhập học viên và làm bài Writing dạng ESSAY"
+  - "2. Đính kèm file docx và bấm Nộp bài"
+  - "3. Backend nhận POST /api/v1/submission-modules/{id}/submit và ném HTTP 500"
+remediation:
+  - "1. Tạo migration Flyway V5__increase_doc_mime_type_length.sql: ALTER TABLE answers ALTER COLUMN doc_mime_type TYPE VARCHAR(100);"
+  - "2. Cập nhật Answer.java: @Column(name = \"doc_mime_type\", length = 100)"

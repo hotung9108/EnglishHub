@@ -147,18 +147,20 @@ Qua rà soát trực tiếp các dòng mã nguồn và cấu hình hệ thống:
 - **Vị trí phát hiện**: `AuthenticatedUserProvider.java` (dòng 33), `AssignmentService.java` (dòng 58-67), `ClassMemberRepository.java`.
 - **Cơ chế lỗi**: Home Server đặt tại Việt Nam, nhưng CSDL Neon Serverless đặt tại Singapore (`ap-southeast-1.aws.neon.tech`). Khoảng cách địa lý tạo ra Round-Trip Time (RTT) tối thiểu **35ms - 45ms cho mỗi lượt gửi/nhận packet TCP**.
 - Trong mỗi API được bảo vệ bởi quyền hạn, hệ thống thực hiện tuần tự:
-  1. `userRepository.findById(principal.userId())` ➔ Mất 1 RTT (~40ms).
+  1. `userRepository.findById(principal.userId())` ➔ Mất 1 RTT (~40ms), cộng thêm 1 RTT cho bảng `teacher_profiles`/`student_profiles` ➔ thực tế **2 RTT**.
   2. `classRepository.findById(classId)` ➔ Mất 1 RTT (~40ms).
   3. `classMemberRepository.isStudentActiveInClass(...)` ➔ Mất 1 RTT (~40ms).
   4. Query nghiệp vụ chính (Count + Select) ➔ Mất 2 RTT (~80ms).
 - **Tổng cộng riêng thời gian chờ tín hiệu bay qua lại giữa Việt Nam và Singapore đã ngốn mất 200ms - 240ms!**
+- **Đã khắc phục** (branch `fix/OPS-40-query-optimize`): Caffeine cache cho user (0 RTT khi cache ấm), `ClassRepository.findAccess` gộp class + membership còn 1 RTT, và `COUNT(*) OVER ()` gộp Count + Select còn 1 RTT. Cache ấm còn **2 RTT/request** (page+count, skills). Chi tiết: `.agents/private/errors/BUG-24 ... .md`.
 
 #### 2. HikariCP chưa được cấu hình cho Database Serverless
 - **Vị trí phát hiện**: `backend/src/main/resources/application.properties` hoàn toàn không có bất kỳ dòng cấu hình nào cho `spring.datasource.hikari.*`.
 - **Cơ chế lỗi**:
   - Neon Serverless tự động ngắt kết nối không hoạt động (idle connection timeout) sau vài phút hoặc hạ tải compute (scale-to-zero).
   - HikariCP mặc định không gửi keepalive probe. Khi request mới đến, connection cũ đã bị đứt ở phía Neon, HikariCP phải chờ timeout rồi khởi tạo kết nối TLS TCP mới. Quá trình thiết lập SSL Handshake đường dài tốn thêm **120ms - 180ms**.
-  - Chuỗi kết nối JDBC hiện tại (`env.production.example`) đang dùng direct connection thay vì **Neon PgBouncer Connection Pooler** (đầu host có tiền tố `-pooler`).
+  - Chuỗi kết nối JDBC (`env.production.example`) **đã** dùng đúng host `-pooler` của Neon (không phải lỗi như bản báo cáo trước nêu); phần còn thiếu là `prepareThreshold=0&tcpKeepAlive=true` để tương thích PgBouncer transaction-mode và giữ kết nối qua NAT.
+  - **Đã khắc phục** trong `application-prod.properties`: `maximum-pool-size=12`, `minimum-idle=2`, `keepalive-time=60s`, `max-lifetime=600s`.
 
 #### 3. Cấu hình Logging & Hibernate Debug đang kích hoạt trên Staging
 - **Vị trí phát hiện**: `backend/src/main/resources/application.properties` (dòng 14, 15, 22):
@@ -169,6 +171,7 @@ Qua rà soát trực tiếp các dòng mã nguồn và cấu hình hệ thống:
   ```
 - **Cơ chế lỗi**: Dự án **không có file `application-prod.properties`**. Khi `SPRING_PROFILES_ACTIVE=prod` chạy trong container, Spring Boot vẫn nạp các tham số này.
 - Mọi câu lệnh SQL đều bị bộ format Hibernate dùng Regex chia dòng, thụt lề rồi in thẳng ra stdout của container. Trên Docker, việc ghi hàng chục dòng log console đồng bộ gây nghẽn buffer I/O (stdout blocking) và ngốn CPU.
+- **Đã khắc phục**: file `application-prod.properties` đã được thêm, tắt `show-sql`/`format_sql`, hạ log xuống `INFO`/`WARN`.
 
 #### 4. Frontend Bundle quá nặng (1.25 MB) & Import Tĩnh 100%
 - **Vị trí phát hiện**: `frontend/src/App.tsx` (dòng 3-53) import tĩnh toàn bộ 46 trang giao diện.
@@ -177,9 +180,11 @@ Qua rà soát trực tiếp các dòng mã nguồn và cấu hình hệ thống:
 
 ---
 
-### 2.3. Chiến lược & Kỹ thuật tối ưu hóa giảm xuống < 120ms
+### 2.3. Chiến lược & Kỹ thuật tối ưu hóa giảm xuống < 200ms
 
-Để đưa response time từ ~500ms xuống ngưỡng lý tưởng **80ms - 120ms** trên Staging, cần thực hiện đồng bộ 5 giải pháp kỹ thuật sau:
+Mục tiêu: đưa response time từ ~500ms xuống `p95 < 200ms` trên Staging. Mốc này tính cả độ
+trễ vật lý của đường truyền client → Cloudflare → Home Server (~85–110ms), nên "mọi request
+< 120ms" là bất khả thi với hạ tầng hiện tại. Cần thực hiện đồng bộ các giải pháp kỹ thuật sau.
 
 #### Giải pháp 1: Bổ sung Caffeine In-Memory Cache cho Tầng Xác thực & Tra cứu thường xuyên
 **Hiệu quả**: Giảm ngay **40ms - 80ms** trên 100% các request.
@@ -390,14 +395,16 @@ public class RedisCacheConfig {
 
 ### Bảng so sánh Toàn diện Các Mức Hiệu Năng (Trước, Sau & Khi Có Redis):
 
-| Chỉ số hiệu năng | Mức 1: Trước tối ưu (Hiện tại) | Mức 2: Tối ưu Cơ sở (Hikari + Caffeine + Code Split) | Mức 3: Nâng cấp Toàn diện (+ Redis Server) | Mức độ cải thiện tổng thể |
+| Chỉ số hiệu năng | Mức 1: Trước tối ưu (đo được) | Mức 2: Tối ưu Cơ sở (đã code, **dự báo**) | Mức 3: Nâng cấp Toàn diện (+ Redis, **dự báo**) | Mức độ cải thiện |
 | :--- | :---: | :---: | :---: | :---: |
-| **API Response Time (Đọc dữ liệu)** | **480ms - 580ms** | **85ms - 120ms** | **45ms - 65ms** | **Nhanh hơn ~9 lần!** |
-| **Độ trễ tầng CSDL/Cache** | 200ms - 260ms (Neon SG) | 0.05ms (Caffeine RAM) / 40ms (Neon) | **~1ms (Redis Local)** | Triệt tiêu độ trễ mạng quốc tế |
-| **Tần suất truy vấn Neon DB** | 100% requests | Giảm ~50% (chỉ cache user) | **Giảm 85% - 90%** (Cache cả assignments/classes) | Tiết kiệm chi phí Serverless Neon |
+| **API Response Time (Đọc dữ liệu)** | **480ms - 580ms** | **~200ms - 250ms** | **~120ms - 160ms** | Nhanh hơn ~2-4 lần |
+| **Round-trip DB / request (cache ấm)** | 6 - 7 | **2** | ~0 - 1 | Giảm ~70% |
+| **Tần suất truy vấn Neon DB** | 100% requests | Giảm ~50% (user + class-access) | **Giảm 85% - 90%** (Redis L2) | Tiết kiệm chi phí Serverless Neon |
 | **Khả năng giữ Cache khi Redeploy** | Không hỗ trợ (Chưa có) | ❌ Mất cache khi restart Spring Boot | ✅ **Bền vững 100%** trong Redis container | Trải nghiệm ổn định sau mỗi đợt deploy |
-| **Kích thước Bundle JS ban đầu** | 1.24 MB (1 file) | ~160 KB (Vendor/Page Chunks) | ~160 KB | Giảm ~87% dung lượng |
-| **First Contentful Paint (FCP)** | 1.8s | 0.4s | 0.4s | Cực kỳ mượt mà |
+| **Kích thước Bundle JS ban đầu** | 1.2 MB (1 file, hiện tại) | ~250 KB (dự kiến khi code-split) | ~250 KB | Giảm ~80% |
+
+> **Lưu ý**: cột Mức 1 là số đo trên staging; cột Mức 2/3 là dự báo từ số round-trip còn lại
+> nhân với RTT ~40ms, cộng độ trễ edge ~85–110ms. Cần `@tester` đo lại để xác nhận.
 
 ---
 
@@ -627,18 +634,18 @@ Axios Interceptor ở Frontend bắt đúng cấu trúc này và tự động g�
 
 ---
 
-### 4.6. Kiểm thử tự động & Bịt lỗ hổng CI/CD Pipeline
+### 4.6. Kiểm thử tự động & CI/CD Pipeline
 
-Qua rà soát file `.github/workflows/ci-frontend.yml`:
-- **Lỗ hổng nghiêm trọng**: Pipeline CI Frontend hiện tại chỉ chạy `npm run lint` và `npm run build`, **hoàn toàn bỏ quên `npm test`**!
-- **Hành động khắc phục**:
-  1. Cập nhật `ci-frontend.yml` bổ sung bước:
-     ```yaml
-     - name: Run Frontend Tests
-       run: npm test
-     ```
-  2. Bổ sung **Vitest** và **React Testing Library** cho Frontend để đạt độ bao phủ Component UI > 80% (đáp ứng đúng DoD của dự án).
-  3. Xây dựng bộ test **E2E Playwright** mô phỏng 1 luồng trọn vẹn: Giáo viên tạo bài tập ➔ Học sinh làm bài trắc nghiệm + ghi âm ➔ Hệ thống chấm điểm ➔ Học sinh xem kết quả.
+Rà soát `.github/workflows/ci-frontend.yml` (bản hiện tại, không còn đúng với mô tả cũ):
+
+- **Không còn lỗ hổng "bỏ quên `npm test`"**: pipeline đã chạy lần lượt
+  `npm ci` → `npm test` (API tests) → `npm run lint` → `npm run test:ui:types`
+  (typecheck test) → `npm run test:ui` (`vitest run --coverage`, có coverage gate)
+  → `npm run build` (typecheck + Vite production build).
+- **Còn thiếu**: bộ test **E2E Playwright** cho luồng trọn vẹn
+  (Giáo viên tạo bài tập ➔ Học sinh làm bài trắc nghiệm + ghi âm ➔ Hệ thống chấm
+  điểm ➔ Học sinh xem kết quả). Đây là hạng mục nên bổ sung tiếp theo, không
+  phải sửa lỗi cấu hình.
 
 ---
 
@@ -671,7 +678,8 @@ gantt
 
 | Mã Nhiệm vụ | Hạng mục | Người phụ trách (Git User) | Ưu tiên | Kết quả bàn giao (Deliverables) |
 | :--- | :--- | :--- | :---: | :--- |
-| **TASK-PERF-01** | Cấu hình HikariCP, Neon PgBouncer Pooler & Caffeine Cache | `@be-primary` (`doanthaison2706`) | **P0** | File cấu hình `application-prod.properties`, Class `CacheConfig.java`, Response time API giảm xuống < 120ms. |
+| **TASK-PERF-01** | Cấu hình HikariCP, `application-prod.properties` & Caffeine Cache | `@be-secondary` (`tuanpham21105`) — **đã code** trên `fix/OPS-40-query-optimize` | **P0** | `application-prod.properties`, `CacheConfig.java`, `UserSnapshotCache.java`, eviction khi ghi user; chờ deploy + đo lại (`p95` mục tiêu < 200ms). |
+| **TASK-PERF-04** | Gộp query phân quyền + gộp COUNT vào query phân trang | `@be-secondary` (`tuanpham21105`) — **đã code** | **P0** | `ClassRepository.findAccess` (1 native query), `AssignmentService` dùng access record, `COUNT(*) OVER ()` trong `AssignmentJpaAdapter.findPage`. Round-trip DB/request: 6–7 → 2 (cache ấm). |
 | **TASK-PERF-02** | Frontend Code-Splitting (`React.lazy`) & Nén Assets | `@fe-primary` (`Maloque18705`) | **P0** | Cập nhật `App.tsx`, bundle JS ban đầu giảm từ 1.25MB xuống < 200KB. |
 | **TASK-PERF-03** | Triển khai Redis Cache Container & Spring Data Redis | `@devops-primary` (`tuanpham21105`)<br>`@be-primary` (`doanthaison2706`) | **P0** | Container `englishhub-redis-staging` trong Docker Compose, class `RedisCacheConfig.java`, Read Response Time đạt ~45ms - 65ms. |
 | **TASK-FE-20** | Khắc phục mất trắng câu hỏi khi tạo bài Reading/Listening | `@fe-primary` (`Maloque18705`) | **P0** | Tích hợp gọi `questionService.createQuestion` khi lưu bài tập trong form. |

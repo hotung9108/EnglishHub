@@ -350,7 +350,7 @@ Table answers {
   audio_mime_type varchar(50)
   audio_upload_status upload_status
   doc_storage_key varchar(255)
-  doc_mime_type varchar(50)
+  doc_mime_type varchar(255)
   doc_file_size_bytes bigint
   doc_upload_status upload_status
   created_at timestamptz [not null, default: `now()`]

@@ -1,32 +1,32 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  RotateCcw, 
-  FileText, 
-  Award, 
-  UserCheck, 
-  AlertCircle, 
-  RefreshCw, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  BookOpen, 
-  Headphones, 
-  Mic, 
-  FileEdit, 
-  HelpCircle, 
-  TrendingUp, 
+import {
+  ArrowLeft,
+  Sparkles,
+  RotateCcw,
+  FileText,
+  Award,
+  UserCheck,
+  AlertCircle,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  BookOpen,
+  Headphones,
+  Mic,
+  FileEdit,
+  HelpCircle,
+  TrendingUp,
   File
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  submissionService, 
-  type SubmissionDetail, 
-  type SubmissionListItem, 
-  type SubmissionModuleDetailResponse, 
+import {
+  submissionService,
+  type SubmissionDetail,
+  type SubmissionListItem,
+  type SubmissionModuleDetailResponse,
   type SubmissionSkill,
   type SubmittedAnswerItem
 } from '../api/services/submission.service';
@@ -112,6 +112,10 @@ function extractTranscriptFromGrading(rawTranscript: unknown): string {
       .join(' ');
   }
   return '';
+}
+
+function formatCriterionScore(val?: number | null): string {
+  return typeof val === 'number' && Number.isFinite(val) ? val.toFixed(1) : '--';
 }
 
 
@@ -441,6 +445,13 @@ export const StudentSubmissionResult: React.FC = () => {
     return `${scoreVal}/${maxVal}`;
   }, [rawScore, maxScore]);
 
+  const rubricMaxScore = useMemo<number>(() => {
+    if (aiSuggestion?.maxScore != null && aiSuggestion.maxScore > 0) {
+      return aiSuggestion.maxScore;
+    }
+    return 10;
+  }, [aiSuggestion]);
+
   const isGraded = useMemo<boolean>(() => {
     if (submission?.status === 'GRADED') return true;
     if (activeSubModule?.status === 'GRADED') return true;
@@ -618,60 +629,71 @@ export const StudentSubmissionResult: React.FC = () => {
 
   const criteriaList = useMemo(() => {
     if (selectedSkill === 'SPEAKING') {
+      const fc = criteriaScores?.fluencyAndCoherence ?? criteriaScores?.fluencyCohesion;
+      const lr = criteriaScores?.lexicalResource;
+      const gra = criteriaScores?.grammaticalRangeAndAccuracy ?? criteriaScores?.grammaticalRange;
+      const pr = criteriaScores?.pronunciation;
+
       return [
-        { 
-          key: 'fc', 
-          title: 'Fluency & Coherence', 
-          score: criteriaScores?.fluencyCohesion != null ? criteriaScores.fluencyCohesion.toFixed(1) : (isGraded ? '--' : '--'), 
-          desc: 'Nhịp nói tự nhiên, phát triển ý liền mạch, hạn chế khoảng ngừng ngắt quãng.' 
+        {
+          key: 'fc',
+          title: 'Fluency & Coherence',
+          score: formatCriterionScore(fc),
+          desc: 'Nhịp nói tự nhiên, phát triển ý liền mạch, hạn chế khoảng ngừng ngắt quãng.'
         },
-        { 
-          key: 'lr', 
-          title: 'Lexical Resource', 
-          score: criteriaScores?.lexicalResource != null ? criteriaScores.lexicalResource.toFixed(1) : (isGraded ? '--' : '--'), 
-          desc: 'Vận dụng linh hoạt cụm từ chuyên đề, chuyển đổi từ đồng nghĩa chính xác.' 
+        {
+          key: 'lr',
+          title: 'Lexical Resource',
+          score: formatCriterionScore(lr),
+          desc: 'Vận dụng linh hoạt cụm từ chuyên đề, chuyển đổi từ đồng nghĩa chính xác.'
         },
-        { 
-          key: 'gr', 
-          title: 'Grammatical Range', 
-          score: criteriaScores?.grammaticalRange != null ? criteriaScores.grammaticalRange.toFixed(1) : (isGraded ? '--' : '--'), 
-          desc: 'Kiểm soát tốt câu ghép và câu điều kiện, ít lỗi chia động từ.' 
+        {
+          key: 'gr',
+          title: 'Grammatical Range & Accuracy',
+          score: formatCriterionScore(gra),
+          desc: 'Kiểm soát tốt câu ghép và câu điều kiện, ít lỗi chia động từ.'
         },
-        { 
-          key: 'pr', 
-          title: 'Pronunciation', 
-          score: criteriaScores?.pronunciation != null ? criteriaScores.pronunciation.toFixed(1) : (isGraded ? '--' : '--'), 
-          desc: 'Ngữ điệu tự nhiên, chuẩn trọng âm từ và âm đuôi /s/, /ed/ rõ ràng.' 
+        {
+          key: 'pr',
+          title: 'Pronunciation',
+          score: formatCriterionScore(pr),
+          desc: 'Ngữ điệu tự nhiên, chuẩn trọng âm từ và âm đuôi /s/, /ed/ rõ ràng.'
         }
       ];
     }
+
+    const tr = criteriaScores?.taskResponse ?? criteriaScores?.taskAchievement;
+    const cc = criteriaScores?.coherenceAndCohesion ?? criteriaScores?.coherenceCohesion;
+    const lr = criteriaScores?.lexicalResource;
+    const gra = criteriaScores?.grammaticalRangeAndAccuracy ?? criteriaScores?.grammaticalRange;
+
     return [
-      { 
-        key: 'ta', 
-        title: 'Task Achievement', 
-        score: criteriaScores?.taskAchievement != null ? criteriaScores.taskAchievement.toFixed(1) : (isGraded ? '--' : '--'), 
-        desc: 'Trả lời đầy đủ các vế của đề bài. Lập luận chặt chẽ và đưa ra dẫn chứng xác đáng.' 
+      {
+        key: 'ta',
+        title: 'Task Achievement',
+        score: formatCriterionScore(tr),
+        desc: 'Trả lời đầy đủ các vế của đề bài. Lập luận chặt chẽ và đưa ra dẫn chứng xác đáng.'
       },
-      { 
-        key: 'cc', 
-        title: 'Coherence & Cohesion', 
-        score: criteriaScores?.coherenceCohesion != null ? criteriaScores.coherenceCohesion.toFixed(1) : (isGraded ? '--' : '--'), 
-        desc: 'Cấu trúc bài viết logic. Sử dụng linh hoạt các liên từ chuyển tiếp mạch lạc.' 
+      {
+        key: 'cc',
+        title: 'Coherence & Cohesion',
+        score: formatCriterionScore(cc),
+        desc: 'Cấu trúc bài viết logic. Sử dụng linh hoạt các liên từ chuyển tiếp mạch lạc.'
       },
-      { 
-        key: 'lr', 
-        title: 'Lexical Resource', 
-        score: criteriaScores?.lexicalResource != null ? criteriaScores.lexicalResource.toFixed(1) : (isGraded ? '--' : '--'), 
-        desc: 'Vốn từ vựng phong phú. Vận dụng tốt các cụm collocations học thuật nâng cao.' 
+      {
+        key: 'lr',
+        title: 'Lexical Resource',
+        score: formatCriterionScore(lr),
+        desc: 'Vốn từ vựng phong phú. Vận dụng tốt các cụm collocations học thuật nâng cao.'
       },
-      { 
-        key: 'gr', 
-        title: 'Grammatical Range & Accuracy', 
-        score: criteriaScores?.grammaticalRange != null ? criteriaScores.grammaticalRange.toFixed(1) : (isGraded ? '--' : '--'), 
-        desc: 'Phối hợp đa dạng các cấu trúc ngữ pháp phức. Hạn chế tối đa các lỗi chia thì.' 
+      {
+        key: 'gr',
+        title: 'Grammatical Range & Accuracy',
+        score: formatCriterionScore(gra),
+        desc: 'Phối hợp đa dạng các cấu trúc ngữ pháp phức. Hạn chế tối đa các lỗi chia thì.'
       }
     ];
-  }, [selectedSkill, criteriaScores, isGraded]);
+  }, [selectedSkill, criteriaScores]);
 
   // Available skills in submission
   const availableSkills: SubmissionSkill[] = useMemo(() => {
@@ -701,9 +723,9 @@ export const StudentSubmissionResult: React.FC = () => {
     return (
       <div className="student-result-page">
         <div className="result-breadcrumbs">
-          <button 
-            type="button" 
-            className="result-back-btn" 
+          <button
+            type="button"
+            className="result-back-btn"
             onClick={() => navigate('/student/assignments')}
           >
             <ArrowLeft size={14} />
@@ -717,7 +739,7 @@ export const StudentSubmissionResult: React.FC = () => {
             Chưa tìm thấy bài nộp nào
           </h2>
           <p className="result-empty-desc">
-            {assignment?.title 
+            {assignment?.title
               ? `Bạn chưa nộp bài cho bài tập "${assignment.title}". Hãy vào phần làm bài để hoàn thành và nhận đánh giá từ hệ thống.`
               : 'Hiện tại chưa ghi nhận lượt nộp bài nào của bạn cho mã bài tập này.'}
           </p>
@@ -746,16 +768,16 @@ export const StudentSubmissionResult: React.FC = () => {
     <div className="student-result-page">
       {/* 1. Breadcrumbs */}
       <div className="result-breadcrumbs">
-        <button 
-          type="button" 
-          className="result-back-btn" 
+        <button
+          type="button"
+          className="result-back-btn"
           onClick={() => navigate('/student/assignments')}
         >
           <ArrowLeft size={14} />
           <span>{t('studentResult.backToList')}</span>
         </button>
         <span className="result-crumb-sep">/</span>
-        <span 
+        <span
           className="result-crumb-link"
           onClick={() => navigate(`/student/assignments/${assignment?.id || numericId}/overview`)}
           role="button"
@@ -811,7 +833,7 @@ export const StudentSubmissionResult: React.FC = () => {
 
             {/* Attempt Switcher if multiple attempts exist */}
             {attempts.length > 1 ? (
-              <select 
+              <select
                 className="result-attempt-select"
                 value={submission?.id || attempts[0]?.id}
                 onChange={(e) => void handleSelectAttempt(Number(e.target.value))}
@@ -850,8 +872,8 @@ export const StudentSubmissionResult: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="result-hero-actions">
-            <button 
-              className="result-btn-white" 
+            <button
+              className="result-btn-white"
               onClick={() => navigate(`/student/assignments/${submission?.assignmentId || assignment?.id || numericId}/overview`)}
               type="button"
             >
@@ -938,8 +960,8 @@ export const StudentSubmissionResult: React.FC = () => {
                     <span className="result-filter-count">
                       Lọc ghi chú:
                     </span>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       className={`annotation-filter-btn ${activeFilter === 'all' ? 'active' : ''}`}
                       onClick={() => setActiveFilter('all')}
                     >
@@ -1037,7 +1059,7 @@ export const StudentSubmissionResult: React.FC = () => {
                       </>
                     ) : (
                       <div className="result-ann-empty">
-                        {annotations.length === 0 
+                        {annotations.length === 0
                           ? 'Chưa có điểm sửa lỗi nào được ghi nhận từ AI hoặc giáo viên.'
                           : 'Chọn một ghi chú ở danh sách để xem chi tiết.'}
                       </div>
@@ -1073,7 +1095,7 @@ export const StudentSubmissionResult: React.FC = () => {
                     {criteriaList.map((crit) => (
                       <div key={crit.key} className="flex-between">
                         <span className="text-on-surface-variant">{crit.title}:</span>
-                        <strong className="text-primary">{crit.score} / 10</strong>
+                        <strong className="text-primary">{crit.score} / {rubricMaxScore}</strong>
                       </div>
                     ))}
                   </div>
@@ -1135,9 +1157,9 @@ export const StudentSubmissionResult: React.FC = () => {
                       </div>
                     ) : (
                       <div className="result-audio-player-wrap">
-                        <audio 
-                          controls 
-                          src={audioUrl} 
+                        <audio
+                          controls
+                          src={audioUrl}
                           className="result-audio-player"
                           onError={() => setAudioErrorUrl(audioUrl)}
                         >
@@ -1255,7 +1277,7 @@ export const StudentSubmissionResult: React.FC = () => {
                 ) : (
                   <div className="result-mcq-list">
                     {filteredQuestions.map((q) => (
-                      <div 
+                      <div
                         key={q.id}
                         className={`result-mcq-card ${q.isCorrect === true ? 'is-correct' : q.isCorrect === false ? 'is-incorrect' : ''}`}
                       >
@@ -1353,27 +1375,25 @@ export const StudentSubmissionResult: React.FC = () => {
         <div className="flex-col gap-24">
           {/* 4 Rubrics Breakdown */}
           <section className="result-rubrics-grid">
-            {criteriaList.map((crit, idx) => {
+            {criteriaList.map((crit) => {
               const numScore = Number(crit.score);
               const hasScore = !isNaN(numScore);
-              const colors = ['#2563eb', '#8b5cf6', '#f59e0b', '#10b981'];
-              const color = colors[idx % colors.length];
+              const progressPercent = hasScore
+                ? Math.min(100, Math.max(0, (numScore / rubricMaxScore) * 100))
+                : 0;
 
               return (
-                <div key={crit.key} className="result-rubric-card" style={{ borderColor: color }}>
+                <div key={crit.key} className={`result-rubric-card result-rubric-${crit.key}`}>
                   <div className="result-rubric-header">
                     <h3 className="result-rubric-title">{crit.title}</h3>
-                    <span className="result-rubric-score" style={{ color }}>
-                      {hasScore ? `${crit.score} / 10` : '-- / 10'}
+                    <span className="result-rubric-score">
+                      {hasScore ? `${crit.score} / ${rubricMaxScore}` : `-- / ${rubricMaxScore}`}
                     </span>
                   </div>
                   <div className="result-rubric-bar-track">
-                    <div 
-                      className="result-rubric-bar-fill" 
-                      style={{ 
-                        width: hasScore ? `${(numScore / 10) * 100}%` : '0%', 
-                        backgroundColor: color 
-                      }} 
+                    <div
+                      className="result-rubric-bar-fill"
+                      style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                   <p className="result-rubric-desc">{crit.desc}</p>
@@ -1399,7 +1419,7 @@ export const StudentSubmissionResult: React.FC = () => {
                   </div>
                 ) : (
                   <div className="result-feedback-empty">
-                    {isGraded 
+                    {isGraded
                       ? 'Không có chẩn đoán chi tiết bổ sung từ hệ thống AI.'
                       : 'Hệ thống AI đang phân tích bài làm để tạo chẩn đoán năng lực.'}
                   </div>
@@ -1421,8 +1441,8 @@ export const StudentSubmissionResult: React.FC = () => {
                     <h4 className="result-recommendation-title">Tiếp tục ôn tập kỹ năng {selectedSkill}</h4>
                     <span className="result-recommendation-sub">Bài tập rèn luyện tương ứng</span>
                   </div>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() => navigate('/student/workspace')}
                   >

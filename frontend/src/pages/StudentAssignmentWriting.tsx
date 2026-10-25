@@ -11,8 +11,8 @@ import { assignmentService, type AssignmentDetail } from '../api/services/assign
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import {
   submissionService,
-  isSubmissionGraded,
   type SubmissionDetail,
+  type SubmitModulePayload,
 } from '../api/services/submission.service';
 import { parseApiError } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +24,7 @@ import {
   getSkillLabel,
   getExamPageRedirectRoute,
   resolveEffectiveModules,
+  getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
 import '../styles/student-writing.css';
 
@@ -136,13 +137,13 @@ const StudentAssignmentWriting: React.FC = () => {
           }
         } else if (user?.id) {
           try {
-            const subList = await submissionService.listSubmissions({
+                        const inProgressRes = await submissionService.listSubmissions({
               assignmentId: numericId,
               studentId: user.id,
-              limit: 10
+              status: 'IN_PROGRESS',
+              limit: 1,
             });
-            const subs = subList.data || [];
-            const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
+            const inProgressItem = inProgressRes.data?.[0];
 
             if (inProgressItem) {
               const sub = await submissionService.getSubmission(inProgressItem.id);
@@ -159,12 +160,18 @@ const StudentAssignmentWriting: React.FC = () => {
               }
               setSubmission(sub);
             } else {
+              const subList = await submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10,
+              });
+              const subs = subList.data || [];
               const completedItem =
-                subs.find((s) => isSubmissionGraded(s)) ||
+                subs.find((s) => s.status === 'GRADED') ||
                 subs.find((s) => s.status === 'SUBMITTED') ||
                 subs[0];
 
-              if (completedItem) {
+              if (completedItem && (completedItem.status === 'GRADED' || completedItem.status === 'SUBMITTED')) {
                 if (isMounted) {
                   navigate(`/student/submissions/${completedItem.id}`, { replace: true });
                 }
@@ -305,7 +312,9 @@ const StudentAssignmentWriting: React.FC = () => {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (editorText.trim() === '' && !uploadedFile) {
+
+    const trimmedText = editorText.trim();
+    if (trimmedText === '' && !uploadedFile) {
       setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
       return;
     }
@@ -331,35 +340,69 @@ const StudentAssignmentWriting: React.FC = () => {
     setIsSubmitting(true);
     setError(null);
     try {
+      let uploadedStorageKey: string | undefined = undefined;
+
       // 1. Upload document file if selected
       if (uploadedFile) {
-        const docMimeType = uploadedFile.name.toLowerCase().endsWith('.docx')
-          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          : uploadedFile.type || 'application/pdf';
-        const { uploadUrl } = await submissionService.getDocumentUploadUrl(
-          subModuleId,
-          docMimeType
-        );
-        if (uploadUrl) {
-          await submissionService.uploadDirectToStorage(uploadUrl, uploadedFile, docMimeType);
+        const mimeType = getBackendDocumentMimeType(uploadedFile);
+        try {
+          const { uploadUrl, storageKey } = await submissionService.getDocumentUploadUrl(
+            subModuleId,
+            mimeType
+          );
+
+          if (!uploadUrl || !storageKey) {
+            throw new Error('Không nhận được liên kết tải tệp lên từ máy chủ.');
+          }
+
+          let targetUrl = uploadUrl;
+          if (uploadUrl.includes('//minio:9000/')) {
+            targetUrl = uploadUrl.replace(/^https?:\/\/minio:9000/, '/s3-upload');
+          }
+
+          const uploadResp = await fetch(targetUrl, {
+            method: 'PUT',
+            body: uploadedFile,
+            headers: {
+              'Content-Type': uploadedFile.type || 'application/octet-stream',
+            },
+          });
+          if (!uploadResp.ok) {
+            throw new Error(`Tải tệp lên kho lưu trữ thất bại (HTTP ${uploadResp.status}).`);
+          }
+
+          uploadedStorageKey = storageKey;
+        } catch (uploadErr) {
+          console.error('Document storage upload failed:', uploadErr);
+          const uploadMsg = uploadErr instanceof Error ? uploadErr.message : 'Tải tệp bài làm lên kho lưu trữ thất bại.';
+          setError(`Lỗi tải tệp đính kèm: ${uploadMsg}`);
+          setIsSubmitting(false);
+          return;
         }
       }
 
-      // 2. Submit module (do not swallow HTTP 400 errors)
-      const trimmedText = editorText.trim();
-      await submissionService.submitModule(
-        subModuleId,
-        trimmedText
-          ? {
-              answers: [
-                {
-                  questionId: 1,
-                  content: { text: trimmedText }
+      // 2. Submit module with storageKey and text content answers
+      const questionId = 1;
+      const submitPayload: SubmitModulePayload = {
+        answers: [
+          {
+            questionId,
+            content: uploadedFile
+              ? {
+                  text: trimmedText,
+                  fileName: uploadedFile.name,
+                  hasAttachedFile: true,
                 }
-              ]
-            }
-          : {}
-      );
+              : { text: trimmedText },
+          },
+        ],
+      };
+
+      if (uploadedStorageKey) {
+        submitPayload.storageKey = uploadedStorageKey;
+      }
+
+      await submissionService.submitModule(subModuleId, submitPayload);
 
       const currentSubModules = (submission.modules || []).map((m) =>
         m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
@@ -367,7 +410,7 @@ const StudentAssignmentWriting: React.FC = () => {
       setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
 
       // 3. Check if all modules in this submission are now completed
-      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
@@ -408,6 +451,7 @@ const StudentAssignmentWriting: React.FC = () => {
         }
       }
     } catch (err: unknown) {
+      console.error('Submit writing assignment error:', err);
       const apiErr = parseApiError(err);
       setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
     } finally {
@@ -624,7 +668,7 @@ const StudentAssignmentWriting: React.FC = () => {
               <Button 
                 variant="primary"
                 onClick={handleSubmit}
-                disabled={isSubmitting || !submission}
+                disabled={isSubmitting}
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >

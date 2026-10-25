@@ -99,6 +99,33 @@ public class User extends BaseEntity<Long> {
 		return !deleted && status == UserStatus.ACTIVE;
 	}
 
+	/**
+	 * Returns a detached copy of this user.
+	 *
+	 * <p>{@link com.english_hub.core.modules.user.infrastructure.cache.UserSnapshotCache}
+	 * shares one instance between concurrent requests, so callers that mutate
+	 * (profile update, password change) must work on a copy to keep the cached
+	 * snapshot immutable.</p>
+	 */
+	public User copy() {
+		return new User(
+				getId(),
+				fullName,
+				email,
+				phone,
+				avatarUrl,
+				passwordHash,
+				role,
+				status,
+				deleted,
+				specialization,
+				studentCode,
+				dateOfBirth,
+				parentPhone,
+				getCreatedAt(),
+				getUpdatedAt());
+	}
+
 	public boolean isAdmin() {
 		return role == UserRole.ADMIN;
 	}

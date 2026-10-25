@@ -233,6 +233,7 @@ const StudentAssignments: React.FC = () => {
     };
   }, [user?.id, reloadKey]);
 
+
   // Filtered by class & search query & status filter
   const filteredAssignments = useMemo(() => {
     return rawAssignments.filter((a) => {
@@ -474,12 +475,13 @@ const StudentAssignments: React.FC = () => {
           paginatedAssignments.map((assignment) => {
             const badge = getTypeBadge(assignment.type);
             const handleAction = () => {
-              navigate(
+navigate(
                 getStudentAssignmentActionRoute({
                   id: assignment.id,
                   status: assignment.status,
                   submissionId: assignment.submissionId,
                   activeSkill: assignment.activeSkill,
+                  type: assignment.type,
                 })
               );
             };

@@ -1,0 +1,7 @@
+id: BUG-QA32-ATTEMPT
+title: "[FE][Student Writing] Báo nộp thành công khi không tải được lượt nộp"
+assignee: "@fe-primary"
+status: "To Do"
+issue: "https://github.com/hotung9108/EnglishHub/issues/208"
+source: "QA-32 / develop e8e85a4 / component jsdom"
+description: "Chi tiết và retest: production_artifacts/test_reports/QA-32/issues/public/ATTEMPT.md"

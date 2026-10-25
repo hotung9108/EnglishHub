@@ -248,11 +248,26 @@ export function calculateExamSteps(
   });
 }
 
+export function getBackendDocumentMimeType(file: { name?: string; type?: string }): string {
+  const fileName = (file.name || '').toLowerCase();
+  const fileType = (file.type || '').toLowerCase();
+
+  if (
+    fileName.endsWith('.docx') ||
+    fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    fileType === 'application/msword'
+  ) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return 'application/pdf';
+}
+
 export interface StudentAssignmentActionTarget {
   id: number | string;
   status: 'not_started' | 'in_progress' | 'pending' | 'ai_processing' | 'graded';
   submissionId?: number | string;
   activeSkill?: string | null;
+  type?: string;
 }
 
 /**
@@ -260,19 +275,26 @@ export interface StudentAssignmentActionTarget {
  * in StudentAssignments or StudentClassDetails.
  */
 export function getStudentAssignmentActionRoute(target: StudentAssignmentActionTarget): string {
-  const { id, status, submissionId, activeSkill } = target;
-  const subIdStr = submissionId !== undefined && submissionId !== null && String(submissionId).trim() !== ''
-    ? String(submissionId)
-    : undefined;
+  const { id, status, submissionId, activeSkill, type } = target;
+  const subIdStr =
+    submissionId !== undefined && submissionId !== null && String(submissionId).trim() !== ''
+      ? String(submissionId)
+      : undefined;
 
   if (status === 'graded' || status === 'pending' || status === 'ai_processing') {
     return subIdStr ? `/student/submissions/${subIdStr}` : `/student/assignments/${id}/result`;
   }
 
   if (status === 'in_progress') {
-    if (activeSkill) {
-      const numericSubId = subIdStr && Number.isFinite(Number(subIdStr)) ? Number(subIdStr) : undefined;
-      return getSkillRoute(activeSkill, id, numericSubId);
+    const numericSubId =
+      subIdStr && Number.isFinite(Number(subIdStr)) ? Number(subIdStr) : undefined;
+    if (activeSkill !== undefined) {
+      return activeSkill
+        ? getSkillRoute(activeSkill, id, numericSubId)
+        : `/student/assignments/${id}/overview`;
+    }
+    if (type && normalizeSkill(type) !== 'unknown') {
+      return getSkillRoute(type, id, numericSubId);
     }
     return `/student/assignments/${id}/overview`;
   }

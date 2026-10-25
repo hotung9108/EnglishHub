@@ -1,0 +1,626 @@
+[
+  {
+    "file": "Login.test.tsx",
+    "test": "blocks empty credentials and malformed email",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "submits credentials and redirects authenticated admin",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "submits credentials and redirects authenticated teacher",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "submits credentials and redirects authenticated student",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "validates the saved destination for admin",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "validates the saved destination for teacher",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "validates the saved destination for student",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "validates the saved destination for student",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "reports auth failure in vi and re-enables submit",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "reports auth failure in en and re-enables submit",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "prevents duplicate requests while login is pending on current develop",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "Login.test.tsx",
+    "test": "toggles password visibility, remember-me and language",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting does not overwrite the current assignment when an earlier route loads late",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting counts words for \"\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting counts words for \"   \\n\\t \"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting counts words for \"Hello\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting counts words for \"  Hello   world\\nfrom\\tVietnam  \"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting warns and prevents submission for an empty essay (\"\")",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting warns and prevents submission for an empty essay (\"  \\n\\t \")",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting restores and saves the assignment draft, then clears the editor",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting hides the saved-draft confirmation after three seconds without losing the draft",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting renders an assignment without modules without starting an attempt for a missing user",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting submits the essay, clears the draft and opens the submission result",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting resolves the submission from the URL instead of starting another attempt",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting finds the current attempt when the optional submissionId query is malformed",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting starts an attempt if no in-progress submission exists",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting shows the chosen filename and replaces it on drop",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "StudentAssignmentWriting renders fallback instructions when assignment/module endpoints are unavailable",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "redirects an assignment without Writing to READING",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "redirects an assignment without Writing to LISTENING",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "redirects an assignment without Writing to SPEAKING",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "blocks submitting a closed assignment",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "rejects invalid upload invalid.txt",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "rejects invalid upload large.pdf",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "waits for file upload before submitting (application/pdf)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "waits for file upload before submitting ()",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "handles remaining Reading module in state IN_PROGRESS",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "handles remaining Reading module in state SUBMITTED",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "handles remaining Reading module in state GRADED",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "StudentAssignmentWriting.test.tsx",
+    "test": "opens picker by mouse or keyboard and supports replacing a selected file",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates missing title and writing prompt (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates missing title and writing prompt (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "requires a class when class loading fails (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "requires a class when class loading fails (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "publishes writing with exact payload and local schedule (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "publishes writing with exact payload and local schedule (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "saves a speaking draft without publishing (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "saves a speaking draft without publishing (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "persists actual MCQ and short-answer questions (reading)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "persists actual MCQ and short-answer questions (listening)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates reading content, questions and answer keys (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates reading content, questions and answer keys (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates listening audio, questions and answer keys (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "validates listening audio, questions and answer keys (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "reports creation errors and enables retry (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "reports creation errors and enables retry (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherCreateAssignment.test.tsx",
+    "test": "previews entered writing, closes preview and cancels",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows English grading controls and attachment placeholders (not real downloads)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows English empty and error states and recovers on retry",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails reports an English save failure",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows Vietnamese download placeholders and preserves the existing grade when AI has no score",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails accepts typed score 0.0 and saves the exact feedback payload",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails accepts typed score 7.5 and saves the exact feedback payload",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails accepts typed score 10.0 and saves the exact feedback payload",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails rejects out-of-range or missing numeric value after typing \"-0.1\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails rejects out-of-range or missing numeric value after typing \"10.1\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails rejects out-of-range or missing numeric value after typing \"10.01\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails rejects out-of-range or missing numeric value after typing \"\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails rejects out-of-range or missing numeric value after typing \"abc\"",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails normalizes typed scientific notation 1e1 to score 10 in jsdom",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails finalizes the grade and returns to the assignment",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows a save failure and re-enables the controls",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 5 using Trước to student 7, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 5 using Tiếp to student 6, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 6 using Trước to student 5, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 6 using Tiếp to student 7, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 7 using Tiếp to student 5, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails navigates from student 7 using Trước to student 6, including wraparound",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows the empty state if the student has not submitted",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails shows a load error and successfully retries",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails uses AI score when no final grade exists",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails blocks saving when the grading record lookup fails",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content Plain essay",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content Essay field",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content Answer field",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content Content field",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content {\"other\":\"Unknown field\"}",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails renders answer content 123",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails defines scoring precision (0.5 IELTS bands versus arbitrary decimals) before asserting 0.1 policy",
+    "status": "todo",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "TeacherSubmissionDetails approves an annotation through the review button (UI not implemented)",
+    "status": "todo",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "shows speaking audio and AI feedback (vi, https://storage.example.test/audio.mp3)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "shows speaking audio and AI feedback (en, /recordings/audio.mp3)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "shows speaking audio and AI feedback (vi, null)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "shows speaking audio and AI feedback (en, null)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "reports AI request failures and allows retry (vi)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "reports AI request failures and allows retry (en)",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "refreshes speaking grading after the AI request completes",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "resolves student identity from assigned",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "resolves student identity from fallback",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "resolves student identity from error",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "resolves student identity from route",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "resolves student identity from route-error",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "honors the requested module and switches between Writing and Speaking",
+    "status": "passed",
+    "assertion": null
+  },
+  {
+    "file": "TeacherSubmissionDetails.test.tsx",
+    "test": "does not load grading or permit grading for an in-progress submission",
+    "status": "passed",
+    "assertion": null
+  }
+]
