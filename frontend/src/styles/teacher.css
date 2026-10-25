@@ -1310,6 +1310,11 @@
   border-radius: 50%;
   background-color: #10b981;
 }
+.tsd-ontime-text {
+  font-weight: 500;
+  color: var(--on-surface, #262320);
+  font-size: 13px;
+}
 
 .tsd-files-card {
   background-color: var(--surface);
@@ -1613,6 +1618,223 @@
   width: 100%;
   height: 40px;
   outline: none;
+}
+
+/* ==========================================================================
+   Speaking Optimized Layout (.tsd-speaking-*)
+   ========================================================================== */
+.tsd-speaking-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.tsd-speaking-hero-card {
+  background-color: var(--surface);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tsd-speaking-hero-header {
+  padding: 14px 20px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.tsd-speaking-hero-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+.tsd-speaking-hero-body {
+  padding: 18px 20px;
+}
+
+.tsd-speaking-audio-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.tsd-speaking-audio-wrap {
+  flex: 1;
+  min-width: 280px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.tsd-audio-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm, 8px);
+  padding: 8px 12px;
+  background-color: var(--color-danger-light, #fbebeb);
+  border: 1px solid var(--color-danger, #8f2222);
+  border-radius: var(--radius-sm, 8px);
+  flex: 1;
+  min-width: 280px;
+}
+
+.tsd-audio-error-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-danger, #8f2222);
+  font-weight: 500;
+}
+
+.tsd-audio-empty {
+  padding: 16px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border-radius: var(--radius-sm, 8px);
+  border: 1px dashed var(--outline-variant, #e6dfd5);
+  font-size: 13px;
+  color: var(--text-secondary, #736b63);
+  text-align: center;
+}
+
+.tsd-speaking-workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .tsd-speaking-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tsd-speaking-ai-panel,
+.tsd-speaking-teacher-panel {
+  background-color: var(--surface);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.tsd-speaking-panel-header {
+  padding: 14px 20px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border-bottom: 1px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tsd-speaking-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.tsd-speaking-ai-score {
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.tsd-speaking-ai-score strong {
+  font-size: 14.5px;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.tsd-speaking-ai-content {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: 560px;
+}
+
+.tsd-speaking-ai-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tsd-speaking-ai-content::-webkit-scrollbar-thumb {
+  background-color: var(--outline-variant);
+  border-radius: 3px;
+}
+
+.tsd-speaking-ai-markdown {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--on-surface);
+}
+
+.tsd-speaking-score-row {
+  padding: 16px 20px 14px 20px;
+  border-bottom: 1px dashed var(--outline-variant);
+}
+
+.tsd-speaking-feedback-wrap {
+  padding: 16px 20px 20px 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tsd-speaking-feedback-wrap .tsd-feedback-textarea {
+  flex: 1;
+  min-height: 240px;
+}
+
+.tsd-ai-markdown {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--on-surface, #0f172a);
+}
+
+.tsd-ai-markdown p {
+  margin: 0 0 8px 0;
+}
+.tsd-ai-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.tsd-ai-markdown strong {
+  color: var(--primary, #1b4d3e);
+  font-weight: 700;
+}
+
+.tsd-ai-markdown ul,
+.tsd-ai-markdown ol {
+  margin: 4px 0 8px 0;
+  padding-left: 18px;
+}
+
+.tsd-ai-markdown li {
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+.tsd-ai-markdown li:last-child {
+  margin-bottom: 0;
+}
+
+.tsd-ai-markdown h1,
+.tsd-ai-markdown h2,
+.tsd-ai-markdown h3,
+.tsd-ai-markdown h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary, #1b4d3e);
+  margin: 10px 0 4px 0;
 }
 
 /* ==========================================================================
@@ -1992,6 +2214,15 @@
 
 .tsd-file-only-note p {
   margin: 0;
+}
+
+.tsd-online-answer-note {
+  margin: 0;
+  font-family: var(--font-sans, 'Plus Jakarta Sans', sans-serif);
+  font-size: 14px;
+  color: var(--text-secondary, #736b63);
+  line-height: 1.6;
+  white-space: pre-line;
 }
 
 .tsd-essay-paragraph {

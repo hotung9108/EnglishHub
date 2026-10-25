@@ -844,7 +844,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
         {isLoadingAnnotations ? (
           <div className="tsd-annotations-loading">
-            <RefreshCw size={18} className="animate-spin text-slate-400" />
+            <RefreshCw size={18} className="animate-spin" />
             <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
           </div>
         ) : filteredAnnotations.length === 0 ? (
@@ -1111,7 +1111,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <div className="tsd-time-divider" />
               <div className="tsd-ontime-indicator">
                 <span className="tsd-ontime-dot" />
-                <span className="font-medium text-slate-700">{t('submissionDetails.statusOnTime')}</span>
+                <span className="tsd-ontime-text">{t('submissionDetails.statusOnTime')}</span>
               </div>
             </>
           )}
@@ -1272,7 +1272,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <label className="tsd-card-label">
                   {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
                 </label>
-                <div className="flex items-center gap-2 mt-1.5">
+                <div className="tsd-score-input-wrap">
                   <input
                     type="number"
                     step="0.5"
@@ -1283,7 +1283,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                     onChange={(e) => setFinalScoreInput(e.target.value)}
                     className="tsd-score-input"
                   />
-                  <span className="text-sm font-semibold text-slate-500">/ 10</span>
+                  <span className="tsd-score-scale">/ 10</span>
                 </div>
               </div>
 
@@ -1366,7 +1366,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <p>{isVi ? 'Học viên đã nộp bài hoàn chỉnh qua tệp đính kèm ở trên. Hãy bấm "Xem" hoặc "Tải xuống" để kiểm tra bài làm.' : 'Student submitted their assignment via the attached document above. Click "View" or "Download" to review.'}</p>
                 </div>
               ) : (
-                <p className="tsd-file-only-note">
+                <p className="tsd-online-answer-note">
                   {isVi ? 'Học viên đã nộp bài tập trực tuyến.' : 'Student submitted the online assignment.'}
                 </p>
               )}
