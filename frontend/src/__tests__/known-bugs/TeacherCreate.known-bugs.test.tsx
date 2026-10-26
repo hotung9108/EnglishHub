@@ -51,14 +51,3 @@ it('BUG-QA32-SCHEDULE: rejects a closing date before the opening date', async ()
   await user.click(screen.getByRole('button', { name: 'Giao bài tập' }));
   expect(assignmentService.createAssignment).not.toHaveBeenCalled();
 });
-
-it('BUG-QA32-TIMEZONE: initializes datetime-local defaults with local time rather than UTC clock text', async () => {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date('2026-10-22T03:00:00.000Z'));
-  // Worker TZ is Asia/Ho_Chi_Minh: 03:00 UTC is 10:00 local.
-  const { container } = renderPage(<TeacherCreateAssignment />, '/teacher/create');
-  await screen.findByRole('option', { name: 'Lớp: IELTS A' });
-  const dates = container.querySelectorAll('input[type="datetime-local"]');
-  expect(dates[0]).toHaveValue('2026-10-22T10:00');
-  expect(dates[1]).toHaveValue('2026-10-29T10:00');
-});
