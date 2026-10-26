@@ -29,6 +29,7 @@ import {
   AssignmentPreviewModal
 } from '../components/assignments/editor';
 import { StickyActionBar } from '../components/common';
+import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
 
 export const TeacherEditAssignment: React.FC = () => {
@@ -61,8 +62,8 @@ export const TeacherEditAssignment: React.FC = () => {
     title: '',
     skill: 'writing',
     className: '',
-    startDate: new Date().toISOString().slice(0, 16),
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    startDate: formatToLocalDateTimeInput(),
+    dueDate: formatToLocalDateTimeInput(addDays(new Date(), 7)),
     durationMinutes: 60,
     allowLate: true,
     status: 'active',
@@ -308,8 +309,8 @@ export const TeacherEditAssignment: React.FC = () => {
         className: matchedClass ? matchedClass.name : (classList[0]?.name || 'Lớp tiếng Anh'),
         status: statusMap[detail.status] || 'active',
         maxSubmissions: detail.maxSubmissions ?? prev.maxSubmissions,
-        dueDate: detail.closeAt ? detail.closeAt.slice(0, 16) : prev.dueDate,
-        startDate: detail.openAt ? detail.openAt.slice(0, 16) : prev.startDate,
+        dueDate: detail.closeAt ? formatToLocalDateTimeInput(detail.closeAt) : prev.dueDate,
+        startDate: detail.openAt ? formatToLocalDateTimeInput(detail.openAt) : prev.startDate,
         writing: {
           ...prev.writing,
           promptText: writingPrompt || prev.writing.promptText,

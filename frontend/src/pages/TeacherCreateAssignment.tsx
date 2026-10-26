@@ -24,6 +24,7 @@ import {
   AssignmentPreviewModal
 } from '../components/assignments/editor';
 import { StickyActionBar } from '../components/common';
+import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
 
 export const TeacherCreateAssignment: React.FC = () => {
@@ -52,8 +53,8 @@ export const TeacherCreateAssignment: React.FC = () => {
     title: '',
     skill: initialSkill,
     className: '',
-    startDate: new Date().toISOString().slice(0, 16),
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    startDate: formatToLocalDateTimeInput(),
+    dueDate: formatToLocalDateTimeInput(addDays(new Date(), 7)),
     durationMinutes: initialSkill === 'reading' ? 60 : initialSkill === 'listening' ? 30 : 60,
     allowLate: true,
     status: 'active',
