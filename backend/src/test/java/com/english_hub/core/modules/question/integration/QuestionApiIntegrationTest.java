@@ -40,30 +40,55 @@ import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 import com.english_hub.core.infrastructure.persistence.repository.StudentProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
+import com.english_hub.core.modules.question.presentation.rest.dto.CreateQuestionRequest;
+import com.english_hub.core.modules.question.presentation.rest.dto.UpdateQuestionRequest;
+import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer;
+import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer.QuestionOption;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Transactional
 class QuestionApiIntegrationTest {
+
+	private static final String NULL_OPTION_MESSAGE = "options không được chứa phần tử null.";
+
+	private final ObjectMapper objectMapper;
+	private final EntityManager entityManager;
+
+	@Autowired
+	QuestionApiIntegrationTest(ObjectMapper objectMapper, EntityManager entityManager) {
+		this.objectMapper = objectMapper;
+		this.entityManager = entityManager;
+	}
 
 	@Container
 	static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -427,6 +452,70 @@ class QuestionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("correctAnswer không được để trống."));
 	}
 
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1, 2, 3})
+	void updateRejectsNullCorrectAnswerOptionBeforeService(int nullIndex) throws Exception {
+		entityManager.flush();
+		entityManager.clear();
+		Question before = questionRepository.findById(questionId).orElseThrow();
+		UpdateQuestionRequest request = new UpdateQuestionRequest(
+				null, correctAnswerWithNullOption(nullIndex), null, null);
+		String body = objectMapper.writeValueAsString(request);
+		UpdateQuestionRequest parsed = objectMapper.readValue(body, UpdateQuestionRequest.class);
+		assertThat(parsed.correctAnswer()).isInstanceOf(MultipleChoiceCorrectAnswer.class);
+		MultipleChoiceCorrectAnswer answer = (MultipleChoiceCorrectAnswer) parsed.correctAnswer();
+		assertThat(answer.options()).hasSize(4);
+		assertThat(answer.options().get(nullIndex)).isNull();
+
+		ResultActions result = performWithExceptionDetails("A.02 nullIndex=" + nullIndex,
+				put("/api/v1/questions/{id}", questionId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body));
+		assertNullOptionRejected(result, nullIndex);
+		entityManager.flush();
+		entityManager.clear();
+		Question after = questionRepository.findById(questionId).orElseThrow();
+		assertThat(after.getModuleId()).isEqualTo(before.getModuleId());
+		assertThat(after.getContent()).isEqualTo(before.getContent());
+		assertThat(after.getQuestionType()).isEqualTo(before.getQuestionType());
+		assertThat(after.getCorrectAnswer()).isEqualTo(before.getCorrectAnswer());
+		assertThat(after.getScore()).isEqualByComparingTo(before.getScore());
+		assertThat(after.getOrderIndex()).isEqualTo(before.getOrderIndex());
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1, 2, 3})
+	void createRejectsNullCorrectAnswerOptionBeforeService(int nullIndex) throws Exception {
+		entityManager.flush();
+		entityManager.clear();
+		List<Question> before = questionRepository.findByModuleIdOrderByOrderIndexAsc(moduleId);
+		Question existing = questionRepository.findById(questionId).orElseThrow();
+		CreateQuestionRequest request = new CreateQuestionRequest(
+				existing.getContent(),
+				com.english_hub.core.modules.question.domain.model.QuestionType.valueOf(existing.getQuestionType().name()),
+				correctAnswerWithNullOption(nullIndex),
+				existing.getScore(), existing.getOrderIndex() + 1);
+		String body = objectMapper.writeValueAsString(request);
+		CreateQuestionRequest parsed = objectMapper.readValue(body, CreateQuestionRequest.class);
+		assertThat(parsed.correctAnswer()).isInstanceOf(MultipleChoiceCorrectAnswer.class);
+		MultipleChoiceCorrectAnswer answer = (MultipleChoiceCorrectAnswer) parsed.correctAnswer();
+		assertThat(answer.options()).hasSize(4);
+		assertThat(answer.options().get(nullIndex)).isNull();
+
+		ResultActions result = performWithExceptionDetails("A.03 nullIndex=" + nullIndex,
+				post("/api/v1/modules/{id}/questions", moduleId)
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body));
+		assertNullOptionRejected(result, nullIndex);
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(questionRepository.findByModuleIdOrderByOrderIndexAsc(moduleId))
+				.extracting(Question::getId)
+				.containsExactlyElementsOf(before.stream().map(Question::getId).toList());
+	}
+
 	@Test
 	void updatePersistsTypedCorrectAnswerAndRejectsInvalidShape() throws Exception {
 		mockMvc.perform(put("/api/v1/questions/{id}", questionId)
@@ -545,6 +634,54 @@ class QuestionApiIntegrationTest {
 		mockMvc.perform(get("/api/v1/questions/{id}", questionId)
 				.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
 				.andExpect(status().isForbidden());
+	}
+
+	private MultipleChoiceCorrectAnswer correctAnswerWithNullOption(int nullIndex) {
+		String storedAnswer = questionRepository.findById(questionId).orElseThrow().getCorrectAnswer();
+		UpdateQuestionRequest parsed = objectMapper.readValue(
+				"{\"correctAnswer\":" + storedAnswer + "}", UpdateQuestionRequest.class);
+		MultipleChoiceCorrectAnswer answer = (MultipleChoiceCorrectAnswer) parsed.correctAnswer();
+		List<QuestionOption> options = new ArrayList<>(answer.options());
+		options.set(nullIndex, null);
+		return new MultipleChoiceCorrectAnswer(options);
+	}
+
+	private void assertNullOptionRejected(ResultActions result, int nullIndex) throws Exception {
+		result.andExpect(status().isBadRequest());
+		MvcResult response = result.andReturn();
+		assertThat(response.getResolvedException()).isInstanceOf(MethodArgumentNotValidException.class);
+		MethodArgumentNotValidException exception =
+				(MethodArgumentNotValidException) response.getResolvedException();
+		assertThat(exception.getBindingResult().getFieldError("correctAnswer.options[" + nullIndex + "]"))
+				.isNotNull();
+		assertThat(objectMapper.readTree(response.getResponse().getContentAsString()))
+				.isEqualTo(objectMapper.readTree(objectMapper.writeValueAsString(
+						java.util.Map.of("error", NULL_OPTION_MESSAGE))));
+	}
+
+	private ResultActions performWithExceptionDetails(
+			String scenario, MockHttpServletRequestBuilder request) throws Exception {
+		try {
+			ResultActions result = mockMvc.perform(request);
+			MvcResult response = result.andReturn();
+			System.out.println("BE-68 " + scenario + " HTTP " + response.getResponse().getStatus());
+			printExceptionChain(scenario, response.getResolvedException());
+			return result;
+		} catch (Exception exception) {
+			printExceptionChain(scenario, exception);
+			throw exception;
+		}
+	}
+
+	private void printExceptionChain(String scenario, Throwable exception) {
+		if (exception == null) {
+			System.out.println("BE-68 " + scenario + " exception: none");
+		}
+		while (exception != null) {
+			System.out.println("BE-68 " + scenario + " exception: " + exception.getClass().getName()
+					+ ": " + exception.getMessage());
+			exception = exception.getCause();
+		}
 	}
 
 	private void assertPublicOptions(JsonNode response, UserRole role) {

@@ -15,7 +15,7 @@ import java.util.Map;
 public record MultipleChoiceCorrectAnswer(
 		@NotNull(message = "options là bắt buộc.")
 		@Size(min = 4, max = 4, message = "options phải có đúng 4 lựa chọn.")
-		List<@Valid QuestionOption> options) implements CorrectAnswer {
+		List<@NotNull(message = "options không được chứa phần tử null.") @Valid QuestionOption> options) implements CorrectAnswer {
 
 	@Override
 	public Map<String, Object> toMap() {
