@@ -967,6 +967,9 @@ class SubmissionServiceTest {
 		closed.setId(100L);
 		closed.setStatus(SubmissionStatus.SUBMITTED);
 		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(closed));
+		Submission own = submission(5L, 41L, 1);
+		own.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(own));
 
 		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
 						multipleChoice(21L, 1))))
@@ -980,6 +983,37 @@ class SubmissionServiceTest {
 		SubmissionModule quizModule = module(9L);
 		quizModule.setId(100L);
 		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(quizModule));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void audit18ForeignSubmittedModuleMustReturnForbidden() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule closed = module(9L);
+		closed.setId(100L);
+		closed.setStatus(SubmissionStatus.SUBMITTED);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(closed));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(multipleChoice(21L, 1))))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void audit18ForeignInProgressModuleMustReturnForbidden() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule inProgress = module(9L);
+		inProgress.setId(100L);
+		when(submissionModuleRepository.findById(100L)).thenReturn(Optional.of(inProgress));
 		Submission foreign = submission(5L, 99L, 1);
 		foreign.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));

@@ -243,13 +243,13 @@ public class SubmissionService {
 		}
 		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
 				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
-		}
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
 		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
