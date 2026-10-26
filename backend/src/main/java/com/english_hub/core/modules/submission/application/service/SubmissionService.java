@@ -63,6 +63,7 @@ public class SubmissionService {
 
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
+	private static final String ASSIGNMENT_CLOSED_MESSAGE = "Bài tập đã đóng";
 	private static final String CANNOT_START_MESSAGE = "Không thể bắt đầu làm bài tập này lúc này.";
 	private static final String SUBMISSION_DEADLINE_PASSED_MESSAGE =
 			"Không thể nộp phần làm bài này vì đã quá hạn nộp bài.";
@@ -258,6 +259,9 @@ public class SubmissionService {
 		AssignmentWindow window = assignmentWindowRepository
 				.findWindowById(submission.getAssignmentId())
 				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		if (window.status() == AssignmentStatus.CLOSED) {
+			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
+		}
 		OffsetDateTime now = OffsetDateTime.now();
 		if (now.isAfter(window.closeAt())) {
 			throw ApiException.conflict(SUBMISSION_DEADLINE_PASSED_MESSAGE);
@@ -387,6 +391,12 @@ public class SubmissionService {
 		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
+		AssignmentWindow window = assignmentWindowRepository
+				.findWindowById(submission.getAssignmentId())
+				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		if (window.status() == AssignmentStatus.CLOSED) {
+			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
 		}
 		OffsetDateTime submittedAt = OffsetDateTime.now();
 		submission.setStatus(SubmissionStatus.SUBMITTED);

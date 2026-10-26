@@ -64,6 +64,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 @Testcontainers
@@ -1383,5 +1384,93 @@ class SubmissionApiIntegrationTest {
 			throw new IllegalStateException("Field not found in response: " + json);
 		}
 		return Long.parseLong(matcher.group(1));
+	}
+
+	@Test
+	void audit17ClosedAssignmentMustRejectFileSubmit() throws Exception {
+		// Given: a PUBLISHED assignment with future closeAt, student starts a submission
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		// When: teacher closes the assignment (status → CLOSED, closeAt still in future)
+		mockMvc.perform(patch("/api/v1/assignments/{id}/status", publishedAssignmentId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"status\": \"CLOSED\"}")
+						.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk());
+
+		entityManager.flush();
+		entityManager.clear();
+
+		// Assert — submit-module is rejected with ASSIGNMENT_CLOSED
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict());
+
+		// And: no answers written to the DB
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+
+		// Assert — final submit is rejected with ASSIGNMENT_CLOSED
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isConflict());
+
+		// And: submission status must remain IN_PROGRESS (no data written)
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.IN_PROGRESS);
+	}
+
+	@Test
+	void publishedAssignmentAcceptsSubmissionBeforeCloseAt() throws Exception {
+		// Given: a PUBLISHED assignment with openAt in the past and closeAt in the future
+		long openAssignmentId = assignment(classId, AssignmentStatus.PUBLISHED,
+				OffsetDateTime.now().minusHours(1), OffsetDateTime.now().plusHours(24),
+				2, false);
+		module(openAssignmentId, ModuleSkill.READING, ModuleTaskType.QUIZ, 1);
+
+		// When: student starts a submission — must be accepted
+		String startResponse = mockMvc.perform(post("/api/v1/assignments/{id}/submissions", openAssignmentId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long submissionId = jsonLong(startResponse, "id");
+
+		// And: student does final submit — must also be accepted
+		mockMvc.perform(post("/api/v1/submissions/{id}/submit", submissionId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		// Then: submission is persisted and SUBMITTED
+		assertThat(submissionRepository.findById(submissionId)).isNotEmpty();
+		assertThat(submissionRepository.findById(submissionId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
+	}
+
+	@Test
+	void autoDispatchNotAffectedByClosedGuard() throws Exception {
+		// Given: a PUBLISHED assignment with a QUIZ module — auto-grading is triggered after
+		// submit-module; the CLOSED guard lives only in submitModule/submit, not in the
+		// auto-grading event listener, so a quiz submission on a PUBLISHED assignment must
+		// complete successfully without interference from the guard.
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+
+		// When: student submits the quiz module on the still-PUBLISHED assignment
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(quizAnswersBody())
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
+
+		// Then: answers are persisted and module is SUBMITTED — auto-dispatch path is intact
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).hasSize(2);
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow().getStatus())
+				.isEqualTo(SubmissionStatus.SUBMITTED);
 	}
 }
