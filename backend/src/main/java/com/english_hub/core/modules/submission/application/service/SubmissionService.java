@@ -389,14 +389,14 @@ public class SubmissionService {
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
+		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
+			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
+		}
 		AssignmentWindow window = assignmentWindowRepository
 				.findWindowById(submission.getAssignmentId())
 				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
 		if (window.status() == AssignmentStatus.CLOSED) {
 			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
-		}
-		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
 		}
 		OffsetDateTime submittedAt = OffsetDateTime.now();
 		submission.setStatus(SubmissionStatus.SUBMITTED);

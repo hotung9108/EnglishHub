@@ -1307,6 +1307,8 @@ class SubmissionServiceTest {
 	@Test
 	void submitLocksTheSubmissionAndFlipsInProgressModules() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		Submission submission = submission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
@@ -1345,6 +1347,8 @@ class SubmissionServiceTest {
 	@Test
 	void submitWithNoModulesStillLocksTheSubmission() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		Submission submission = submission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
@@ -1418,6 +1422,21 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.submit(88L))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bài làm này đã được nộp.");
+		verify(submissionRepository, never()).save(any());
+	}
+
+	@Test
+	void submitRejectsAClosedAssignment() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(88L)).thenReturn(Optional.of(submission));
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(new AssignmentWindow(5L, 3L, AssignmentStatus.CLOSED, open(), close(), 2, false)));
+
+		assertThatThrownBy(() -> submissionService.submit(88L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bài tập đã đóng");
 		verify(submissionRepository, never()).save(any());
 	}
 
