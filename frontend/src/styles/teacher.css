@@ -1514,20 +1514,6 @@
   border-color: var(--primary);
 }
 
-.tsd-internal-note-input {
-  width: 100%;
-  padding: 8px 12px;
-  font-size: 12.5px;
-  border-radius: 6px;
-  border: 1px solid var(--outline-variant);
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--surface);
-  color: var(--on-surface);
-}
-.tsd-internal-note-input:focus {
-  border-color: var(--primary);
-}
 
 /* ==========================================================================
    Speaking AI Grading & Audio Components
@@ -2251,17 +2237,6 @@
   color: var(--on-surface-variant);
 }
 
-.tsd-internal-note-wrap {
-  margin-top: 12px;
-}
-
-.tsd-note-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--on-surface-variant);
-  margin-bottom: 4px;
-}
 
 .tsd-ai-header-title {
   display: inline-flex;

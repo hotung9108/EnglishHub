@@ -28,6 +28,8 @@ class CriteriaScores(CamelModel):
 class AnnotationItem(CamelModel):
     start_offset: int
     end_offset: int
+    exact_text: Optional[str] = None
+    context: Optional[str] = None
     error_type: str
     comment: str
     suggested_fix: Optional[str] = None

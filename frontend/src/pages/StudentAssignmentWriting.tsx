@@ -26,6 +26,7 @@ import {
   resolveEffectiveModules,
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
@@ -47,6 +48,7 @@ const StudentAssignmentWriting: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editorText, setEditorText] = useState(() => {
     return localStorage.getItem(`eh_draft_writing_${id}`) || '';
   });
@@ -301,6 +303,37 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const wordCount = editorText.trim() === '' ? 0 : editorText.trim().split(/\s+/).length;
 
+  // Auto-save draft with debounce when typing
+  useEffect(() => {
+    if (!id || isSubmitting) return;
+    const trimmed = editorText.trim();
+    if (!trimmed) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (!isSubmitting) {
+        localStorage.setItem(`eh_draft_writing_${id}`, editorText);
+      }
+    }, 2500);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [editorText, id, isSubmitting]);
+
+  const handleClearEditor = () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    setEditorText('');
+    localStorage.removeItem(`eh_draft_writing_${id}`);
+  };
+
   const handleSaveDraft = () => {
     localStorage.setItem(`eh_draft_writing_${id}`, editorText);
     setIsDraftSaved(true);
@@ -308,6 +341,10 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
     if (assignment?.status === 'CLOSED') {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
@@ -383,8 +420,10 @@ const StudentAssignmentWriting: React.FC = () => {
 
       // 2. Submit module with storageKey and text content answers
       const questionId = 1;
-      const submitPayload: SubmitModulePayload = {
-        answers: [
+      const submitPayload: SubmitModulePayload = {};
+
+      if (trimmedText !== '') {
+        submitPayload.answers = [
           {
             questionId,
             content: uploadedFile
@@ -395,8 +434,10 @@ const StudentAssignmentWriting: React.FC = () => {
                 }
               : { text: trimmedText },
           },
-        ],
-      };
+        ];
+      } else {
+        submitPayload.answers = [];
+      }
 
       if (uploadedStorageKey) {
         submitPayload.storageKey = uploadedStorageKey;
@@ -425,6 +466,7 @@ const StudentAssignmentWriting: React.FC = () => {
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
       if (allOthersDone) {
+        notifyAssignmentSubmitted();
         setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
           if (subId) {
@@ -580,7 +622,7 @@ const StudentAssignmentWriting: React.FC = () => {
               </div>
               <button 
                 type="button"
-                onClick={() => setEditorText('')}
+                onClick={handleClearEditor}
                 className="bg-transparent border-none cursor-pointer text-xs font-semibold text-slate-600 underline"
               >
                 Xóa bài viết &amp; Làm lại từ đầu
@@ -597,7 +639,7 @@ const StudentAssignmentWriting: React.FC = () => {
             <input 
               ref={fileInputRef}
               type="file" 
-              style={{ display: 'none' }}
+              className="hidden"
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
               onChange={handleFileChange} 
             />

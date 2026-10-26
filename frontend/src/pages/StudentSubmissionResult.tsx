@@ -41,6 +41,7 @@ import {
   normalizeAnnotationCategory,
   type StudentAnnotationCategory,
 } from '../utils/annotationCategory.utils';
+import { extractAnnotationSnippet, extractAnswerContentText, extractTranscriptText } from '../utils/annotationSnippet.utils';
 import '../styles/student-result.css';
 
 interface DisplayAnnotation {
@@ -83,35 +84,11 @@ interface QuestionDisplayItem {
 }
 
 function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
-  if (!answers || answers.length === 0) return '';
-  const first = answers[0];
-  if (first.content === null || first.content === undefined) return '';
-  if (typeof first.content === 'string') return first.content;
-  if (first.content && typeof first.content === 'object') {
-    const obj = first.content as Record<string, unknown>;
-    if (typeof obj.text === 'string') return obj.text;
-    if (typeof obj.essay === 'string') return obj.essay;
-    if (typeof obj.answer === 'string') return obj.answer;
-    return JSON.stringify(first.content);
-  }
-  return '';
+  return extractAnswerContentText(answers);
 }
 
 function extractTranscriptFromGrading(rawTranscript: unknown): string {
-  if (!rawTranscript) return '';
-  const node =
-    typeof rawTranscript === 'object' &&
-    rawTranscript !== null &&
-    'transcript' in (rawTranscript as Record<string, unknown>)
-      ? (rawTranscript as Record<string, unknown>).transcript
-      : rawTranscript;
-  if (typeof node === 'string') return node;
-  if (Array.isArray(node)) {
-    return node
-      .map((w) => (typeof w === 'object' && w !== null && 'word' in w ? String((w as { word: unknown }).word) : String(w)))
-      .join(' ');
-  }
-  return '';
+  return extractTranscriptText(rawTranscript);
 }
 
 function formatCriterionScore(val?: number | null): string {
@@ -231,21 +208,21 @@ export const StudentSubmissionResult: React.FC = () => {
 
       // Only show ACCEPTED annotations to students
       const acceptedAnnotations = rawAnnotations.filter((ann) => ann.reviewStatus === 'ACCEPTED');
+      const fallbackSnippet = t('studentResult.segmentUnavailable');
       const rawText =
-        extractAnswerText(loadedModDetail?.answers) ||
+        extractAnswerContentText(loadedModDetail?.answers, targetAnswer?.id) ||
         extractTranscriptFromGrading(
           sugRes.status === 'fulfilled' ? sugRes.value.transcript : loadedGradingDetail?.aiTranscript
         );
 
       if (acceptedAnnotations.length > 0) {
         const mapped: DisplayAnnotation[] = acceptedAnnotations.map((ann, idx) => {
-          const hasValidRange =
-            ann.endOffset > ann.startOffset &&
-            ann.startOffset >= 0 &&
-            rawText.length > ann.startOffset;
-          const slicedSnippet = hasValidRange
-            ? rawText.slice(ann.startOffset, Math.min(ann.endOffset, rawText.length)).trim()
-            : '';
+          const slicedSnippet = extractAnnotationSnippet(
+            rawText,
+            ann.startOffset,
+            ann.endOffset,
+            fallbackSnippet
+          );
 
           const category = normalizeAnnotationCategory(ann.errorType);
           const trimmedFix = ann.suggestedFix?.trim() || null;
@@ -254,7 +231,7 @@ export const StudentSubmissionResult: React.FC = () => {
             id: ann.id || idx + 1,
             type: category,
             badgeLabel: formatAnnotationBadgeLabel(ann.errorType, category),
-            original: slicedSnippet || `Đoạn ký tự [${ann.startOffset} - ${ann.endOffset}]`,
+            original: slicedSnippet,
             suggestion: trimmedFix,
             explanation: ann.comment?.trim() || 'Nhận xét từ hệ thống AI',
             teacherNote: ann.source === 'TEACHER' ? 'Ghi chú từ giáo viên' : undefined,
@@ -272,7 +249,7 @@ export const StudentSubmissionResult: React.FC = () => {
     } catch {
       // Continue without crashing
     }
-  }, []);
+  }, [t]);
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => setReloadKey((k) => k + 1);
