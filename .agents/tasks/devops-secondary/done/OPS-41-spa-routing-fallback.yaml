@@ -1,0 +1,20 @@
+id: OPS-41
+issue: "#159"
+title: "Sửa lỗi 404 khi refresh hoặc mở trực tiếp route con của SPA"
+assignee: "@devops-secondary"
+role: "devops-secondary"
+git_user: "hotung9108"
+status: "Done"
+priority: "High"
+created_at: "2026-10-27"
+completed_at: "2026-10-27"
+description: "Cấu hình SPA rewrite fallback về index.html cho mọi route con frontend (Vercel & Nginx), loại trừ /api/ để phân biệt rõ frontend vs API; hỗ trợ cả Staging và Production."
+affected_components:
+  - "frontend/vercel.json"
+  - "frontend/nginx.conf"
+  - "docs/devops/HOTUNG9108_ME_SETUP_GUIDE.md"
+  - "production_artifacts/devops_to_team/OPS-41-SPA-ROUTING-FALLBACK.md"
+validation:
+  unit_tests: "182/182 tests passed"
+  frontend_build: "Vite production build passed (dist/index.html)"
+  routing_check: "Negative lookahead /((?!api/).*) prevents API rewrite regression while preserving SPA fallback"
