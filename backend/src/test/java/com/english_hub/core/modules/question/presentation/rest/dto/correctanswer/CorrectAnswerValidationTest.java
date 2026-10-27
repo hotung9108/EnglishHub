@@ -7,12 +7,16 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.NotNull;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CorrectAnswerValidationTest {
 
@@ -37,6 +41,22 @@ class CorrectAnswerValidationTest {
 	void acceptsFourOptionsWithExactlyOneCorrectAndUniqueIds() {
 		assertThat(messagesOf(option(1, true), option(2, false), option(3, false), option(4, false)))
 				.isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1, 2, 3})
+	void rejectsNullOptionWithExactlyOneElementViolation(int nullIndex) {
+		List<QuestionOption> options = Arrays.asList(
+				option(1, true), option(2, false), option(3, false), option(4, false));
+		options.set(nullIndex, null);
+		Set<ConstraintViolation<MultipleChoiceCorrectAnswer>> violations =
+				validator.validate(new MultipleChoiceCorrectAnswer(options));
+
+		assertThat(violations).hasSize(1);
+		ConstraintViolation<MultipleChoiceCorrectAnswer> violation = violations.iterator().next();
+		assertThat(violation.getConstraintDescriptor().getAnnotation()).isInstanceOf(NotNull.class);
+		assertThat(violation.getInvalidValue()).isNull();
+		assertThat(violation.getPropertyPath().toString()).isEqualTo("options[" + nullIndex + "].<list element>");
 	}
 
 	@Test

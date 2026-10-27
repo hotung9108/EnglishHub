@@ -32,6 +32,7 @@ import com.english_hub.core.modules.submission.domain.repository.AnswerRepositor
 import com.english_hub.core.modules.submission.domain.repository.GradingRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionModuleRepository;
 import com.english_hub.core.modules.submission.domain.repository.SubmissionRepository;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
@@ -48,17 +49,25 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -69,15 +78,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 @Testcontainers
 @SpringBootTest
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Transactional
 class SubmissionApiIntegrationTest {
 
+	private static final String NULL_ANSWER_MESSAGE = "answers không được chứa phần tử null.";
+
 	private final EntityManager entityManager;
+	private final ObjectMapper objectMapper;
 
 	@Autowired
-	SubmissionApiIntegrationTest(EntityManager entityManager) {
+	SubmissionApiIntegrationTest(EntityManager entityManager, ObjectMapper objectMapper) {
 		this.entityManager = entityManager;
+		this.objectMapper = objectMapper;
 	}
 
 	@Container
@@ -780,6 +793,55 @@ class SubmissionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài hoặc câu hỏi."));
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = {"null-only", "null-first", "null-last"})
+	void submitModuleRejectsNullAnswerElementBeforeService(String scenario) throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long submissionModuleId = quizSubmissionModuleId(submissionId);
+		String validAnswer = "{\"questionId\":" + quizQuestionOne
+				+ ",\"content\":{\"selectedOptionIds\":[1]}}";
+		String answers = "[null]";
+		int nullIndex = 0;
+		if (scenario.equals("null-first")) {
+			answers = "[null," + validAnswer + "]";
+		}
+		if (scenario.equals("null-last")) {
+			answers = "[" + validAnswer + ",null]";
+			nullIndex = 1;
+		}
+		String body = "{\"answers\":" + answers + "}";
+		SubmitModuleRequest parsed = objectMapper.readValue(body, SubmitModuleRequest.class);
+		assertThat(parsed.answers()).hasSize(scenario.equals("null-only") ? 1 : 2);
+		assertThat(parsed.answers().get(nullIndex)).isNull();
+		entityManager.flush();
+		entityManager.clear();
+		Submission before = submissionRepository.findById(submissionId).orElseThrow();
+		SubmissionModule moduleBefore = submissionModuleRepository.findById(submissionModuleId).orElseThrow();
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+
+		ResultActions result = performWithExceptionDetails("A.01 " + scenario,
+				post("/api/v1/submission-modules/{id}/submit", submissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body));
+		result.andExpect(status().isBadRequest());
+		MvcResult response = result.andReturn();
+		assertThat(response.getResolvedException()).isInstanceOf(MethodArgumentNotValidException.class);
+		MethodArgumentNotValidException exception =
+				(MethodArgumentNotValidException) response.getResolvedException();
+		assertThat(exception.getBindingResult().getFieldError("answers[" + nullIndex + "]")).isNotNull();
+		assertThat(objectMapper.readTree(response.getResponse().getContentAsString()))
+				.isEqualTo(objectMapper.readTree(objectMapper.writeValueAsString(
+						java.util.Map.of("error", NULL_ANSWER_MESSAGE))));
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(answerRepository.findBySubmissionModuleId(submissionModuleId)).isEmpty();
+		assertThat(submissionRepository.findById(submissionId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(before);
+		assertThat(submissionModuleRepository.findById(submissionModuleId).orElseThrow())
+				.usingRecursiveComparison().isEqualTo(moduleBefore);
+	}
+
 	@Test
 	void submitModuleRejectsMissingOrEmptyAnswers() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
@@ -1251,6 +1313,31 @@ class SubmissionApiIntegrationTest {
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Không tìm thấy phần làm bài."));
+	}
+
+	private ResultActions performWithExceptionDetails(
+			String scenario, MockHttpServletRequestBuilder request) throws Exception {
+		try {
+			ResultActions result = mockMvc.perform(request);
+			MvcResult response = result.andReturn();
+			System.out.println("BE-68 " + scenario + " HTTP " + response.getResponse().getStatus());
+			printExceptionChain(scenario, response.getResolvedException());
+			return result;
+		} catch (Exception exception) {
+			printExceptionChain(scenario, exception);
+			throw exception;
+		}
+	}
+
+	private void printExceptionChain(String scenario, Throwable exception) {
+		if (exception == null) {
+			System.out.println("BE-68 " + scenario + " exception: none");
+		}
+		while (exception != null) {
+			System.out.println("BE-68 " + scenario + " exception: " + exception.getClass().getName()
+					+ ": " + exception.getMessage());
+			exception = exception.getCause();
+		}
 	}
 
 	private long startSubmissionAsStudentMember() throws Exception {
