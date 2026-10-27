@@ -194,6 +194,18 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
+    const openTimestamp = assignmentData.startDate 
+      ? new Date(assignmentData.startDate).getTime() 
+      : Date.now();
+    const closeTimestamp = assignmentData.dueDate 
+      ? new Date(assignmentData.dueDate).getTime() 
+      : Date.now() + 7 * 24 * 60 * 60 * 1000;
+
+    if (!isNaN(openTimestamp) && !isNaN(closeTimestamp) && closeTimestamp <= openTimestamp) {
+      showToast(isVi ? 'Ngày đóng phải sau ngày mở!' : 'Due date must be after opening date!');
+      return;
+    }
+
     const allSkills: AssignmentSkill[] = ['listening', 'reading', 'writing', 'speaking'];
     const configuredSkills = allSkills.filter(isSkillConfigured);
     const targetSkills = configuredSkills.length > 0 ? configuredSkills : [assignmentData.skill];
