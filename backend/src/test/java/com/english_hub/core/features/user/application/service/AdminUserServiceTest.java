@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -108,11 +109,12 @@ class AdminUserServiceTest {
 		verify(userRepository).findPage(eq(""), eq(null), any(UserPageRequest.class));
 	}
 
-	@Test
-	void rejectsInvalidPaginationBeforeQueryingUsers() {
+	@ParameterizedTest
+	@CsvSource({"0,20", "-1,20", "1,0", "1,-1", "1,101"})
+	void rejectsInvalidPaginationBeforeQueryingUsers(int page, int limit) {
 		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
 
-		assertThatThrownBy(() -> adminUserService.listUsers("", "", 0, 20))
+		assertThatThrownBy(() -> adminUserService.listUsers("", "", page, limit))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Dữ liệu phân trang không hợp lệ.");
 		verify(userRepository, never()).findPage(any(), any(), any(UserPageRequest.class));
