@@ -13,7 +13,7 @@ import tools.jackson.databind.ValueDeserializer;
  */
 public class CorrectAnswerDeserializer extends ValueDeserializer<CorrectAnswer> {
 
-	static final String INVALID_SHAPE_MESSAGE =
+	public static final String INVALID_SHAPE_MESSAGE =
 			"correctAnswer phải là {\"options\": [...]} cho MULTIPLE_CHOICE "
 			+ "hoặc {\"correctAnswer\": \"...\"} cho SHORT_ANSWER.";
 

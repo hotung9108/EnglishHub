@@ -547,6 +547,99 @@ class QuestionApiIntegrationTest {
 	}
 
 	@Test
+	void audit03CreateRejectsMismatchedQuestionTypeAndAnswerShape() throws Exception {
+		long countBefore = questionRepository.count();
+
+		// MCQ with ShortAnswer shape
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"QA mismatch MCQ with ShortAnswer",
+						"questionType":"MULTIPLE_CHOICE",
+						"correctAnswer":{"correctAnswer":"QA answer"},
+						"score":1.00,"orderIndex":99}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						org.hamcrest.Matchers.startsWith("correctAnswer phải là")));
+
+		// ShortAnswer with MCQ shape
+		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"content":"QA mismatch ShortAnswer with MCQ",
+						"questionType":"SHORT_ANSWER",
+						"correctAnswer":{"options":[
+						  {"id":1,"content":"A","isCorrect":true},
+						  {"id":2,"content":"B","isCorrect":false},
+						  {"id":3,"content":"C","isCorrect":false},
+						  {"id":4,"content":"D","isCorrect":false}
+						]},
+						"score":1.00,"orderIndex":100}
+						"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(
+						org.hamcrest.Matchers.startsWith("correctAnswer phải là")));
+
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(questionRepository.count()).isEqualTo(countBefore);
+	}
+
+	@Test
+	void audit03UpdateRejectsMismatchedCorrectAnswerShape() throws Exception {
+		entityManager.flush();
+		entityManager.clear();
+		String originalMcqAnswer = questionRepository.findById(questionId).orElseThrow().getCorrectAnswer();
+
+		// Update existing MCQ question with ShortAnswer shape (questionType omitted from body)
+		mockMvc.perform(put("/api/v1/questions/{id}", questionId)
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"correctAnswer":{"correctAnswer":"QA answer"}}
+						"""))
+				.andExpect(status().isBadRequest());
+
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(questionRepository.findById(questionId).orElseThrow().getCorrectAnswer())
+				.isEqualTo(originalMcqAnswer);
+
+		// Create a separate SHORT_ANSWER question to test updating ShortAnswer with MCQ shape
+		Question shortAnswerQuestion = questionRepository.save(new Question(
+				moduleId,
+				"Short answer question",
+				com.english_hub.core.infrastructure.persistence.entity.QuestionType.SHORT_ANSWER,
+				"{\"correct_answer\":\"original answer\"}",
+				BigDecimal.ONE,
+				88));
+		entityManager.flush();
+		entityManager.clear();
+
+		// Update existing ShortAnswer question with MCQ shape
+		mockMvc.perform(put("/api/v1/questions/{id}", shortAnswerQuestion.getId())
+				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"correctAnswer":{"options":[
+						  {"id":1,"content":"A","isCorrect":true},
+						  {"id":2,"content":"B","isCorrect":false},
+						  {"id":3,"content":"C","isCorrect":false},
+						  {"id":4,"content":"D","isCorrect":false}
+						]}}
+						"""))
+				.andExpect(status().isBadRequest());
+
+		entityManager.flush();
+		entityManager.clear();
+		assertThat(questionRepository.findById(shortAnswerQuestion.getId()).orElseThrow().getCorrectAnswer())
+				.isEqualTo("{\"correct_answer\":\"original answer\"}");
+	}
+
+	@Test
 	void deleteRejectsQuestionReferencedByAnswer() throws Exception {
 		Submission submission = submissionRepository.save(new Submission(
 				assignmentId,
