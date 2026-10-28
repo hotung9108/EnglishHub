@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.core.modules.grading.domain.model.AnswerSubmission;
@@ -25,6 +27,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
@@ -243,6 +247,100 @@ class AutoGradingServiceTest {
 
 		verify(gradingRepository).saveAutoGrade(gradingCaptor.capture());
 		assertThat(gradingCaptor.getValue().finalScore()).isEqualByComparingTo("1.00");
+	}
+
+	@Test
+	void skipsAnAiGradedResultAfterLockingWithoutWritingAnything() {
+		graderableContext(ModuleSkill.READING, ModuleTaskType.QUIZ);
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(SUBMISSION_MODULE_ID))
+				.thenReturn(Optional.of(grading(GradingStatus.AI_GRADED)));
+
+		service.grade(SUBMISSION_MODULE_ID);
+
+		verify(gradingRepository).findBySubmissionModuleIdForUpdate(SUBMISSION_MODULE_ID);
+		verifyNoMoreInteractions(gradingRepository);
+		verifyNoInteractions(questionRepository, gradedAnswerRepository, submissionModuleStatusRepository);
+	}
+
+	@ParameterizedTest(name = "null max score is rejected, has answer: {0}")
+	@ValueSource(booleans = {false, true})
+	void propagatesInvalidMaxScoreAfterCalculatingOutcomes(boolean hasAnswer) {
+		graderableContext(ModuleSkill.READING, ModuleTaskType.QUIZ);
+		when(gradingContextRepository.findBySubmissionModuleId(SUBMISSION_MODULE_ID))
+				.thenReturn(Optional.of(context(ModuleSkill.READING, ModuleTaskType.QUIZ, true, null)));
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(MODULE_ID))
+				.thenReturn(List.of(choiceQuestion("1.00")));
+		List<AnswerSubmission> answers = List.of();
+		if (hasAnswer) {
+			answers = List.of(new AnswerSubmission(ANSWER_ID, QUESTION_ID, Map.of("selectedOptionIds", List.of(1L))));
+		}
+		when(gradedAnswerRepository.findBySubmissionModuleId(SUBMISSION_MODULE_ID)).thenReturn(answers);
+
+		assertThatThrownBy(() -> service.grade(SUBMISSION_MODULE_ID))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessage("Auto score must be between zero and the module max score.");
+
+		verify(gradedAnswerRepository).saveOutcomes(outcomesCaptor.capture());
+		assertThat(outcomesCaptor.getValue()).containsExactly(new AnswerOutcome(
+				hasAnswer ? ANSWER_ID : null, QUESTION_ID, hasAnswer, hasAnswer ? new BigDecimal("1.00") : BigDecimal.ZERO));
+		verify(gradingRepository, never()).saveAutoGrade(any());
+		verifyNoInteractions(submissionModuleStatusRepository);
+	}
+
+	@Test
+	void ignoresAnAnswerWhoseQuestionDoesNotBelongToTheModule() {
+		graderableContext(ModuleSkill.READING, ModuleTaskType.QUIZ);
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(MODULE_ID))
+				.thenReturn(List.of(choiceQuestion("1.00")));
+		long foreignQuestionId = QUESTION_ID + 1;
+		when(gradedAnswerRepository.findBySubmissionModuleId(SUBMISSION_MODULE_ID))
+				.thenReturn(List.of(new AnswerSubmission(ANSWER_ID, foreignQuestionId, Map.of("selectedOptionIds", List.of(1L)))));
+
+		service.grade(SUBMISSION_MODULE_ID);
+
+		verify(gradedAnswerRepository).saveOutcomes(outcomesCaptor.capture());
+		assertThat(outcomesCaptor.getValue()).containsExactly(new AnswerOutcome(null, QUESTION_ID, false, BigDecimal.ZERO));
+		verify(gradingRepository).saveAutoGrade(gradingCaptor.capture());
+		assertThat(gradingCaptor.getValue().status()).isEqualTo(GradingStatus.COMPLETED);
+		assertThat(gradingCaptor.getValue().finalScore()).isEqualByComparingTo("0");
+		verify(submissionModuleStatusRepository).markGraded(SUBMISSION_MODULE_ID);
+	}
+
+	@Test
+	void skipsADuplicateEventAfterTheFirstEventCompletesGrading() {
+		graderableContext(ModuleSkill.READING, ModuleTaskType.QUIZ);
+		when(gradingRepository.findBySubmissionModuleIdForUpdate(SUBMISSION_MODULE_ID))
+				.thenReturn(Optional.of(grading(GradingStatus.PENDING)), Optional.of(grading(GradingStatus.COMPLETED)));
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(MODULE_ID))
+				.thenReturn(List.of(choiceQuestion("1.00")));
+		when(gradedAnswerRepository.findBySubmissionModuleId(SUBMISSION_MODULE_ID)).thenReturn(List.of());
+
+		service.grade(SUBMISSION_MODULE_ID);
+		service.grade(SUBMISSION_MODULE_ID);
+
+		verify(gradingRepository, times(2)).findBySubmissionModuleIdForUpdate(SUBMISSION_MODULE_ID);
+		verify(questionRepository).findByModuleIdOrderByOrderIndexAsc(MODULE_ID);
+		verify(gradedAnswerRepository).findBySubmissionModuleId(SUBMISSION_MODULE_ID);
+		verify(gradedAnswerRepository).saveOutcomes(any());
+		verify(gradingRepository).saveAutoGrade(any());
+		verify(submissionModuleStatusRepository).markGraded(SUBMISSION_MODULE_ID);
+		verifyNoMoreInteractions(questionRepository, gradedAnswerRepository, gradingRepository, submissionModuleStatusRepository);
+	}
+
+	@Test
+	void completesAnEmptyModuleWithZeroAndNoAnswerOutcomes() {
+		graderableContext(ModuleSkill.READING, ModuleTaskType.QUIZ);
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(MODULE_ID)).thenReturn(List.of());
+		when(gradedAnswerRepository.findBySubmissionModuleId(SUBMISSION_MODULE_ID)).thenReturn(List.of());
+
+		service.grade(SUBMISSION_MODULE_ID);
+
+		verify(gradedAnswerRepository).saveOutcomes(outcomesCaptor.capture());
+		assertThat(outcomesCaptor.getValue()).isEmpty();
+		verify(gradingRepository).saveAutoGrade(gradingCaptor.capture());
+		assertThat(gradingCaptor.getValue().status()).isEqualTo(GradingStatus.COMPLETED);
+		assertThat(gradingCaptor.getValue().finalScore()).isEqualByComparingTo("0");
+		verify(submissionModuleStatusRepository).markGraded(SUBMISSION_MODULE_ID);
 	}
 
 	private void graderableContext(ModuleSkill skill, ModuleTaskType taskType) {
