@@ -15,6 +15,7 @@ import com.english_hub.core.modules.user.presentation.rest.dto.CreatedUserRespon
 import com.english_hub.core.modules.user.presentation.rest.dto.MessageResponse;
 import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserRequest;
 import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserStatusRequest;
+import com.english_hub.core.modules.user.presentation.rest.dto.UserResponse;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,6 +114,25 @@ class AdminUserControllerTest {
 				41L, new UpdateUserStatusRequest("ACTIVE"));
 
 		assertThat(response.getBody()).isEqualTo(new MessageResponse("Đã mở khoá tài khoản."));
+	}
+
+	@Test
+	void getUser_whenStudentExists_returnsTheRequestedUserResponse() {
+		User target = new User(12L, "Ngô Thị Phương", "ngo.thi.phuong@gmail.com", null, null,
+				"test-password-hash", UserRole.STUDENT, UserStatus.ACTIVE, false,
+				null, "mock-repository-student-code", null, null);
+		when(adminUserService.getUser(12L)).thenReturn(target);
+
+		ResponseEntity<UserResponse> response = adminUserController.getUser(12L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody().getId()).isEqualTo(12L);
+		assertThat(response.getBody().getFullName()).isEqualTo("Ngô Thị Phương");
+		assertThat(response.getBody().getEmail()).isEqualTo("ngo.thi.phuong@gmail.com");
+		assertThat(response.getBody().getRole()).isEqualTo("STUDENT");
+		assertThat(response.getBody().getStatus()).isEqualTo("ACTIVE");
+		assertThat(response.getBody().getStudentCode()).isNotBlank();
+		verify(adminUserService).getUser(12L);
 	}
 
 	private User user(long id) {

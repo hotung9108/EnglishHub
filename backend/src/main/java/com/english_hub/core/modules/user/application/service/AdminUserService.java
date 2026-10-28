@@ -49,6 +49,15 @@ public class AdminUserService {
 		return userRepository.findPage(query, parseRoleFilter(roleValue), pageRequest);
 	}
 
+	@Transactional(readOnly = true)
+	public User getUser(long userId) {
+		currentUserProvider.requireAdmin();
+		if (userId <= 0) {
+			throw ApiException.notFound(USER_NOT_FOUND_MESSAGE);
+		}
+		return findUserOrThrow(userId);
+	}
+
 	@Transactional
 	public CreatedUserData createUser(CreateUserCommand request) {
 		currentUserProvider.requireAdmin();
