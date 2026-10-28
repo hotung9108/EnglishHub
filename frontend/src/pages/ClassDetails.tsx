@@ -365,7 +365,13 @@ export const ClassDetails: React.FC = () => {
                                     <div style={{ display: 'inline-flex', gap: '8px' }}>
                                       <button 
                                         className="btn btn-secondary btn-sm"
-                                        onClick={() => navigate(`/admin/students/${st.studentId}`)}
+                                        onClick={() => navigate(`/admin/students/${st.studentId}`, {
+                                          state: {
+                                            studentId: st.studentId,
+                                            fullName: st.fullName,
+                                            studentCode: st.studentCode,
+                                          }
+                                        })}
                                       >
                                         {isVi ? 'Hồ sơ' : 'Profile'}
                                       </button>

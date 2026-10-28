@@ -57,7 +57,7 @@ export const TeacherDetails: React.FC = () => {
         if (!isMounted) return;
 
         const users: UserListItem[] = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
-        const found = users.find(u => u.id === numericId) || (users.length > 0 ? users[0] : null);
+        const found = users.find(u => u.id === numericId) || null;
 
         if (found) {
           setTeacherUser(found);
