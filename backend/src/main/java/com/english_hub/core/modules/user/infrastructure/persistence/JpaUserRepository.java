@@ -12,7 +12,9 @@ import com.english_hub.core.modules.user.infrastructure.persistence.entity.Teach
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,9 +59,17 @@ public class JpaUserRepository implements UserRepository {
 	@Override
 	@Transactional(readOnly = true)
 	public List<User> findAll() {
-		return userJpaRepository.findByDeletedFalse(Sort.by(Sort.Direction.ASC, "id"))
-				.stream()
-				.map(this::toDomain)
+		var users = userJpaRepository.findByDeletedFalse(Sort.by(Sort.Direction.ASC, "id"));
+		Map<Long, TeacherProfile> teachers = teacherProfileJpaRepository.findAllById(users.stream()
+				.filter(user -> user.getRole() == UserRole.TEACHER)
+				.map(com.english_hub.core.modules.user.infrastructure.persistence.entity.User::getId).toList())
+				.stream().collect(Collectors.toMap(TeacherProfile::getUserId, profile -> profile));
+		Map<Long, StudentProfile> students = studentProfileJpaRepository.findAllById(users.stream()
+				.filter(user -> user.getRole() == UserRole.STUDENT)
+				.map(com.english_hub.core.modules.user.infrastructure.persistence.entity.User::getId).toList())
+				.stream().collect(Collectors.toMap(StudentProfile::getUserId, profile -> profile));
+		return users.stream()
+				.map(user -> mapper.toDomain(user, teachers.get(user.getId()), students.get(user.getId())))
 				.toList();
 	}
 
@@ -135,6 +145,9 @@ public class JpaUserRepository implements UserRepository {
 	@Override
 	@Transactional(readOnly = true)
 	public UserPage findPage(String query, UserRole role, UserPageRequest pageRequest) {
+		if ((long) (pageRequest.page() - 1) * pageRequest.limit() > Integer.MAX_VALUE) {
+			throw ApiException.badRequest("Dữ liệu phân trang không hợp lệ.");
+		}
 		String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
 		Specification<com.english_hub.core.modules.user.infrastructure.persistence.entity.User> specification =
 				(root, ignoredQuery, criteriaBuilder) -> {
@@ -158,7 +171,8 @@ public class JpaUserRepository implements UserRepository {
 				Sort.by(Sort.Direction.ASC, "id"));
 		Page<com.english_hub.core.modules.user.infrastructure.persistence.entity.User> page =
 				userJpaRepository.findAll(specification, pageable);
-		List<User> users = page.getContent().stream().map(this::toDomain).toList();
+		// List results are summary-only: use findById before reading or saving profile data.
+		List<User> users = page.getContent().stream().map(user -> mapper.toDomain(user, null, null)).toList();
 		return new UserPage(users, pageRequest.page(), pageRequest.limit(), page.getTotalElements());
 	}
 

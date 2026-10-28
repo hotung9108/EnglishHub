@@ -2,17 +2,25 @@ package com.english_hub.core.modules.question.presentation.rest.dto.correctanswe
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.english_hub.core.modules.question.domain.model.QuestionType;
+import com.english_hub.core.modules.question.presentation.rest.dto.CreateQuestionRequest;
+import com.english_hub.core.modules.question.presentation.rest.dto.UpdateQuestionRequest;
 import com.english_hub.core.modules.question.presentation.rest.dto.correctanswer.MultipleChoiceCorrectAnswer.QuestionOption;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class CorrectAnswerValidationTest {
 
@@ -37,6 +45,22 @@ class CorrectAnswerValidationTest {
 	void acceptsFourOptionsWithExactlyOneCorrectAndUniqueIds() {
 		assertThat(messagesOf(option(1, true), option(2, false), option(3, false), option(4, false)))
 				.isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, 1, 2, 3})
+	void rejectsNullOptionWithExactlyOneElementViolation(int nullIndex) {
+		List<QuestionOption> options = Arrays.asList(
+				option(1, true), option(2, false), option(3, false), option(4, false));
+		options.set(nullIndex, null);
+		Set<ConstraintViolation<MultipleChoiceCorrectAnswer>> violations =
+				validator.validate(new MultipleChoiceCorrectAnswer(options));
+
+		assertThat(violations).hasSize(1);
+		ConstraintViolation<MultipleChoiceCorrectAnswer> violation = violations.iterator().next();
+		assertThat(violation.getConstraintDescriptor().getAnnotation()).isInstanceOf(NotNull.class);
+		assertThat(violation.getInvalidValue()).isNull();
+		assertThat(violation.getPropertyPath().toString()).isEqualTo("options[" + nullIndex + "].<list element>");
 	}
 
 	@Test
@@ -107,6 +131,73 @@ class CorrectAnswerValidationTest {
 				.containsExactly("correctAnswer không được để trống.");
 		assertThat(messagesOf(new ShortAnswerCorrectAnswer(null)))
 				.containsExactly("correctAnswer không được để trống.");
+	}
+
+	@Test
+	void audit03MismatchedQuestionAnswerMustBeRejected() {
+		CreateQuestionRequest mcqWithShortAnswer = new CreateQuestionRequest(
+				"QA mismatch",
+				QuestionType.MULTIPLE_CHOICE,
+				new ShortAnswerCorrectAnswer("QA answer"),
+				BigDecimal.ONE,
+				1);
+		Set<ConstraintViolation<CreateQuestionRequest>> mcqViolations = validator.validate(mcqWithShortAnswer);
+		assertThat(mcqViolations).isNotEmpty();
+		assertThat(mcqViolations)
+				.extracting(ConstraintViolation::getMessage)
+				.contains(CorrectAnswerDeserializer.INVALID_SHAPE_MESSAGE);
+
+		CreateQuestionRequest shortAnswerWithMcq = new CreateQuestionRequest(
+				"QA mismatch",
+				QuestionType.SHORT_ANSWER,
+				new MultipleChoiceCorrectAnswer(List.of(
+						option(1, true), option(2, false), option(3, false), option(4, false))),
+				BigDecimal.ONE,
+				1);
+		Set<ConstraintViolation<CreateQuestionRequest>> shortAnswerViolations = validator.validate(shortAnswerWithMcq);
+		assertThat(shortAnswerViolations).isNotEmpty();
+		assertThat(shortAnswerViolations)
+				.extracting(ConstraintViolation::getMessage)
+				.contains(CorrectAnswerDeserializer.INVALID_SHAPE_MESSAGE);
+
+		CreateQuestionRequest validMcq = new CreateQuestionRequest(
+				"QA valid",
+				QuestionType.MULTIPLE_CHOICE,
+				new MultipleChoiceCorrectAnswer(List.of(
+						option(1, true), option(2, false), option(3, false), option(4, false))),
+				BigDecimal.ONE,
+				1);
+		assertThat(validator.validate(validMcq)).isEmpty();
+
+		CreateQuestionRequest validShortAnswer = new CreateQuestionRequest(
+				"QA valid",
+				QuestionType.SHORT_ANSWER,
+				new ShortAnswerCorrectAnswer("QA answer"),
+				BigDecimal.ONE,
+				1);
+		assertThat(validator.validate(validShortAnswer)).isEmpty();
+	}
+
+	@Test
+	void updateRequestRejectsMismatchedQuestionTypeWhenProvided() {
+		UpdateQuestionRequest mismatchedUpdate = new UpdateQuestionRequest(
+				"QA mismatch",
+				new ShortAnswerCorrectAnswer("QA answer"),
+				BigDecimal.ONE,
+				1,
+				QuestionType.MULTIPLE_CHOICE);
+		Set<ConstraintViolation<UpdateQuestionRequest>> violations = validator.validate(mismatchedUpdate);
+		assertThat(violations).isNotEmpty();
+		assertThat(violations)
+				.extracting(ConstraintViolation::getMessage)
+				.contains(CorrectAnswerDeserializer.INVALID_SHAPE_MESSAGE);
+
+		UpdateQuestionRequest validUpdateWithoutType = new UpdateQuestionRequest(
+				"QA valid",
+				new ShortAnswerCorrectAnswer("QA answer"),
+				BigDecimal.ONE,
+				1);
+		assertThat(validator.validate(validUpdateWithoutType)).isEmpty();
 	}
 
 	private Set<String> messagesOf(QuestionOption... options) {

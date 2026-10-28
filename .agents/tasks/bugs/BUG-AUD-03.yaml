@@ -1,0 +1,26 @@
+id: BUG-AUD-03
+title: "[Bug] [AUD-03] Mismatched correctAnswer shape and questionType allowed on Create/Update"
+assignee: "@be-secondary"
+status: "Resolved"
+priority: "Medium"
+severity: "P2"
+affected_modules:
+  - backend/src/main/java/com/english_hub/core/modules/question/presentation/rest/dto/CreateQuestionRequest.java
+  - backend/src/main/java/com/english_hub/core/modules/question/presentation/rest/dto/UpdateQuestionRequest.java
+  - backend/src/main/java/com/english_hub/core/modules/question/presentation/rest/dto/correctanswer/CorrectAnswer.java
+  - backend/src/main/java/com/english_hub/core/modules/question/presentation/rest/dto/correctanswer/MultipleChoiceCorrectAnswer.java
+  - backend/src/main/java/com/english_hub/core/modules/question/presentation/rest/dto/correctanswer/ShortAnswerCorrectAnswer.java
+  - backend/src/main/java/com/english_hub/core/modules/question/application/service/QuestionService.java
+description: |
+  **Steps to Reproduce:**
+  1. POST /api/v1/modules/{moduleId}/questions with questionType MULTIPLE_CHOICE and ShortAnswer correctAnswer shape {"correctAnswer": "QA answer"}.
+  2. PUT /api/v1/questions/{id} with mismatched correctAnswer shape.
+  
+  **Expected Behavior:** Backend rejects mismatched correctAnswer shapes with 400 Bad Request prior to persisting data.
+  
+  **Actual Behavior:** Payloads bypassed boundary validation and QuestionService persisted mismatched data directly.
+remediation:
+  - Added questionType() to sealed interface CorrectAnswer and concrete records.
+  - Added @AssertTrue cross-validation on CreateQuestionRequest and UpdateQuestionRequest.
+  - Added validateCorrectAnswerShape in QuestionService for both create and update (checking persisted questionType).
+  - Added unit and integration test coverage verifying 400 Bad Request and zero database mutations.

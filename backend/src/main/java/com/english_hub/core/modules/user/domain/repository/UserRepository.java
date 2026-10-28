@@ -21,6 +21,11 @@ public interface UserRepository extends IRepository<User, Long> {
 
 	boolean existsByEmail(String email);
 
+	/**
+	 * Returns users for list summaries, with teacher/student profile fields deliberately unloaded (null).
+	 * A null profile field does not indicate that the stored profile is missing. Do not save these
+	 * partial aggregates: use {@link #findById(Long)} to load the full user before reading or updating profiles.
+	 */
 	UserPage findPage(String query, UserRole role, UserPageRequest pageRequest);
 
 	int revokeActiveRefreshTokens(long userId);
