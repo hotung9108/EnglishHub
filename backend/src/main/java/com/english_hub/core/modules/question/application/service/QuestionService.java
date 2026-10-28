@@ -10,6 +10,7 @@ import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.question.application.command.CreateQuestionCommand;
 import com.english_hub.core.modules.question.application.command.UpdateQuestionCommand;
 import com.english_hub.core.modules.question.domain.model.Question;
+import com.english_hub.core.modules.question.domain.model.QuestionType;
 import com.english_hub.core.modules.question.domain.repository.QuestionRepository;
 import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.domain.repository.ModuleRepository;
@@ -111,6 +112,14 @@ public class QuestionService {
 		requireTeacherOwnsAssignment(assignment, caller);
 		if (command == null || hasNoUpdateFields(command)) {
 			throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
+		}
+
+		if (command.questionType() != null && command.questionType() != question.questionType()) {
+			throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
+		}
+
+		if (command.correctAnswer() != null) {
+			validateCorrectAnswerShape(question.questionType(), command.correctAnswer());
 		}
 
 		String content = command.content() == null ? question.content() : command.content();
@@ -231,6 +240,27 @@ public class QuestionService {
 			throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
 		}
 		validateScoreAndOrder(command.score() == null ? DEFAULT_SCORE : command.score(), command.orderIndex());
+		validateCorrectAnswerShape(command.questionType(), command.correctAnswer());
+	}
+
+	private void validateCorrectAnswerShape(QuestionType questionType, Map<String, Object> correctAnswer) {
+		if (questionType == null || correctAnswer == null) {
+			throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
+		}
+		boolean hasOptions = correctAnswer.containsKey("options");
+		boolean hasText = correctAnswer.containsKey("correctAnswer") || correctAnswer.containsKey("correct_answer");
+		if (questionType == QuestionType.MULTIPLE_CHOICE) {
+			if (!hasOptions || hasText || !(correctAnswer.get("options") instanceof List<?> list) || list.isEmpty()) {
+				throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
+			}
+		} else if (questionType == QuestionType.SHORT_ANSWER) {
+			Object text = correctAnswer.containsKey("correctAnswer")
+					? correctAnswer.get("correctAnswer")
+					: correctAnswer.get("correct_answer");
+			if (!hasText || hasOptions || text == null || (text instanceof String s && s.isBlank())) {
+				throw ApiException.badRequest(INVALID_QUESTION_MESSAGE);
+			}
+		}
 	}
 
 	private void validateScoreAndOrder(BigDecimal score, int orderIndex) {
