@@ -57,6 +57,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -456,9 +457,10 @@ class SoftDeletedAccountAuthIntegrationTest extends SoftDeletedAccountTestSuppor
 		String access = login(admin).get("accessToken").asText();
 		token(target, 3600, false);
 		List<Session> before = sessions(target);
+		IllegalStateException revocationFailure = new IllegalStateException("Forced BE-64 revocation failure");
 		doAnswer(invocation -> {
 			invocation.callRealMethod();
-			throw new IllegalStateException("Forced BE-64 revocation failure");
+			throw revocationFailure;
 		}).when(refreshPort).revokeAllByUserId(target.id());
 		try {
 			if (throughAdminApi) {
@@ -469,8 +471,8 @@ class SoftDeletedAccountAuthIntegrationTest extends SoftDeletedAccountTestSuppor
 				}
 			} else {
 				assertThatThrownBy(() -> crudUsers.delete(target.id()))
-						.isInstanceOf(IllegalStateException.class)
-						.hasMessage("Forced BE-64 revocation failure");
+						.isInstanceOf(InvalidDataAccessApiUsageException.class)
+						.hasCause(revocationFailure);
 			}
 			assertThat(row(target).isDeleted()).isFalse();
 			assertThat(sessions(target)).isEqualTo(before);
