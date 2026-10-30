@@ -1,0 +1,6 @@
+id: OPS-39
+title: "CI Validation: Chặn Build/Deploy AI Service Thiếu ffmpeg"
+assignee: "@devops-primary"
+status: "Done"
+priority: "High"
+description: "Thêm step validate ffmpeg vào .github/workflows/ci-ai-service.yml để ngăn deploy khi thiếu dependency xử lý audio."
