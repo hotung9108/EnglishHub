@@ -28,6 +28,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -39,6 +41,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,12 +61,15 @@ class AdminUserServiceTest {
 	@Mock
 	private CurrentUserProvider currentUserProvider;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 	private AdminUserService adminUserService;
 
 	@BeforeEach
 	void setUp() {
-		adminUserService = new AdminUserService(userRepository, currentUserProvider, passwordEncoder);
+		adminUserService = new AdminUserService(userRepository, currentUserProvider, passwordEncoder, eventPublisher);
 	}
 
 	@Test
@@ -410,7 +418,10 @@ class AdminUserServiceTest {
 
 		adminUserService.deleteUser(41L);
 
-		verify(userRepository).deleteById(41L);
+		var order = inOrder(userRepository, eventPublisher);
+		order.verify(userRepository).deleteById(41L);
+		order.verify(eventPublisher).publishEvent(new UserSoftDeletedEvent(41L));
+		verify(userRepository, never()).revokeActiveRefreshTokens(any(Long.class));
 	}
 
 	@Test
@@ -420,6 +431,36 @@ class AdminUserServiceTest {
 		assertThatThrownBy(() -> adminUserService.listUsers("", "", 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenCallerIsForbidden() {
+		when(currentUserProvider.requireAdmin()).thenThrow(ApiException.forbidden("Forbidden"));
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+		verifyNoInteractions(userRepository, eventPublisher);
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenTargetIsMissing() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.empty());
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+		verify(userRepository, never()).deleteById(any());
+		verifyNoInteractions(eventPublisher);
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenPersistenceFails() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(user(41L, UserRole.STUDENT)));
+		IllegalStateException failure = new IllegalStateException("Deletion failed");
+		doThrow(failure).when(userRepository).deleteById(41L);
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L)).isSameAs(failure);
+		verifyNoInteractions(eventPublisher);
 	}
 
 	private static Stream<Arguments> invalidAdminRequests() {
