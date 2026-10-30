@@ -264,6 +264,37 @@ class GradingMaxScoreSnapshotRegressionIntegrationTest {
 	}
 
 	@Test
+	void aiInstructionSnapshotIsPreservedAndFrozenAcrossStartAttempt() throws Exception {
+		long assignmentId = createAssignment();
+		AssignmentModule module = moduleRepository.save(new AssignmentModule(
+				assignmentId,
+				ModuleSkill.WRITING,
+				ModuleTaskType.ESSAY,
+				1,
+				"Write an essay",
+				new BigDecimal("10.00"),
+				null,
+				null,
+				null,
+				null,
+				"Strict IELTS Writing Band 8 prompt"));
+
+		Attempt attempt = startAttempt(assignmentId);
+		Grading grading = gradingFor(attempt.submissionModuleId());
+
+		assertThat(grading.getAiInstructionSnapshot()).isEqualTo("Strict IELTS Writing Band 8 prompt");
+		assertThat(grading.getMaxScoreSnapshot()).isEqualByComparingTo("10.00");
+
+		// Even if teacher updates the module prompt later, the grading snapshot remains frozen
+		module.updateDetails(module.getOrderIndex(), module.getInstructions(), module.getMaxScore(), "Modified prompt after student started");
+		moduleRepository.saveAndFlush(module);
+
+		Grading frozenGrading = gradingFor(attempt.submissionModuleId());
+		assertThat(frozenGrading.getAiInstructionSnapshot()).isEqualTo("Strict IELTS Writing Band 8 prompt");
+		assertThat(frozenGrading.getMaxScoreSnapshot()).isEqualByComparingTo("10.00");
+	}
+
+	@Test
 	void legacyNullSnapshotRejectsInvalidScoresWithoutFillingSnapshot() throws Exception {
 		long assignmentId = createAssignment();
 		createModule(assignmentId, ModuleSkill.WRITING, ModuleTaskType.ESSAY);

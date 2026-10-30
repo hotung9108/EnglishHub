@@ -45,6 +45,7 @@ public class AssignmentModulesJpaAdapter
 				ModuleSkill.valueOf(entity.getSkill().name()),
 				ModuleTaskType.valueOf(entity.getTaskType().name()),
 				entity.getOrderIndex(),
-				entity.getMaxScore());
+				entity.getMaxScore(),
+				entity.getAiInstruction());
 	}
 }

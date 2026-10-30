@@ -110,7 +110,8 @@ public class SubmissionPersistenceMapper {
 				source.getFinalScore(),
 				source.getMaxScoreSnapshot(),
 				source.getAiFeedback(),
-				source.getFinalFeedback());
+				source.getFinalFeedback(),
+				source.getAiInstructionSnapshot());
 		target.setId(source.getId());
 		return target;
 	}
@@ -129,7 +130,7 @@ public class SubmissionPersistenceMapper {
 				null,
 				null,
 				null,
-				null);
+				source.getAiInstructionSnapshot());
 		target.setId(source.getId());
 		return target;
 	}
