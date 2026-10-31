@@ -5,6 +5,8 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { MemoryTokenStorage } from '../core/token-storage';
 import { TokenRefreshManager } from '../core/interceptors';
 import { AuthService } from '../services/auth.service';
+import { NotFoundError } from '../core/errors';
+import { environment } from '../../config/environment';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
 import { buildListParams, computePagination, pageAfterEmptyRefetch } from '../../hooks/useUsers.utils';
@@ -42,6 +44,40 @@ test('AuthService - login sets tokens and session, logout clears session', async
   assert.strictEqual(storage.getAccessToken(), null);
   assert.strictEqual(storage.getRefreshToken(), null);
   assert.strictEqual(auth.isAuthenticated(), false);
+});
+
+test('AuthService - login HTTP 404 rejects without writing tokens or cached user', async (context) => {
+  const mockHttp = new MockHttpClient();
+  const storage = new MemoryTokenStorage();
+  const auth = new AuthService(mockHttp, storage);
+  const failure = new NotFoundError('Tài khoản không tồn tại.');
+  mockHttp.mockError = failure;
+  const accessWrites = context.mock.method(storage, 'setAccessToken');
+  const refreshWrites = context.mock.method(storage, 'setRefreshToken');
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const cachedItems = new Map<string, string>();
+  const userWrites: string[] = [];
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => cachedItems.get(key) ?? null,
+    setItem: (key: string, value: string) => { userWrites.push(key); cachedItems.set(key, value); },
+    removeItem: (key: string) => { cachedItems.delete(key); },
+  } });
+  try {
+    await assert.rejects(auth.login({ email: 'teacher@englishhub.dev', password: 'SecretPassword' }),
+      (error: unknown) => error === failure);
+    assert.strictEqual(accessWrites.mock.callCount(), 0);
+    assert.strictEqual(refreshWrites.mock.callCount(), 0);
+    assert.strictEqual(storage.getAccessToken(), null);
+    assert.strictEqual(storage.getRefreshToken(), null);
+    assert.strictEqual(auth.getSavedUser(), null);
+    assert.strictEqual(cachedItems.has(environment.auth.userKey), false);
+    assert.strictEqual(userWrites.length, 0);
+    assert.deepStrictEqual(mockHttp.calls, [{ method: 'POST', url: '/auth/login',
+      data: { email: 'teacher@englishhub.dev', password: 'SecretPassword' }, options: { skipAuth: true } }]);
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  }
 });
 
 test('AuthService - logout clears session even if backend call fails', async () => {

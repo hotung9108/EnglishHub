@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -25,6 +28,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,12 +42,15 @@ class UserCrudServiceTest {
 	@Mock
 	private PasswordEncoder encoder;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	private UserCrudService service;
 	private User existing;
 
 	@BeforeEach
 	void setUp() {
-		service = new UserCrudService(repository, new UserMapper(), encoder);
+		service = new UserCrudService(repository, new UserMapper(), encoder, eventPublisher);
 		existing = new User(12L, "Nguyễn Văn An", "crud@example.test", "0900000000",
 				"https://example.test/old-avatar.png", null, UserRole.STUDENT, UserStatus.ACTIVE,
 				false, null, null, null, null);
@@ -105,6 +113,33 @@ class UserCrudServiceTest {
 				.hasMessage("Không có dữ liệu để cập nhật.");
 		verify(repository, never()).save(any(User.class));
 		assertThat(existing.phone()).isEqualTo("0900000000");
+	}
+
+	@Test
+	void deletePublishesOnlyAfterPersistenceSucceeds() {
+		service.delete(12L);
+		var order = inOrder(repository, eventPublisher);
+		order.verify(repository).deleteById(12L);
+		order.verify(eventPublisher).publishEvent(new UserSoftDeletedEvent(12L));
+		verify(repository, never()).revokeActiveRefreshTokens(any(Long.class));
+	}
+
+	@Test
+	void deleteRejectsMissingTargetWithoutPublishing() {
+		when(repository.findById(12L)).thenReturn(Optional.empty());
+		assertThatThrownBy(() -> service.delete(12L))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+		verify(repository, never()).deleteById(any());
+		verifyNoInteractions(eventPublisher);
+	}
+
+	@Test
+	void deletePropagatesPersistenceFailureWithoutPublishing() {
+		IllegalStateException failure = new IllegalStateException("Deletion failed");
+		doThrow(failure).when(repository).deleteById(12L);
+		assertThatThrownBy(() -> service.delete(12L)).isSameAs(failure);
+		verifyNoInteractions(eventPublisher);
 	}
 
 	private static Stream<Arguments> phoneUpdates() {

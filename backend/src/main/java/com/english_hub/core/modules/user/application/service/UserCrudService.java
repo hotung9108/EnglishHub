@@ -5,6 +5,7 @@ import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.user.application.dto.UserDto;
 import com.english_hub.core.modules.user.application.mapper.UserMapper;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import com.english_hub.core.modules.user.domain.model.FullNameValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,14 +31,17 @@ public class UserCrudService implements UserService {
 	private final UserRepository userRepository;
 	private final UserMapper userMapper;
 	private final PasswordEncoder passwordEncoder;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public UserCrudService(
 			UserRepository userRepository,
 			UserMapper userMapper,
-			PasswordEncoder passwordEncoder) {
+			PasswordEncoder passwordEncoder,
+			ApplicationEventPublisher eventPublisher) {
 		this.userRepository = userRepository;
 		this.userMapper = userMapper;
 		this.passwordEncoder = passwordEncoder;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Override
@@ -107,6 +112,7 @@ public class UserCrudService implements UserService {
 			throw ApiException.notFound("Không tìm thấy người dùng.");
 		}
 		userRepository.deleteById(id);
+		eventPublisher.publishEvent(new UserSoftDeletedEvent(id));
 	}
 
 	private void validateCreateRequest(UserDto request) {
