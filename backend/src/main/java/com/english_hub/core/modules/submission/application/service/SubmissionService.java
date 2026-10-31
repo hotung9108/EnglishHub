@@ -169,10 +169,15 @@ public class SubmissionService {
 							&& moduleInfo.maxScore().compareTo(BigDecimal.ZERO) > 0
 							? moduleInfo.maxScore()
 							: null;
+					String aiInstructionSnapshot = moduleInfo.aiInstruction() != null
+							&& !moduleInfo.aiInstruction().isBlank()
+							? moduleInfo.aiInstruction().trim()
+							: null;
 					return new GradingDraft(
 							submissionModule.getId(),
 							gradingMethodOf(moduleInfo),
-							maxScoreSnapshot);
+							maxScoreSnapshot,
+							aiInstructionSnapshot);
 				})
 				.toList());
 

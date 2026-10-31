@@ -38,7 +38,8 @@ public class GradingJpaAdapter implements GradingRepository {
 								null,
 								draft.maxScoreSnapshot(),
 								null,
-								null)))
+								null,
+								draft.aiInstructionSnapshot())))
 						.toList();
 		return jpaRepository.saveAllAndFlush(entities).stream().map(mapper::toDomain).toList();
 	}

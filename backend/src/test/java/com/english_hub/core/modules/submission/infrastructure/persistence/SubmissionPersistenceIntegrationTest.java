@@ -353,7 +353,7 @@ class SubmissionPersistenceIntegrationTest {
 				submissionModuleRepository.bulkCreate(submissionId, List.of(seed.module1Id(), seed.module2Id()));
 
 		List<GradingDraft> drafts = List.of(
-				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO, BigDecimal.TEN),
+				new GradingDraft(modules.get(0).getId(), GradingMethod.AUTO, BigDecimal.TEN, "Rubric prompt A"),
 				new GradingDraft(modules.get(1).getId(), GradingMethod.TEACHER_MANUAL, BigDecimal.TEN));
 
 		List<Grading> gradings = gradingRepository.bulkCreate(drafts);
@@ -371,8 +371,10 @@ class SubmissionPersistenceIntegrationTest {
 		assertThat(first.getMethod()).isEqualTo(GradingMethod.AUTO);
 		assertThat(first.getStatus()).isEqualTo(GradingStatus.PENDING);
 		assertThat(first.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
+		assertThat(first.getAiInstructionSnapshot()).isEqualTo("Rubric prompt A");
 		Grading second = gradingRepository.findBySubmissionModuleId(modules.get(1).getId()).get(0);
 		assertThat(second.getMaxScoreSnapshot()).isEqualByComparingTo(BigDecimal.TEN);
+		assertThat(second.getAiInstructionSnapshot()).isNull();
 	}
 
 	@Test

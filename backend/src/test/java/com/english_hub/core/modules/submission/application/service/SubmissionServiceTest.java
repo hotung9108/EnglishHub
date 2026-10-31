@@ -283,6 +283,42 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void startAttemptPreservesAiInstructionSnapshotWhenConfigured() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
+		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(0L);
+
+		Submission submission = submission(5L, 41L, 1);
+		submission.setId(15L);
+		when(submissionRepository.create(5L, 41L, 1)).thenReturn(submission);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L)).thenReturn(List.of(
+				new ModuleInfo(9L, 5L, ModuleSkill.WRITING, ModuleTaskType.ESSAY, 1, BigDecimal.TEN, "  Grade with IELTS Writing Band 8 rubric  "),
+				new ModuleInfo(10L, 5L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING, 2, BigDecimal.TEN, "   "),
+				new ModuleInfo(11L, 5L, ModuleSkill.READING, ModuleTaskType.QUIZ, 3, BigDecimal.TEN, null)));
+
+		SubmissionModule mod1 = module(9L);
+		mod1.setId(101L);
+		SubmissionModule mod2 = module(10L);
+		mod2.setId(102L);
+		SubmissionModule mod3 = module(11L);
+		mod3.setId(103L);
+		when(submissionModuleRepository.bulkCreate(15L, List.of(9L, 10L, 11L)))
+				.thenReturn(List.of(mod1, mod2, mod3));
+
+		submissionService.startAttempt(5L);
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<GradingDraft>> draftsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(gradingRepository).bulkCreate(draftsCaptor.capture());
+		List<GradingDraft> drafts = draftsCaptor.getValue();
+		assertThat(drafts).extracting(GradingDraft::aiInstructionSnapshot)
+				.containsExactly("Grade with IELTS Writing Band 8 rubric", null, null);
+		assertThat(drafts).extracting(GradingDraft::maxScoreSnapshot)
+				.containsExactly(BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN);
+	}
+
+	@Test
 	void rejectsAnAssignmentThatIsNotPublished() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		when(assignmentWindowRepository.findWindowById(5L))

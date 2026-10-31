@@ -27,4 +27,17 @@ public class Grading extends BaseEntity<Long> {
 	private String aiFeedback;
 
 	private String finalFeedback;
+
+	private String aiInstructionSnapshot;
+
+	public Grading(
+			Long submissionModuleId,
+			GradingMethod method,
+			GradingStatus status,
+			BigDecimal finalScore,
+			BigDecimal maxScoreSnapshot,
+			String aiFeedback,
+			String finalFeedback) {
+		this(submissionModuleId, method, status, finalScore, maxScoreSnapshot, aiFeedback, finalFeedback, null);
+	}
 }
