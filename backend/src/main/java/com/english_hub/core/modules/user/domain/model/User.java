@@ -135,7 +135,15 @@ public class User extends BaseEntity<Long> {
 	}
 
 	public void updatePhone(String phone) {
-		this.phone = phone;
+		String normalized = phone == null ? null : phone.trim();
+		if (normalized != null && normalized.isEmpty()) {
+			normalized = null;
+		}
+		if (normalized != null && normalized.length() > 20) {
+			throw com.english_hub.core.common.ApiException.badRequest(
+					"Số điện thoại không được vượt quá 20 ký tự.");
+		}
+		this.phone = normalized;
 	}
 
 	public void updateAvatarUrl(String avatarUrl) {

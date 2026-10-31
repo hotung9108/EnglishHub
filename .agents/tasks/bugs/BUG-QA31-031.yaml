@@ -1,0 +1,10 @@
+id: BUG-QA31-031
+title: "[BE][Audit Logs] HTTP 403 Forbidden on Request Detail in Audit Drawer"
+assignee: "@be-secondary"
+status: "Resolved"
+priority: "High"
+issue: "https://github.com/hotung9108/EnglishHub/issues/194"
+source: "QA-31 / staging / QA31-031"
+description: "Resolved 403 Forbidden for Admin on GET /api/v1/gradings/{id} by updating ApiRoutePolicy to include ADMIN and adjusting GradingService.requireSubmissionReadAccess to permit Admin audit inspection."
+artifacts:
+  - "production_artifacts/be_to_tester/grading-api-testing-instructions.md"
