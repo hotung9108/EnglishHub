@@ -1,126 +1,67 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   User, Mail, 
   Award, ShieldCheck, 
   CheckCircle2, FileText,
-  KeyRound, ArrowLeft, Loader2, AlertCircle
+  KeyRound, ArrowLeft, Loader2, UserX
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { userService } from '../api/services/user.service';
-import { reportService } from '../api/services/report.service';
-import { studentEvaluationService } from '../api/services/student-evaluation.service';
-import type { UserListItem } from '../api/services/user.service';
-import type { ReportStudentProgressResponse } from '../types/report.types';
-import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
+import { useStudentDetails, type StudentIdentityHint } from '../hooks/useStudentDetails';
+import { Button, EmptyState } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
+  const routeState = (location.state as StudentIdentityHint) || null;
+  const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 0 : 0;
+
   const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'evaluations' | 'security'>('overview');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [studentUser, setStudentUser] = useState<UserListItem | null>(null);
-  const [progressData, setProgressData] = useState<ReportStudentProgressResponse | null>(null);
-  const [evaluations, setEvaluations] = useState<StudentEvaluationListItem[]>([]);
-
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 1 : 1;
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchStudentData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [usersRes, progressRes, evalRes] = await Promise.allSettled([
-          userService.listUsers({ role: 'STUDENT', limit: 100 }),
-          reportService.getStudentProgress(numericId),
-          studentEvaluationService.list(numericId)
-        ]);
-
-        if (!isMounted) return;
-
-        const users: UserListItem[] = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
-        const found = users.find(u => u.id === numericId) || (users.length > 0 ? users[0] : null);
-        if (found) {
-          setStudentUser(found);
-        }
-
-        if (progressRes.status === 'fulfilled') {
-          setProgressData(progressRes.value);
-        }
-
-        if (evalRes.status === 'fulfilled') {
-          setEvaluations(evalRes.value.data);
-        }
-      } catch (err: unknown) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : isVi ? 'Không thể tải thông tin học viên.' : 'Failed to load student details.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchStudentData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [numericId, isVi]);
+  const {
+    studentUser,
+    progressData,
+    evaluations,
+    isLoading,
+    isError,
+    errorMessage,
+    statusMessage,
+    isTogglingStatus,
+    toggleSuspend,
+    resetPassword,
+  } = useStudentDetails({
+    studentId: numericId,
+    initialHint: routeState,
+    isVi,
+  });
 
   const handleToggleSuspend = async () => {
-    if (!studentUser) return;
-    const nextStatus = studentUser.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
-    try {
-      setIsTogglingStatus(true);
-      await userService.updateStatus(studentUser.id, nextStatus);
-      setStudentUser(prev => prev ? { ...prev, status: nextStatus } : null);
-      setStatusMessage(
-        nextStatus === 'LOCKED'
-          ? (isVi ? 'Đã tạm khóa tài khoản học viên.' : 'Student account suspended.')
-          : (isVi ? 'Đã kích hoạt lại tài khoản học viên.' : 'Student account reactivated.')
-      );
-      setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
-    } finally {
-      setIsTogglingStatus(false);
-    }
+    await toggleSuspend();
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword.trim() || !studentUser) return;
-    try {
-      await userService.updateUser(studentUser.id, {});
+    if (!newPassword.trim()) return;
+    const ok = await resetPassword(newPassword);
+    if (ok) {
       setPasswordSuccess(true);
       setTimeout(() => {
         setShowPasswordModal(false);
         setPasswordSuccess(false);
         setNewPassword('');
       }, 1500);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : isVi ? 'Không thể đổi mật khẩu.' : 'Failed to reset password.');
     }
   };
 
   const studentName = studentUser?.fullName || (isVi ? 'Học viên' : 'Student');
-  const studentCode = studentUser ? `HV-${String(studentUser.id).padStart(4, '0')}` : `HV-${numericId}`;
+  const studentCode = studentUser?.id ? `HV-${String(studentUser.id).padStart(4, '0')}` : `HV-${numericId}`;
   const studentInitials = studentName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
   const studentEmail = studentUser?.email || '—';
   const isActive = studentUser?.status === 'ACTIVE';
@@ -132,23 +73,23 @@ export const StudentDetails: React.FC = () => {
   return (
     <div className="adm-container">
       <div style={{ marginBottom: '16px' }}>
-        <button 
-          className="btn btn-secondary btn-sm"
+        <Button 
+          variant="secondary"
+          size="sm"
+          icon={<ArrowLeft size={16} />}
           onClick={() => navigate('/admin/students')}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          <ArrowLeft size={16} />
-          <span>{isVi ? 'Quay lại danh sách' : 'Back to Students'}</span>
-        </button>
+          {isVi ? 'Quay lại danh sách' : 'Back to Students'}
+        </Button>
       </div>
 
       {statusMessage && (
         <div style={{
           padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          color: '#15803d',
+          borderRadius: 'var(--radius-md, 8px)',
+          backgroundColor: 'var(--secondary-container, #e7f3ec)',
+          border: '1px solid var(--border-color, #e6dfd5)',
+          color: 'var(--on-secondary-container, #17523f)',
           fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
@@ -160,70 +101,69 @@ export const StudentDetails: React.FC = () => {
         </div>
       )}
 
-      {error && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#fef2f2',
-          border: '1px solid #fecaca',
-          color: '#b91c1c',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          <AlertCircle size={18} />
-          <span>{error}</span>
-        </div>
+      {isError && !studentUser && !isLoading && (
+        <EmptyState
+          icon={<UserX size={48} />}
+          title={isVi ? 'Không tìm thấy học viên' : 'Student Not Found'}
+          description={errorMessage || (isVi ? 'Không tìm thấy thông tin học viên cho mã định danh này.' : 'Student identity could not be verified.')}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => navigate('/admin/students')}>
+              {isVi ? 'Quay lại danh sách' : 'Back to Students'}
+            </Button>
+          }
+        />
       )}
 
-      {loading ? (
-        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+      {isLoading ? (
+        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
           <div>{isVi ? 'Đang tải thông tin học viên...' : 'Loading student details...'}</div>
         </div>
-      ) : (
+      ) : studentUser ? (
         <>
           {/* Hero Profile Bento Banner */}
           <div className="card" style={{ padding: '24px', marginBottom: '24px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-              <div style={{
-                width: '84px',
-                height: '84px',
-                borderRadius: '50%',
-                backgroundColor: '#059669',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '32px',
-                fontWeight: 700,
-                boxShadow: 'var(--shadow-md)'
-              }}>
+              <div 
+                className="adm-avatar"
+                style={{
+                  width: '84px',
+                  height: '84px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--primary, #1b4d3e)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  boxShadow: 'var(--shadow-card)'
+                }}
+              >
                 {studentInitials}
               </div>
 
               <div style={{ flex: 1, minWidth: '240px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--on-surface)', margin: 0 }}>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary, #262320)', margin: 0 }}>
                     {studentName}
                   </h2>
                   <span className="badge badge-primary font-mono">{studentCode}</span>
                   <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
-                    {isActive ? (isVi ? 'Đang học' : 'Active') : (isVi ? 'Tạm khóa' : 'Locked')}
+                    {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Locked')}
                   </span>
                   <button 
                     type="button"
                     disabled={isTogglingStatus}
                     className={`btn ${!isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
                     onClick={handleToggleSuspend}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
                   </button>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--on-surface-variant)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--text-secondary, #736b63)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <Mail size={15} /> {studentEmail}
                   </span>
                 </div>
@@ -234,20 +174,20 @@ export const StudentDetails: React.FC = () => {
                 <div style={{
                   padding: '16px 20px',
                   borderRadius: 'var(--radius-lg, 12px)',
-                  background: 'var(--surface-container-high)',
-                  border: '1px solid var(--outline-variant)',
+                  background: 'var(--surface-dim, #f4efe6)',
+                  border: '1px solid var(--border-color, #e6dfd5)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
                   minWidth: '220px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span className="text-on-surface-variant">{isVi ? 'Bài đã hoàn thành:' : 'Completed Tests:'}</span>
-                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Bài đã hoàn thành:' : 'Completed Tests:'}</span>
+                    <span style={{ color: 'var(--primary, #1b4d3e)', fontWeight: 700 }}>
                       {completedTimelineCount} {isVi ? 'bài' : 'items'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--on-surface-variant)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #736b63)' }}>
                     <span>{isVi ? 'Điểm TB: ' : 'Avg Score: '}<strong>{avgSkillScore}%</strong></span>
                     <span>{progressData.skillAverages?.length ?? 0} {isVi ? 'kỹ năng' : 'skills'}</span>
                   </div>
@@ -257,7 +197,7 @@ export const StudentDetails: React.FC = () => {
           </div>
 
           {/* Navigation Tabs */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--outline-variant)', marginBottom: '24px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color, #e6dfd5)', marginBottom: '24px', overflowX: 'auto' }}>
             {(
               [
                 { key: 'overview', label: t('studentDetails.infoTitle'), icon: User },
@@ -273,7 +213,7 @@ export const StudentDetails: React.FC = () => {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
                     padding: '12px 18px',
@@ -281,8 +221,8 @@ export const StudentDetails: React.FC = () => {
                     background: 'none',
                     fontSize: '14px',
                     fontWeight: isTabActive ? 600 : 500,
-                    color: isTabActive ? 'var(--primary)' : 'var(--on-surface-variant)',
-                    borderBottom: isTabActive ? '3px solid var(--primary)' : '3px solid transparent',
+                    color: isTabActive ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
+                    borderBottom: isTabActive ? '3px solid var(--primary, #1b4d3e)' : '3px solid transparent',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s ease'
@@ -304,18 +244,18 @@ export const StudentDetails: React.FC = () => {
                   {isVi ? 'Hồ Sơ CSDL (Student Profile)' : 'Database Student Profile'}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                    <span className="text-on-surface-variant">{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color, #e6dfd5)' }}>
+                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
                     <span className="font-semibold">{studentCode}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--outline-variant)' }}>
-                    <span className="text-on-surface-variant">Email</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color, #e6dfd5)' }}>
+                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>Email</span>
                     <span className="font-semibold">{studentEmail}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="text-on-surface-variant">{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
-                    <span className={`badge ${isActive ? 'badge-active' : 'badge-onleave'}`}>
-                      {isActive ? (isVi ? 'Bình thường' : 'Good Standing') : (isVi ? 'Tạm khóa' : 'Locked')}
+                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
+                    <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
+                      {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Locked')}
                     </span>
                   </div>
                 </div>
@@ -328,9 +268,9 @@ export const StudentDetails: React.FC = () => {
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '14px' }}>
                     {progressData.skillAverages.map(sk => (
-                      <div key={sk.skill} style={{ padding: '14px', borderRadius: 'var(--radius-md)', background: 'var(--surface-container-low)', border: '1px solid var(--outline-variant)' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>{sk.skill}</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
+                      <div key={sk.skill} style={{ padding: '14px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--surface-dim, #f4efe6)', border: '1px solid var(--border-color, #e6dfd5)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #736b63)' }}>{sk.skill}</div>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary, #1b4d3e)', marginTop: '4px' }}>
                           {sk.averageScorePercent}%
                         </div>
                       </div>
@@ -348,7 +288,7 @@ export const StudentDetails: React.FC = () => {
                 <h3 className="headline-md card-section-header-title">{isVi ? 'Dòng Thời Gian Điểm Số Bài Tập' : 'Score Timeline'}</h3>
               </div>
               {!progressData || !progressData.scoreTimeline || progressData.scoreTimeline.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
                   <Award size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có kết quả bài nộp nào cho học viên này' : 'No submission timeline available'}
@@ -370,7 +310,7 @@ export const StudentDetails: React.FC = () => {
                         <tr key={item.assignmentId}>
                           <td className="font-mono font-semibold text-primary">#{item.assignmentId}</td>
                           <td className="font-medium">{item.title}</td>
-                          <td className="text-on-surface-variant font-mono">{item.submittedAt}</td>
+                          <td className="font-mono text-muted">{item.submittedAt}</td>
                           <td className="font-bold text-primary">{item.scorePercent}%</td>
                         </tr>
                       ))}
@@ -385,7 +325,7 @@ export const StudentDetails: React.FC = () => {
           {activeTab === 'evaluations' && (
             <div>
               {evaluations.length === 0 ? (
-                <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+                <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
                   <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có nhận xét hoặc đánh giá học tập nào' : 'No evaluations recorded'}
@@ -394,15 +334,15 @@ export const StudentDetails: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {evaluations.map((ev) => (
-                    <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
+                    <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--primary, #1b4d3e)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                           <strong style={{ fontSize: '15px' }}>{ev.teacherName || (isVi ? 'Giảng viên phụ trách' : 'Instructor')}</strong>
-                          <span className="badge" style={{ backgroundColor: 'var(--surface-container-high)', fontSize: '12px' }}>#{ev.id}</span>
+                          <span className="badge" style={{ backgroundColor: 'var(--surface-dim, #f4efe6)', fontSize: '12px' }}>#{ev.id}</span>
                         </div>
-                        <span className="label-md text-on-surface-variant">{ev.createdAt || '—'}</span>
+                        <span className="label-md text-muted">{ev.createdAt || '—'}</span>
                       </div>
-                      <p className="body-md" style={{ color: 'var(--on-surface)', marginBottom: '8px', lineHeight: 1.6 }}>
+                      <p className="body-md" style={{ color: 'var(--text-primary, #262320)', marginBottom: '8px', lineHeight: 1.6 }}>
                         "{ev.content}"
                       </p>
                     </div>
@@ -418,20 +358,20 @@ export const StudentDetails: React.FC = () => {
               <h3 className="headline-md" style={{ marginBottom: '16px' }}>
                 {t('studentDetails.tabSecurity')}
               </h3>
-              <p className="body-md text-on-surface-variant" style={{ marginBottom: '20px' }}>
+              <p className="body-md text-muted" style={{ marginBottom: '20px' }}>
                 {isVi 
                   ? 'Quản trị viên có toàn quyền cấp lại mật khẩu mới hoặc khóa phiên đăng nhập đối với tài khoản học viên này.' 
                   : 'Administrators have full privilege to force-reset credentials or revoke active tokens for this student.'}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <button 
-                  className="btn btn-primary"
+                <Button 
+                  variant="primary"
+                  icon={<KeyRound size={16} />}
                   onClick={() => setShowPasswordModal(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                 >
-                  <KeyRound size={16} />
-                  <span>{t('studentDetails.btnResetPassword')}</span>
-                </button>
+                  {t('studentDetails.btnResetPassword')}
+                </Button>
               </div>
             </div>
           )}
@@ -452,11 +392,11 @@ export const StudentDetails: React.FC = () => {
             }}>
               <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '24px' }}>
                 <h3 className="headline-md" style={{ marginBottom: '8px' }}>{t('studentDetails.btnResetPassword')}</h3>
-                <p className="body-sm text-on-surface-variant" style={{ marginBottom: '16px' }}>
+                <p className="body-sm text-muted" style={{ marginBottom: '16px' }}>
                   {isVi ? `Đặt lại mật khẩu cho học viên ${studentName} (${studentCode})` : `Set new password for ${studentName}`}
                 </p>
                 {passwordSuccess ? (
-                  <div style={{ padding: '16px', borderRadius: '8px', background: '#f0fdf4', color: '#16a34a', fontWeight: 600, textAlign: 'center' }}>
+                  <div style={{ padding: '16px', borderRadius: '8px', background: 'var(--secondary-container, #e7f3ec)', color: 'var(--on-secondary-container, #17523f)', fontWeight: 600, textAlign: 'center' }}>
                     <CheckCircle2 size={24} style={{ margin: '0 auto 8px' }} />
                     {isVi ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!'}
                   </div>
@@ -477,16 +417,16 @@ export const StudentDetails: React.FC = () => {
                       />
                     </div>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                      <button 
+                      <Button 
                         type="button" 
-                        className="btn btn-secondary" 
+                        variant="secondary" 
                         onClick={() => setShowPasswordModal(false)}
                       >
                         {isVi ? 'Hủy' : 'Cancel'}
-                      </button>
-                      <button type="submit" className="btn btn-primary">
+                      </Button>
+                      <Button type="submit" variant="primary">
                         {isVi ? 'Xác nhận' : 'Confirm'}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 )}
@@ -494,7 +434,7 @@ export const StudentDetails: React.FC = () => {
             </div>
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 };

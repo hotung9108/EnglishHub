@@ -90,6 +90,42 @@ export class UserService {
     return this.http.patch<UserProfile>(`${USERS_ENDPOINT}/${id}/status`, { status });
   }
 
+  async getUserById(
+    id: UserId,
+    hint?: { fullName?: string; email?: string },
+    options?: ApiRequestOptions
+  ): Promise<UserListItem | null> {
+    try {
+      const direct = await this.http.get<UserListItem>(`${USERS_ENDPOINT}/${id}`, options);
+      if (direct && direct.id === id) {
+        return direct;
+      }
+    } catch {
+      // Backend direct endpoint GET /{id} may not be available yet; fallback gracefully
+    }
+
+    const searchQuery = hint?.email?.trim() || hint?.fullName?.trim();
+    if (searchQuery) {
+      try {
+        const searchRes = await this.listUsers({ q: searchQuery, role: 'STUDENT', limit: 50 }, options);
+        const matched = (searchRes.data || []).find((u: UserListItem) => u.id === id);
+        if (matched) return matched;
+      } catch {
+        // Ignore and fallback to list scan
+      }
+    }
+
+    try {
+      const listRes = await this.listUsers({ role: 'STUDENT', limit: 100 }, options);
+      const matchedFromList = (listRes.data || []).find((u: UserListItem) => u.id === id);
+      if (matchedFromList) return matchedFromList;
+    } catch {
+      // Ignore
+    }
+
+    return null;
+  }
+
   async listUsers(params: UserListParams = {}, options?: ApiRequestOptions): Promise<UserListResponse> {
     const response = await this.http.get<UserListResponse>(USERS_ENDPOINT, {
       ...options,

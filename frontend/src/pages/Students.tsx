@@ -229,7 +229,14 @@ export const Students: React.FC = () => {
                   <tr 
                     key={st.id} 
                     className="adm-table-row-clickable cursor-pointer"
-                    onClick={() => navigate(`/admin/students/${st.id}`)}
+                    onClick={() => navigate(`/admin/students/${st.id}`, {
+                      state: {
+                        studentId: st.id,
+                        fullName: st.name,
+                        email: st.email,
+                        studentCode: st.code,
+                      }
+                    })}
                   >
                     <td className="font-mono font-semibold text-primary">{st.code}</td>
                     <td>
@@ -264,7 +271,14 @@ export const Students: React.FC = () => {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/admin/students/${st.id}`);
+                            navigate(`/admin/students/${st.id}`, {
+                              state: {
+                                studentId: st.id,
+                                fullName: st.name,
+                                email: st.email,
+                                studentCode: st.code,
+                              }
+                            });
                           }}
                         >
                           {t('students.actionViewDetails')}

@@ -405,12 +405,17 @@ export const ClassDetails: React.FC = () => {
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="text-right">
-                                    <div className="inline-flex gap-2">
-                                      <Button 
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => navigate(`/admin/students/${st.studentId}`)}
+                                  <td style={{ textAlign: 'right' }}>
+                                    <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                      <button 
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => navigate(`/admin/students/${st.studentId}`, {
+                                          state: {
+                                            studentId: st.studentId,
+                                            fullName: st.fullName,
+                                            studentCode: st.studentCode,
+                                          }
+                                        })}
                                       >
                                         {isVi ? 'Hồ sơ' : 'Profile'}
                                       </Button>

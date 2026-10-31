@@ -2,7 +2,7 @@
 
 *Bản V3 = áp dụng schema V6 (V4 → V5 → V6) lên api_overview_v2. Chi tiết các thay đổi xem Changelog bên dưới. Vẫn chỉ ở mức sương sương: method + endpoint + mục đích, chưa thiết kế request/response chi tiết.*
 
-**Tổng: 62 endpoint** (giảm từ 63 của V2, do bỏ endpoint PATCH class_members không còn nghiệp vụ sau khi xoá member_type).
+**Tổng: 63 endpoint** (V3 ban đầu có 62 sau khi bỏ PATCH class_members; bổ sung GET /admin/users/{id} cho FE-71).
 
 ---
 
@@ -45,7 +45,7 @@
 
 ---
 
-## CỤM 2 — User (8 endpoint)
+## CỤM 2 — User (9 endpoint)
 
 | # | Method + Endpoint | Mục đích |
 |---|---|---|
@@ -57,6 +57,7 @@
 | 9 | PUT /admin/users/{id} | Admin sửa thông tin 1 user |
 | 10 | DELETE /admin/users/{id} | Admin xoá (hoặc soft-delete) user |
 | 11 | PATCH /admin/users/{id}/status | Admin khoá/mở khoá tài khoản |
+| 11a | GET /admin/users/{id} | Admin xem chi tiết user theo ID (FE-71) |
 
 ---
 
