@@ -39,6 +39,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isUploadPhaseError, setIsUploadPhaseError] = useState(false);
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
@@ -69,7 +70,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
   }, [id]);
 
   const [reloadKey, setReloadKey] = useState(0);
-  const handleRetry = () => setReloadKey((k) => k + 1);
 
   // Load assignment and submission data
   useEffect(() => {
@@ -269,19 +269,21 @@ const StudentAssignmentSpeaking: React.FC = () => {
     [assignment?.modules, submission?.modules]
   );
 
-  // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
+  // Submit flow: Upload Blob to Presigned S3 URL -> submitModule
   const handleSubmitAssignment = async () => {
     if (assignment?.status === 'CLOSED') {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (!audioBlob) {
-      setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
-      return;
+
+    if (isPlaying && audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      setIsPlaying(false);
     }
 
-    if (isRecording) {
-      stopRecording();
+    if (!audioBlob || audioBlob.size === 0) {
+      setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
+      return;
     }
 
     if (!submission) {
@@ -291,6 +293,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
     setIsSubmitting(true);
     setError(null);
+    setIsUploadPhaseError(false);
 
     try {
       const subId = submission.id;
@@ -308,18 +311,29 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
       // Step 1: Request presigned PUT URL from backend
       // Backend validates MIME against: 'audio/webm', 'audio/wav', 'audio/mpeg'
-      const { uploadUrl, storageKey } = await submissionService.getAudioUploadUrl(
+      setIsUploadPhaseError(true);
+      const { uploadUrl } = await submissionService.getAudioUploadUrl(
         subModuleId,
         backendMimeType
       );
 
       // Step 2: Upload audio blob directly to S3 / MinIO storage
       await submissionService.uploadDirectToStorage(uploadUrl, audioBlob, backendMimeType);
+      setIsUploadPhaseError(false);
 
-      // Step 3: Submit module with audioStorageKey (backend probes storage and marks READY)
-      await submissionService.submitModule(subModuleId, {
-        audioStorageKey: storageKey,
-      });
+      // Step 3: Submit module (backend probes storage based on submission/module convention and marks READY)
+      const submitRes = await submissionService.submitModule(subModuleId);
+
+      // Step 3.1: Guard post-submit verification (bao gồm cả trường hợp answers rỗng)
+      const firstAnswer = submitRes.answers?.[0];
+      const isAudioReady =
+        Boolean(firstAnswer) &&
+        (firstAnswer.audioUploadStatus === 'READY' ||
+          (Boolean(firstAnswer.audioStorageKey) && firstAnswer.audioUploadStatus !== 'UPLOADING'));
+
+      if (!isAudioReady) {
+        throw new Error('Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+      }
 
       const currentSubModules = (submission.modules || []).map((m) =>
         m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
@@ -373,13 +387,21 @@ const StudentAssignmentSpeaking: React.FC = () => {
     }
   };
 
+  const handleRetry = () => {
+    if (isUploadPhaseError && audioBlob && audioBlob.size > 0 && submission) {
+      void handleSubmitAssignment();
+    } else {
+      setReloadKey((k) => k + 1);
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const recordedAudioReady = Boolean(audioBlob && audioUrl);
+  const recordedAudioReady = Boolean(audioBlob && audioBlob.size > 0 && audioUrl);
   const activeError = permissionError || error;
 
   return (
@@ -600,7 +622,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               <button 
                 className="btn-submit-speaking"
                 onClick={handleSubmitAssignment}
-                disabled={isSubmitting || !recordedAudioReady || !submission}
+                disabled={isSubmitting || isRecording || !recordedAudioReady || !submission}
                 type="button"
               >
                 {isSubmitting ? (
