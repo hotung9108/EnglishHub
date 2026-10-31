@@ -40,8 +40,10 @@ import com.english_hub.core.modules.user.domain.model.User;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,6 +52,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +64,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class SubmissionService {
+
+	private static final Logger LOGGER = LoggerFactory.getLogger(SubmissionService.class);
 
 	private static final String FORBIDDEN_MESSAGE = "Bạn không có quyền thực hiện thao tác này.";
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
@@ -398,19 +404,80 @@ public class SubmissionService {
 		if (window.status() == AssignmentStatus.CLOSED) {
 			throw ApiException.conflict(ASSIGNMENT_CLOSED_MESSAGE);
 		}
+		List<SubmissionModule> modulesToSubmit = findInProgressModules(submissionId);
+		Map<Long, ModuleInfo> moduleById = Map.of();
+		if (!modulesToSubmit.isEmpty()) {
+			moduleById = modulesOf(submission.getAssignmentId());
+		}
+
 		OffsetDateTime submittedAt = OffsetDateTime.now();
 		submission.setStatus(SubmissionStatus.SUBMITTED);
 		submission.setSubmittedAt(submittedAt);
 		submissionRepository.save(submission);
+		saveSubmittedModules(modulesToSubmit);
 
-		List<SubmissionModule> submissionModules = submissionModuleRepository.findBySubmissionId(submissionId);
-		for (SubmissionModule submissionModule : submissionModules) {
+		Set<Long> autoGradingModuleIds = autoGradingModuleIds(submission, modulesToSubmit, moduleById);
+		publishModuleSubmittedEvents(autoGradingModuleIds);
+		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
+	}
+
+	private List<SubmissionModule> findInProgressModules(long submissionId) {
+		List<SubmissionModule> modulesToSubmit = new ArrayList<>();
+		for (SubmissionModule submissionModule : submissionModuleRepository.findBySubmissionId(submissionId)) {
 			if (submissionModule.getStatus() == SubmissionStatus.IN_PROGRESS) {
-				submissionModule.setStatus(SubmissionStatus.SUBMITTED);
-				submissionModuleRepository.save(submissionModule);
+				modulesToSubmit.add(submissionModule);
 			}
 		}
-		return new SubmitResult(SUBMITTED_FINAL_MESSAGE, SubmissionStatus.SUBMITTED, submittedAt);
+		return modulesToSubmit;
+	}
+
+	private void saveSubmittedModules(List<SubmissionModule> modulesToSubmit) {
+		for (SubmissionModule submissionModule : modulesToSubmit) {
+			submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+			submissionModuleRepository.save(submissionModule);
+		}
+	}
+
+	private Set<Long> autoGradingModuleIds(
+			Submission submission, List<SubmissionModule> submittedModules, Map<Long, ModuleInfo> moduleById) {
+		Set<Long> submissionModuleIds = new LinkedHashSet<>();
+		for (SubmissionModule submissionModule : submittedModules) {
+			ModuleInfo moduleInfo = moduleById.get(submissionModule.getModuleId());
+			if (isEligibleForFinalAutoGrading(submission, submissionModule, moduleInfo)) {
+				submissionModuleIds.add(submissionModule.getId());
+			}
+		}
+		return submissionModuleIds;
+	}
+
+	private boolean isEligibleForFinalAutoGrading(
+			Submission submission, SubmissionModule submissionModule, ModuleInfo moduleInfo) {
+		if (moduleInfo == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "missing module metadata");
+			return false;
+		}
+		if (moduleInfo.skill() == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "null skill");
+			return false;
+		}
+		if (moduleInfo.taskType() == null) {
+			warnSkippedAutoGrading(submission, submissionModule, "null taskType");
+			return false;
+		}
+		return gradingMethodOf(moduleInfo) == GradingMethod.AUTO;
+	}
+
+	private void warnSkippedAutoGrading(
+			Submission submission, SubmissionModule submissionModule, String reason) {
+		LOGGER.warn(
+				"Skipping final-submit auto-grading event: submissionId={}, assignmentId={}, submissionModuleId={}, moduleId={}, reason={}",
+				submission.getId(), submission.getAssignmentId(), submissionModule.getId(), submissionModule.getModuleId(), reason);
+	}
+
+	private void publishModuleSubmittedEvents(Set<Long> submissionModuleIds) {
+		for (Long submissionModuleId : submissionModuleIds) {
+			eventPublisher.publishEvent(new SubmissionModuleSubmittedEvent(submissionModuleId));
+		}
 	}
 
 	@Transactional(readOnly = true)

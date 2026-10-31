@@ -1,5 +1,9 @@
 package com.english_hub.core.modules.submission.application.service;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
@@ -55,17 +59,26 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -79,9 +92,15 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -126,6 +145,18 @@ class SubmissionServiceTest {
 	private static final JsonMapper JSON_READER = new JsonMapper();
 
 	private static final OffsetDateTime EXPIRES_AT = OffsetDateTime.parse("2026-09-24T10:00:00Z");
+
+	private static final long FINAL_SUBMISSION_ID = 88L;
+	private static final long FINAL_ASSIGNMENT_ID = 5L;
+	private static final long FINAL_STUDENT_ID = 41L;
+	private static final long FINAL_READING_MODULE_ID = 9L;
+	private static final long FINAL_LISTENING_MODULE_ID = 10L;
+	private static final long FINAL_ESSAY_MODULE_ID = 11L;
+	private static final long FINAL_RECORDING_MODULE_ID = 12L;
+	private static final long FINAL_READING_SUBMISSION_MODULE_ID = 150L;
+	private static final long FINAL_LISTENING_SUBMISSION_MODULE_ID = 151L;
+	private static final long FINAL_ESSAY_SUBMISSION_MODULE_ID = 152L;
+	private static final long FINAL_RECORDING_SUBMISSION_MODULE_ID = 153L;
 
 	private SubmissionService submissionService;
 
@@ -1475,6 +1506,427 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void audit04FinalSubmitMustDispatchGrading() {
+		SubmissionModule reading = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(reading), List.of(moduleInfo(FINAL_READING_MODULE_ID, ModuleTaskType.QUIZ)));
+
+		SubmitResult result = submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertFinalSubmitModuleSaved(reading);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@ParameterizedTest(name = "final submit dispatches {0} + {1}")
+	@CsvSource({"READING, QUIZ", "READING, REWRITE", "LISTENING, QUIZ"})
+	void finalSubmitDispatchesEachEligiblePair(ModuleSkill skill, ModuleTaskType taskType) {
+		SubmissionModule eligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(eligible), List.of(moduleInfo(FINAL_READING_MODULE_ID, skill, taskType)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitModuleSaved(eligible);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitDispatchesEveryNewAutoModuleExactlyOnce() {
+		SubmissionModule reading = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule listening = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		prepareFinalSubmit(List.of(reading, listening), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_LISTENING_MODULE_ID, ModuleSkill.LISTENING, ModuleTaskType.QUIZ)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitModuleSaved(reading);
+		assertFinalSubmitModuleSaved(listening);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_LISTENING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitSavesManualModulesButOnlyDispatchesAutoModules() {
+		SubmissionModule reading = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule essay = finalSubmitModule(FINAL_ESSAY_SUBMISSION_MODULE_ID, FINAL_ESSAY_MODULE_ID);
+		SubmissionModule recording = finalSubmitModule(FINAL_RECORDING_SUBMISSION_MODULE_ID, FINAL_RECORDING_MODULE_ID);
+		prepareFinalSubmit(List.of(reading, essay, recording), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_ESSAY_MODULE_ID, ModuleSkill.WRITING, ModuleTaskType.ESSAY),
+				moduleInfo(FINAL_RECORDING_MODULE_ID, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		ListAppender<ILoggingEvent> logs = captureFinalSubmitLogs();
+		try {
+			submissionService.submit(FINAL_SUBMISSION_ID);
+
+			assertFinalSubmitModuleSaved(reading);
+			assertFinalSubmitModuleSaved(essay);
+			assertFinalSubmitModuleSaved(recording);
+			assertThat(finalSubmitWarnings(logs)).isEmpty();
+			assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+			assertFinalSubmitDoesNotGrade();
+		} finally {
+			stopCapturingFinalSubmitLogs(logs);
+		}
+	}
+
+	@Test
+	void finalSubmitDoesNotSaveOrRepublishPreviouslySubmittedOrGradedModules() {
+		SubmissionModule fresh = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule submitted = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		submitted.setStatus(SubmissionStatus.SUBMITTED);
+		SubmissionModule graded = finalSubmitModule(FINAL_ESSAY_SUBMISSION_MODULE_ID, FINAL_ESSAY_MODULE_ID);
+		graded.setStatus(SubmissionStatus.GRADED);
+		prepareFinalSubmit(List.of(fresh, submitted, graded), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_LISTENING_MODULE_ID, ModuleSkill.LISTENING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_ESSAY_MODULE_ID, ModuleSkill.READING, ModuleTaskType.REWRITE)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitModuleSaved(fresh);
+		verify(submissionModuleRepository, never()).save(submitted);
+		verify(submissionModuleRepository, never()).save(graded);
+		assertThat(submitted.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(graded.getStatus()).isEqualTo(SubmissionStatus.GRADED);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitDispatchesDifferentModuleIdsWithTheSameSkill() {
+		SubmissionModule quiz = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule rewrite = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		prepareFinalSubmit(List.of(quiz, rewrite), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_LISTENING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.REWRITE)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_LISTENING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitPublishesEachModuleIdAtMostOnce() {
+		SubmissionModule first = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule duplicate = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(first, duplicate), List.of(moduleInfo(FINAL_READING_MODULE_ID, ModuleTaskType.QUIZ)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@ParameterizedTest(name = "final submit does not dispatch or warn for {0} + {1}")
+	@CsvSource({
+			"READING, ESSAY", "READING, RECORDING",
+			"LISTENING, REWRITE", "LISTENING, ESSAY", "LISTENING, RECORDING",
+			"WRITING, QUIZ", "WRITING, REWRITE", "WRITING, ESSAY", "WRITING, RECORDING",
+			"SPEAKING, QUIZ", "SPEAKING, REWRITE", "SPEAKING, ESSAY", "SPEAKING, RECORDING"
+	})
+	void finalSubmitDoesNotDispatchOrWarnForNonEligiblePairs(ModuleSkill skill, ModuleTaskType taskType) {
+		SubmissionModule nonEligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(nonEligible), List.of(moduleInfo(FINAL_READING_MODULE_ID, skill, taskType)));
+		ListAppender<ILoggingEvent> logs = captureFinalSubmitLogs();
+		try {
+			submissionService.submit(FINAL_SUBMISSION_ID);
+
+			assertFinalSubmitModuleSaved(nonEligible);
+			assertThat(finalSubmitWarnings(logs)).isEmpty();
+			verifyNoInteractions(eventPublisher);
+			assertFinalSubmitDoesNotGrade();
+		} finally {
+			stopCapturingFinalSubmitLogs(logs);
+		}
+	}
+
+	@Test
+	void finalSubmitWithNoModulesDoesNotReadMetadataOrPublish() {
+		Submission parent = prepareFinalSubmit(List.of(), List.of());
+
+		SubmitResult result = submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.submittedAt()).isNotNull();
+		assertThat(parent.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		verify(submissionRepository).save(parent);
+		verify(submissionModuleRepository, never()).save(any());
+		verifyNoInteractions(assignmentModuleRepository, eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitWithAllModulesAlreadyFinishedDoesNotReadMetadataOrPublish() {
+		SubmissionModule submitted = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		submitted.setStatus(SubmissionStatus.SUBMITTED);
+		SubmissionModule graded = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		graded.setStatus(SubmissionStatus.GRADED);
+		Submission parent = prepareFinalSubmit(List.of(submitted, graded), List.of());
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertThat(parent.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		verify(submissionRepository).save(parent);
+		verify(submissionModuleRepository, never()).save(any());
+		verifyNoInteractions(assignmentModuleRepository, eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitSavesParentAndEveryModuleBeforePublishingAnyEvent() {
+		SubmissionModule reading = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule listening = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		SubmissionModule essay = finalSubmitModule(FINAL_ESSAY_SUBMISSION_MODULE_ID, FINAL_ESSAY_MODULE_ID);
+		Submission parent = prepareFinalSubmit(List.of(reading, essay, listening), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_LISTENING_MODULE_ID, ModuleSkill.LISTENING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_ESSAY_MODULE_ID, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		InOrder order = inOrder(submissionRepository, submissionModuleRepository, eventPublisher);
+		order.verify(submissionRepository).save(parent);
+		order.verify(submissionModuleRepository, times(3)).save(any(SubmissionModule.class));
+		order.verify(eventPublisher, times(2)).publishEvent(any(SubmissionModuleSubmittedEvent.class));
+		verifyNoMoreInteractions(eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitReadsMetadataExactlyOnceForModulesBeingFinalized() {
+		SubmissionModule essay = finalSubmitModule(FINAL_ESSAY_SUBMISSION_MODULE_ID, FINAL_ESSAY_MODULE_ID);
+		SubmissionModule recording = finalSubmitModule(FINAL_RECORDING_SUBMISSION_MODULE_ID, FINAL_RECORDING_MODULE_ID);
+		prepareFinalSubmit(List.of(essay, recording), List.of(
+				moduleInfo(FINAL_ESSAY_MODULE_ID, ModuleSkill.WRITING, ModuleTaskType.ESSAY),
+				moduleInfo(FINAL_RECORDING_MODULE_ID, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		verify(assignmentModuleRepository).findModulesByAssignmentId(FINAL_ASSIGNMENT_ID);
+		verifyNoMoreInteractions(assignmentModuleRepository);
+		verifyNoInteractions(eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitWarnsWithModuleIdentifiersWhenMetadataIsMissing() {
+		SubmissionModule missing = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(missing), List.of());
+		ListAppender<ILoggingEvent> logs = captureFinalSubmitLogs();
+		try {
+			submissionService.submit(FINAL_SUBMISSION_ID);
+
+			assertFinalSubmitModuleSaved(missing);
+			verifyNoInteractions(eventPublisher);
+			assertFinalSubmitWarning(logs, missing, "metadata");
+			assertFinalSubmitDoesNotGrade();
+		} finally {
+			stopCapturingFinalSubmitLogs(logs);
+		}
+	}
+
+	@ParameterizedTest(name = "final submit warns for missing {2}")
+	@MethodSource("finalSubmitMetadataWithMissingFields")
+	void finalSubmitWarnsWithoutEnumConversionFailureForNullMetadataFields(
+			ModuleSkill skill, ModuleTaskType taskType, String missingField) {
+		SubmissionModule invalid = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(invalid), List.of(moduleInfo(FINAL_READING_MODULE_ID, skill, taskType)));
+		ListAppender<ILoggingEvent> logs = captureFinalSubmitLogs();
+		try {
+			submissionService.submit(FINAL_SUBMISSION_ID);
+
+			assertFinalSubmitModuleSaved(invalid);
+			verifyNoInteractions(eventPublisher);
+			assertFinalSubmitWarning(logs, invalid, missingField);
+			assertFinalSubmitDoesNotGrade();
+		} finally {
+			stopCapturingFinalSubmitLogs(logs);
+		}
+	}
+
+	@Test
+	void finalSubmitStillDispatchesEligibleModulesWhenAnotherModuleHasNoMetadata() {
+		SubmissionModule missing = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		SubmissionModule eligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(missing, eligible), List.of(moduleInfo(FINAL_READING_MODULE_ID, ModuleTaskType.QUIZ)));
+		ListAppender<ILoggingEvent> logs = captureFinalSubmitLogs();
+		try {
+			submissionService.submit(FINAL_SUBMISSION_ID);
+
+			assertFinalSubmitModuleSaved(missing);
+			assertFinalSubmitModuleSaved(eligible);
+			assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+			assertFinalSubmitWarning(logs, missing, "metadata");
+			assertFinalSubmitDoesNotGrade();
+		} finally {
+			stopCapturingFinalSubmitLogs(logs);
+		}
+	}
+
+	@ParameterizedTest(name = "final submit rejects parent status {0} without events")
+	@EnumSource(value = SubmissionStatus.class, names = {"SUBMITTED", "GRADED"})
+	void finalSubmitRejectsFinishedParentsWithoutSavingOrPublishing(SubmissionStatus status) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(FINAL_STUDENT_ID));
+		Submission parent = submission(FINAL_ASSIGNMENT_ID, FINAL_STUDENT_ID, 1);
+		parent.setId(FINAL_SUBMISSION_ID);
+		parent.setStatus(status);
+		when(submissionRepository.findById(FINAL_SUBMISSION_ID)).thenReturn(Optional.of(parent));
+
+		assertFinalSubmitRejected(HttpStatus.BAD_REQUEST);
+	}
+
+	@ParameterizedTest(name = "final submit rejects {0} without events")
+	@EnumSource(value = UserRole.class, names = {"TEACHER", "ADMIN"})
+	void finalSubmitRejectsTeacherAndAdminWithoutSavingOrPublishing(UserRole role) {
+		User caller = teacher(7L);
+		if (role == UserRole.ADMIN) {
+			caller = admin(1L);
+		}
+		when(currentUserProvider.requireActiveUser()).thenReturn(caller);
+
+		assertFinalSubmitRejected(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(submissionRepository, assignmentWindowRepository);
+	}
+
+	@Test
+	void finalSubmitRejectsAnotherStudentsSubmissionWithoutSavingOrPublishing() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(FINAL_STUDENT_ID));
+		Submission foreign = submission(FINAL_ASSIGNMENT_ID, 45L, 1);
+		foreign.setId(FINAL_SUBMISSION_ID);
+		when(submissionRepository.findById(FINAL_SUBMISSION_ID)).thenReturn(Optional.of(foreign));
+
+		assertFinalSubmitRejected(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(assignmentWindowRepository);
+	}
+
+	@Test
+	void finalSubmitStopsWhenActiveUserLookupIsUnauthorized() {
+		when(currentUserProvider.requireActiveUser()).thenThrow(ApiException.unauthorized("Inactive user"));
+
+		assertFinalSubmitRejected(HttpStatus.UNAUTHORIZED);
+		verifyNoInteractions(submissionRepository, assignmentWindowRepository);
+	}
+
+	@Test
+	void finalSubmitRejectsUnknownSubmissionWithoutSavingOrPublishing() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(FINAL_STUDENT_ID));
+		when(submissionRepository.findById(FINAL_SUBMISSION_ID)).thenReturn(Optional.empty());
+
+		assertFinalSubmitRejected(HttpStatus.NOT_FOUND);
+		verifyNoInteractions(assignmentWindowRepository);
+	}
+
+	@Test
+	void finalSubmitRejectsMissingAssignmentWithoutSavingOrPublishing() {
+		prepareFinalSubmitWindow(Optional.empty());
+
+		assertFinalSubmitRejected(HttpStatus.NOT_FOUND);
+	}
+
+	@Test
+	void finalSubmitRejectsClosedAssignmentWithoutSavingOrPublishing() {
+		AssignmentWindow closed = new AssignmentWindow(
+				FINAL_ASSIGNMENT_ID, 3L, AssignmentStatus.CLOSED, open(), close(), 2, false);
+		prepareFinalSubmitWindow(Optional.of(closed));
+
+		assertFinalSubmitRejected(HttpStatus.CONFLICT);
+	}
+
+	@Test
+	void finalSubmitPreservesAcceptanceAfterCloseAtWhenAssignmentIsNotClosed() {
+		AssignmentWindow expired = window(
+				FINAL_ASSIGNMENT_ID, OffsetDateTime.now().minusDays(2), OffsetDateTime.now().minusDays(1), 2);
+		prepareFinalSubmitWindow(Optional.of(expired));
+		assertFinalSubmitPreservesAcceptanceForManualModule();
+	}
+
+	@Test
+	void finalSubmitPreservesAcceptanceForDraftAssignment() {
+		AssignmentWindow draft = new AssignmentWindow(
+				FINAL_ASSIGNMENT_ID, 3L, AssignmentStatus.DRAFT, open(), close(), 2, false);
+		prepareFinalSubmitWindow(Optional.of(draft));
+		assertFinalSubmitPreservesAcceptanceForManualModule();
+	}
+
+	@Test
+	void finalSubmitPreservesAcceptanceBeforeAssignmentOpenAt() {
+		AssignmentWindow notOpenYet = window(
+				FINAL_ASSIGNMENT_ID, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(2), 2);
+		prepareFinalSubmitWindow(Optional.of(notOpenYet));
+		assertFinalSubmitPreservesAcceptanceForManualModule();
+	}
+
+	@Test
+	void finalSubmitPropagatesModuleSaveFailureWithoutPublishingAnyEvent() {
+		SubmissionModule first = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		SubmissionModule failing = finalSubmitModule(FINAL_LISTENING_SUBMISSION_MODULE_ID, FINAL_LISTENING_MODULE_ID);
+		prepareFinalSubmit(List.of(first, failing), List.of(
+				moduleInfo(FINAL_READING_MODULE_ID, ModuleSkill.READING, ModuleTaskType.QUIZ),
+				moduleInfo(FINAL_LISTENING_MODULE_ID, ModuleSkill.LISTENING, ModuleTaskType.QUIZ)));
+		RuntimeException failure = new IllegalStateException("Module save failed");
+		doReturn(first).when(submissionModuleRepository).save(first);
+		doThrow(failure).when(submissionModuleRepository).save(failing);
+
+		assertThatThrownBy(() -> submissionService.submit(FINAL_SUBMISSION_ID)).isSameAs(failure);
+
+		verify(submissionModuleRepository).save(first);
+		verifyNoInteractions(eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitPropagatesPublisherFailure() {
+		SubmissionModule eligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(eligible), List.of(moduleInfo(FINAL_READING_MODULE_ID, ModuleTaskType.QUIZ)));
+		RuntimeException failure = new IllegalStateException("Event publication failed");
+		// The unfixed final submit never reaches this fault-injection stub.
+		lenient().doThrow(failure).when(eventPublisher)
+				.publishEvent(new SubmissionModuleSubmittedEvent(FINAL_READING_SUBMISSION_MODULE_ID));
+
+		assertThatThrownBy(() -> submissionService.submit(FINAL_SUBMISSION_ID)).isSameAs(failure);
+
+		assertFinalSubmitModuleSaved(eligible);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
+	void finalSubmitPropagatesMetadataReadFailureWithoutPublishing() {
+		SubmissionModule eligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmitWindow(Optional.of(window(FINAL_ASSIGNMENT_ID, open(), close(), 2)));
+		when(submissionModuleRepository.findBySubmissionId(FINAL_SUBMISSION_ID)).thenReturn(List.of(eligible));
+		RuntimeException failure = new IllegalStateException("Metadata read failed");
+		lenient().when(assignmentModuleRepository.findModulesByAssignmentId(FINAL_ASSIGNMENT_ID)).thenThrow(failure);
+
+		assertThatThrownBy(() -> submissionService.submit(FINAL_SUBMISSION_ID)).isSameAs(failure);
+
+		verify(submissionModuleRepository, never()).save(any());
+		verifyNoInteractions(eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@ParameterizedTest(name = "producer does not read existing grading status {0}")
+	@EnumSource(value = GradingStatus.class, names = {"COMPLETED", "FAILED", "AI_GRADED"})
+	void finalSubmitDispatchesWithoutReadingExistingGradingStatus(GradingStatus status) {
+		SubmissionModule eligible = finalSubmitModule(FINAL_READING_SUBMISSION_MODULE_ID, FINAL_READING_MODULE_ID);
+		prepareFinalSubmit(List.of(eligible), List.of(moduleInfo(FINAL_READING_MODULE_ID, ModuleTaskType.QUIZ)));
+		Grading existing = grading(FINAL_READING_SUBMISSION_MODULE_ID, GradingMethod.AUTO, status);
+		// This grading is deliberately available but must never be read by the producer.
+		lenient().when(gradingRepository.findBySubmissionModuleId(FINAL_READING_SUBMISSION_MODULE_ID))
+				.thenReturn(List.of(existing));
+
+		submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertFinalSubmitModuleSaved(eligible);
+		verifyNoInteractions(gradingRepository);
+		assertFinalSubmitEvents(FINAL_READING_SUBMISSION_MODULE_ID);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	@Test
 	void getModuleDetailHidesCorrectAnswersWhileSubmitted() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule quizModule = submittedModule(9L);
@@ -1931,6 +2383,114 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+	}
+
+	private SubmissionModule finalSubmitModule(long submissionModuleId, long moduleId) {
+		SubmissionModule submissionModule = module(moduleId);
+		submissionModule.setId(submissionModuleId);
+		submissionModule.setSubmissionId(FINAL_SUBMISSION_ID);
+		return submissionModule;
+	}
+
+	private Submission prepareFinalSubmitWindow(Optional<AssignmentWindow> assignmentWindow) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(FINAL_STUDENT_ID));
+		Submission parent = submission(FINAL_ASSIGNMENT_ID, FINAL_STUDENT_ID, 1);
+		parent.setId(FINAL_SUBMISSION_ID);
+		when(submissionRepository.findById(FINAL_SUBMISSION_ID)).thenReturn(Optional.of(parent));
+		when(assignmentWindowRepository.findWindowById(FINAL_ASSIGNMENT_ID)).thenReturn(assignmentWindow);
+		return parent;
+	}
+
+	private Submission prepareFinalSubmit(List<SubmissionModule> modules, List<ModuleInfo> metadata) {
+		Submission parent = prepareFinalSubmitWindow(Optional.of(window(FINAL_ASSIGNMENT_ID, open(), close(), 2)));
+		when(submissionModuleRepository.findBySubmissionId(FINAL_SUBMISSION_ID)).thenReturn(modules);
+		stubFinalSubmitMetadata(metadata);
+		return parent;
+	}
+
+	private void stubFinalSubmitMetadata(List<ModuleInfo> metadata) {
+		// The unfixed final submit never reads metadata; keep unrelated Mockito stubs strict.
+		lenient().when(assignmentModuleRepository.findModulesByAssignmentId(FINAL_ASSIGNMENT_ID)).thenReturn(metadata);
+	}
+
+	private void assertFinalSubmitModuleSaved(SubmissionModule submissionModule) {
+		verify(submissionModuleRepository).save(submissionModule);
+		assertThat(submissionModule.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+	}
+
+	private void assertFinalSubmitEvents(Long... submissionModuleIds) {
+		ArgumentCaptor<SubmissionModuleSubmittedEvent> events = ArgumentCaptor.forClass(SubmissionModuleSubmittedEvent.class);
+		verify(eventPublisher, times(submissionModuleIds.length)).publishEvent(events.capture());
+		List<Long> actualIds = events.getAllValues().stream()
+				.map(SubmissionModuleSubmittedEvent::submissionModuleId)
+				.toList();
+		assertThat(actualIds).containsExactlyInAnyOrder(submissionModuleIds);
+		verifyNoMoreInteractions(eventPublisher);
+	}
+
+	private void assertFinalSubmitDoesNotGrade() {
+		verifyNoInteractions(gradingRepository, answerRepository, moduleQuestionRepository, storageService);
+	}
+
+	private void assertFinalSubmitRejected(HttpStatus status) {
+		assertThatThrownBy(() -> submissionService.submit(FINAL_SUBMISSION_ID))
+				.isInstanceOfSatisfying(ApiException.class, exception -> assertThat(exception.getStatus()).isEqualTo(status));
+		verify(submissionRepository, never()).save(any());
+		verifyNoInteractions(submissionModuleRepository, assignmentModuleRepository, eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	private void assertFinalSubmitPreservesAcceptanceForManualModule() {
+		SubmissionModule manual = finalSubmitModule(FINAL_ESSAY_SUBMISSION_MODULE_ID, FINAL_ESSAY_MODULE_ID);
+		when(submissionModuleRepository.findBySubmissionId(FINAL_SUBMISSION_ID)).thenReturn(List.of(manual));
+		stubFinalSubmitMetadata(List.of(moduleInfo(FINAL_ESSAY_MODULE_ID, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+
+		SubmitResult result = submissionService.submit(FINAL_SUBMISSION_ID);
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.submittedAt()).isNotNull();
+		assertFinalSubmitModuleSaved(manual);
+		verifyNoInteractions(eventPublisher);
+		assertFinalSubmitDoesNotGrade();
+	}
+
+	private ListAppender<ILoggingEvent> captureFinalSubmitLogs() {
+		Logger logger = (Logger) LoggerFactory.getLogger(SubmissionService.class);
+		ListAppender<ILoggingEvent> appender = new ListAppender<>();
+		appender.start();
+		logger.addAppender(appender);
+		return appender;
+	}
+
+	private void stopCapturingFinalSubmitLogs(ListAppender<ILoggingEvent> appender) {
+		Logger logger = (Logger) LoggerFactory.getLogger(SubmissionService.class);
+		logger.detachAppender(appender);
+		appender.stop();
+	}
+
+	private List<ILoggingEvent> finalSubmitWarnings(ListAppender<ILoggingEvent> appender) {
+		return appender.list.stream().filter(event -> event.getLevel() == Level.WARN).toList();
+	}
+
+	private void assertFinalSubmitWarning(
+			ListAppender<ILoggingEvent> appender, SubmissionModule submissionModule, String reasonField) {
+		List<ILoggingEvent> warnings = finalSubmitWarnings(appender);
+		assertThat(warnings).hasSize(1);
+		String message = warnings.getFirst().getFormattedMessage();
+		assertThat(message).contains("submissionId=" + FINAL_SUBMISSION_ID);
+		assertThat(message).contains("assignmentId=" + FINAL_ASSIGNMENT_ID);
+		assertThat(message).contains("submissionModuleId=" + submissionModule.getId());
+		assertThat(message).contains("moduleId=" + submissionModule.getModuleId());
+		assertThat(message).containsIgnoringCase(reasonField);
+		String lowerCaseMessage = message.toLowerCase(Locale.ROOT);
+		assertThat(lowerCaseMessage).containsAnyOf("missing", "null", "absent", "invalid", "not found");
+	}
+
+	private static Stream<Arguments> finalSubmitMetadataWithMissingFields() {
+		return Stream.of(
+				Arguments.of(null, ModuleTaskType.QUIZ, "skill"),
+				Arguments.of(ModuleSkill.READING, null, "taskType"),
+				Arguments.of(null, null, "skill"));
 	}
 
 	private org.mockito.stubbing.Answer<List<Answer>> savedAnswers(long firstId) {
