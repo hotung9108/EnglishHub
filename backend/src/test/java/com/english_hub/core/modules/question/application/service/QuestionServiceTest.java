@@ -203,6 +203,36 @@ class QuestionServiceTest {
 	}
 
 	@Test
+	void audit03MismatchedShapeMustNotPersistOnCreate() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenModuleAndOwner(9L, 5L, 3L, 10L);
+
+		assertApiException(
+				() -> questionService.createQuestion(
+						9L,
+						new CreateQuestionCommand(
+								"Choose one",
+								QuestionType.MULTIPLE_CHOICE,
+								Map.of("correctAnswer", "QA answer"),
+								BigDecimal.ONE,
+								1)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+
+		assertApiException(
+				() -> questionService.createQuestion(
+						9L,
+						new CreateQuestionCommand(
+								"Name a subject",
+								QuestionType.SHORT_ANSWER,
+								multipleChoiceAnswer(),
+								BigDecimal.ONE,
+								1)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+
+		verify(questionRepository, never()).save(any(Question.class));
+	}
+
+	@Test
 	void updateKeepsQuestionTypeAndAllowsSelfOrder() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		givenModuleAndOwner(9L, 5L, 3L, 10L);
@@ -234,6 +264,53 @@ class QuestionServiceTest {
 						21L,
 						new UpdateQuestionCommand(null, null, null, 2)),
 				"orderIndex đã được sử dụng.");
+	}
+
+	@Test
+	void audit03MismatchedShapeMustNotPersistOnUpdate() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenModuleAndOwner(9L, 5L, 3L, 10L);
+		Question mcq = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		Question shortAnswer = question(22L, 9L, QuestionType.SHORT_ANSWER, 2);
+
+		when(questionRepository.findById(21L)).thenReturn(Optional.of(mcq));
+		when(questionRepository.findById(22L)).thenReturn(Optional.of(shortAnswer));
+
+		// Updating MCQ with ShortAnswer shape should fail
+		assertApiException(
+				() -> questionService.updateQuestion(
+						21L,
+						new UpdateQuestionCommand(
+								null,
+								Map.of("correctAnswer", "QA answer"),
+								null,
+								null)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+
+		// Updating ShortAnswer with MCQ shape should fail
+		assertApiException(
+				() -> questionService.updateQuestion(
+						22L,
+						new UpdateQuestionCommand(
+								null,
+								multipleChoiceAnswer(),
+								null,
+								null)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+
+		// Updating with mismatched questionType in command should fail
+		assertApiException(
+				() -> questionService.updateQuestion(
+						21L,
+						new UpdateQuestionCommand(
+								null,
+								multipleChoiceAnswer(),
+								null,
+								null,
+								QuestionType.SHORT_ANSWER)),
+				"Dữ liệu câu hỏi không hợp lệ.");
+
+		verify(questionRepository, never()).save(any(Question.class));
 	}
 
 	@Test

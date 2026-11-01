@@ -1,0 +1,19 @@
+id: BE-TASK-70
+title: "Optimize admin user list without unused profile lookups (Issue #229)"
+assignee: "@be-primary"
+status: "Done"
+priority: "Low"
+description: >-
+  Implement the approved BE-70 scope: summary-only mapping in findPage with an
+  explicit port contract, JPA offset validation, and batch profile reads in
+  findAll. Preserve full-profile findById/save behavior and the existing API
+  response, filters, order, and Flyway schema setup. Extend the existing admin
+  integration tests with generated marker-scoped fixtures and repository/HTTP
+  SQL measurements. Verification completed: 118 targeted cases passed (55
+  integration, 63 unit/regression), with zero failures or skips; bootJar and
+  git diff --check passed. Repository list uses two SELECTs and the full HTTP
+  request uses three for both limits 2 and 20, with zero profile SELECTs.
+  Full-profile positive controls passed; findAll uses three SELECTs including
+  two batch profile reads. No production configuration or migrations changed.
+  Local instructions, PM search-semantics notes, and the two deferred performance
+  issue drafts are in local-dev/be-70/README.md. Latency/SLO was not measured.

@@ -538,9 +538,27 @@ button.sidebar-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--on-surface-variant);
-  margin-bottom: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.breadcrumb a,
+.breadcrumb-link {
+  color: var(--on-surface-variant);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+.breadcrumb a:hover,
+.breadcrumb-link:hover {
+  color: var(--primary);
+}
+.breadcrumb-separator {
+  color: var(--outline);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 .breadcrumb-active {
   color: var(--on-surface);

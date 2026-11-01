@@ -16,6 +16,12 @@ import type {
 import type { UserListItem } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import {
+  filterReportClasses,
+  filterAvailableClasses,
+  reconcileSelectedClass,
+  computeReportPagination,
+} from '../utils/reportFilters.utils';
 
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
@@ -46,11 +52,16 @@ export const AdminReports: React.FC = () => {
 
   const handleTeacherChange = (id: number | undefined) => {
     setSelectedTeacherId(id);
+    setSelectedClassId(reconcileSelectedClass(selectedClassId, id, allClasses));
+    setInspectingClass(null);
+    setClassProgress(null);
     setCurrentPage(1);
   };
 
   const handleClassChange = (id: number | undefined) => {
     setSelectedClassId(id);
+    setInspectingClass(null);
+    setClassProgress(null);
     setCurrentPage(1);
   };
 
@@ -59,6 +70,12 @@ export const AdminReports: React.FC = () => {
   const [reportClasses, setReportClasses] = useState<ReportClassSummary[]>([]);
   const [teachers, setTeachers] = useState<UserListItem[]>([]);
   const [allClasses, setAllClasses] = useState<ClassSummary[]>([]);
+
+  // Available classes for dropdown based on selected teacher
+  const availableClasses = filterAvailableClasses(allClasses, selectedTeacherId);
+
+  // Filtered report classes based on selected class cohort
+  const filteredClasses = filterReportClasses(reportClasses, selectedClassId);
 
   // Class Progress Modal
   const [inspectingClass, setInspectingClass] = useState<ReportClassSummary | null>(null);
@@ -177,6 +194,9 @@ export const AdminReports: React.FC = () => {
     setToDate('');
     setSelectedTeacherId(undefined);
     setSelectedClassId(undefined);
+    setCurrentPage(1);
+    setInspectingClass(null);
+    setClassProgress(null);
   };
 
   return (
@@ -292,7 +312,7 @@ export const AdminReports: React.FC = () => {
                 onChange={(e) => handleClassChange(e.target.value ? Number(e.target.value) : undefined)}
               >
                 <option value="">{isVi ? 'Tất cả lớp học' : 'All Classes'}</option>
-                {allClasses.map(c => (
+                {availableClasses.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -326,7 +346,7 @@ export const AdminReports: React.FC = () => {
       <div className="adm-kpi-grid mb-6">
         <MetricCard
           title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
-          value={loading ? '...' : (overview?.classCount ?? reportClasses.length)}
+          value={loading ? '...' : (overview?.classCount ?? filteredClasses.length)}
         />
 
         <MetricCard
@@ -352,20 +372,25 @@ export const AdminReports: React.FC = () => {
         </div>
       ) : (
         <div className="adm-table-card">
-          {reportClasses.length === 0 ? (
+          {filteredClasses.length === 0 ? (
             <EmptyState
               icon={<BookOpen size={36} />}
               title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
-              description={isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.'}
+              description={
+                selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
+                  ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                  : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
+              }
             />
           ) : (
             (() => {
-              const totalPages = Math.ceil(reportClasses.length / pageSize) || 1;
-              const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
-              const paginatedClasses = reportClasses.slice(
-                (safeCurrentPage - 1) * pageSize,
-                safeCurrentPage * pageSize
+              const { totalPages, safeCurrentPage, startIndex, endIndex } = computeReportPagination(
+                filteredClasses.length,
+                currentPage,
+                pageSize
               );
+
+              const paginatedClasses = filteredClasses.slice(startIndex, endIndex);
 
               return (
                 <>
@@ -412,11 +437,11 @@ export const AdminReports: React.FC = () => {
                     </table>
                   </div>
 
-                  {reportClasses.length > 0 && (
+                  {filteredClasses.length > 0 && (
                     <Pagination
                       currentPage={safeCurrentPage}
                       totalPages={totalPages}
-                      totalItems={reportClasses.length}
+                      totalItems={filteredClasses.length}
                       itemLabel={isVi ? 'lớp học' : 'classes'}
                       isVi={isVi}
                       onPageChange={setCurrentPage}
@@ -431,6 +456,7 @@ export const AdminReports: React.FC = () => {
                   )}
                 </>
               );
+
             })()
           )}
         </div>

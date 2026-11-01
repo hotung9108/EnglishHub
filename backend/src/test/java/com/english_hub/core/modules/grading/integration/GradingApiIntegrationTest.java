@@ -249,6 +249,23 @@ class GradingApiIntegrationTest {
 	}
 
 	@Test
+	void adminCanReadGradingDetailSuccessfully() throws Exception {
+		Grading target = gradingRepository.findAll().stream()
+				.filter(grading -> grading.getStatus() == GradingStatus.AI_GRADED)
+				.findFirst()
+				.orElseThrow();
+		long adminId = createUser(UserRole.ADMIN, "Grading API admin");
+
+		mockMvc.perform(get("/api/v1/gradings/{id}", target.getId())
+					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(target.getId()))
+				.andExpect(jsonPath("$.status").value(target.getStatus().name()))
+				.andExpect(jsonPath("$.finalScore").value(target.getFinalScore()))
+				.andExpect(jsonPath("$.method").value(target.getMethod().name()));
+	}
+
+	@Test
 	void aiAnalysisAcceptsPendingWritingAndSpeakingWithoutChangingPersistedData() throws Exception {
 		List<Grading> pendingGradings = gradingRepository.findAll().stream()
 				.filter(grading -> grading.getStatus() == GradingStatus.PENDING)

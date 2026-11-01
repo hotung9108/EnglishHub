@@ -23,10 +23,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -38,6 +41,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,12 +61,15 @@ class AdminUserServiceTest {
 	@Mock
 	private CurrentUserProvider currentUserProvider;
 
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
+
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 	private AdminUserService adminUserService;
 
 	@BeforeEach
 	void setUp() {
-		adminUserService = new AdminUserService(userRepository, currentUserProvider, passwordEncoder);
+		adminUserService = new AdminUserService(userRepository, currentUserProvider, passwordEncoder, eventPublisher);
 	}
 
 	@Test
@@ -108,11 +117,12 @@ class AdminUserServiceTest {
 		verify(userRepository).findPage(eq(""), eq(null), any(UserPageRequest.class));
 	}
 
-	@Test
-	void rejectsInvalidPaginationBeforeQueryingUsers() {
+	@ParameterizedTest
+	@CsvSource({"0,20", "-1,20", "1,0", "1,-1", "1,101"})
+	void rejectsInvalidPaginationBeforeQueryingUsers(int page, int limit) {
 		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
 
-		assertThatThrownBy(() -> adminUserService.listUsers("", "", 0, 20))
+		assertThatThrownBy(() -> adminUserService.listUsers("", "", page, limit))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Dữ liệu phân trang không hợp lệ.");
 		verify(userRepository, never()).findPage(any(), any(), any(UserPageRequest.class));
@@ -278,7 +288,9 @@ class AdminUserServiceTest {
 	@Test
 	void updatesStudentBaseAndProfileFieldsForAnAdmin() {
 		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
-		when(userRepository.findById(41L)).thenReturn(Optional.of(user(41L, UserRole.STUDENT)));
+		User target = user(41L, UserRole.STUDENT);
+		target.updatePhone("0900000000");
+		when(userRepository.findById(41L)).thenReturn(Optional.of(target));
 
 		adminUserService.updateUser(41L, new UpdateUserCommand(
 				" Updated Student ", "", null, " HV0041 ", LocalDate.of(2004, 4, 1), " 0912345678 "));
@@ -289,6 +301,58 @@ class AdminUserServiceTest {
 		assertThat(captor.getValue().phone()).isNull();
 		assertThat(captor.getValue().studentCode()).isEqualTo("HV0041");
 		assertThat(captor.getValue().parentPhone()).isEqualTo("0912345678");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"123456789012345678901", " 123456789012345678901 "})
+	void rejectsOverlongPhoneBeforeSavingBaseOrProfileChanges(String phone) {
+		User target = user(41L, UserRole.TEACHER);
+		target.updatePhone("0900000000");
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(target));
+
+		assertThatThrownBy(() -> adminUserService.updateUser(41L,
+				new UpdateUserCommand("Trần Thị Mai Lan", phone, "Changed specialization", null, null, null)))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không được vượt quá 20 ký tự.");
+		verify(userRepository, never()).save(any(User.class));
+		assertThat(target.phone()).isEqualTo("0900000000");
+		assertThat(target.specialization()).isEqualTo("IELTS");
+	}
+
+	@ParameterizedTest
+	@MethodSource("phoneUpdates")
+	void savesNormalizedPhoneOrClearsAnExistingPhone(String phone, String expected) {
+		User target = user(41L, UserRole.STUDENT);
+		target.updatePhone("0900000000");
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(target));
+
+		adminUserService.updateUser(41L, new UpdateUserCommand(null, phone, null, null, null, null));
+
+		verify(userRepository).save(target);
+		assertThat(target.phone()).isEqualTo(expected);
+	}
+
+	@Test
+	void nullPhoneKeepsAnExistingPhoneWhileUpdatingAnotherField() {
+		User target = user(41L, UserRole.STUDENT);
+		target.updatePhone("0900000000");
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(target));
+
+		adminUserService.updateUser(41L, new UpdateUserCommand("Trần Thị Mai Lan", null, null, null, null, null));
+
+		verify(userRepository).save(target);
+		assertThat(target.phone()).isEqualTo("0900000000");
+		assertThat(target.fullName()).isEqualTo("Trần Thị Mai Lan");
+	}
+
+	private static Stream<Arguments> phoneUpdates() {
+		String boundary = "1".repeat(20);
+		return Stream.of(Arguments.of(boundary, boundary), Arguments.of(" " + boundary + " ", boundary),
+				Arguments.of("", null), Arguments.of("   ", null));
 	}
 
 	@Test
@@ -354,7 +418,10 @@ class AdminUserServiceTest {
 
 		adminUserService.deleteUser(41L);
 
-		verify(userRepository).deleteById(41L);
+		var order = inOrder(userRepository, eventPublisher);
+		order.verify(userRepository).deleteById(41L);
+		order.verify(eventPublisher).publishEvent(new UserSoftDeletedEvent(41L));
+		verify(userRepository, never()).revokeActiveRefreshTokens(any(Long.class));
 	}
 
 	@Test
@@ -364,6 +431,36 @@ class AdminUserServiceTest {
 		assertThatThrownBy(() -> adminUserService.listUsers("", "", 1, 20))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenCallerIsForbidden() {
+		when(currentUserProvider.requireAdmin()).thenThrow(ApiException.forbidden("Forbidden"));
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+		verifyNoInteractions(userRepository, eventPublisher);
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenTargetIsMissing() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.empty());
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+		verify(userRepository, never()).deleteById(any());
+		verifyNoInteractions(eventPublisher);
+	}
+
+	@Test
+	void deleteDoesNotPublishWhenPersistenceFails() {
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(user(41L, UserRole.STUDENT)));
+		IllegalStateException failure = new IllegalStateException("Deletion failed");
+		doThrow(failure).when(userRepository).deleteById(41L);
+		assertThatThrownBy(() -> adminUserService.deleteUser(41L)).isSameAs(failure);
+		verifyNoInteractions(eventPublisher);
 	}
 
 	private static Stream<Arguments> invalidAdminRequests() {

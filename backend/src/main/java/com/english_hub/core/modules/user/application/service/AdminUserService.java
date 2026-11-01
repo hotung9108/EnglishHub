@@ -8,11 +8,13 @@ import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.core.modules.user.application.page.UserPageRequest;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
+import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import com.english_hub.core.modules.user.domain.model.FullNameValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,14 +33,17 @@ public class AdminUserService {
 	private final UserRepository userRepository;
 	private final CurrentUserProvider currentUserProvider;
 	private final PasswordEncoder passwordEncoder;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public AdminUserService(
 			UserRepository userRepository,
 			CurrentUserProvider currentUserProvider,
-			PasswordEncoder passwordEncoder) {
+			PasswordEncoder passwordEncoder,
+			ApplicationEventPublisher eventPublisher) {
 		this.userRepository = userRepository;
 		this.currentUserProvider = currentUserProvider;
 		this.passwordEncoder = passwordEncoder;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -151,6 +156,7 @@ public class AdminUserService {
 		currentUserProvider.requireAdmin();
 		findUserOrThrow(userId);
 		userRepository.deleteById(userId);
+		eventPublisher.publishEvent(new UserSoftDeletedEvent(userId));
 	}
 
 	@Transactional

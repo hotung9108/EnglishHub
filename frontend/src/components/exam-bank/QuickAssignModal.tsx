@@ -3,6 +3,7 @@ import { X, Send, Bell, GraduationCap, Loader2, AlertCircle, RefreshCw } from 'l
 import type { ExamTemplateItem, QuickAssignForm } from '../../types/exam-bank.types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../../api/services/class.service';
+import { formatToLocalDateTimeInput, addDays } from '../../utils/dateTime.utils';
 
 interface QuickAssignModalProps {
   exam: ExamTemplateItem;
@@ -20,8 +21,8 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState<QuickAssignForm>(() => {
-    const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
-    const defaultStartDate = new Date().toISOString().slice(0, 16);
+    const defaultDueDate = formatToLocalDateTimeInput(addDays(new Date(), 7));
+    const defaultStartDate = formatToLocalDateTimeInput();
     return {
       templateId: exam.id,
       classId: '',

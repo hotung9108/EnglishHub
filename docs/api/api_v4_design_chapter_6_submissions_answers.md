@@ -90,7 +90,7 @@
 
 ## 6.4 #40. Nộp bài chính thức
 
-**Mô tả:** Chốt lại toàn bộ bài làm. Đổi `submissions.status` và tất cả `submission_modules.status` chưa `SUBMITTED` → `SUBMITTED`, set `submitted_at = now()`. Module có `method = AUTO` được chấm tự động **sau khi transaction commit**: server so khớp `answers.content` với `questions.correct_answer`, tính điểm, cập nhật `gradings.final_score` và `status = COMPLETED` sau khi response đã trả về (xem mục 6.6).
+**Mô tả:** Chốt lại toàn bộ bài làm. Đổi `submissions.status` và các `submission_modules.status` đang `IN_PROGRESS` → `SUBMITTED`, set `submitted_at = now()`. Chỉ module vừa chuyển `IN_PROGRESS` → `SUBMITTED` trong request này và đủ điều kiện AUTO (`READING+QUIZ`, `READING+REWRITE`, `LISTENING+QUIZ`) được xét dispatch chấm tự động **bất đồng bộ sau khi transaction commit**: server so khớp `answers.content` với `questions.correct_answer`, tính điểm, cập nhật `gradings.final_score` và `status = COMPLETED`; trạng thái/kết quả được đọc qua `GET /submissions/{id}` (mục 6.2) hoặc `GET /submission-modules/{id}` (mục 6.5). Module đã `SUBMITTED` hoặc `GRADED` từ trước không được dispatch lại; gọi final submit lặp vẫn trả `400` như bảng dưới.
 
 **Method - Path:** `POST /submissions/{id}/submit`
 

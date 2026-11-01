@@ -13,11 +13,17 @@ import com.english_hub.core.modules.user.domain.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpStatus;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +69,55 @@ class UserProfileServiceTest {
 		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
 
 		assertThat(userProfileService.getMyProfile()).isSameAs(currentUser);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"123456789012345678901", " 123456789012345678901 "})
+	void rejectsOverlongPhoneBeforeSavingAnyProvidedFields(String phone) {
+		User currentUser = user(12L);
+		currentUser.updatePhone("0900000000");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		assertThatThrownBy(() -> userProfileService.updateMyProfile(new UpdateOwnProfileCommand(
+				"Trần Thị Mai Lan", phone, "https://example.test/new-avatar.png")))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không được vượt quá 20 ký tự.");
+		verify(userRepository, never()).save(any(User.class));
+		assertThat(currentUser.phone()).isEqualTo("0900000000");
+	}
+
+	@ParameterizedTest
+	@MethodSource("phoneUpdates")
+	void savesNormalizedPhoneOrClearsAnExistingPhone(String phone, String expected) {
+		User currentUser = user(12L);
+		currentUser.updatePhone("0900000000");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		userProfileService.updateMyProfile(new UpdateOwnProfileCommand(null, phone, null));
+
+		ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+		verify(userRepository).save(captor.capture());
+		assertThat(captor.getValue().phone()).isEqualTo(expected);
+	}
+
+	@Test
+	void nullPhoneKeepsAnExistingPhoneWhileUpdatingAnotherField() {
+		User currentUser = user(12L);
+		currentUser.updatePhone("0900000000");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		userProfileService.updateMyProfile(new UpdateOwnProfileCommand("Trần Thị Mai Lan", null, null));
+
+		verify(userRepository).save(currentUser);
+		assertThat(currentUser.phone()).isEqualTo("0900000000");
+		assertThat(currentUser.fullName()).isEqualTo("Trần Thị Mai Lan");
+	}
+
+	private static Stream<Arguments> phoneUpdates() {
+		String boundary = "1".repeat(20);
+		return Stream.of(Arguments.of(boundary, boundary), Arguments.of(" " + boundary + " ", boundary),
+				Arguments.of("", null), Arguments.of("   ", null));
 	}
 
 	@Test

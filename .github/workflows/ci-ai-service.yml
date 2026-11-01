@@ -49,5 +49,8 @@ jobs:
       - name: Run Tests
         run: pytest -v
 
-      - name: Build Docker Image
-        run: docker build -t englishhub-ai-service:ci .
+      - name: Build AI Service image
+        run: docker build -t ai-service:ci-test .
+
+      - name: Validate ffmpeg trong image
+        run: docker run --rm ai-service:ci-test ffmpeg -version

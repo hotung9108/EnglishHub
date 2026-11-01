@@ -3,6 +3,7 @@ package com.english_hub.core.modules.question.presentation.rest.dto.correctanswe
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 public class ValidMultipleChoiceAnswerValidator
@@ -11,6 +12,10 @@ public class ValidMultipleChoiceAnswerValidator
 	@Override
 	public boolean isValid(MultipleChoiceCorrectAnswer answer, ConstraintValidatorContext context) {
 		if (answer == null || answer.options() == null) {
+			return true;
+		}
+		if (answer.options().stream().anyMatch(Objects::isNull)) {
+			// Leave null elements to the element-level @NotNull constraint.
 			return true;
 		}
 		return hasExactlyOneCorrectOption(answer) && hasUniqueIds(answer);

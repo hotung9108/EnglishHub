@@ -692,6 +692,40 @@ class GradingServiceTest {
 				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 	}
 
+	@Test
+	void adminCanReadAnyGradingById() {
+		Grading expectedGrading = grading(5L, bd("10.00"), bd("8.00"), GradingStatus.COMPLETED);
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
+		when(gradingRepository.findById(5L)).thenReturn(Optional.of(expectedGrading));
+		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		Grading result = gradingService.getById(5L);
+
+		assertThat(result).isSameAs(expectedGrading);
+	}
+
+	@Test
+	void studentCannotReadAnotherStudentsGradingById() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, UserRole.STUDENT));
+		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("8.00"), GradingStatus.COMPLETED)));
+		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.getById(5L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	@Test
+	void nonOwnerTeacherCannotReadGradingById() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, UserRole.TEACHER));
+		when(gradingRepository.findById(5L)).thenReturn(Optional.of(grading(5L, bd("10.00"), bd("8.00"), GradingStatus.COMPLETED)));
+		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.getById(5L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
 	private Grading grading(Long id, BigDecimal maxScore, BigDecimal finalScore, GradingStatus status) {
 		return new Grading(
 				id,

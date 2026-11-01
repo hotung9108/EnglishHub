@@ -469,6 +469,9 @@ public class GradingService {
 	}
 
 	private void requireSubmissionReadAccess(GradingContext context, User caller) {
+		if (caller.role() == UserRole.ADMIN) {
+			return;
+		}
 		if (caller.role() == UserRole.TEACHER) {
 			requireTeacherOwnsContext(context, caller);
 			return;

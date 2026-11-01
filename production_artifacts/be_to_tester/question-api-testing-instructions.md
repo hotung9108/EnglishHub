@@ -71,9 +71,13 @@ field discriminator**. Endpoint #33 và #35 dùng chung contract này. Sai shape
 | `isCorrect` thiếu | `isCorrect là bắt buộc.` |
 | `SHORT_ANSWER` với `correctAnswer` rỗng / khoảng trắng | `correctAnswer không được để trống.` |
 | `correctAnswer` là JSON `null` | `correctAnswer là bắt buộc.` |
+| `POST` với `MULTIPLE_CHOICE` nhưng `correctAnswer` dạng SHORT_ANSWER (AUD-03) | `correctAnswer phải là {"options": [...]} cho MULTIPLE_CHOICE hoặc {"correctAnswer": "..."} cho SHORT_ANSWER.` |
+| `POST` với `SHORT_ANSWER` nhưng `correctAnswer` dạng MULTIPLE_CHOICE (AUD-03) | `correctAnswer phải là {"options": [...]} cho MULTIPLE_CHOICE hoặc {"correctAnswer": "..."} cho SHORT_ANSWER.` |
+| `PUT` câu hỏi MULTIPLE_CHOICE nhưng `correctAnswer` dạng SHORT_ANSWER (AUD-03) | `400 Bad Request` |
+| `PUT` câu hỏi SHORT_ANSWER nhưng `correctAnswer` dạng MULTIPLE_CHOICE (AUD-03) | `400 Bad Request` |
 
-Các case trên trả `400` **ở tầng controller** (Bean Validation + Jackson), không phải từ
-`QuestionService` — service không còn inspect cấu trúc `correctAnswer` nữa.
+Các case tạo mới được validate ở tầng controller qua Bean Validation (`@AssertTrue` trên `CreateQuestionRequest`) và kiểm tra chéo tại `QuestionService`.
+Các case cập nhật (PUT) được kiểm tra tại `QuestionService.updateQuestion` đối chiếu trực tiếp với `questionType` đã được lưu trữ trong cơ sở dữ liệu. Không có dữ liệu không hợp lệ nào được ghi vào cơ sở dữ liệu.
 
 ### Tương thích ngược
 
