@@ -407,8 +407,9 @@ export const ClassDetails: React.FC = () => {
                                   </td>
                                   <td style={{ textAlign: 'right' }}>
                                     <div style={{ display: 'inline-flex', gap: '8px' }}>
-                                      <button 
-                                        className="btn btn-secondary btn-sm"
+                                      <Button 
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => navigate(`/admin/students/${st.studentId}`, {
                                           state: {
                                             studentId: st.studentId,
