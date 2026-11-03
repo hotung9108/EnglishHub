@@ -36,6 +36,7 @@ export interface ChangePasswordPayload {
 type CreateUserBase = { fullName: string; email: string; password: string };
 
 export type CreateUserPayload =
+  | (CreateUserBase & { role: 'ADMIN' })
   | (CreateUserBase & { role: 'TEACHER'; specialization?: string })
   | (CreateUserBase & {
       role: 'STUDENT';

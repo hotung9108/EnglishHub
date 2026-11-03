@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Users, UserPlus, Search, 
   Loader2, AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useUsers } from '../hooks/useUsers';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
@@ -17,98 +18,51 @@ export const Students: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const {
+    users,
+    pagination,
+    isLoading: loading,
+    error,
+    setQuery,
+    setPage,
+    setLimit,
+    refetch,
+  } = useUsers({
+    initialRole: 'STUDENT',
+    initialPage: 1,
+    initialLimit: 10,
+  });
 
-  const [studentsData, setStudentsData] = useState<Array<{
-    id: number;
-    name: string;
-    code: string;
-    email: string;
-    status: 'ACTIVE' | 'LOCKED';
-    enrolledClasses: number;
-  }>>([]);
+  const studentsData = useMemo(() => {
+    return users.map((st: UserListItem) => ({
+      id: st.id,
+      name: st.fullName,
+      code: `HV-${String(st.id).padStart(4, '0')}`,
+      email: st.email,
+      status: (st.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE') as 'ACTIVE' | 'LOCKED',
+      enrolledClasses: 1
+    }));
+  }, [users]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchStudents = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await userService.listUsers({ role: 'STUDENT', limit: 100 });
-        if (!isMounted) return;
-
-        const mapped = (res.data || []).map((st: UserListItem) => ({
-          id: st.id,
-          name: st.fullName,
-          code: `HV-${String(st.id).padStart(4, '0')}`,
-          email: st.email,
-          status: (st.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE') as 'ACTIVE' | 'LOCKED',
-          enrolledClasses: 1
-        }));
-
-        setStudentsData(mapped);
-      } catch (err: unknown) {
-        if (!isMounted) return;
-        setError(err instanceof Error ? err.message : isVi ? 'Không thể tải danh sách học viên.' : 'Failed to fetch students.');
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchStudents();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isVi]);
-
-  const filtered = useMemo(() => {
-    return studentsData.filter(st => {
-      if (statusFilter !== 'All' && st.status !== statusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          st.name.toLowerCase().includes(q) ||
-          st.code.toLowerCase().includes(q) ||
-          st.email.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [studentsData, statusFilter, searchQuery]);
-
-  const totalItems = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  const paginatedStudents = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, safeCurrentPage, pageSize]);
+  const displayedStudents = useMemo(() => {
+    if (statusFilter === 'All') return studentsData;
+    return studentsData.filter(st => st.status === statusFilter);
+  }, [studentsData, statusFilter]);
 
   const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
     setStatusFilter(status);
-    setCurrentPage(1);
   };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    setCurrentPage(1);
+    setQuery(query.trim());
   };
 
   const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
+    setLimit(size);
   };
 
-  const totalEnrolled = studentsData.length;
+  const totalEnrolled = pagination.total;
   const activeCount = studentsData.filter(s => s.status === 'ACTIVE').length;
 
   return (
@@ -135,7 +89,7 @@ export const Students: React.FC = () => {
       {error && (
         <div className="adm-alert-error mb-6">
           <AlertCircle size={18} />
-          <span>{error}</span>
+          <span>{error.message || (isVi ? 'Không thể tải danh sách học viên.' : 'Failed to fetch students.')}</span>
         </div>
       )}
 
@@ -149,7 +103,7 @@ export const Students: React.FC = () => {
 
         <MetricCard
           title={isVi ? 'TRẠNG THÁI HỆ THỐNG' : 'ACCOUNT STATUS'}
-          value={totalEnrolled > 0 ? `${Math.round((activeCount / totalEnrolled) * 100)}%` : '100%'}
+          value={totalEnrolled > 0 ? `${Math.round((activeCount / Math.max(1, studentsData.length)) * 100)}%` : '100%'}
           footerText={isVi ? 'Tỷ lệ kích hoạt' : 'Activation rate'}
         />
 
@@ -194,7 +148,7 @@ export const Students: React.FC = () => {
             <Loader2 size={32} className="animate-spin mx-auto mb-3" />
             <div>{isVi ? 'Đang tải danh sách học viên...' : 'Loading students...'}</div>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : displayedStudents.length === 0 ? (
           <EmptyState
             icon={<Users size={40} />}
             title={isVi ? 'Không tìm thấy học viên nào' : 'No students found'}
@@ -225,7 +179,7 @@ export const Students: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {paginatedStudents.map(st => (
+                {displayedStudents.map(st => (
                   <tr 
                     key={st.id} 
                     className="adm-table-row-clickable cursor-pointer"
@@ -251,7 +205,7 @@ export const Students: React.FC = () => {
                             const nextStatus = st.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
                             try {
                               await userService.updateStatus(st.id, nextStatus);
-                              setStudentsData(prev => prev.map(item => item.id === st.id ? { ...item, status: nextStatus } : item));
+                              await refetch();
                             } catch {
                               alert(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
                             }
@@ -277,12 +231,12 @@ export const Students: React.FC = () => {
             </table>
 
             <Pagination
-              currentPage={safeCurrentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              pageSize={pageSize}
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              pageSize={pagination.limit}
               pageSizeOptions={[10, 20, 50, 100]}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={(page) => setPage(page)}
               onPageSizeChange={handlePageSizeChange}
               itemLabel={isVi ? 'học viên' : 'students'}
               isVi={isVi}
