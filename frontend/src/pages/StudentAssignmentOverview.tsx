@@ -103,13 +103,13 @@ const StudentAssignmentOverview: React.FC = () => {
             // Find best score
             let maxVal = -1;
             list.forEach((item) => {
-              const sc = getSubmissionFinalScore(item) ?? 0;
-              if (sc > maxVal) maxVal = sc;
+              const sc = getSubmissionFinalScore(item);
+              if (sc !== null && sc > maxVal) maxVal = sc;
             });
 
             const records: AttemptRecord[] = list.map((item) => {
               const rawScore = getSubmissionFinalScore(item);
-              const isGraded = isSubmissionGraded(item);
+              const isGraded = isSubmissionGraded(item) || rawScore !== null;
               const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
               return {
                 id: item.id,
@@ -119,7 +119,7 @@ const StudentAssignmentOverview: React.FC = () => {
                 maxScore: 10,
                 score10: s10,
                 status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
-                isBest: rawScore !== null && rawScore === maxVal && maxVal > 0,
+                isBest: rawScore !== null && rawScore === maxVal && maxVal >= 0,
               };
             });
 

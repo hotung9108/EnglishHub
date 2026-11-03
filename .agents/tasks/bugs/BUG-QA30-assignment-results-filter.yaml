@@ -1,7 +1,7 @@
 id: "BUG-QA30-assignment-results-filter"
 title: "[FE][Student Assignments] Bài đã có điểm chính thức không xuất hiện ở tab Đã có kết quả"
 assignee: "@fe-primary"
-status: "To Do"
+status: "Resolved"
 issue_url: "https://github.com/hotung9108/EnglishHub/issues/186"
 test_cases: ["QA30-030"]
 blocked_cases: []

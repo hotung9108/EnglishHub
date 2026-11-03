@@ -1,7 +1,7 @@
 id: "BUG-QA30-grading-status"
 title: "[FE][Student Feedback] Không có thẻ nhận xét chính thức dù grading đã COMPLETED"
 assignee: "@fe-primary"
-status: "To Do"
+status: "Resolved"
 issue_url: "https://github.com/hotung9108/EnglishHub/issues/179"
 test_cases: ["QA30-022"]
 blocked_cases: ["QA30-034"]
