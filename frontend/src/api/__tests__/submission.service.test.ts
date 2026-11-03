@@ -478,12 +478,12 @@ test('SubmissionService - submitModule posts answers and returns response', asyn
     message: 'Đã nộp phần làm bài.',
     submissionModuleId: 44,
     status: 'SUBMITTED' as const,
-    answers: [{ id: 101, questionId: 1, content: { selectedOptionIds: ['A'] } }],
+    answers: [{ id: 101, questionId: 1, content: { selectedOptionIds: [101] } }],
   };
   http.mockResponse = response;
 
   const result = await new SubmissionService(http).submitModule(44, {
-    answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+    answers: [{ questionId: 1, content: { selectedOptionIds: [101] } }],
   }, options);
 
   assert.strictEqual(result, response);
@@ -492,7 +492,7 @@ test('SubmissionService - submitModule posts answers and returns response', asyn
       method: 'POST',
       url: '/submission-modules/44/submit',
       data: {
-        answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+        answers: [{ questionId: 1, content: { selectedOptionIds: [101] } }],
       },
       options,
     },
