@@ -12,5 +12,16 @@ public record ModuleInfo(
 		ModuleSkill skill,
 		ModuleTaskType taskType,
 		int orderIndex,
-		BigDecimal maxScore) {
+		BigDecimal maxScore,
+		String aiInstruction) {
+
+	public ModuleInfo(
+			Long moduleId,
+			Long assignmentId,
+			ModuleSkill skill,
+			ModuleTaskType taskType,
+			int orderIndex,
+			BigDecimal maxScore) {
+		this(moduleId, assignmentId, skill, taskType, orderIndex, maxScore, null);
+	}
 }

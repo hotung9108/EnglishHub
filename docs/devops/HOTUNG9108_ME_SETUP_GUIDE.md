@@ -173,8 +173,10 @@ docker compose -f docker-compose.staging.yml up -d
    - Bản ghi 1: Type `CNAME` | Name `app` | Target `cname.vercel-dns.com` | Proxy status: **DNS Only** (icon đám mây màu xám)
    - Bản ghi 2: Type `CNAME` | Name `staging` | Target `cname.vercel-dns.com` | Proxy status: **DNS Only** (icon đám mây màu xám)
 4. **Cấu hình SPA Routing Fallback (`vercel.json`)**:
-   - Thư mục `frontend/` có file `vercel.json` định nghĩa quy tắc rewrite `/(.*)` về `/index.html`.
+   - Thư mục `frontend/` có file `vercel.json` định nghĩa quy tắc rewrite `/((?!api/).*)` về `/index.html` (loại trừ `/api/` để không rewrite nhầm API endpoint).
    - Đảm bảo khi người dùng Refresh (F5/Ctrl+R) hoặc mở trực tiếp các đường dẫn con (như `/teacher/profile`, `/teacher/classes/:id/progress`), Vercel Edge sẽ phục vụ entry point `index.html` của React SPA thay vì trả lỗi hosting `404 NOT_FOUND`.
+   - Các request tới API không tồn tại trên domain frontend (ví dụ `/api/v1/...`) vẫn trả mã `404 Not Found` đúng nghĩa thay vì trả HTML `index.html`.
+   - **Lưu ý triển khai**: Cấu hình này được kích hoạt trên Staging qua nhánh `develop` và trên Production qua nhánh `main`. Khi đẩy tính năng lên Production, cần merge `develop` vào `main` để workflow `cd-frontend.yml` build và deploy `vercel.json` lên Production.
 
 ---
 

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.core.common.ApiException;
@@ -83,6 +84,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.BAD_REQUEST));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -93,6 +95,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.NOT_FOUND));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -103,6 +106,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.UNAUTHORIZED));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -115,6 +119,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.FORBIDDEN));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -187,6 +192,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.BAD_REQUEST));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -198,6 +204,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.UNAUTHORIZED));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -211,6 +218,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.UNAUTHORIZED));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -224,10 +232,11 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.UNAUTHORIZED));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
-	void refreshRejectsTokenOfDeletedUser() {
+	void refreshRejectsTokenWhenUserLookupReturnsEmpty() {
 		when(refreshTokenRepository.findByTokenHash(TokenHasher.sha256(RAW_REFRESH_TOKEN)))
 				.thenReturn(Optional.of(validToken()));
 		when(authUserRepository.findById(USER_ID)).thenReturn(Optional.empty());
@@ -236,6 +245,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.UNAUTHORIZED));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -250,6 +260,7 @@ class AuthServiceTest {
 				.isInstanceOf(ApiException.class)
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.FORBIDDEN));
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -297,6 +308,7 @@ class AuthServiceTest {
 				.satisfies(exception -> assertThat(((ApiException) exception).getStatus())
 						.isEqualTo(HttpStatus.NOT_FOUND));
 		verify(emailService, never()).sendPasswordResetOtp(any(), any(), any(), anyInt());
+		assertNoAuthenticationSideEffects();
 	}
 
 	@Test
@@ -339,6 +351,27 @@ class AuthServiceTest {
 						.isEqualTo(HttpStatus.BAD_REQUEST));
 
 		verify(authUserRepository, never()).save(any());
+		verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+		assertNoAuthenticationSideEffects();
+	}
+
+	@Test
+	void resetPasswordRejectsMissingUserAfterValidChallenge() {
+		passwordResetStore.store(EMAIL, "000000", RAW_REFRESH_TOKEN, 900);
+		when(authUserRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> authService.resetPassword(
+				new ResetPasswordCommand(EMAIL, null, RAW_REFRESH_TOKEN, PASSWORD)))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+		assertNoAuthenticationSideEffects();
+	}
+
+	private void assertNoAuthenticationSideEffects() {
+		verifyNoInteractions(jwtTokenService, emailService);
+		verify(authUserRepository, never()).save(any());
+		verify(refreshTokenRepository, never()).create(any(), any(), any(), any(), any());
+		verify(refreshTokenRepository, never()).save(any());
 		verify(refreshTokenRepository, never()).revokeAllByUserId(any());
 	}
 
