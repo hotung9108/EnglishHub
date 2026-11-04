@@ -5,6 +5,7 @@ import com.english_hub.core.modules.user.application.command.CreateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.command.UpdateUserStatusCommand;
 import com.english_hub.core.modules.user.application.service.AdminUserService;
+import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.presentation.rest.dto.AdminUserListResponse;
 import com.english_hub.core.modules.user.presentation.rest.dto.AdminUserSummary;
@@ -14,6 +15,7 @@ import com.english_hub.core.modules.user.presentation.rest.dto.MessageResponse;
 import com.english_hub.core.modules.user.presentation.rest.dto.PaginationResponse;
 import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserRequest;
 import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserStatusRequest;
+import com.english_hub.core.modules.user.presentation.rest.dto.UserResponse;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -49,6 +51,12 @@ public class AdminUserController {
 				result.users().stream().map(AdminUserSummary::from).toList(),
 				new PaginationResponse(result.page(), result.limit(), result.total()));
 		return ResponseEntity.ok(response);
+	}
+
+	@GetMapping("/{id}")
+	public ResponseEntity<UserResponse> getUser(@PathVariable long id) {
+		User user = adminUserService.getUser(id);
+		return ResponseEntity.ok(UserResponse.from(user));
 	}
 
 	@PostMapping
