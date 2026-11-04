@@ -24,6 +24,7 @@ import com.english_hub.core.modules.auth.presentation.rest.dto.ResetPasswordResp
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,12 @@ public class AuthService {
 	private static final int USER_AGENT_MAX_LENGTH = 255;
 	private static final int IP_ADDRESS_MAX_LENGTH = 45;
 	private static final long PASSWORD_RESET_TTL_SECONDS = 900; // 15 minutes
+	private static final Pattern LOGIN_EMAIL_ONLY_WHITESPACE = Pattern.compile("\\p{IsWhite_Space}+");
+	private static final Pattern LOGIN_EMAIL_BOUNDARY_WHITESPACE =
+			Pattern.compile("\\A\\p{IsWhite_Space}|\\p{IsWhite_Space}\\z");
+	private static final String LOGIN_CREDENTIALS_REQUIRED_MESSAGE = "Vui lòng nhập email và mật khẩu.";
+	private static final String LOGIN_EMAIL_WHITESPACE_MESSAGE =
+			"Email không được chứa khoảng trắng ở đầu hoặc cuối.";
 
 	private final AuthUserRepository authUserRepository;
 	private final RefreshTokenRepository refreshTokenRepository;
@@ -73,10 +80,16 @@ public class AuthService {
 	@Transactional
 	public AuthResponse login(LoginCommand command) {
 		if (command == null || !hasText(command.email()) || !hasText(command.password())) {
-			throw ApiException.badRequest("Vui lòng nhập email và mật khẩu.");
+			throw ApiException.badRequest(LOGIN_CREDENTIALS_REQUIRED_MESSAGE);
+		}
+		if (LOGIN_EMAIL_ONLY_WHITESPACE.matcher(command.email()).matches()) {
+			throw ApiException.badRequest(LOGIN_CREDENTIALS_REQUIRED_MESSAGE);
+		}
+		if (LOGIN_EMAIL_BOUNDARY_WHITESPACE.matcher(command.email()).find()) {
+			throw ApiException.badRequest(LOGIN_EMAIL_WHITESPACE_MESSAGE);
 		}
 
-		AuthUser user = authUserRepository.findByEmail(command.email().trim())
+		AuthUser user = authUserRepository.findByEmail(command.email())
 				.orElseThrow(() -> ApiException.notFound("Tài khoản không tồn tại."));
 
 		if (!passwordEncoder.matches(command.password(), user.getPasswordHash())) {
