@@ -1,0 +1,5 @@
+{
+  "name": "github-integration",
+  "description": "GitHub MCP integration for EnglishHub repository management, issues, and PRs",
+  "version": "1.0.0"
+}

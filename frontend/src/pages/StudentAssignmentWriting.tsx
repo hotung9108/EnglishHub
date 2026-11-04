@@ -44,6 +44,7 @@ const StudentAssignmentWriting: React.FC = () => {
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
+  const [resolvedQuestionId, setResolvedQuestionId] = useState<number | null>(null);
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -55,7 +56,7 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
-    return Number.isFinite(parsed) ? parsed : 1;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   }, [id]);
 
   const [reloadKey, setReloadKey] = useState(0);
@@ -67,6 +68,30 @@ const StudentAssignmentWriting: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
+
+      const parsedId = Number(id);
+      if (!Number.isFinite(parsedId) || parsedId <= 0) {
+        if (isMounted) {
+          setError('Mã bài tập không hợp lệ.');
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      const resolveSubModuleQuestions = async (sub: SubmissionDetail) => {
+        const writingMod = sub.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING') || sub.modules?.[0];
+        if (writingMod?.id) {
+          try {
+            const detail = await submissionService.getSubmissionModuleDetail(writingMod.id);
+            if (isMounted && detail?.questions && detail.questions.length > 0) {
+              setResolvedQuestionId(detail.questions[0].id);
+            }
+          } catch {
+            // Fallback if detail call fails
+          }
+        }
+      };
+
       try {
         // 1. Fetch assignment details
         let currentAssignment: AssignmentDetail | null = null;
@@ -131,6 +156,7 @@ const StudentAssignmentWriting: React.FC = () => {
               return;
             }
             setSubmission(sub);
+            void resolveSubModuleQuestions(sub);
           } catch (subErr: unknown) {
             if (isMounted) {
               const apiErr = parseApiError(subErr);
@@ -161,6 +187,7 @@ const StudentAssignmentWriting: React.FC = () => {
                 return;
               }
               setSubmission(sub);
+              void resolveSubModuleQuestions(sub);
             } else {
               const subList = await submissionService.listSubmissions({
                 assignmentId: numericId,
@@ -195,6 +222,7 @@ const StudentAssignmentWriting: React.FC = () => {
                   return;
                 }
                 setSubmission(sub);
+                void resolveSubModuleQuestions(sub);
               } else if (currentAssignment?.status === 'CLOSED') {
                 if (isMounted) {
                   setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
@@ -419,7 +447,7 @@ const StudentAssignmentWriting: React.FC = () => {
       }
 
       // 2. Submit module with storageKey and text content answers
-      const questionId = 1;
+      const questionId = resolvedQuestionId || 1;
       const submitPayload: SubmitModulePayload = {};
 
       if (trimmedText !== '') {
@@ -455,11 +483,7 @@ const StudentAssignmentWriting: React.FC = () => {
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
-        try {
-          await submissionService.submitSubmission(subId);
-        } catch {
-          // Continue if parent submission was auto-finalized
-        }
+        await submissionService.submitSubmission(subId);
       }
 
       // Clear draft

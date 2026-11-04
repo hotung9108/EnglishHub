@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Users, Search, 
-  X, Check, Lock, Unlock,
+  Users, UserPlus, Search, 
+  X, Check, Lock, Unlock, Shield,
   Mail, Phone, Edit3, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -19,18 +19,22 @@ export const Accounts: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-
   const {
     users,
+    pagination,
     isLoading,
     error,
+    createUser,
     updateUser,
+    setQuery,
+    setRole,
+    setPage,
+    setLimit,
     refetch
   } = useUsers({
-    initialLimit: 100,
+    initialPage: 1,
+    initialLimit: 10,
+    initialRole: undefined,
   });
 
   // Drawer state
@@ -40,6 +44,7 @@ export const Accounts: React.FC = () => {
     name: '',
     email: '',
     phone: '',
+    password: '',
     role: 'STUDENT' as 'STUDENT' | 'TEACHER' | 'ADMIN',
     status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
@@ -47,50 +52,27 @@ export const Accounts: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
-  const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      if (roleFilter !== 'All' && user.role !== roleFilter) return false;
-      if (statusFilter !== 'All' && user.status !== statusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const code = formatUserCode(user.id, user.role).toLowerCase();
-        return (
-          user.fullName.toLowerCase().includes(q) ||
-          user.email.toLowerCase().includes(q) ||
-          code.includes(q)
-        );
-      }
-      return true;
-    });
-  }, [users, roleFilter, statusFilter, searchQuery]);
-
-  const totalItems = filteredUsers.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  const paginatedUsers = useMemo(() => {
-    const start = (safeCurrentPage - 1) * pageSize;
-    return filteredUsers.slice(start, start + pageSize);
-  }, [filteredUsers, safeCurrentPage, pageSize]);
+  const displayedUsers = useMemo(() => {
+    if (statusFilter === 'All') return users;
+    return users.filter(user => user.status === statusFilter);
+  }, [users, statusFilter]);
 
   const handleRoleFilterChange = (role: 'All' | 'STUDENT' | 'TEACHER' | 'ADMIN') => {
     setRoleFilter(role);
-    setCurrentPage(1);
+    setRole(role === 'All' ? undefined : role);
   };
 
   const handleStatusFilterChange = (status: 'All' | 'ACTIVE' | 'LOCKED') => {
     setStatusFilter(status);
-    setCurrentPage(1);
   };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    setCurrentPage(1);
+    setQuery(query.trim());
   };
 
   const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize);
-    setCurrentPage(1);
+    setLimit(newSize);
   };
 
   function formatUserCode(id: number, role: string) {
@@ -106,6 +88,21 @@ export const Accounts: React.FC = () => {
     return parts.map(p => p[0]).slice(-2).join('').toUpperCase();
   }
 
+  const handleOpenCreateDrawer = () => {
+    setEditingUser(null);
+    setNameError('');
+    setActionError('');
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      password: '',
+      role: 'STUDENT',
+      status: 'ACTIVE'
+    });
+    setIsDrawerOpen(true);
+  };
+
   const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
@@ -114,6 +111,7 @@ export const Accounts: React.FC = () => {
       name: user.fullName,
       email: user.email,
       phone: '',
+      password: '',
       role: user.role,
       status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE'
     });
@@ -122,7 +120,8 @@ export const Accounts: React.FC = () => {
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser || !formData.name.trim()) return;
+    if (!formData.name.trim()) return;
+    if (!editingUser && !formData.email.trim()) return;
 
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -135,12 +134,44 @@ export const Accounts: React.FC = () => {
 
     try {
       setActionLoading(true);
-      await updateUser(editingUser.id, {
-        fullName: cleanName,
-        phone: formData.phone || undefined
-      });
-      if (editingUser.status !== formData.status) {
-        await userService.updateStatus(editingUser.id, formData.status);
+      if (editingUser) {
+        await updateUser(editingUser.id, {
+          fullName: cleanName,
+          phone: formData.phone || undefined
+        });
+        if (editingUser.status !== formData.status) {
+          await userService.updateStatus(editingUser.id, formData.status);
+        }
+      } else {
+        const defaultPassword = formData.role === 'ADMIN' 
+          ? 'Admin123!' 
+          : formData.role === 'TEACHER' 
+            ? 'Teacher123!' 
+            : 'Student123!';
+        const password = formData.password.trim() || defaultPassword;
+        if (formData.role === 'ADMIN') {
+          await createUser({
+            role: 'ADMIN',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password
+          });
+        } else if (formData.role === 'TEACHER') {
+          await createUser({
+            role: 'TEACHER',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password
+          });
+        } else {
+          await createUser({
+            role: 'STUDENT',
+            fullName: cleanName,
+            email: formData.email.trim(),
+            password,
+            parentPhone: formData.phone || undefined
+          });
+        }
       }
       await refetch();
       setIsDrawerOpen(false);
@@ -179,6 +210,16 @@ export const Accounts: React.FC = () => {
             {t('accounts.title')}
           </h1>
         </div>
+
+        <div className="adm-actions">
+          <Button 
+            variant="primary"
+            onClick={handleOpenCreateDrawer}
+            icon={<UserPlus size={16} />}
+          >
+            {t('accounts.addAccount')}
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -195,7 +236,9 @@ export const Accounts: React.FC = () => {
               >
                 <span>{role === 'All' ? (isVi ? 'Tất cả' : 'All') : role === 'STUDENT' ? 'Student' : role === 'TEACHER' ? 'Teacher' : 'Admin'}</span>
                 <span className="adm-pill-badge">
-                  {role === 'All' ? users.length : users.filter(u => u.role === role).length}
+                  {role === 'All' 
+                    ? pagination.total 
+                    : (roleFilter === role ? pagination.total : users.filter(u => u.role === role).length)}
                 </span>
               </button>
             ))}
@@ -243,7 +286,7 @@ export const Accounts: React.FC = () => {
             <Loader2 size={32} className="animate-spin mx-auto mb-3" />
             <div>{isVi ? 'Đang tải danh sách tài khoản...' : 'Loading accounts...'}</div>
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : displayedUsers.length === 0 ? (
           <EmptyState
             icon={<Users size={32} />}
             title={isVi ? 'Không tìm thấy tài khoản nào' : 'No accounts found'}
@@ -264,7 +307,7 @@ export const Accounts: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {paginatedUsers.map(user => {
+                {displayedUsers.map(user => {
                   const code = formatUserCode(user.id, user.role);
                   const initials = getAvatarInitials(user.fullName);
                   const isActive = user.status === 'ACTIVE';
@@ -324,12 +367,12 @@ export const Accounts: React.FC = () => {
             </table>
 
             <Pagination
-              currentPage={safeCurrentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              pageSize={pageSize}
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              pageSize={pagination.limit}
               pageSizeOptions={[10, 20, 50, 100]}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={(page) => setPage(page)}
               onPageSizeChange={handlePageSizeChange}
               itemLabel={isVi ? 'tài khoản' : 'accounts'}
               isVi={isVi}
@@ -339,16 +382,18 @@ export const Accounts: React.FC = () => {
         )}
       </div>
 
-      {/* Slide-over Drawer for Edit */}
-      {isDrawerOpen && editingUser && (
+      {/* Slide-over Drawer for Create & Edit */}
+      {isDrawerOpen && (
         <div className="adm-drawer-backdrop" onClick={() => setIsDrawerOpen(false)}>
           <div className="adm-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="adm-drawer-header">
               <h2 className="adm-drawer-title">
-                {isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`}
+                {editingUser 
+                  ? (isVi ? `Chỉnh Sửa Tài Khoản: ${editingUser.fullName}` : `Edit Account: ${editingUser.fullName}`)
+                  : (isVi ? 'Thêm Tài Khoản Mới' : 'Add New Account')}
               </h2>
               <button 
-                type="button"
+                type="button" 
                 className="btn-ghost p-1 cursor-pointer"
                 onClick={() => setIsDrawerOpen(false)}
               >
@@ -400,18 +445,36 @@ export const Accounts: React.FC = () => {
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
-                    Email
+                    Email <span className="text-error">*</span>
                   </label>
                   <div className="adm-input-icon-wrap">
                     <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className="input adm-input-with-icon opacity-80 cursor-not-allowed"
+                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''}`}
+                      placeholder="user@center.edu.vn"
                       value={formData.email}
-                      disabled
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      disabled={!!editingUser}
+                      required
                     />
                   </div>
                 </div>
+
+                {!editingUser && (
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">
+                      {isVi ? 'Mật khẩu ban đầu' : 'Initial Password'}
+                    </label>
+                    <input 
+                      type="password" 
+                      className="input"
+                      placeholder={isVi ? 'Để trống dùng mặc định' : 'Leave empty for default'}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">
@@ -433,9 +496,10 @@ export const Accounts: React.FC = () => {
                   <div className="adm-form-group">
                     <label className="adm-form-label">{t('accounts.colRole')}</label>
                     <select 
-                      className="input opacity-80 cursor-not-allowed"
+                      className={`input ${editingUser ? 'opacity-80 cursor-not-allowed' : ''}`}
                       value={formData.role}
-                      disabled
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
+                      disabled={!!editingUser}
                     >
                       <option value="STUDENT">Student (Học viên)</option>
                       <option value="TEACHER">Teacher (Giáo viên)</option>
@@ -455,12 +519,22 @@ export const Accounts: React.FC = () => {
                     </select>
                   </div>
                 </div>
+
+                <div className="p-3 rounded-md bg-surface-low text-xs text-muted leading-relaxed">
+                  <div className="font-semibold text-surface mb-1 flex items-center gap-2">
+                    <Shield size={15} className="text-primary" />
+                    {isVi ? 'Chính sách bảo mật tài khoản' : 'Security Credential Policy'}
+                  </div>
+                  {isVi 
+                    ? 'Tài khoản mới sẽ có hiệu lực trực tiếp trên cơ sở dữ liệu hệ thống.' 
+                    : 'Created user credentials will sync directly with the production authentication service.'}
+                </div>
               </div>
 
               <div className="adm-drawer-footer">
                 <Button 
                   variant="secondary"
-                  type="button"
+                  type="button" 
                   onClick={() => setIsDrawerOpen(false)}
                   disabled={actionLoading}
                 >
@@ -468,11 +542,11 @@ export const Accounts: React.FC = () => {
                 </Button>
                 <Button 
                   variant="primary"
-                  type="submit"
+                  type="submit" 
                   loading={actionLoading}
                   icon={<Check size={16} />}
                 >
-                  {isVi ? 'Lưu thay đổi' : 'Save Changes'}
+                  {editingUser ? (isVi ? 'Lưu thay đổi' : 'Save Changes') : (isVi ? 'Lưu tài khoản' : 'Save User')}
                 </Button>
               </div>
             </form>

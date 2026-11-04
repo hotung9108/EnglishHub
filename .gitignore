@@ -11,8 +11,22 @@
 *.dbdiagram
 .env.production
 
+# Dependencies
+node_modules/
+**/node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+/sharepoint_extractors
+
+/tester_doc
+
+/tester_plan_real
+
+# Local MCP configs containing secrets
+.agents/plugins/**/mcp_config.json
+!.agents/plugins/**/mcp_config.example.json

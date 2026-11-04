@@ -10,6 +10,7 @@ import {
   isModuleGraded,
   isSubmissionGraded,
   isSubmissionPartiallyGraded,
+  hasAnyGradedModule,
   getSubmissionFinalScore,
   type StartSubmissionResponse,
   type SubmissionDetail,
@@ -478,12 +479,12 @@ test('SubmissionService - submitModule posts answers and returns response', asyn
     message: 'Đã nộp phần làm bài.',
     submissionModuleId: 44,
     status: 'SUBMITTED' as const,
-    answers: [{ id: 101, questionId: 1, content: { selectedOptionIds: ['A'] } }],
+    answers: [{ id: 101, questionId: 1, content: { selectedOptionIds: [101] } }],
   };
   http.mockResponse = response;
 
   const result = await new SubmissionService(http).submitModule(44, {
-    answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+    answers: [{ questionId: 1, content: { selectedOptionIds: [101] } }],
   }, options);
 
   assert.strictEqual(result, response);
@@ -492,7 +493,7 @@ test('SubmissionService - submitModule posts answers and returns response', asyn
       method: 'POST',
       url: '/submission-modules/44/submit',
       data: {
-        answers: [{ questionId: 1, content: { selectedOptionIds: ['A'] } }],
+        answers: [{ questionId: 1, content: { selectedOptionIds: [101] } }],
       },
       options,
     },
@@ -709,3 +710,35 @@ test('isSubmissionGraded: single-module auto-graded assignment is graded once su
   assert.strictEqual(isSubmissionPartiallyGraded(singlePending), false);
   assert.strictEqual(getSubmissionFinalScore(singlePending), null);
 });
+
+test('hasAnyGradedModule: accurately detects if a submission has at least one graded module', () => {
+  assert.strictEqual(hasAnyGradedModule(null), false);
+  assert.strictEqual(hasAnyGradedModule(undefined), false);
+  assert.strictEqual(hasAnyGradedModule({ status: 'GRADED' }), true);
+  assert.strictEqual(hasAnyGradedModule({ status: 'SUBMITTED', modules: [] }), false);
+
+  // Partially graded multi-module: 1 module graded, 1 module pending
+  const partiallyGraded = {
+    id: 104,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'SUBMITTED', grading: { status: 'PENDING', finalScore: null } },
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 7.5 } },
+    ]
+  };
+  assert.strictEqual(isSubmissionGraded(partiallyGraded), false);
+  assert.strictEqual(hasAnyGradedModule(partiallyGraded), true);
+
+  // Single module officially graded by teacher (grading COMPLETED, submission status SUBMITTED) - Issue #179 fixture
+  const officiallyGraded = {
+    id: 1506,
+    status: 'SUBMITTED',
+    modules: [
+      { status: 'GRADED', grading: { status: 'COMPLETED', finalScore: 7.5 } }
+    ]
+  };
+  assert.strictEqual(hasAnyGradedModule(officiallyGraded), true);
+  assert.strictEqual(isSubmissionGraded(officiallyGraded), true);
+  assert.strictEqual(getSubmissionFinalScore(officiallyGraded), 7.5);
+});
+

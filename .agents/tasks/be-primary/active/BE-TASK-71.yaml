@@ -1,0 +1,28 @@
+id: BE-TASK-71
+title: "Add admin user detail endpoint for FE-71 (Issue #191)"
+assignee: "@be-primary"
+status: "In Progress"
+priority: "High"
+description: >-
+  Slice 1 implements ADMIN-only GET /api/v1/admin/users/{id} with the existing
+  direct UserResponse, read-only service, permission check before target lookup,
+  and 404 for nonpositive, missing, or soft-deleted target IDs. Slice 2 adds
+  detail service, web/security, adapter/mapper tests, one controller test, and
+  the three approved API overview edits. Production and existing protected
+  tests were not modified in slice 2. Final offline JDK 21 verification passed
+  110 cases: AdminUserDetailServiceTest 8, AdminUserDetailWebIntegrationTest 53,
+  AdminUserDetailRepositoryTest 9, AdminUserControllerTest 7, and unchanged
+  AdminUserServiceTest 33; zero failures, errors, or skips. P0 passed before P1;
+  P2 was implemented last and passed. MockMvc confirmed locked/deleted/missing
+  ADMIN callers receive 401 without target lookup, and trailing-slash/extra-path
+  requests receive 403 without invoking detail. Authentication Caffeine cache
+  was enabled for repeated and alternating target reads. Existing CRUD route
+  regression checks used mocks only. git diff --check and protected-file
+  checksums passed. No Docker, DB, Testcontainers, Flyway, SQL seed, live API,
+  commit, or push was used. Snapshot identity fields are fixed test fixtures;
+  profile-code/specialization scalars are explicitly mocked, not real DB values.
+  Local expectations and actual automated results are in local-dev/fe-71/README.md;
+  Postman collection/environment remain unchanged. The user reported HTTP 403
+  for both detail requests before the fix; post-fix live results have not been
+  supplied. Full-suite coverage, actual PostgreSQL/JPA/profile data, and UI
+  reload/back-forward verification remain pending. Do not mark Done.

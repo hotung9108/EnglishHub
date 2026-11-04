@@ -10,7 +10,7 @@ import { Button, EmptyState, Skeleton, Pagination, MarkdownView } from '../compo
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
-import { submissionService, type SubmissionListItem, isSubmissionGraded } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, isSubmissionGraded, hasAnyGradedModule } from '../api/services/submission.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
@@ -139,15 +139,15 @@ export const StudentFeedback: React.FC = () => {
             date: formattedDate,
             badgeType: isVi ? 'Nhận xét lớp học' : 'Class Review',
             content: ev.content,
-            actionUrl: `/student/classes/${ev.classId}`,
+            actionUrl: ev.classId ? `/student/classes/${ev.classId}` : '/student/classes',
             actionLabel: isVi ? 'Xem thông tin lớp học' : 'View Class Details'
           });
         });
 
         // 4. Process Graded Submissions (Fetch detail to get real finalFeedback & aiFeedback)
         const gradedSubmissions = submissions
-          .filter(sub => isSubmissionGraded(sub))
-          .slice(0, 20);
+          .filter(sub => hasAnyGradedModule(sub) || isSubmissionGraded(sub))
+          .slice(0, 50);
 
         const submissionDetails = await Promise.allSettled(
           gradedSubmissions.map(sub => submissionService.getSubmission(sub.id))

@@ -116,6 +116,7 @@ const StudentAssignments: React.FC = () => {
                     if (subRes.data && subRes.data.length > 0) {
                       const subs = subRes.data;
                       matchedSub = subs.find(s => isSubmissionGraded(s))
+                        || subs.find(s => getSubmissionFinalScore(s) !== null)
                         || subs.find(s => s.status === 'SUBMITTED')
                         || subs.find(s => s.status === 'IN_PROGRESS')
                         || subs[0];
@@ -129,9 +130,9 @@ const StudentAssignments: React.FC = () => {
                 let score: number | undefined = undefined;
 
                 if (matchedSub) {
-                  if (isSubmissionGraded(matchedSub)) {
+                  const finalSc = getSubmissionFinalScore(matchedSub);
+                  if (isSubmissionGraded(matchedSub) || finalSc !== null) {
                     displayStatus = 'graded';
-                    const finalSc = getSubmissionFinalScore(matchedSub);
                     score = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
                   } else if (matchedSub.status === 'SUBMITTED') {
                     displayStatus = 'pending';

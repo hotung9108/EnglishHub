@@ -1,7 +1,7 @@
 id: "BUG-QA30-attempt-grading-status"
 title: "[FE][Student Overview] Lịch sử hiện Chờ chấm điểm dù cùng lượt đã có điểm chính thức 7.5/10"
 assignee: "@fe-primary"
-status: "To Do"
+status: "Resolved"
 issue_url: "https://github.com/hotung9108/EnglishHub/issues/185"
 test_cases: ["QA30-024"]
 blocked_cases: []

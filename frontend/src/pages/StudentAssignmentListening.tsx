@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, Headphones, 
@@ -9,21 +9,44 @@ import {
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { questionService, extractMcqOptions, type QuestionResponse } from '../api/services/question.service';
-import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmitModuleAnswerPayload } from '../api/services/submission.service';
+import { questionService } from '../api/services/question.service';
+import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
-  getNextIncompleteModule,
   getSkillLabel,
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
+import { useStudentQuizSubmit, QUIZ_SUBMIT_ERROR } from '../hooks/useStudentQuizSubmit';
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
+import {
+  validateStudentQuizQuestions, buildStudentQuizPayload, isStudentQuizBlank,
+  classifyStudentQuizProgress, isStudentQuizPendingFinalization, isStudentQuizSubmitScopeValid,
+  type StudentQuizAnswer, type StudentQuizAnswers, type StudentQuizSubmitScope,
+} from '../utils/studentQuiz.utils';
 import '../styles/student-exam.css';
+
+const MCQ_OPTION_LABELS = ['A', 'B', 'C', 'D'];
+const NAVIGATION_DELAY_MS = 1200;
+const PENDING_MESSAGE = 'Đáp án của bạn đã được lưu, nhưng hệ thống chưa xác nhận hoàn tất bài thi. Vui lòng thử nộp lại.';
+const UNCONFIRMED_MESSAGE = 'Chưa thể xác nhận trạng thái nộp bài. Vui lòng tải lại trang để kiểm tra trước khi thử lại.';
+// An unavailable scope disables submission; these values are never sent to the API.
+const UNAVAILABLE_SCOPE: StudentQuizSubmitScope = {
+  assignmentId: 0, submissionId: 0, moduleId: 0, submissionModuleId: 0, expectedModuleIds: [],
+};
+
+function createSubmitScope(assignment: AssignmentDetail, submission: SubmissionDetail, moduleId: number, submissionId: number): StudentQuizSubmitScope {
+  if (!Array.isArray(assignment.modules) || !Array.isArray(submission?.modules)) return UNAVAILABLE_SCOPE;
+  const currentModules = submission.modules.filter(module => module?.moduleId === moduleId && module.skill === 'LISTENING');
+  if (currentModules.length !== 1) return UNAVAILABLE_SCOPE;
+  const scope = { assignmentId: assignment.id, submissionId, moduleId,
+    submissionModuleId: currentModules[0].id, expectedModuleIds: assignment.modules.map(module => module?.id) };
+  return isStudentQuizSubmitScopeValid(scope) ? scope : UNAVAILABLE_SCOPE;
+}
 
 const StudentAssignmentListening: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -32,65 +55,99 @@ const StudentAssignmentListening: React.FC = () => {
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const viewKey = `${id}:${searchParams.toString()}:${reloadKey}`;
+  const [pageError, setPageError] = useState<{ key: string; message: string | null }>({ key: viewKey, message: null });
+  const error = pageError.key === viewKey ? pageError.message : null;
+  const setError = useCallback((message: string | null) => setPageError({ key: viewKey, message }), [viewKey]);
+  const [loadedScope, setLoadedScope] = useState({ key: '', scope: UNAVAILABLE_SCOPE });
+  const submitScope = loadedScope.key === viewKey ? loadedScope.scope : UNAVAILABLE_SCOPE;
+  const scopeReady = isStudentQuizSubmitScopeValid(submitScope);
+  const quizSubmit = useStudentQuizSubmit(submitScope);
+  const submitState = quizSubmit.state;
+  const isSubmitting = submitState.kind === 'submitting';
+  const viewGeneration = useRef(0);
+  useLayoutEffect(() => {
+    viewGeneration.current += 1;
+    return () => { viewGeneration.current += 1; };
+  }, [viewKey, submitScope]);
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
-  const [questions, setQuestions] = useState<QuestionResponse[]>([]);
+  const [questions, setQuestions] = useState<unknown>([]);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioProgress, setAudioProgress] = useState(30);
   const [activeQuestion, setActiveQuestion] = useState(1);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<StudentQuizAnswers>({});
+  const answerScope = useRef<{ assignmentId: number | null; submissionId: number | null; moduleId: number | null }>({
+    assignmentId: null, submissionId: null, moduleId: null,
+  });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
-    return Number.isFinite(parsed) ? parsed : 1;
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
   }, [id]);
 
-  const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => setReloadKey((k) => k + 1);
 
   useEffect(() => {
     let isMounted = true;
 
+    const applySubmission = (sub: SubmissionDetail, currentAssignment: AssignmentDetail, moduleId: number, expectedSubmissionId: number) => {
+      if (!isMounted) return;
+      const scope = createSubmitScope(currentAssignment, sub, moduleId, expectedSubmissionId);
+      const progress = classifyStudentQuizProgress(sub, scope);
+      if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
+      if (!isStudentQuizPendingFinalization(sub, scope)) {
+        const redirectRoute = getExamPageRedirectRoute(sub, 'LISTENING', numericId, currentAssignment.modules);
+        if (redirectRoute) {
+          navigate(redirectRoute, { replace: true });
+          return;
+        }
+      }
+      if (answerScope.current.submissionId !== sub.id) {
+        answerScope.current.submissionId = sub.id;
+        setSelectedAnswers({});
+        setActiveQuestion(1);
+      }
+      setSubmission(sub);
+      setLoadedScope({ key: viewKey, scope });
+    };
+
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
+      setLoadedScope({ key: viewKey, scope: UNAVAILABLE_SCOPE });
+      setSubmission(null);
+      const requestedId = searchParams.get('submissionId');
+      const requestedSubmissionId = requestedId && Number.isFinite(Number(requestedId)) ? Number(requestedId) : null;
+      const scope = answerScope.current;
+      if (scope.assignmentId !== numericId || (requestedSubmissionId !== null && scope.submissionId !== requestedSubmissionId)) {
+        answerScope.current = { assignmentId: numericId, submissionId: requestedSubmissionId, moduleId: null };
+        setSelectedAnswers({});
+        setActiveQuestion(1);
+      }
       try {
-        // 1. Fetch assignment
-        let currentAssignment: AssignmentDetail | null = null;
-        try {
-          currentAssignment = await assignmentService.getAssignment(numericId);
-          if (isMounted) setAssignment(currentAssignment);
-        } catch {
-          currentAssignment = {
-            id: numericId,
-            title: `Listening Practice #${id || '1'}`,
-            status: 'PUBLISHED',
-            modules: [{ id: 1, skill: 'LISTENING' }]
-          };
-          if (isMounted) setAssignment(currentAssignment);
-        }
+        if (requestedId !== null && (!Number.isSafeInteger(Number(requestedId)) || Number(requestedId) <= 0)) throw new Error(UNCONFIRMED_MESSAGE);
+        if (!numericId) throw new Error('Không tìm thấy bài tập hợp lệ.');
+        const currentAssignment = await assignmentService.getAssignment(numericId);
+        if (!isMounted) return;
+        if (currentAssignment?.id !== numericId || !Array.isArray(currentAssignment.modules)) throw new Error(UNCONFIRMED_MESSAGE);
+        if (!currentAssignment.modules.every(module => Number.isSafeInteger(module?.id) && module.id > 0 && typeof module.skill === 'string')) throw new Error(UNCONFIRMED_MESSAGE);
+        setAssignment(currentAssignment);
+        const skillModules = currentAssignment.modules.filter(module => module?.skill === 'LISTENING');
+        if (skillModules.length !== 1) throw new Error(UNCONFIRMED_MESSAGE);
+        const moduleId = skillModules[0].id;
+        if (!Number.isSafeInteger(moduleId) || moduleId <= 0) throw new Error(UNCONFIRMED_MESSAGE);
 
-        // 2. Fetch listening module and questions
-        const listeningMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'LISTENING');
-        let moduleId = listeningMod?.id;
-        if (!moduleId) {
-          try {
-            const modRes = await moduleService.listModules(numericId);
-            const mList = modRes.modules || modRes.data || [];
-            const matched = mList.find((m) => m.skill?.toUpperCase() === 'LISTENING') || mList[0];
-            if (matched) {
-              moduleId = matched.id;
-            }
-          } catch {
-            // Fallback
-          }
+        if (!isMounted) return;
+        if (answerScope.current.moduleId !== (moduleId ?? null)) {
+          answerScope.current.moduleId = moduleId ?? null;
+          setSelectedAnswers({});
+          setActiveQuestion(1);
         }
 
         if (moduleId) {
@@ -104,8 +161,8 @@ const StudentAssignmentListening: React.FC = () => {
           try {
             const qRes = await questionService.listQuestions(moduleId);
             if (isMounted) {
-              const qList = qRes.questions || qRes.data || [];
-              setQuestions(qList);
+              const qList = qRes.questions ?? qRes.data;
+              setQuestions(() => qList);
             }
           } catch {
             if (isMounted) setQuestions([]);
@@ -114,23 +171,14 @@ const StudentAssignmentListening: React.FC = () => {
           if (isMounted) setQuestions([]);
         }
 
-        // 3. Resolve or start submission attempt
+        if (!isMounted) return;
+        // Resolve or start submission attempt
         const urlSubmissionId = searchParams.get('submissionId');
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           try {
             const sub = await submissionService.getSubmission(Number(urlSubmissionId));
             if (!isMounted) return;
-            const redirectRoute = getExamPageRedirectRoute(
-              sub,
-              'LISTENING',
-              numericId,
-              currentAssignment?.modules
-            );
-            if (redirectRoute) {
-              navigate(redirectRoute, { replace: true });
-              return;
-            }
-            setSubmission(sub);
+            applySubmission(sub, currentAssignment, moduleId, Number(urlSubmissionId));
           } catch (subErr: unknown) {
             if (isMounted) {
               const apiErr = parseApiError(subErr);
@@ -150,43 +198,23 @@ const StudentAssignmentListening: React.FC = () => {
             if (inProgressItem) {
               const sub = await submissionService.getSubmission(inProgressItem.id);
               if (!isMounted) return;
-              const redirectRoute = getExamPageRedirectRoute(
-                sub,
-                'LISTENING',
-                numericId,
-                currentAssignment?.modules
-              );
-              if (redirectRoute) {
-                navigate(redirectRoute, { replace: true });
-                return;
-              }
-              setSubmission(sub);
+              applySubmission(sub, currentAssignment, moduleId, inProgressItem.id);
             } else {
               const completedItem = subs.find(
-                (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
+                (s) => s.status === 'GRADED' || s.status === 'SUBMITTED'
               );
               if (completedItem) {
-                if (isMounted) {
-                  navigate(`/student/submissions/${completedItem.id}`, { replace: true });
-                }
+                const sub = await submissionService.getSubmission(completedItem.id);
+                applySubmission(sub, currentAssignment, moduleId, completedItem.id);
                 return;
               }
 
               if (currentAssignment?.status === 'PUBLISHED') {
                 const startRes = await submissionService.startAttempt(numericId);
+                if (!isMounted) return;
                 const sub = await submissionService.getSubmission(startRes.id);
                 if (!isMounted) return;
-                const redirectRoute = getExamPageRedirectRoute(
-                  sub,
-                  'LISTENING',
-                  numericId,
-                  currentAssignment?.modules
-                );
-                if (redirectRoute) {
-                  navigate(redirectRoute, { replace: true });
-                  return;
-                }
-                setSubmission(sub);
+                applySubmission(sub, currentAssignment, moduleId, startRes.id);
               } else if (currentAssignment?.status === 'CLOSED') {
                 if (isMounted) {
                   setError('Bài tập này đã được giáo viên đóng. Học viên không thể làm bài hoặc nộp bài.');
@@ -216,148 +244,92 @@ const StudentAssignmentListening: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
+  }, [numericId, searchParams, user?.id, viewKey, navigate, setError]);
 
   const effectiveModules = useMemo(
     () => resolveEffectiveModules(assignment?.modules, submission?.modules),
     [assignment?.modules, submission?.modules]
   );
 
-  const totalQuestions = questions.length;
-  const answeredCount = useMemo(() => {
-    return questions.filter((q, idx) => {
-      const val = selectedAnswers[idx + 1] ?? selectedAnswers[q.id];
-      return val !== undefined && val !== null && String(val).trim().length > 0;
-    }).length;
-  }, [questions, selectedAnswers]);
+  const questionValidation = useMemo(() => validateStudentQuizQuestions(questions), [questions]);
+  const quizPayload = useMemo(() => buildStudentQuizPayload(questions, selectedAnswers), [questions, selectedAnswers]);
+  const validatedQuestions = questionValidation.questions;
+  const totalQuestions = validatedQuestions.length;
+  const validQuestionCount = validatedQuestions.filter(result => result.question !== null).length;
+  const invalidQuestionNumbers = validatedQuestions.filter(result => result.reason !== null).map(result => result.index + 1);
+  const answeredCount = quizPayload.answers.length;
+  const answeredQuestionIds = new Set(quizPayload.answers.map(answer => answer.questionId));
+  let questionDataError: string | null = null;
+  if (!questionValidation.isValid) {
+    questionDataError = invalidQuestionNumbers.length > 0
+      ? `Đề bài có dữ liệu lỗi ở câu ${invalidQuestionNumbers.join(', ')}. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.`
+      : 'Đề bài không có danh sách câu hỏi hợp lệ. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.';
+  }
+  const recoveryPending = scopeReady && isStudentQuizPendingFinalization(submission, submitScope);
+  const finalRejected = submitState.kind === 'failed' && submitState.reason === QUIZ_SUBMIT_ERROR.FINAL_REJECTED;
+  const showFinalRetry = submitState.kind === 'pendingFinalization' || finalRejected
+    || (submitState.kind === 'idle' && recoveryPending);
+  const canSubmitModule = scopeReady && !isLoading && !recoveryPending
+    && (submitState.kind === 'idle' || (submitState.kind === 'failed' && submitState.reason === QUIZ_SUBMIT_ERROR.MODULE_REJECTED));
+  let submitError: string | null = null;
+  if (submitState.kind === 'unconfirmed') submitError = UNCONFIRMED_MESSAGE;
+  if (submitState.kind === 'failed') {
+    submitError = submitState.reason === QUIZ_SUBMIT_ERROR.MODULES_INCOMPLETE
+      ? 'Tiến độ bài thi đã thay đổi. Vui lòng tải lại trang để kiểm tra các phần chưa hoàn tất.'
+      : parseApiError(submitState.cause).message || 'Không thể nộp bài. Vui lòng thử lại.';
+  }
+  const displayError = error || submitError || (!isLoading && canSubmitModule ? questionDataError : null);
+  const successMessage = submitState.kind === 'completed'
+    ? 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...'
+    : submitState.kind === 'nextSkill'
+      ? `Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${getSkillLabel(submitState.nextModule.skill)}...` : null;
 
-  const handleSelectAnswer = (qId: number, answer: string) => {
-    setSelectedAnswers(prev => ({ ...prev, [qId]: answer }));
+  useEffect(() => {
+    if (!scopeReady || (submitState.kind !== 'completed' && submitState.kind !== 'nextSkill')) return;
+    const generation = viewGeneration.current;
+    const destination = submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
+      : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id);
+    if (submitState.kind === 'completed') notifyAssignmentSubmitted();
+    const timer = setTimeout(() => {
+      if (viewGeneration.current === generation) navigate(destination, { replace: true });
+    }, NAVIGATION_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [scopeReady, submitState, submitScope, viewKey, navigate]);
+
+  const handleSelectAnswer = (questionId: number, answer: StudentQuizAnswer) => {
+    if (canSubmitModule) setSelectedAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
 
   const toggleBookmark = (qId: number) => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (assignment?.status === 'CLOSED') {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (!submission) {
-      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+    if (!canSubmitModule) return;
+    if (!quizPayload.validation.isValid) {
+      setError(questionDataError);
       return;
     }
-    if (questions.length > 0 && answeredCount === 0) {
+    if (isStudentQuizBlank(questions, selectedAnswers)) {
       setError('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
       return;
     }
-
-    setIsSubmitting(true);
     setError(null);
-    try {
-      const subId = submission.id;
-      const listeningSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'LISTENING');
-      const subModuleId = listeningSubMod?.id || submission.modules?.[0]?.id;
-
-      if (!subModuleId) {
-        throw new Error('Không tìm thấy thông tin phần làm bài nghe trong bài nộp.');
-      }
-
-      if (listeningSubMod && (listeningSubMod.status === 'SUBMITTED' || listeningSubMod.status === 'GRADED')) {
-        navigate(`/student/submissions/${subId}`, { replace: true });
-        return;
-      }
-
-      const optionKeyToId: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
-      const answersPayload: SubmitModuleAnswerPayload[] = [];
-
-      questions.forEach((q, idx) => {
-        const qIndex = idx + 1;
-        const chosenVal = selectedAnswers[qIndex] ?? selectedAnswers[q.id];
-        if (chosenVal === undefined || chosenVal === null || !String(chosenVal).trim()) return;
-
-        const qType = (q.questionType || '').toUpperCase();
-        if (qType === 'SHORT_ANSWER') {
-          answersPayload.push({
-            questionId: q.id,
-            content: { text: String(chosenVal).trim() },
-          });
-          return;
-        }
-
-        let optId: number;
-        if (typeof chosenVal === 'number') {
-          optId = chosenVal;
-        } else {
-          const upper = String(chosenVal).trim().toUpperCase();
-          optId = optionKeyToId[upper] ?? parseInt(upper, 10);
-          if (isNaN(optId) || optId < 1 || optId > 4) {
-            optId = 1;
-          }
-        }
-
-        answersPayload.push({
-          questionId: q.id,
-          content: { selectedOptionIds: [optId] },
-        });
-      });
-
-      await submissionService.submitModule(subModuleId, { answers: answersPayload });
-
-      const currentSubModules = (submission.modules || []).map((m) =>
-        m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
-      );
-      setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
-
-      // Check if all modules in this submission are now completed
-      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
-      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
-
-      if (subId && allOthersDone) {
-        try {
-          await submissionService.submitSubmission(subId);
-        } catch (subErr) {
-          console.warn('submitSubmission warning:', subErr);
-        }
-      }
-
-      if (allOthersDone) {
-        notifyAssignmentSubmitted();
-        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
-        setTimeout(() => {
-          if (subId) {
-            navigate(`/student/submissions/${subId}`, { replace: true });
-          } else {
-            navigate(`/student/assignments/${id}/result`, { replace: true });
-          }
-        }, 1200);
-      } else {
-        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
-        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
-        if (nextMod) {
-          const nextSkillLabel = getSkillLabel(nextMod.skill);
-          setSuccessMessage(`Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${nextSkillLabel}...`);
-          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
-          setTimeout(() => {
-            navigate(nextRoute, { replace: true });
-          }, 1200);
-        } else {
-          setSuccessMessage('Đã hoàn thành phần thi Listening! Đang quay lại trang tổng quan bài tập...');
-          setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`, { replace: true });
-          }, 1200);
-        }
-      }
-    } catch (err: unknown) {
-      const apiErr = parseApiError(err);
-      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    void quizSubmit.submit(quizPayload.answers);
   };
 
-  const currentQuestionItem = questions[activeQuestion - 1] || questions[0];
+  const handleRetryFinal = () => {
+    if (!scopeReady || isLoading || assignment?.status === 'CLOSED') return;
+    setError(null);
+    void quizSubmit.retryFinal();
+  };
+
+  const currentQuestionResult = validatedQuestions[activeQuestion - 1] || validatedQuestions[0];
+  const currentQuestionItem = currentQuestionResult?.question;
 
   return (
     <div className="exam-page">
@@ -401,11 +373,11 @@ const StudentAssignmentListening: React.FC = () => {
         )}
       </div>
 
-      {error && (
-        <div className="exam-alert-error">
+      {displayError && (
+        <div className="exam-alert-error" role="alert">
           <div className="exam-alert-msg">
             <AlertCircle size={20} />
-            <span>{error}</span>
+            <span>{displayError}</span>
           </div>
           <Button
             variant="danger"
@@ -414,6 +386,19 @@ const StudentAssignmentListening: React.FC = () => {
             onClick={handleRetry}
           >
             Thử lại
+          </Button>
+        </div>
+      )}
+
+      {showFinalRetry && (
+        <div className="exam-alert-error" role="alert">
+          <div className="exam-alert-msg">
+            <AlertCircle size={20} />
+            <span>{PENDING_MESSAGE}</span>
+          </div>
+          <Button variant="danger" size="sm" icon={RefreshCw} onClick={handleRetryFinal}
+            disabled={isSubmitting || isLoading || assignment?.status === 'CLOSED'}>
+            Thử nộp lại bài
           </Button>
         </div>
       )}
@@ -528,7 +513,7 @@ const StudentAssignmentListening: React.FC = () => {
               </div>
               {totalQuestions > 0 && (
                 <div className="exam-progress-badge">
-                  {answeredCount} / {totalQuestions} đã làm
+                  {answeredCount} / {validQuestionCount} đã làm{invalidQuestionNumbers.length > 0 ? ' (câu hợp lệ)' : ''}
                 </div>
               )}
             </div>
@@ -536,10 +521,9 @@ const StudentAssignmentListening: React.FC = () => {
             {/* Question Navigator */}
             {totalQuestions > 0 && (
               <div className="exam-nav-grid">
-                {questions.map((q, i) => {
+                {validatedQuestions.map((result, i) => {
                   const qId = i + 1;
-                  const rawAns = selectedAnswers[qId] ?? selectedAnswers[q.id];
-                  const isAnswered = Boolean(rawAns !== undefined && rawAns !== null && String(rawAns).trim().length > 0);
+                  const isAnswered = result.question !== null && answeredQuestionIds.has(result.question.id);
                   const isBookmarked = bookmarkedQuestions[qId];
                   const isActive = activeQuestion === qId;
                   
@@ -554,6 +538,7 @@ const StudentAssignmentListening: React.FC = () => {
                     <button 
                       key={qId}
                       type="button"
+                      aria-label={result.reason ? `Câu ${qId}: dữ liệu lỗi` : undefined}
                       onClick={() => setActiveQuestion(qId)}
                       className={btnClasses}
                     >
@@ -577,8 +562,13 @@ const StudentAssignmentListening: React.FC = () => {
                 <p className="exam-empty-title">Chưa có câu hỏi cho phần thi nghe này</p>
                 <span className="exam-empty-desc">Giáo viên chưa cập nhật danh sách câu hỏi. Vui lòng quay lại sau.</span>
               </div>
+            ) : currentQuestionResult?.reason ? (
+              <div className="exam-alert-error" role="alert">
+                <p>Câu {currentQuestionResult.index + 1} có dữ liệu không hợp lệ.</p>
+              </div>
             ) : currentQuestionItem ? (() => {
-              const isShortAnswer = (currentQuestionItem.questionType || '').toUpperCase() === 'SHORT_ANSWER';
+              const isShortAnswer = currentQuestionItem.questionType === 'SHORT_ANSWER';
+              const currentAnswer = selectedAnswers[currentQuestionItem.id];
               return (
                 <div className="exam-question-card">
                   <div className="exam-question-top">
@@ -616,42 +606,35 @@ const StudentAssignmentListening: React.FC = () => {
                         id={`short-answer-${currentQuestionItem.id || activeQuestion}`}
                         type="text"
                         className="exam-short-answer-input"
+                        disabled={!canSubmitModule}
                         placeholder="Nhập câu trả lời ngắn của bạn tại đây..."
-                        value={selectedAnswers[activeQuestion] ?? selectedAnswers[currentQuestionItem.id] ?? ''}
-                        onChange={(e) => handleSelectAnswer(activeQuestion, e.target.value)}
+                        value={currentAnswer?.questionType === 'SHORT_ANSWER' ? currentAnswer.text : ''}
+                        onChange={(e) => handleSelectAnswer(currentQuestionItem.id, { questionType: 'SHORT_ANSWER', text: e.target.value })}
                         autoComplete="off"
                       />
                     </div>
-                  ) : (
+                  ) : currentQuestionItem.questionType === 'MULTIPLE_CHOICE' ? (
                     /* Options */
                     <div className="exam-options-group">
-                      {['A', 'B', 'C', 'D'].map((optKey, optIdx) => {
-                        const isSelected = selectedAnswers[activeQuestion] === optKey;
-                        const extracted = currentQuestionItem.correctAnswer ? extractMcqOptions(currentQuestionItem.correctAnswer) : null;
-                        const questionWithOptions = currentQuestionItem as {
-                          options?: Array<{ id?: string | number; key?: string; text?: string; content?: string }>;
-                        };
-                        const matchedOption = questionWithOptions.options?.find(
-                          (o) => o.id === optKey || o.key === optKey || o.id === optIdx + 1
-                        );
-                        const optText = (extracted && extracted.options[optIdx]) || matchedOption?.text || matchedOption?.content || `Lựa chọn ${optKey}`;
+                      {currentQuestionItem.options?.map((option, optIdx) => {
+                        const isSelected = currentAnswer?.questionType === 'MULTIPLE_CHOICE' && currentAnswer.selectedOptionId === option.id;
                         return (
                           <label 
-                            key={optKey}
-                            onClick={() => handleSelectAnswer(activeQuestion, optKey)}
+                            key={option.id}
+                            onClick={() => handleSelectAnswer(currentQuestionItem.id, { questionType: 'MULTIPLE_CHOICE', selectedOptionId: option.id })}
                             className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
                           >
                             <div className="exam-radio-indicator">
                               {isSelected && <div className="exam-radio-dot" />}
                             </div>
                             <div className="exam-option-content">
-                              <strong className="exam-option-key">{optKey}.</strong> {optText}
+                              <strong className="exam-option-key">{MCQ_OPTION_LABELS[optIdx]}.</strong> {option.content}
                             </div>
                           </label>
                         );
                       })}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })() : null}
@@ -683,7 +666,7 @@ const StudentAssignmentListening: React.FC = () => {
               variant="primary"
               size="md"
               loading={isSubmitting}
-              disabled={isSubmitting || !submission}
+              disabled={!canSubmitModule || isSubmitting}
               onClick={handleSubmit}
             >
               Hoàn thành & Nộp bài
