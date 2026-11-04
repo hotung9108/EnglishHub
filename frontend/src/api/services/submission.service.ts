@@ -263,6 +263,16 @@ export function isSubmissionPartiallyGraded(sub?: SubmissionGradedCheckInput | n
 }
 
 /**
+ * Checks if at least one module has been graded in the submission.
+ */
+export function hasAnyGradedModule(sub?: SubmissionGradedCheckInput | null): boolean {
+  if (!sub) return false;
+  if (sub.status === 'GRADED') return true;
+  if (!sub.modules || sub.modules.length === 0) return false;
+  return sub.modules.some((m) => isModuleGraded(m));
+}
+
+/**
  * Calculates overall final score for a submission.
  * For multi-module submissions, returns the average score across modules only when all are graded.
  * Returns null if the submission has not been fully graded yet.

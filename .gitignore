@@ -11,6 +11,10 @@
 *.dbdiagram
 .env.production
 
+# Dependencies
+node_modules/
+**/node_modules/
+
 # Python
 __pycache__/
 *.py[cod]
