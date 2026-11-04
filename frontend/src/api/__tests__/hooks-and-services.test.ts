@@ -194,6 +194,21 @@ test('UserService - uses admin create, update, and delete routes', async () => {
   ]);
 });
 
+test('UserService - creates ADMIN role successfully', async () => {
+  const mockHttp = new MockHttpClient();
+  const userSvc = new UserService(mockHttp);
+  const adminPayload = { fullName: 'Admin QA', email: 'admin@qa.test', password: 'AdminPassword1!', role: 'ADMIN' as const };
+  mockHttp.mockResponse = { message: 'created', user: { id: 99, email: adminPayload.email, role: 'ADMIN' } };
+  const res = await userSvc.createUser(adminPayload);
+  assert.strictEqual(res.user.role, 'ADMIN');
+  assert.deepStrictEqual(mockHttp.calls[0], {
+    method: 'POST',
+    url: '/admin/users',
+    data: adminPayload,
+    options: undefined,
+  });
+});
+
 test('buildListParams clamps pagination and omits blank filters', () => {
   assert.deepStrictEqual(buildListParams({ page: 0, limit: 101, q: '  ', role: undefined }), {
     page: 1,
