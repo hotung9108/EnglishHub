@@ -17,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -36,12 +37,14 @@ class AdminUserDetailServiceTest {
 	private CurrentUserProvider currentUserProvider;
 	@Mock
 	private PasswordEncoder passwordEncoder;
+	@Mock
+	private ApplicationEventPublisher eventPublisher;
 
 	private AdminUserService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new AdminUserService(userRepository, currentUserProvider, passwordEncoder);
+		service = new AdminUserService(userRepository, currentUserProvider, passwordEncoder, eventPublisher);
 	}
 
 	@ParameterizedTest
