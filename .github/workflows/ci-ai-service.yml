@@ -45,9 +45,26 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
+      - name: Lint Code with Ruff
+        run: ruff check app/ tests/
+
       # tests/conftest.py tự bật MOCK_MODE nên không cần API key
-      - name: Run Tests
-        run: pytest -v
+      - name: Run Tests with Coverage Gate (>= 80%)
+        run: pytest -v --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+
+      - name: Upload AI Service Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-service-coverage-report
+          path: ai-service/coverage.xml
+          retention-days: 14
+
+      - name: Publish AI Service Summary
+        if: always()
+        run: |
+          echo "### AI Service CI & Coverage Gate" >> $GITHUB_STEP_SUMMARY
+          echo "Pytest test suite & coverage gate (>= 80%) executed." >> $GITHUB_STEP_SUMMARY
 
       - name: Build AI Service image
         run: docker build -t ai-service:ci-test .

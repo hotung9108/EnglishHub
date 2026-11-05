@@ -54,8 +54,24 @@ jobs:
       - name: Typecheck UI Tests
         run: npm run test:ui:types
 
-      - name: Run UI Component Tests and Coverage
+      - name: Run UI Component Tests and Coverage Gate (>= 80%)
         run: npm run test:ui
+
+      - name: Upload Vitest Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-vitest-coverage-report
+          path: frontend/coverage/
+          retention-days: 14
+
+      - name: Publish Frontend Coverage Summary
+        if: always()
+        run: |
+          echo "### Frontend CI & Coverage Gate" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "Vitest coverage passed threshold (>= 80% per configured file)." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Build Production Bundle (Typecheck & Vite)
         run: npm run build

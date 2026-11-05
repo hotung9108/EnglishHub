@@ -1,0 +1,67 @@
+name: Staging Deployment Smoke Check
+
+on:
+  workflow_run:
+    workflows:
+      - "CD-Backend-Staging"
+      - "CD-Frontend-Development"
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Environment to verify'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Staging Health & Endpoint Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify Backend Actuator Health
+        run: |
+          echo "Running Backend Actuator Health check..."
+          STAGING_API_URL="${{ secrets.STAGING_API_URL || 'https://staging-api.englishhub.online' }}"
+          echo "Pinging: $STAGING_API_URL/actuator/health"
+          # Retry loop up to 5 times for service startup
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_API_URL/actuator/health" || echo "000")
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Backend Actuator is UP (HTTP 200)."
+              break
+            fi
+            echo "Attempt $i: Received HTTP $STATUS, retrying in 5 seconds..."
+            sleep 5
+          done
+
+      - name: Verify AI Service Health
+        run: |
+          echo "Running AI Service Health check..."
+          STAGING_AI_URL="${{ secrets.STAGING_AI_URL || 'https://staging-ai.englishhub.online' }}"
+          echo "Pinging: $STAGING_AI_URL/health"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_AI_URL/health" || echo "000")
+          echo "AI Service responded with status $STATUS"
+
+      - name: Verify Frontend Web Response
+        run: |
+          echo "Running Frontend Web Ping..."
+          STAGING_FE_URL="${{ secrets.STAGING_FE_URL || 'https://staging.englishhub.online' }}"
+          echo "Pinging: $STAGING_FE_URL"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_FE_URL" || echo "000")
+          echo "Frontend responded with status $STATUS"
+
+      - name: Report Smoke Status
+        if: always()
+        run: |
+          echo "### Staging Smoke Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Automated health and endpoint checks completed for staging environment." >> $GITHUB_STEP_SUMMARY

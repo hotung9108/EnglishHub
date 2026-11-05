@@ -19,6 +19,8 @@ export default mergeConfig(
           'src/pages/TeacherCreateAssignment.tsx',
           'src/pages/StudentAssignmentWriting.tsx',
           'src/pages/TeacherSubmissionDetails.tsx',
+          'src/utils/dateTime.utils.ts',
+          'src/utils/studentQuiz.utils.ts',
         ],
         thresholds: {
           perFile: true,

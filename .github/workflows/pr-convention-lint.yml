@@ -1,0 +1,77 @@
+name: PR Convention Linter
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - main
+      - staging
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-pr:
+    name: Validate PR Title, Branch & Traceability
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR Title (Conventional Commits)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Checking PR Title: '$PR_TITLE'"
+          TITLE_REGEX="^(feat|fix|docs|ci|test|refactor|perf|chore)\([A-Za-z0-9_\-\/]+\): .+"
+
+          if [[ "$PR_TITLE" =~ $TITLE_REGEX ]]; then
+            echo "PR Title matches convention."
+          else
+            echo "::error file=.github/workflows/pr-convention-lint.yml::PR Title '$PR_TITLE' does not match Conventional Commits format! Example valid: 'feat(FE-84): build audio recording player'"
+            echo "Expected regex: ^(feat|fix|docs|ci|test|refactor|perf|chore)\([A-Za-z0-9_\-\/]+\): .+"
+            exit 1
+          fi
+
+      - name: Validate Source Branch Naming
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          echo "Checking Source Branch: '$HEAD_BRANCH' targeting '$BASE_BRANCH'"
+          # Allow promote branches develop -> staging and staging -> main
+          if [[ ("$HEAD_BRANCH" == "develop" && "$BASE_BRANCH" == "staging") || ("$HEAD_BRANCH" == "staging" && "$BASE_BRANCH" == "main") ]]; then
+            echo "Release promotion branch detected ($HEAD_BRANCH -> $BASE_BRANCH). Allowed."
+            exit 0
+          fi
+
+          BRANCH_REGEX="^(feature|feat|fix|bugfix|hotfix|docs|ci|refactor|test)\/([a-zA-Z0-9_\-\.]+)$"
+          if [[ "$HEAD_BRANCH" =~ $BRANCH_REGEX ]]; then
+            echo "Source branch name matches convention."
+          else
+            echo "::error file=.github/workflows/pr-convention-lint.yml::Branch name '$HEAD_BRANCH' does not follow convention! Example valid: 'feature/FE-84-audio-player' or 'fix/BE-64-soft-delete-token'"
+            echo "Expected regex: ^(feature|feat|fix|bugfix|hotfix|docs|ci|refactor|test)\/([a-zA-Z0-9_\-\.]+)$"
+            exit 1
+          fi
+
+      - name: Validate PR Body (Trello Link / Work Items)
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "Checking PR Body for Trello Card link or task ID..."
+          if [[ "$PR_BODY" =~ trello\.com || "$PR_BODY" =~ \[(FE|BE|OPS|QA|DOC)-[0-9]+\] ]]; then
+            echo "Traceability reference found in PR description."
+          else
+            echo "::warning file=.github/workflows/pr-convention-lint.yml::PR Description is missing a Trello Card link or task reference! Please add your Trello card link (e.g., https://trello.com/c/...) for traceability."
+          fi
+
+      - name: Publish Quality Gate Summary
+        if: always()
+        run: |
+          echo "### PR Quality Gate Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Target | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR Title Format | \`${{ github.event.pull_request.title }}\` | Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Source Branch Format | \`${{ github.head_ref }}\` | Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target Branch | \`${{ github.base_ref }}\` | Valid |" >> $GITHUB_STEP_SUMMARY

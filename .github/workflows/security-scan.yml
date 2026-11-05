@@ -33,3 +33,34 @@ jobs:
           path: ./
           extra_args: --debug --only-verified
 
+  dependency-and-migration-audit:
+    name: DB Migration & Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Frontend Dependency Security Audit
+        run: |
+          cd frontend
+          npm audit --audit-level=high || echo "::warning file=frontend/package.json::High or critical severity vulnerabilities detected in npm dependencies."
+
+      - name: Validate Flyway Migration Filenames
+        run: |
+          echo "Checking Flyway migration filenames..."
+          MIGRATION_DIR="backend/src/main/resources/db/migration"
+          if [ -d "$MIGRATION_DIR" ]; then
+            cd "$MIGRATION_DIR"
+            for file in *.sql; do
+              if [[ ! "$file" =~ ^V[0-9]+__.*\.sql$ ]]; then
+                echo "::error file=$file::Flyway migration filename '$file' does not match pattern V{number}__{description}.sql"
+                exit 1
+              fi
+            done
+            echo "All Flyway migration scripts adhere to naming conventions."
+          fi
