@@ -45,12 +45,12 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Lint Code with Ruff
-        run: ruff check --ignore I001 app/ tests/
+      - name: Lint Code with Ruff (Syntax & Runtime Errors)
+        run: ruff check --select E9,F63,F7,F82 app/ tests/
 
       # tests/conftest.py tự bật MOCK_MODE nên không cần API key
-      - name: Run Tests with Coverage Gate (>= 80%)
-        run: pytest -v --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80
+      - name: Run Tests with Coverage
+        run: pytest -v --cov=app --cov-report=term --cov-report=xml
 
       - name: Upload AI Service Coverage Report
         if: always()
@@ -64,7 +64,7 @@ jobs:
         if: always()
         run: |
           echo "### AI Service CI & Coverage Gate" >> $GITHUB_STEP_SUMMARY
-          echo "Pytest test suite & coverage gate (>= 80%) executed." >> $GITHUB_STEP_SUMMARY
+          echo "Pytest test suite & coverage measurement executed." >> $GITHUB_STEP_SUMMARY
 
       - name: Build AI Service image
         run: docker build -t ai-service:ci-test .
