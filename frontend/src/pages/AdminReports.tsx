@@ -29,6 +29,7 @@ export const AdminReports: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
 
   // Filters
   const [fromDate, setFromDate] = useState('');
@@ -123,6 +124,7 @@ export const AdminReports: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        setTableError(null);
 
         const [ovRes, clRes] = await Promise.allSettled([
           reportService.getOverview({
@@ -145,15 +147,22 @@ export const AdminReports: React.FC = () => {
         if (ovRes.status === 'fulfilled') {
           setOverview(ovRes.value);
         } else {
-          throw ovRes.reason;
+          setOverview(null);
+          setError(ovRes.reason instanceof Error && ovRes.reason.message ? ovRes.reason.message : isVi ? 'Không thể tổng hợp báo cáo thời gian thực.' : 'Failed to aggregate telemetry reports.');
         }
 
         if (clRes.status === 'fulfilled') {
           setReportClasses(clRes.value.data || []);
+        } else {
+          setReportClasses([]);
+          setTableError(clRes.reason instanceof Error && clRes.reason.message ? clRes.reason.message : isVi ? 'Không thể tải bảng báo cáo lớp học.' : 'Failed to load class reports.');
         }
       } catch (err: unknown) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : isVi ? 'Không thể tổng hợp báo cáo thời gian thực.' : 'Failed to aggregate telemetry reports.');
+          setOverview(null);
+          setReportClasses([]);
+          setError(err instanceof Error && err.message ? err.message : isVi ? 'Không thể tổng hợp báo cáo thời gian thực.' : 'Failed to aggregate telemetry reports.');
+          setTableError(err instanceof Error && err.message ? err.message : isVi ? 'Không thể tải bảng báo cáo lớp học.' : 'Failed to load class reports.');
         }
       } finally {
         if (isMounted) {
@@ -346,22 +355,22 @@ export const AdminReports: React.FC = () => {
       <div className="adm-kpi-grid mb-6">
         <MetricCard
           title={isVi ? 'TỔNG LỚP ĐANG THEO DÕI' : 'MONITORED CLASSES'}
-          value={loading ? '...' : (overview?.classCount ?? filteredClasses.length)}
+          value={loading ? '...' : error ? '—' : (overview?.classCount ?? filteredClasses.length)}
         />
 
         <MetricCard
           title={isVi ? 'TỶ LỆ HOÀN THÀNH BÀI TẬP' : 'COMPLETION RATE'}
-          value={loading ? '...' : `${overview?.completionRatePercent ?? 0}%`}
+          value={loading ? '...' : error ? '—' : `${overview?.completionRatePercent ?? 0}%`}
         />
 
         <MetricCard
           title={isVi ? 'ĐIỂM TRUNG BÌNH TOÀN KHÓA' : 'AVERAGE SCORE'}
-          value={loading ? '...' : `${overview?.averageScorePercent ?? 0}%`}
+          value={loading ? '...' : error ? '—' : `${overview?.averageScorePercent ?? 0}%`}
         />
 
         <MetricCard
           title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
-          value={loading ? '...' : (overview?.pendingGradingCount ?? 0)}
+          value={loading ? '...' : error ? '—' : (overview?.pendingGradingCount ?? 0)}
         />
       </div>
 
@@ -372,7 +381,21 @@ export const AdminReports: React.FC = () => {
         </div>
       ) : (
         <div className="adm-table-card">
-          {filteredClasses.length === 0 ? (
+          {tableError ? (
+            <div className="adm-alert-error justify-between" role="alert">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} />
+                <span>{tableError}</span>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setRefreshKey(prev => prev + 1)}
+              >
+                {isVi ? 'Thử lại' : 'Retry'}
+              </Button>
+            </div>
+          ) : filteredClasses.length === 0 ? (
             <EmptyState
               icon={<BookOpen size={36} />}
               title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}

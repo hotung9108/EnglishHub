@@ -253,6 +253,12 @@ Xoá thành viên khỏi lớp học.
 ### GET `/api/v1/classes/{classId}/assignments`
 Lấy danh sách bài tập của một lớp (có phân trang, lọc trạng thái).
 
+**Quyền truy cập:** `ADMIN`, giáo viên phụ trách lớp (`TEACHER`) và học viên là thành viên lớp (`STUDENT`). Tài khoản phải đang hoạt động và chưa bị xóa mềm.
+
+- `ADMIN` được đọc danh sách của lớp tồn tại, không phụ thuộc giáo viên phụ trách, membership hoặc trạng thái lớp. Lớp không tồn tại trả `404`.
+- Khi không truyền `status`, danh sách bao gồm `DRAFT`, `PUBLISHED`, `CLOSED` theo truy vấn hiện có; bài tập đã xóa mềm không được trả về. `ADMIN` vì vậy thấy cả bài `DRAFT`.
+- Quyền này chỉ áp dụng cho GET danh sách: `ADMIN` chưa được đọc chi tiết qua GET `/api/v1/assignments/{assignmentId}` và chưa có quyền tạo, sửa, xóa hoặc đổi trạng thái bài tập.
+
 **Path Params:** `classId` (int64)
 
 **Query Params:**

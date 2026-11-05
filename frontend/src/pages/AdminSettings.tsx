@@ -1,93 +1,98 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   Sparkles, Shield, Bell, 
   Save, RotateCcw, CheckCircle2, 
-  Eye, EyeOff,
   Database, Sliders
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import {
+  ADMIN_SETTINGS_LIMITS, ADMIN_SETTINGS_OPTIONS, DEFAULT_ADMIN_SETTINGS,
+  readAdminSettings, resetAdminSettings, saveAdminSettings,
+} from '../utils/adminSettings.utils';
 
 export const AdminSettings: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
 
   const [activeTab, setActiveTab] = useState<'ai' | 'grading' | 'notifications' | 'security'>('ai');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [initialConfig] = useState(readAdminSettings);
+  const [saveSuccess, setSaveSuccess] = useState<'saved' | 'reset' | null>(null);
+  const [storageIssue, setStorageIssue] = useState<'invalid' | 'unavailable' | 'save' | 'reset' | null>(
+    initialConfig.status === 'invalid' || initialConfig.status === 'unavailable' ? initialConfig.status : null,
+  );
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const STORAGE_KEY = 'englishhub_admin_system_settings';
+  const [aiModelWriting, setAiModelWriting] = useState(initialConfig.settings.aiModelWriting);
+  const [aiModelSpeaking, setAiModelSpeaking] = useState(initialConfig.settings.aiModelSpeaking);
+  const [temperature, setTemperature] = useState(initialConfig.settings.temperature);
+  const [autoApproveQuiz, setAutoApproveQuiz] = useState(initialConfig.settings.autoApproveQuiz);
+  const [requireTeacherReview, setRequireTeacherReview] = useState(initialConfig.settings.requireTeacherReview);
+  const [plagiarismThreshold, setPlagiarismThreshold] = useState(initialConfig.settings.plagiarismThreshold);
+  const [slaHours, setSlaHours] = useState(initialConfig.settings.slaHours);
+  const [emailStudentOnGraded, setEmailStudentOnGraded] = useState(initialConfig.settings.emailStudentOnGraded);
+  const [emailParentDigest, setEmailParentDigest] = useState(initialConfig.settings.emailParentDigest);
+  const [jwtLifetimeMinutes, setJwtLifetimeMinutes] = useState(initialConfig.settings.jwtLifetimeMinutes);
+  const [maxConcurrentDevices, setMaxConcurrentDevices] = useState(initialConfig.settings.maxConcurrentDevices);
 
-  // Read saved settings once at initialization
-  const initialConfig = (() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return {};
-  })();
+  useEffect(() => () => {
+    if (successTimer.current !== null) clearTimeout(successTimer.current);
+  }, []);
 
-  // Form states
-  const [aiModelWriting, setAiModelWriting] = useState(initialConfig.aiModelWriting || 'gemini-1.5-pro');
-  const [aiModelSpeaking, setAiModelSpeaking] = useState(initialConfig.aiModelSpeaking || 'whisper-large-v3');
-  const [apiKey, setApiKey] = useState(initialConfig.apiKey || '');
-  const [temperature, setTemperature] = useState(typeof initialConfig.temperature === 'number' ? initialConfig.temperature : 0.2);
-  const [autoApproveQuiz, setAutoApproveQuiz] = useState(typeof initialConfig.autoApproveQuiz === 'boolean' ? initialConfig.autoApproveQuiz : true);
-  const [requireTeacherReview, setRequireTeacherReview] = useState(typeof initialConfig.requireTeacherReview === 'boolean' ? initialConfig.requireTeacherReview : true);
-  const [plagiarismThreshold, setPlagiarismThreshold] = useState(typeof initialConfig.plagiarismThreshold === 'number' ? initialConfig.plagiarismThreshold : 30);
-  const [slaHours, setSlaHours] = useState(typeof initialConfig.slaHours === 'number' ? initialConfig.slaHours : 24);
-  const [emailStudentOnGraded, setEmailStudentOnGraded] = useState(typeof initialConfig.emailStudentOnGraded === 'boolean' ? initialConfig.emailStudentOnGraded : true);
-  const [emailParentDigest, setEmailParentDigest] = useState(typeof initialConfig.emailParentDigest === 'boolean' ? initialConfig.emailParentDigest : true);
-  const [jwtLifetimeMinutes, setJwtLifetimeMinutes] = useState(typeof initialConfig.jwtLifetimeMinutes === 'number' ? initialConfig.jwtLifetimeMinutes : 15);
-  const [maxConcurrentDevices, setMaxConcurrentDevices] = useState(typeof initialConfig.maxConcurrentDevices === 'number' ? initialConfig.maxConcurrentDevices : 2);
+  const clearFeedback = () => {
+    if (successTimer.current !== null) clearTimeout(successTimer.current);
+    successTimer.current = null;
+    setSaveSuccess(null);
+    setStorageIssue(null);
+  };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const config = {
-        aiModelWriting,
-        aiModelSpeaking,
-        apiKey,
-        temperature,
-        autoApproveQuiz,
-        requireTeacherReview,
-        plagiarismThreshold,
-        slaHours,
-        emailStudentOnGraded,
-        emailParentDigest,
-        jwtLifetimeMinutes,
-        maxConcurrentDevices,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    } catch {
-      // storage error fallback
-    }
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
+  const showSuccess = (action: 'saved' | 'reset') => {
+    setSaveSuccess(action);
+    successTimer.current = setTimeout(() => {
+      setSaveSuccess(null);
+      successTimer.current = null;
     }, 2500);
   };
 
-  const handleReset = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // fallback
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    clearFeedback();
+    const saved = saveAdminSettings({
+      aiModelWriting, aiModelSpeaking, temperature, autoApproveQuiz, requireTeacherReview,
+      plagiarismThreshold, slaHours, emailStudentOnGraded, emailParentDigest,
+      jwtLifetimeMinutes, maxConcurrentDevices,
+    });
+    if (!saved) {
+      setStorageIssue('save');
+      return;
     }
-    setAiModelWriting('gemini-1.5-pro');
-    setAiModelSpeaking('whisper-large-v3');
-    setApiKey('');
-    setTemperature(0.2);
-    setAutoApproveQuiz(true);
-    setRequireTeacherReview(true);
-    setPlagiarismThreshold(30);
-    setSlaHours(24);
-    setEmailStudentOnGraded(true);
-    setEmailParentDigest(true);
-    setJwtLifetimeMinutes(15);
-    setMaxConcurrentDevices(2);
-    alert(isVi ? 'Đã khôi phục các thiết lập chuẩn ban đầu.' : 'Defaults restored.');
+    showSuccess('saved');
+  };
+
+  const handleReset = () => {
+    clearFeedback();
+    if (!resetAdminSettings()) {
+      setStorageIssue('reset');
+      return;
+    }
+    setAiModelWriting(DEFAULT_ADMIN_SETTINGS.aiModelWriting);
+    setAiModelSpeaking(DEFAULT_ADMIN_SETTINGS.aiModelSpeaking);
+    setTemperature(DEFAULT_ADMIN_SETTINGS.temperature);
+    setAutoApproveQuiz(DEFAULT_ADMIN_SETTINGS.autoApproveQuiz);
+    setRequireTeacherReview(DEFAULT_ADMIN_SETTINGS.requireTeacherReview);
+    setPlagiarismThreshold(DEFAULT_ADMIN_SETTINGS.plagiarismThreshold);
+    setSlaHours(DEFAULT_ADMIN_SETTINGS.slaHours);
+    setEmailStudentOnGraded(DEFAULT_ADMIN_SETTINGS.emailStudentOnGraded);
+    setEmailParentDigest(DEFAULT_ADMIN_SETTINGS.emailParentDigest);
+    setJwtLifetimeMinutes(DEFAULT_ADMIN_SETTINGS.jwtLifetimeMinutes);
+    setMaxConcurrentDevices(DEFAULT_ADMIN_SETTINGS.maxConcurrentDevices);
+    showSuccess('reset');
+  };
+
+  const storageMessages = {
+    invalid: isVi ? 'Cấu hình đã lưu không hợp lệ. Các trường không hợp lệ đã dùng giá trị mặc định.' : 'Saved configuration is invalid. Invalid fields use their defaults.',
+    unavailable: isVi ? 'Không đọc được cấu hình đã lưu. Đang dùng giá trị mặc định.' : 'Could not read saved configuration. Using defaults.',
+    save: isVi ? 'Chưa lưu được cấu hình trên trình duyệt này. Vui lòng thử lại.' : 'Configuration has not been saved in this browser. Please retry.',
+    reset: isVi ? 'Chưa hoàn tất khôi phục cấu hình trên trình duyệt này. Vui lòng thử lại.' : 'Configuration reset is incomplete in this browser. Please retry.',
   };
 
   return (
@@ -97,7 +102,7 @@ export const AdminSettings: React.FC = () => {
         <div className="adm-title-group">
           <h1 className="adm-title">
             <span>{t('adminSettings.title')}</span>
-            <span className="adm-title-badge">Production Config</span>
+            <span className="adm-title-badge">{isVi ? 'Lưu cục bộ' : 'Browser storage'}</span>
           </h1>
         </div>
 
@@ -123,10 +128,16 @@ export const AdminSettings: React.FC = () => {
       </div>
 
       {saveSuccess && (
-        <div className="adm-alert-success mb-5 font-semibold">
+        <div className="adm-alert-success mb-5 font-semibold" role="status">
           <CheckCircle2 size={18} />
-          <span>{isVi ? 'Cập nhật cấu hình hệ thống thành công! Các thiết lập đã có hiệu lực trên toàn bộ server.' : 'Configuration updated successfully! Changes have propagated system-wide.'}</span>
+          <span>{saveSuccess === 'saved'
+            ? (isVi ? 'Đã lưu cấu hình trên trình duyệt này' : 'Configuration saved in this browser')
+            : (isVi ? 'Đã khôi phục cấu hình mặc định trên trình duyệt này' : 'Default configuration restored in this browser')}</span>
         </div>
+      )}
+
+      {storageIssue && (
+        <div className="adm-alert-error mb-5" role="alert">{storageMessages[storageIssue]}</div>
       )}
 
       {/* Settings Tab Navigation */}
@@ -163,7 +174,7 @@ export const AdminSettings: React.FC = () => {
           <div className="flex flex-col gap-6">
             <div className="card adm-settings-section-card">
               <h3 className="headline-md mb-1.5">
-                {isVi ? 'Mô Hình Trí Tuệ Nhân Tạo & Khóa API' : 'AI Models & Provider Credentials'}
+                {isVi ? 'Mô Hình Trí Tuệ Nhân Tạo' : 'AI Models'}
               </h3>
               <p className="body-sm text-on-surface-variant mb-6">
                 {isVi ? 'Định cấu hình các model LLM và Speech-to-Text dùng cho chấm tự luận Writing & Speaking.' : 'Manage multimodal LLM and speech inference endpoints.'}
@@ -179,10 +190,9 @@ export const AdminSettings: React.FC = () => {
                     value={aiModelWriting} 
                     onChange={(e) => setAiModelWriting(e.target.value)}
                   >
-                    <option value="gemini-1.5-pro">Google Gemini 1.5 Pro (Khuyên dùng - Độ chính xác cao nhất)</option>
-                    <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Tốc độ phản hồi cực nhanh &lt; 2s)</option>
-                    <option value="gpt-4o">OpenAI GPT-4o (Omni multimodal)</option>
-                    <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
+                    {ADMIN_SETTINGS_OPTIONS.writingModels.map(model => (
+                      <option key={model.value} value={model.value}>{model.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -195,32 +205,10 @@ export const AdminSettings: React.FC = () => {
                     value={aiModelSpeaking} 
                     onChange={(e) => setAiModelSpeaking(e.target.value)}
                   >
-                    <option value="whisper-large-v3">OpenAI Whisper Large v3 + Pitch/Formant Acoustic</option>
-                    <option value="gemini-1.5-pro-audio">Gemini 1.5 Pro Native Audio Multimodal</option>
+                    {ADMIN_SETTINGS_OPTIONS.speakingModels.map(model => (
+                      <option key={model.value} value={model.value}>{model.label}</option>
+                    ))}
                   </select>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="label-md block mb-2 font-semibold">
-                  {isVi ? 'API Key Cung Cấp Dịch Vụ AI' : 'AI Provider Secret API Key'}
-                </label>
-                <div className="flex gap-2.5">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    className="input flex-1 font-mono"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={isVi ? 'Nhập AI API Key (vd: AIzaSy...)' : 'Enter AI API Key (e.g. AIzaSy...)'}
-                  />
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary inline-flex items-center gap-1.5"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                  >
-                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                    <span>{showApiKey ? (isVi ? 'Ẩn' : 'Hide') : (isVi ? 'Hiện' : 'Show')}</span>
-                  </button>
                 </div>
               </div>
 
@@ -233,9 +221,9 @@ export const AdminSettings: React.FC = () => {
                 </div>
                 <input 
                   type="range" 
-                  min="0.0" 
-                  max="1.0" 
-                  step="0.05"
+                  min={ADMIN_SETTINGS_LIMITS.temperature.min}
+                  max={ADMIN_SETTINGS_LIMITS.temperature.max}
+                  step={ADMIN_SETTINGS_LIMITS.temperature.step}
                   value={temperature}
                   onChange={(e) => setTemperature(parseFloat(e.target.value))}
                   className="adm-range-input"
@@ -328,9 +316,9 @@ Return JSON output with detailed annotations, error start/end offsets, and const
                 </div>
                 <input 
                   type="range" 
-                  min="10" 
-                  max="60" 
-                  step="5"
+                  min={ADMIN_SETTINGS_LIMITS.plagiarismThreshold.min}
+                  max={ADMIN_SETTINGS_LIMITS.plagiarismThreshold.max}
+                  step={ADMIN_SETTINGS_LIMITS.plagiarismThreshold.step}
                   value={plagiarismThreshold}
                   onChange={(e) => setPlagiarismThreshold(parseInt(e.target.value))}
                   className="adm-range-input"
@@ -349,10 +337,9 @@ Return JSON output with detailed annotations, error start/end offsets, and const
                   value={slaHours}
                   onChange={(e) => setSlaHours(parseInt(e.target.value))}
                 >
-                  <option value={12}>12 {isVi ? 'giờ sau khi học viên nộp' : 'hours post-submission'}</option>
-                  <option value={24}>24 {isVi ? 'giờ (Chuẩn khuyến nghị)' : 'hours (Recommended standard)'}</option>
-                  <option value={48}>48 {isVi ? 'giờ' : 'hours'}</option>
-                  <option value={72}>72 {isVi ? 'giờ' : 'hours'}</option>
+                  {ADMIN_SETTINGS_OPTIONS.slaHours.map(hours => (
+                    <option key={hours.value} value={hours.value}>{hours.value} {isVi ? hours.labelVi : hours.labelEn}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -435,9 +422,9 @@ Return JSON output with detailed annotations, error start/end offsets, and const
                   value={jwtLifetimeMinutes} 
                   onChange={(e) => setJwtLifetimeMinutes(parseInt(e.target.value))}
                 >
-                  <option value={15}>15 {isVi ? 'phút (Bảo mật cao)' : 'minutes (High Security)'}</option>
-                  <option value={30}>30 {isVi ? 'phút' : 'minutes'}</option>
-                  <option value={60}>60 {isVi ? 'phút' : 'minutes'}</option>
+                  {ADMIN_SETTINGS_OPTIONS.jwtLifetimeMinutes.map(minutes => (
+                    <option key={minutes.value} value={minutes.value}>{minutes.value} {isVi ? minutes.labelVi : minutes.labelEn}</option>
+                  ))}
                 </select>
               </div>
 
@@ -450,9 +437,9 @@ Return JSON output with detailed annotations, error start/end offsets, and const
                   value={maxConcurrentDevices} 
                   onChange={(e) => setMaxConcurrentDevices(parseInt(e.target.value))}
                 >
-                  <option value={1}>1 {isVi ? 'thiết bị (Chống chia sẻ tài khoản)' : 'device (Strict anti-sharing)'}</option>
-                  <option value={2}>2 {isVi ? 'thiết bị (PC + Mobile)' : 'devices (Laptop + Phone)'}</option>
-                  <option value={5}>5 {isVi ? 'thiết bị' : 'devices'}</option>
+                  {ADMIN_SETTINGS_OPTIONS.maxConcurrentDevices.map(devices => (
+                    <option key={devices.value} value={devices.value}>{devices.value} {isVi ? devices.labelVi : devices.labelEn}</option>
+                  ))}
                 </select>
               </div>
             </div>
