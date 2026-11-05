@@ -281,7 +281,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
     }
 
     if (isRecording) {
-      stopRecording();
+      setError('Vui lòng bấm dừng ghi âm và nghe lại bản ghi trước khi nộp bài.');
+      return;
     }
 
     if (!submission) {

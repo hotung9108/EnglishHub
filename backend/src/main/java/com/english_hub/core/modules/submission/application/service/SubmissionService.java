@@ -88,6 +88,7 @@ public class SubmissionService {
 	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
 	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài.";
 	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
+	private static final String AUDIO_NOT_UPLOADED_MESSAGE = "Vui lòng tải lên file ghi âm trước khi nộp bài.";
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
@@ -336,6 +337,10 @@ public class SubmissionService {
 						storageKey(submission.getId(), submissionModule.getId(), filename, candidate.extension())))
 				.findFirst()
 				.orElse(null);
+
+		if (audio && found == null) {
+			throw ApiException.badRequest(AUDIO_NOT_UPLOADED_MESSAGE);
+		}
 
 		String matchedKey = found == null
 				? null
