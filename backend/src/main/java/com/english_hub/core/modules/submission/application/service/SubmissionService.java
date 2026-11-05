@@ -3,6 +3,8 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.module.domain.service.AutoGradeEligibility;
+import com.english_hub.core.modules.submission.application.mapper.AnswerContentMapper;
+import com.english_hub.core.modules.submission.application.mapper.QuestionCorrectAnswerMapper;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
@@ -512,13 +514,16 @@ public class SubmissionService {
 						question.questionType(),
 						question.score(),
 						question.orderIndex(),
-						graded ? parseContent(question.correctAnswer()) : null))
+						graded ? QuestionCorrectAnswerMapper.toResponse(
+								question.questionType(), parseContent(question.correctAnswer())) : null))
 				.toList();
 		List<AnswerResult> answers = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
 				.map(answer -> new AnswerResult(
 						answer.getId(),
 						answer.getQuestionId(),
-						parseContent(answer.getContent()),
+						answer.getQuestionId() != null
+								? AnswerContentMapper.toResponse(parseContent(answer.getContent()))
+								: toTextContent(answer.getContent()),
 						answer.getDocStorageKey(),
 						answer.getDocMimeType(),
 						answer.getDocUploadStatus(),
@@ -638,6 +643,10 @@ public class SubmissionService {
 				grading.getMaxScoreSnapshot(),
 				grading.getAiFeedback(),
 				grading.getFinalFeedback());
+	}
+
+	private JsonNode toTextContent(String raw) {
+		return raw == null ? null : objectMapper.valueToTree(raw);
 	}
 
 	private JsonNode parseContent(String raw) {
