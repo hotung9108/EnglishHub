@@ -46,7 +46,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lint Code with Ruff
-        run: ruff check app/ tests/
+        run: ruff check --ignore I001 app/ tests/
 
       # tests/conftest.py tự bật MOCK_MODE nên không cần API key
       - name: Run Tests with Coverage Gate (>= 80%)

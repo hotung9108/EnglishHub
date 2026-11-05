@@ -23,48 +23,50 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "Checking PR Title: '$PR_TITLE'"
-          TITLE_REGEX="^(feat|fix|docs|ci|test|refactor|perf|chore)\([A-Za-z0-9_\-\/]+\): .+"
-
-          if [[ "$PR_TITLE" =~ $TITLE_REGEX ]]; then
-            echo "PR Title matches convention."
-          else
-            echo "::error file=.github/workflows/pr-convention-lint.yml::PR Title '$PR_TITLE' does not match Conventional Commits format! Example valid: 'feat(FE-84): build audio recording player'"
-            echo "Expected regex: ^(feat|fix|docs|ci|test|refactor|perf|chore)\([A-Za-z0-9_\-\/]+\): .+"
-            exit 1
-          fi
+          python3 -c '
+          import re, os, sys
+          title = os.environ.get("PR_TITLE", "").strip()
+          print(f"Checking PR Title: {title}")
+          pattern = r"^(feat|fix|docs|ci|test|refactor|perf|chore)\([A-Za-z0-9_\-\/]+\): .+"
+          if not re.match(pattern, title):
+              print(f"::error file=.github/workflows/pr-convention-lint.yml::PR Title \"{title}\" does not match Conventional Commits format! Example valid: \"feat(FE-84): build audio recording player\"")
+              sys.exit(1)
+          print("PR Title matches convention.")
+          '
 
       - name: Validate Source Branch Naming
         env:
           HEAD_BRANCH: ${{ github.head_ref }}
           BASE_BRANCH: ${{ github.base_ref }}
         run: |
-          echo "Checking Source Branch: '$HEAD_BRANCH' targeting '$BASE_BRANCH'"
-          # Allow promote branches develop -> staging and staging -> main
-          if [[ ("$HEAD_BRANCH" == "develop" && "$BASE_BRANCH" == "staging") || ("$HEAD_BRANCH" == "staging" && "$BASE_BRANCH" == "main") ]]; then
-            echo "Release promotion branch detected ($HEAD_BRANCH -> $BASE_BRANCH). Allowed."
-            exit 0
-          fi
-
-          BRANCH_REGEX="^(feature|feat|fix|bugfix|hotfix|docs|ci|refactor|test)\/([a-zA-Z0-9_\-\.]+)$"
-          if [[ "$HEAD_BRANCH" =~ $BRANCH_REGEX ]]; then
-            echo "Source branch name matches convention."
-          else
-            echo "::error file=.github/workflows/pr-convention-lint.yml::Branch name '$HEAD_BRANCH' does not follow convention! Example valid: 'feature/FE-84-audio-player' or 'fix/BE-64-soft-delete-token'"
-            echo "Expected regex: ^(feature|feat|fix|bugfix|hotfix|docs|ci|refactor|test)\/([a-zA-Z0-9_\-\.]+)$"
-            exit 1
-          fi
+          python3 -c '
+          import re, os, sys
+          head = os.environ.get("HEAD_BRANCH", "").strip()
+          base = os.environ.get("BASE_BRANCH", "").strip()
+          print(f"Checking Source Branch: {head} targeting {base}")
+          if (head == "develop" and base == "staging") or (head == "staging" and base == "main"):
+              print("Promotion branch. Allowed.")
+              sys.exit(0)
+          pattern = r"^(feature|feat|fix|bugfix|hotfix|docs|ci|refactor|test)\/([a-zA-Z0-9_\-\.]+)$"
+          if not re.match(pattern, head):
+              print(f"::error file=.github/workflows/pr-convention-lint.yml::Branch name \"{head}\" does not follow convention! Example valid: \"feature/FE-84-audio-player\" or \"fix/BE-64-soft-delete-token\"")
+              sys.exit(1)
+          print("Source branch name matches convention.")
+          '
 
       - name: Validate PR Body (Trello Link / Work Items)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          echo "Checking PR Body for Trello Card link or task ID..."
-          if [[ "$PR_BODY" =~ trello\.com || "$PR_BODY" =~ \[(FE|BE|OPS|QA|DOC)-[0-9]+\] ]]; then
-            echo "Traceability reference found in PR description."
-          else
-            echo "::warning file=.github/workflows/pr-convention-lint.yml::PR Description is missing a Trello Card link or task reference! Please add your Trello card link (e.g., https://trello.com/c/...) for traceability."
-          fi
+          python3 -c '
+          import re, os
+          body = os.environ.get("PR_BODY", "")
+          print("Checking PR Body for Trello Card link or task ID...")
+          if "trello.com" in body or re.search(r"\[(FE|BE|OPS|QA|DOC)-[0-9]+\]", body):
+              print("Traceability reference found in PR description.")
+          else:
+              print("::warning file=.github/workflows/pr-convention-lint.yml::PR Description is missing a Trello Card link or task reference! Please add your Trello card link for traceability.")
+          '
 
       - name: Publish Quality Gate Summary
         if: always()
