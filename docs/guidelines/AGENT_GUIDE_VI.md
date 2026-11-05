@@ -1,6 +1,6 @@
 # Hướng Dẫn Sử Dụng Hệ Thống Agent AI - Dự Án EnglishHub
 
-Tài liệu này cung cấp hướng dẫn chi tiết cách các thành viên trong nhóm phát triển dự án **EnglishHub** tương tác với hệ thống Agent AI. Hệ thống được thiết kế theo mô hình đa tác nhân (Multi-Agent) phân quyền theo tài khoản Git và cấu trúc thư mục riêng biệt nhằm **loại bỏ 100% xung đột Git (Merge Conflicts)**.
+Tài liệu này cung cấp hướng dẫn chi tiết cách các thành viên trong nhóm phát triển dự án **EnglishHub** tương tác với hệ thống Agent AI. Hệ thống được thiết kế theo mô hình đa tác nhân (Multi-Agent) phân quyền theo tài khoản Git, tuân thủ Spec-Driven Development và quy trình CI/CD tự động hóa nhằm **loại bỏ 100% xung đột Git (Merge Conflicts)**.
 
 ---
 
@@ -8,13 +8,13 @@ Tài liệu này cung cấp hướng dẫn chi tiết cách các thành viên tr
 
 Hệ thống tự động phát hiện danh tính của bạn thông qua lệnh `git config user.name`:
 
-| Thành viên (Git User) | Vai trò chính thức | Thư mục Task sở hữu |
-| :--- | :--- | :--- |
-| **`doanthaison2706`** | Backend Primary (`@be-primary`) | `.agents/tasks/be-primary/` |
-| **`tuanpham21105`** | Backend Secondary (`@be-secondary`) & DevOps Primary (`@devops-primary`) | `.agents/tasks/be-secondary/`<br>`.agents/tasks/devops-primary/` |
-| **`Zawn-Tsu`** | QA / Tester (`@tester`) | `.agents/tasks/tester/`<br>`.agents/tasks/bugs/` |
-| **`Maloque18705`** | Frontend (`@fe-primary`, `@fe-secondary`) | `.agents/tasks/fe-primary/`<br>`.agents/tasks/fe-secondary/` |
-| **`hotung9108`** | Product Manager (`@pm`) & DevOps Secondary (`@devops-secondary`) | `.agents/tasks/pm/`<br>`.agents/tasks/devops-secondary/` |
+| Thành viên (Git User) | Vai trò chính thức | Tiền tố nhánh (Branch Prefix) | Phạm vi phụ trách chính |
+| :--- | :--- | :--- | :--- |
+| **`doanthaison2706`** | Backend Primary (`@be-primary`) | `feature/BE-*`, `fix/BE-*` | Domain Driven Design, Spring Boot API, Database Migration |
+| **`tuanpham21105`** | Backend Secondary (`@be-secondary`) & DevOps Primary (`@devops-primary`) | `feature/BE-*`, `feature/OPS-*` | AI Service integration, CI/CD Pipeline, Docker Staging |
+| **`Zawn-Tsu`** | QA / Tester (`@tester`) | `feature/QA-*`, `fix/QA-*` | Kiểm thử tính năng, duyệt PR duy nhất, nghiệm thu Trello |
+| **`Maloque18705`** | Frontend (`@fe-primary`, `@fe-secondary`) | `feature/FE-*`, `fix/FE-*` | Giao diện React 19, TypeScript, Vitest coverage > 80% |
+| **`hotung9108`** | Product Manager (`@pm`) & DevOps Secondary (`@devops-secondary`) | `docs/*`, `feature/OPS-*` | Backlog Trello, Feature Specs, GitHub Ruleset, Production |
 
 ---
 
@@ -24,7 +24,7 @@ Hệ thống tự động phát hiện danh tính của bạn thông qua lệnh 
 - **Không cần gõ `@`**: Agent tự động nhận diện tài khoản Git trên máy và mặc định đóng đúng vai trò của bạn.
 - Bạn chỉ cần nhập lệnh tự nhiên:
   - `doanthaison2706`: *"Viết API chấm điểm Writing Task 2 theo chuẩn DDD"* -> Agent tự hiểu vai trò BE Primary.
-  - `Zawn-Tsu`: *"Viết kịch bản test tính năng nộp bài và log bug"* -> Agent tự hiểu vai trò Tester.
+  - `Zawn-Tsu`: *"Viết kịch bản test tính năng nộp bài và thẩm định kết quả"* -> Agent tự hiểu vai trò Tester.
   - `Maloque18705`: *"Làm giao diện danh sách bài tập bằng React 19"* -> Agent tự hiểu vai trò Frontend.
 
 ### 2.2. Đối với thành viên có 2 vai trò (`hotung9108`, `tuanpham21105`)
@@ -33,48 +33,66 @@ Hệ thống tự động phát hiện danh tính của bạn thông qua lệnh 
   - Khi `hotung9108` hỏi về *Docker, GitHub Actions, CI/CD, deploy* -> Agent tự đóng vai **DevOps Secondary**.
   - Tương tự với `tuanpham21105`: hỏi về *Spring Boot, API, DB* -> **BE Secondary**; hỏi về *Pipeline, deploy* -> **DevOps Primary**.
 - **Chỉ định khi cần thiết (Explicit Override)**: Bạn có thể gõ `@pm` hoặc `@devops-secondary` ở đầu câu nếu muốn ép chính xác vai trò.
-- **Hộp thoại lựa chọn tương tác (Interactive Selection Modal)**: Nếu câu lệnh của bạn quá ngắn hoặc mơ hồ (ví dụ: *"kiểm tra hệ thống cho tôi"*), Agent sẽ tự động bật hộp thoại tương tác với các nút bấm để bạn chọn vai trò mong muốn chỉ bằng 1 cú click chuột trước khi tiến hành thực hiện.
-
-
----
-
-## 3. Cấu Trúc Quản Lý Task & Quy Trình Chuyền Gậy (Handoff)
-
-### 3.1. Cấu trúc thư mục `.agents/tasks/`
-Mỗi vai trò sở hữu thư mục riêng, tuyệt đối không chỉnh sửa thư mục của người khác để tránh xung đột Git:
-- `.agents/tasks/{role}/active/`: Chứa các task đang thực hiện hoặc chờ xử lý.
-- `.agents/tasks/{role}/done/`: Chứa các task đã hoàn thành (`Done`).
-- `.agents/tasks/bugs/`: Chứa các file lỗi do Tester tạo (`BUG-X.yaml`).
-
-### 3.2. Quy trình bàn giao (Handoff Flow)
-1. **PM (`hotung9108`)**:
-   - Viết spec tính năng vào `docs/features/` và `production_artifacts/pm_to_dev/`.
-   - Tạo file task mới trong thư mục của Dev (ví dụ: `.agents/tasks/be-primary/active/BE-TASK-1.yaml`).
-2. **Backend (`doanthaison2706`, `tuanpham21105`)**:
-   - Đọc task trong thư mục `active/` của mình, code theo chuẩn DDD ([`.agents/rules/convention-be.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-be.md)).
-   - Khi hoàn thành, tạo file hướng dẫn test thả vào `production_artifacts/be_to_tester/`, cập nhật task và chuyển sang `done/`.
-3. **Frontend (`Maloque18705`)**:
-   - Đọc task trong `.agents/tasks/fe-primary/active/`, code theo chuẩn ([`.agents/rules/convention-fe.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/convention-fe.md)).
-   - Thả hướng dẫn test vào `production_artifacts/fe_to_tester/` và chuyển task sang `done/`.
-4. **Tester (`Zawn-Tsu`)**:
-   - Đọc hướng dẫn test, kiểm thử chức năng và AI grading.
-   - Thả báo cáo vào `production_artifacts/test_reports/`. Nếu có lỗi, tạo file `.agents/tasks/bugs/BUG-X.yaml`.
-5. **DevOps (`tuanpham21105`, `hotung9108`)**:
-   - Quản lý pipeline GitHub Actions, Docker Compose và triển khai máy chủ theo [`docs/devops/CI_CD_GUIDE.md`](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/devops/CI_CD_GUIDE.md).
+- **Hộp thoại lựa chọn tương tác (Interactive Selection Modal)**: Nếu câu lệnh của bạn quá ngắn hoặc mơ hồ, Agent sẽ tự động hiển thị lựa chọn vai trò tương ứng để xác nhận.
 
 ---
 
-## 4. Các Lệnh & Kỹ Năng Tiện Ích
+## 3. Quy Trình Phát Triển & Bàn Giao (Spec-Driven Development & Zero-MCP)
 
-### 4.1. Báo cáo tiến độ hàng ngày (`/daily-sync`)
-Gõ trực tiếp vào chat: `/daily-sync`.  
-Agent sẽ tự động duyệt toàn bộ các thư mục task trong `.agents/tasks/` và in ra bảng tổng hợp tiến độ của từng thành viên kèm theo các bug đang tồn đọng.
+Dự án áp dụng mô hình quản lý tập trung trên Trello và GitHub, loại bỏ hoàn toàn các tệp task trung gian:
 
-### 4.2. Báo cáo lỗi (`bug-report`)
-Khi phát hiện lỗi, Tester chỉ cần chat:
-> "Tạo bug report: Chức năng nộp bài Speaking bị lỗi 500 khi upload file lớn hơn 10MB."  
-Agent sẽ tự động sinh file `BUG-X.yaml` chuẩn vào `.agents/tasks/bugs/`.
+```
+[PM: Trello & docs/features/]
+          │
+          ▼
+[Dev: Code branch & Chạy /doctor]
+          │
+          ▼
+[Mở GitHub PR targeting develop] ──(GitHub Actions Trello Bot)──► [Trello Card chuyển sang Review]
+          │
+          ▼
+[Tester: Duyệt PR & Chuyển Card sang Done]
+```
 
-### 4.3. Nghiệm thu tính năng (`pm-review-checklist`)
-Trước khi phát hành, PM yêu cầu:
+### 3.1. Các bước thực hiện của Developer
+1. **Tiếp nhận yêu cầu**: Đọc đặc tả tính năng tại `docs/features/` hoặc tệp tóm tắt bàn giao tại `production_artifacts/pm_to_dev/`.
+2. **Khởi tạo nhánh**: Tạo nhánh từ `develop` theo quy chuẩn:
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/FE-84-teacher-audio-player
+   ```
+3. **Phát triển mã nguồn**: Lập trình và viết Unit Test (Coverage > 80%).
+4. **Tự kiểm tra bằng Project Doctor**:
+   ```bash
+   # Gõ /doctor trong chat hoặc chạy các lệnh test tương ứng
+   ```
+5. **Mở Pull Request**: Mở PR nhắm vào nhánh `develop`. Điền PR title đúng chuẩn `feat(FE-84): mô tả`. Hệ thống GitHub Actions sẽ tự động liên kết và chuyển thẻ trên Trello sang cột `Review`.
+6. **Bàn giao kiểm thử**: Gửi hướng dẫn test vào `production_artifacts/fe_to_tester/` hoặc `production_artifacts/be_to_tester/`.
+
+### 3.2. Quy trình nghiệm thu của Tester (`Zawn-Tsu`)
+- Tester là người **duy nhất có quyền approve PR** trên GitHub và kéo thẻ Trello vào `Done (Sprint X)`.
+- Kết quả nghiệm thu được ghi nhận trong `production_artifacts/test_reports/`.
+
+---
+
+## 4. Công Cụ Tự Kiểm Tra Chất Lượng: Project Doctor (`/doctor`)
+
+Trước khi tạo commit hoặc mở PR, Developer và Agent sử dụng Project Doctor để đảm bảo mã nguồn vượt qua 100% Quality Gates:
+- **Trong Chat**: Gõ `/doctor`.
+- **Trong Terminal**: Chạy trực tiếp `npm run lint` / `./gradlew test`.
+- Xem hướng dẫn chi tiết tại [DEVELOPER_DOCTOR_GUIDE.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/guidelines/DEVELOPER_DOCTOR_GUIDE.md).
+
+---
+
+## 5. Các Tiện Ích & Kỹ Năng Bổ Trợ
+
+### 5.1. Báo cáo tiến độ (`/daily-sync`)
+Gõ `/daily-sync` trong chat để Agent tổng hợp nhanh tiến độ Sprint từ Trello và trạng thái các Pull Request hiện hành trên GitHub.
+
+### 5.2. Nghiệm thu tính năng (`pm-review-checklist`)
+Trước khi chốt bàn giao tính năng lớn, PM kích hoạt checklist:
 > "PM hãy dùng review checklist kiểm tra tính năng Writing trước khi nghiệm thu."
+
+### 5.3. Quy định an toàn Git
+Tuyệt đối tuân thủ quy tắc không tự ý commit/push mã nguồn khi chưa có sự xác nhận của người dùng.

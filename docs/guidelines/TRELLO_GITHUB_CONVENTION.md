@@ -98,6 +98,7 @@ Phần Description của mọi thẻ Trello bắt buộc viết theo Markdown v�
 
 ### 2.5. Subtasks là Checklist DoD Bắt Buộc (Definition of Done)
 Ngay bên trong thẻ Trello, người tạo hoặc người thực hiện phải tạo một **Trello Checklist** mang tên `Definition of Done (DoD)` với các mục tiêu chuẩn:
+- [ ] `Chạy Project Doctor (/doctor) đạt 100% Quality Gates`
 - [ ] `Code compile & build thành công, không phát sinh lỗi`
 - [ ] `Unit tests viết đủ và pass toàn bộ (Coverage > 80%)`
 - [ ] `Code đã format và lint sạch sẽ`
@@ -141,14 +142,11 @@ sequenceDiagram
 ```
 
 ### 3.1. Hành động của Lập trình viên khi làm xong code:
-1. Tích hoàn tất các mục trong Checklist DoD trên thẻ.
-2. Mở Pull Request trên GitHub trỏ vào `develop`.
-3. Di chuyển thẻ Trello từ `Ongoing` sang cột **`Review`**.
-4. Gán thêm thành viên **`Zawn-Tsu`** vào thẻ.
-5. **Bắt buộc comment trên thẻ Trello** cú pháp:
-   > `@Zawn-Tsu Đã hoàn thành nhiệm vụ, mời tester test lại.`  
-   > `- PR: [Link Pull Request]`  
-   > `- Hướng dẫn test / Dữ liệu mẫu: [Tài khoản test, kịch bản kiểm tra nhanh]`
+1. Chạy **Project Doctor** (`/doctor`) đảm bảo 100% Quality Gates đạt trạng thái `READY FOR PULL REQUEST`.
+2. Tích hoàn tất các mục trong Checklist DoD trên thẻ.
+3. Mở Pull Request trên GitHub trỏ vào `develop` theo đúng cú pháp tiêu đề `feat(ROLE-NUM): mô tả` (ví dụ `feat(FE-84): implement audio player studio`).
+4. **Cơ chế Tự động hóa Zero-MCP**: GitHub Actions (`.github/workflows/trello-sync.yml`) sẽ tự động phát hiện mã thẻ `[FE-84]`, di chuyển thẻ sang cột **`Review`**, đính kèm link PR và tự động gắn thẻ `@zawntsu`. (Nếu thực hiện thủ công, dev vẫn có thể tự tay chuyển thẻ và comment gọi Tester).
+5. Bàn giao kịch bản kiểm thử vào `production_artifacts/fe_to_tester/` hoặc `production_artifacts/be_to_tester/`.
 
 ### 3.2. Quyền hạn và Trách nhiệm của Tester (`@Zawn-Tsu`):
 - Tester là **người duy nhất** có quyền xác nhận một task đã hoàn thành và kéo thẻ sang cột **`Done (Sprint X)`** hoặc **`Srpint 8`**.

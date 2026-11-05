@@ -59,8 +59,8 @@ flowchart TD
 ---
 
 ## 4. Tài Liệu Liên Quan & Nghiệm Thu
-- Task Tracker: [.agents/tasks/fe-primary/done/TASK-FE-51-FIX-HIGHLIGHT-RAW-STRING.md](file:///d:/Coding/EnglishHub/.agents/tasks/fe-primary/done/TASK-FE-51-FIX-HIGHLIGHT-RAW-STRING.md)
-- Bug Tracker: [.agents/tasks/bugs/BUG-22.yaml](file:///d:/Coding/EnglishHub/.agents/tasks/bugs/BUG-22.yaml)
-- Hướng dẫn kiểm thử cho Tester: [production_artifacts/fe_to_tester/FE-51-TEST-GUIDE.md](file:///d:/Coding/EnglishHub/production_artifacts/fe_to_tester/FE-51-TEST-GUIDE.md)
+- Trello Card: `[FE-51] Fix Highlight Raw String`
+- Bug Tracker: `BUG-22` (Fixed)
+- Hướng dẫn kiểm thử cho Tester: [production_artifacts/fe_to_tester/FE-51-TEST-GUIDE.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/production_artifacts/fe_to_tester/FE-51-TEST-GUIDE.md)
 - Unit Tests Frontend: `frontend/src/api/__tests__/annotationSnippet.test.ts` (182/182 passed).
 - Unit Tests AI Service: `ai-service/tests/test_speaking_api.py` (8/8 passed).
