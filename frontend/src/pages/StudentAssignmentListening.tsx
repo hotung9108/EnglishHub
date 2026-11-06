@@ -151,21 +151,20 @@ const StudentAssignmentListening: React.FC = () => {
         }
 
         if (moduleId) {
-          try {
-            const mod = await moduleService.getModule(moduleId);
-            if (isMounted) setModuleDetail(mod);
-          } catch {
-            // Fallback
-          }
+          const [modRes, qRes] = await Promise.allSettled([
+            moduleService.getModule(moduleId),
+            questionService.listQuestions(moduleId)
+          ]);
+          if (!isMounted) return;
 
-          try {
-            const qRes = await questionService.listQuestions(moduleId);
-            if (isMounted) {
-              const qList = qRes.questions ?? qRes.data;
-              setQuestions(() => qList);
-            }
-          } catch {
-            if (isMounted) setQuestions([]);
+          if (modRes.status === 'fulfilled') {
+            setModuleDetail(modRes.value);
+          }
+          if (qRes.status === 'fulfilled') {
+            const qList = qRes.value.questions ?? qRes.value.data;
+            setQuestions(() => qList);
+          } else {
+            setQuestions([]);
           }
         } else {
           if (isMounted) setQuestions([]);

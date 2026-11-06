@@ -64,12 +64,22 @@ const StudentAssignmentOverview: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        // 1. Fetch assignment detail
-        let assignmentData: AssignmentDetail | null = null;
-        try {
-          assignmentData = await assignmentService.getAssignment(numericAssignmentId);
-          if (isMounted) setAssignment(assignmentData);
-        } catch {
+        // Fetch assignment detail and student attempts in parallel
+        const [assignmentRes, subRes] = await Promise.allSettled([
+          assignmentService.getAssignment(numericAssignmentId),
+          user?.id
+            ? submissionService.listSubmissions({
+                assignmentId: numericAssignmentId,
+                studentId: user.id,
+                limit: 20
+              })
+            : Promise.reject('No user')
+        ]);
+
+        let assignmentData: AssignmentDetail;
+        if (assignmentRes.status === 'fulfilled') {
+          assignmentData = assignmentRes.value;
+        } else {
           // Fallback default info if ID is mock string like HW-01
           assignmentData = {
             id: numericAssignmentId,
@@ -77,56 +87,48 @@ const StudentAssignmentOverview: React.FC = () => {
             status: 'PUBLISHED',
             modules: [{ id: 1, skill: 'WRITING' }]
           };
-          if (isMounted) setAssignment(assignmentData);
         }
+        if (isMounted) setAssignment(assignmentData);
 
-        // 2. Fetch student attempts
-        if (user?.id) {
-          try {
-            const subRes = await submissionService.listSubmissions({
-              assignmentId: numericAssignmentId,
-              studentId: user.id,
-              limit: 20
-            });
-            const list = subRes.data || [];
-            const activeAttempt = findInProgressAttempt(list);
-            const completedAttemptsList = list
-              .filter((item) => item.status === 'SUBMITTED' || item.status === 'GRADED')
-              .sort((a, b) => b.attemptNumber - a.attemptNumber);
-            const latestCompleted = completedAttemptsList[0] || null;
+        if (subRes.status === 'fulfilled') {
+          const list = subRes.value.data || [];
+          const activeAttempt = findInProgressAttempt(list);
+          const completedAttemptsList = list
+            .filter((item) => item.status === 'SUBMITTED' || item.status === 'GRADED')
+            .sort((a, b) => b.attemptNumber - a.attemptNumber);
+          const latestCompleted = completedAttemptsList[0] || null;
 
-            if (isMounted) {
-              setInProgressSub(activeAttempt);
-              setLatestCompletedSub(latestCompleted);
-            }
-
-            // Find best score
-            let maxVal = -1;
-            list.forEach((item) => {
-              const sc = getSubmissionFinalScore(item);
-              if (sc !== null && sc > maxVal) maxVal = sc;
-            });
-
-            const records: AttemptRecord[] = list.map((item) => {
-              const rawScore = getSubmissionFinalScore(item);
-              const isGraded = isSubmissionGraded(item) || rawScore !== null;
-              const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
-              return {
-                id: item.id,
-                attemptNumber: item.attemptNumber,
-                submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
-                score: rawScore,
-                maxScore: 10,
-                score10: s10,
-                status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
-                isBest: rawScore !== null && rawScore === maxVal && maxVal >= 0,
-              };
-            });
-
-            if (isMounted) setAttempts(records);
-          } catch {
-            if (isMounted) setAttempts([]);
+          if (isMounted) {
+            setInProgressSub(activeAttempt);
+            setLatestCompletedSub(latestCompleted);
           }
+
+          // Find best score
+          let maxVal = -1;
+          list.forEach((item) => {
+            const sc = getSubmissionFinalScore(item);
+            if (sc !== null && sc > maxVal) maxVal = sc;
+          });
+
+          const records: AttemptRecord[] = list.map((item) => {
+            const rawScore = getSubmissionFinalScore(item);
+            const isGraded = isSubmissionGraded(item) || rawScore !== null;
+            const s10 = rawScore !== null ? (rawScore > 10 ? (rawScore / 10).toFixed(1) : Number(rawScore).toFixed(1)) : '--';
+            return {
+              id: item.id,
+              attemptNumber: item.attemptNumber,
+              submittedAt: item.submittedAt ? new Date(item.submittedAt).toLocaleString('vi-VN') : 'Đang thực hiện',
+              score: rawScore,
+              maxScore: 10,
+              score10: s10,
+              status: isGraded ? 'graded' : item.status === 'SUBMITTED' ? 'pending' : 'in_progress',
+              isBest: rawScore !== null && rawScore === maxVal && maxVal >= 0,
+            };
+          });
+
+          if (isMounted) setAttempts(records);
+        } else {
+          if (isMounted) setAttempts([]);
         }
       } catch (err: unknown) {
         if (!isMounted) return;

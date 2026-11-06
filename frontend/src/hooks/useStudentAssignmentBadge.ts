@@ -26,6 +26,16 @@ export function formatAssignmentBadge(count: number): string | undefined {
   return String(Math.floor(count));
 }
 
+let cachedBadgeCount: number | null = null;
+let cachedBadgeExpiry = 0;
+let inFlightBadgePromise: Promise<number> | null = null;
+
+export function invalidateStudentAssignmentBadgeCache(): void {
+  cachedBadgeCount = null;
+  cachedBadgeExpiry = 0;
+  inFlightBadgePromise = null;
+}
+
 /**
  * Calculates pending/incomplete assignment count for the currently authenticated student.
  * An assignment is considered incomplete if it is PUBLISHED and the student has not yet
@@ -35,13 +45,13 @@ export function useStudentAssignmentBadge(
   studentId?: number,
   role?: string
 ): UseStudentAssignmentBadgeResult {
-  const [count, setCount] = useState<number>(0);
+  const [count, setCount] = useState<number>(() => cachedBadgeCount ?? 0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
 
   const isStudent = role === 'student' && typeof studentId === 'number' && studentId > 0;
 
-  const fetchBadgeData = useCallback(async () => {
+  const fetchBadgeData = useCallback(async (forceRefresh = false) => {
     if (!isStudent) {
       if (isMountedRef.current) {
         setCount(0);
@@ -50,18 +60,35 @@ export function useStudentAssignmentBadge(
       return;
     }
 
+    if (!forceRefresh && cachedBadgeCount !== null && Date.now() < cachedBadgeExpiry) {
+      if (isMountedRef.current) {
+        setCount(cachedBadgeCount);
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (inFlightBadgePromise) {
+      try {
+        const pendingCount = await inFlightBadgePromise;
+        if (isMountedRef.current) {
+          setCount(pendingCount);
+          setIsLoading(false);
+        }
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
     setIsLoading(true);
-    try {
+    const worker = async (): Promise<number> => {
       // 1. Fetch student's enrolled classes
       const classRes = await classService.list({ limit: 50 });
       const classes = classRes.data || [];
 
       if (classes.length === 0) {
-        if (isMountedRef.current) {
-          setCount(0);
-          setIsLoading(false);
-        }
-        return;
+        return 0;
       }
 
       // 2. Fetch assignments across all enrolled classes and student submissions in parallel
@@ -104,22 +131,31 @@ export function useStudentAssignmentBadge(
       }
 
       // 5. Calculate pending / incomplete assignments (Published and not submitted)
-      let pendingCount = 0;
+      let pending = 0;
       for (const [id] of uniqueAssignments) {
         if (!submittedAssignmentIds.has(id)) {
-          pendingCount++;
+          pending++;
         }
       }
+      return pending;
+    };
+
+    inFlightBadgePromise = worker();
+
+    try {
+      const finalCount = await inFlightBadgePromise;
+      cachedBadgeCount = finalCount;
+      cachedBadgeExpiry = Date.now() + 60000; // Cache for 60 seconds
 
       if (isMountedRef.current) {
-        setCount(pendingCount);
+        setCount(finalCount);
       }
     } catch {
-      // On error, fallback gracefully without crashing UI
       if (isMountedRef.current) {
         setCount(0);
       }
     } finally {
+      inFlightBadgePromise = null;
       if (isMountedRef.current) {
         setIsLoading(false);
       }
@@ -145,7 +181,8 @@ export function useStudentAssignmentBadge(
     if (typeof window === 'undefined' || !isStudent) return;
 
     const handleAssignmentSubmitted = () => {
-      void fetchBadgeData();
+      invalidateStudentAssignmentBadgeCache();
+      void fetchBadgeData(true);
     };
 
     window.addEventListener(ASSIGNMENT_SUBMITTED_EVENT, handleAssignmentSubmitted);

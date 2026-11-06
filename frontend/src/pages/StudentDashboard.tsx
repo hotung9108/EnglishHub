@@ -72,37 +72,21 @@ const StudentDashboard: React.FC = () => {
           }
         }
 
-        // 4. Fetch assignments for each class
+        // 4. Fetch assignments for each class and match submissions in memory
         const assignmentPromises = activeClasses.map(async (cls) => {
           try {
             const res = await assignmentService.listAssignments(cls.id, { limit: 20 });
             const items = res.data || [];
-            return await Promise.all(
-              items.map(async (a) => {
-                let matchedSub: SubmissionListItem | undefined = undefined;
-                if (user?.id) {
-                  try {
-                    const subRes = await submissionService.listSubmissions({
-                      assignmentId: a.id,
-                      studentId: user.id,
-                      limit: 1
-                    });
-                    if (subRes.data && subRes.data.length > 0) {
-                      matchedSub = subRes.data[0];
-                    }
-                  } catch {
-                    // Fallback
-                  }
-                }
-                return {
-                  ...a,
-                  className: cls.name,
-                  classId: cls.id,
-                  submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
-                  score: getSubmissionFinalScore(matchedSub),
-                };
-              })
-            );
+            return items.map((a) => {
+              const matchedSub = subList.find((s) => s.assignmentId === a.id);
+              return {
+                ...a,
+                className: cls.name,
+                classId: cls.id,
+                submitted: !!matchedSub && matchedSub.status !== 'IN_PROGRESS',
+                score: getSubmissionFinalScore(matchedSub),
+              };
+            });
           } catch {
             return [];
           }

@@ -76,7 +76,7 @@ const StudentClassDetails: React.FC = () => {
           ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : []))
           : [];
 
-        if (rawSubmissions.length === 0 && user?.id) {
+        if (submissionsRes.status === 'rejected' && user?.id) {
           try {
             const fallbackSubs = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
             rawSubmissions = fallbackSubs.data || [];

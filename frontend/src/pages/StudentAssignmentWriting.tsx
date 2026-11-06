@@ -12,6 +12,7 @@ import { moduleService, type ModuleDetailResponse } from '../api/services/module
 import {
   submissionService,
   type SubmissionDetail,
+  type SubmissionListItem,
   type SubmitModulePayload,
 } from '../api/services/submission.service';
 import { parseApiError } from '../api';
@@ -127,24 +128,35 @@ const StudentAssignmentWriting: React.FC = () => {
           if (isMounted) setAssignment(currentAssignment);
         }
 
-        // 2. Fetch writing module details if available
+        // 2. Fetch writing module details & initial submission in parallel
         const writingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
         const moduleId = writingMod?.id || currentAssignment?.modules?.[0]?.id;
-        if (moduleId) {
-          try {
-            const mod = await moduleService.getModule(moduleId);
-            if (isMounted) setModuleDetail(mod);
-          } catch {
-            // Module endpoint fallback
-          }
+        const urlSubmissionId = searchParams.get('submissionId');
+
+        const [modRes, initialSubRes] = await Promise.allSettled([
+          moduleId ? moduleService.getModule(moduleId) : Promise.reject('No module'),
+          urlSubmissionId && Number.isFinite(Number(urlSubmissionId))
+            ? submissionService.getSubmission(Number(urlSubmissionId))
+            : user?.id
+            ? submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                status: 'IN_PROGRESS',
+                limit: 1,
+              })
+            : Promise.reject('No submission query')
+        ]);
+
+        if (!isMounted) return;
+
+        if (modRes.status === 'fulfilled') {
+          setModuleDetail(modRes.value);
         }
 
         // 3. Resolve or start submission attempt with Route Guard
-        const urlSubmissionId = searchParams.get('submissionId');
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
-          try {
-            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (!isMounted) return;
+          if (initialSubRes.status === 'fulfilled' && 'id' in initialSubRes.value) {
+            const sub = initialSubRes.value as SubmissionDetail;
             const redirectRoute = getExamPageRedirectRoute(
               sub,
               'WRITING',
@@ -157,21 +169,24 @@ const StudentAssignmentWriting: React.FC = () => {
             }
             setSubmission(sub);
             void resolveSubModuleQuestions(sub);
-          } catch (subErr: unknown) {
-            if (isMounted) {
-              const apiErr = parseApiError(subErr);
-              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
-            }
+          } else if (initialSubRes.status === 'rejected') {
+            const apiErr = parseApiError(initialSubRes.reason);
+            setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
           }
         } else if (user?.id) {
           try {
-                        const inProgressRes = await submissionService.listSubmissions({
-              assignmentId: numericId,
-              studentId: user.id,
-              status: 'IN_PROGRESS',
-              limit: 1,
-            });
-            const inProgressItem = inProgressRes.data?.[0];
+            let inProgressItem: SubmissionListItem | undefined;
+            if (initialSubRes.status === 'fulfilled' && 'data' in initialSubRes.value) {
+              inProgressItem = initialSubRes.value.data?.[0];
+            } else {
+              const inProgressRes = await submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                status: 'IN_PROGRESS',
+                limit: 1,
+              });
+              inProgressItem = inProgressRes.data?.[0];
+            }
 
             if (inProgressItem) {
               const sub = await submissionService.getSubmission(inProgressItem.id);

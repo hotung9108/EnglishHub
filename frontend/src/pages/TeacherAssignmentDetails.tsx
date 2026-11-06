@@ -165,24 +165,32 @@ export const TeacherAssignmentDetails: React.FC = () => {
     try {
       const assignmentIdNum = Number(id);
 
-      // 1. Fetch assignment detail
-      const assignDetail = await assignmentService.getAssignment(assignmentIdNum);
-      setAssignment(assignDetail);
+      // 1. Fetch assignment detail, modules list, all classes, and submissions all in parallel
+      const [assignRes, modRes, classRes, subRes] = await Promise.allSettled([
+        assignmentService.getAssignment(assignmentIdNum),
+        moduleService.listModules(assignmentIdNum),
+        classService.list({ limit: 100 }),
+        submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+      ]);
 
-      // 2. Fetch all modules for instructions, skill & questions
+      if (!isMounted) return;
+
+      const assignDetail = assignRes.status === 'fulfilled' ? assignRes.value : null;
+      if (assignDetail) setAssignment(assignDetail);
+
+      const classesList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
+      let submissionsList: SubmissionListItem[] = subRes.status === 'fulfilled' ? (subRes.value.data || []) : [];
+
       let rawMods: Array<{ id: number; skill: string; orderIndex?: number }> = [];
-      try {
-        const modRes = await moduleService.listModules(assignmentIdNum);
-        rawMods = (modRes.modules || modRes.data || []).map((m) => ({
+      if (modRes.status === 'fulfilled') {
+        rawMods = (modRes.value.modules || modRes.value.data || []).map((m) => ({
           id: m.id,
           skill: m.skill,
           orderIndex: m.orderIndex,
         }));
-      } catch {
-        rawMods = [];
       }
 
-      if (rawMods.length === 0 && assignDetail.modules && assignDetail.modules.length > 0) {
+      if (rawMods.length === 0 && assignDetail?.modules && assignDetail.modules.length > 0) {
         rawMods = assignDetail.modules.map((m, idx) => ({
           id: m.id,
           skill: m.skill,
@@ -190,37 +198,40 @@ export const TeacherAssignmentDetails: React.FC = () => {
         }));
       }
 
-      const detailedMods: AssignmentModuleData[] = [];
-      for (const m of rawMods) {
-        let inst = '';
-        let audio = '';
-        try {
-          const modDetail = await moduleService.getModule(m.id);
-          inst = modDetail.instructions || '';
-          audio = modDetail.sourceAudioStorageKey || '';
-        } catch {
-          // ignore
-        }
-
-        let modQuestions: QuestionResponse[] = [];
-        if (m.skill === 'READING' || m.skill === 'LISTENING') {
-          try {
-            const qRes = await questionService.listQuestions(m.id);
-            modQuestions = qRes.questions || qRes.data || [];
-          } catch {
-            modQuestions = [];
-          }
-        }
-
-        detailedMods.push({
-          id: m.id,
-          skill: m.skill,
-          orderIndex: m.orderIndex,
-          instructions: inst,
-          audioUrl: audio,
-          questions: modQuestions,
-        });
-      }
+      // 2. Fetch module details and search classes in parallel
+      const [detailedMods, classAssignmentsResults] = await Promise.all([
+        Promise.all(
+          rawMods.map(async (m): Promise<AssignmentModuleData> => {
+            const needQuestions = m.skill === 'READING' || m.skill === 'LISTENING';
+            const [mDetailRes, qRes] = await Promise.allSettled([
+              moduleService.getModule(m.id),
+              needQuestions ? questionService.listQuestions(m.id) : Promise.reject('No questions needed')
+            ]);
+            const inst = mDetailRes.status === 'fulfilled' ? (mDetailRes.value.instructions || '') : '';
+            const audio = mDetailRes.status === 'fulfilled' ? (mDetailRes.value.sourceAudioStorageKey || '') : '';
+            const modQuestions = qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : [];
+            return {
+              id: m.id,
+              skill: m.skill,
+              orderIndex: m.orderIndex,
+              instructions: inst,
+              audioUrl: audio,
+              questions: modQuestions,
+            };
+          })
+        ),
+        Promise.all(
+          classesList.map(async (cls) => {
+            try {
+              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+              const matched = assignList.data?.find((a) => a.id === assignmentIdNum);
+              return { cls, matched };
+            } catch {
+              return { cls, matched: undefined };
+            }
+          })
+        )
+      ]);
 
       if (isMounted) {
         setModulesList(detailedMods);
@@ -231,32 +242,17 @@ export const TeacherAssignmentDetails: React.FC = () => {
         }
       }
 
-      // 3. Find class & members
-      const classRes = await classService.list({ limit: 100 });
-      const classesList = classRes.data || [];
-
-      let matchedClass: ClassSummary | undefined = undefined;
-      for (const cls of classesList) {
-        try {
-          const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
-          const matchedSummary = assignList.data?.find((a) => a.id === assignmentIdNum);
-          if (matchedSummary) {
-            matchedClass = cls;
-            if (matchedSummary.closeAt) {
-              const d = new Date(matchedSummary.closeAt);
-              setCloseAtDate(d.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              }));
-            }
-            break;
-          }
-        } catch {
-          // ignore
-        }
+      const foundMatch = classAssignmentsResults.find((r) => r.matched);
+      const matchedClass = foundMatch?.cls;
+      if (foundMatch?.matched?.closeAt) {
+        const d = new Date(foundMatch.matched.closeAt);
+        setCloseAtDate(d.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        }));
       }
 
       if (isMounted) {
@@ -271,15 +267,6 @@ export const TeacherAssignmentDetails: React.FC = () => {
         } catch {
           classMembers = [];
         }
-      }
-
-      // 4. Fetch submissions
-      let submissionsList: SubmissionListItem[] = [];
-      try {
-        const subRes = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
-        submissionsList = subRes.data || [];
-      } catch {
-        submissionsList = [];
       }
 
       // 5. Combine class members with submissions
@@ -310,7 +297,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
         if (matchedSub) {
           if (matchedSub.status === 'IN_PROGRESS') {
-            status = assignDetail.status === 'CLOSED' ? 'missing' : 'in_progress';
+            status = assignDetail?.status === 'CLOSED' ? 'missing' : 'in_progress';
             gradingStatus = 'none';
           } else {
             status = 'submitted';

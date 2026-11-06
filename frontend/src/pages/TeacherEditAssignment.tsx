@@ -136,52 +136,61 @@ export const TeacherEditAssignment: React.FC = () => {
       try {
         const assignmentIdNum = Number(id);
 
-      // 1. Fetch assignment details
-      const detail: AssignmentDetail = await assignmentService.getAssignment(assignmentIdNum);
-      if (isMounted) {
-        setCurrentDbStatus(detail.status);
-      }
-      
-      // 2. Fetch classes
-      const classRes = await classService.list({ limit: 100 });
-      const classList = classRes.data || [];
+      // 1-3. Fetch assignment details, classes, and modules in parallel
+      const [detailRes, classRes, modRes] = await Promise.allSettled([
+        assignmentService.getAssignment(assignmentIdNum),
+        classService.list({ limit: 100 }),
+        moduleService.listModules(assignmentIdNum)
+      ]);
+
+      if (!isMounted) return;
+
+      const detail: AssignmentDetail = detailRes.status === 'fulfilled' ? detailRes.value : {
+        id: assignmentIdNum,
+        title: '',
+        status: 'DRAFT',
+        modules: []
+      };
+      setCurrentDbStatus(detail.status);
+
+      const classList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
       setClasses(classList);
 
-      // Find which class contains this assignment
-      let matchedClass: ClassSummary | undefined = undefined;
-      for (const cls of classList) {
-        try {
-          const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
-          if (assignList.data?.some((a) => a.id === assignmentIdNum)) {
-            matchedClass = cls;
-            break;
+      // Find which class contains this assignment in parallel
+      const classCheckResults = await Promise.all(
+        classList.map(async (cls) => {
+          try {
+            const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+            const hasMatch = assignList.data?.some((a) => a.id === assignmentIdNum);
+            return { cls, hasMatch };
+          } catch {
+            return { cls, hasMatch: false };
           }
-        } catch {
-          // ignore
-        }
-      }
+        })
+      );
+      const matchedClass = classCheckResults.find((r) => r.hasMatch)?.cls;
 
       if (matchedClass) {
         setSelectedClassId(matchedClass.id);
         try {
-          const members = await classService.listMembers(matchedClass.id);
-          const subs = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
+          const [membersRes, subsRes] = await Promise.allSettled([
+            classService.listMembers(matchedClass.id),
+            submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+          ]);
+          const members = membersRes.status === 'fulfilled' ? membersRes.value : [];
+          const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data || []) : [];
           setTurnoutStats({
             total: members.length,
-            submitted: subs.data?.filter((s) => s.status !== 'IN_PROGRESS').length || 0
+            submitted: subs.filter((s) => s.status !== 'IN_PROGRESS').length
           });
         } catch {
           // Fallback
         }
       }
 
-      // 3. Fetch modules
       let modules: ModuleSummary[] = [];
-      try {
-        const modRes = await moduleService.listModules(assignmentIdNum);
-        modules = modRes.modules || modRes.data || [];
-      } catch {
-        modules = [];
+      if (modRes.status === 'fulfilled') {
+        modules = modRes.value.modules || modRes.value.data || [];
       }
 
       if (modules.length === 0 && detail.modules && detail.modules.length > 0) {
@@ -208,22 +217,40 @@ export const TeacherEditAssignment: React.FC = () => {
       let listeningTranscript = '';
       let listeningQuestionsList: ListeningQuestionItem[] = [];
 
-      for (let mIdx = 0; mIdx < modules.length; mIdx++) {
-        const mod = modules[mIdx];
-        const modSkill = mod.skill?.toLowerCase() || '';
-        let sKey: AssignmentSkill = 'writing';
-        if (modSkill.includes('speak')) sKey = 'speaking';
-        else if (modSkill.includes('read')) sKey = 'reading';
-        else if (modSkill.includes('listen')) sKey = 'listening';
-        else sKey = 'writing';
+      // Fetch all module details and their questions in parallel
+      const moduleDetailsResults = await Promise.all(
+        modules.map(async (mod, mIdx) => {
+          const modSkill = mod.skill?.toLowerCase() || '';
+          let sKey: AssignmentSkill = 'writing';
+          if (modSkill.includes('speak')) sKey = 'speaking';
+          else if (modSkill.includes('read')) sKey = 'reading';
+          else if (modSkill.includes('listen')) sKey = 'listening';
+          else sKey = 'writing';
 
+          const needQuestions = sKey === 'reading' || sKey === 'listening';
+          const [mDetailRes, qRes] = await Promise.allSettled([
+            moduleService.getModule(mod.id),
+            needQuestions ? questionService.listQuestions(mod.id) : Promise.reject('No questions')
+          ]);
+
+          return {
+            mod,
+            mIdx,
+            sKey,
+            modDetail: mDetailRes.status === 'fulfilled' ? mDetailRes.value : null,
+            questions: qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : []
+          };
+        })
+      );
+
+      for (const item of moduleDetailsResults) {
+        const { mod, mIdx, sKey, modDetail, questions: fetchedQuestions } = item;
         skillMap[sKey] = mod.id;
         if (mIdx === 0) {
           detectedSkill = sKey;
         }
 
-        try {
-          const modDetail = await moduleService.getModule(mod.id);
+        if (modDetail) {
           const inst = modDetail.instructions || '';
           if (sKey === 'writing') {
             writingPrompt = inst;
@@ -239,54 +266,40 @@ export const TeacherEditAssignment: React.FC = () => {
               readingTitle = inst.slice(0, 100);
               readingContent = inst;
             }
-            try {
-              const qRes = await questionService.listQuestions(mod.id);
-              const fetchedQuestions = qRes.questions || [];
-              readingQuestionsList = fetchedQuestions.map((q, idx) => {
-                const isMcq = q.questionType === 'MULTIPLE_CHOICE';
-                const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
-                const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
-                return {
-                  id: String(q.id),
-                  order: q.orderIndex || idx + 1,
-                  type: isMcq ? 'multiple_choice' : 'gap_fill',
-                  prompt: q.content,
-                  options: mcq ? mcq.options : undefined,
-                  correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
-                  paragraphRef: 'A',
-                  points: Number(q.score) || 1,
-                };
-              });
-            } catch (qErr) {
-              console.warn('Failed to load reading questions for module:', qErr);
-            }
+            readingQuestionsList = fetchedQuestions.map((q, idx) => {
+              const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+              const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+              const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+              return {
+                id: String(q.id),
+                order: q.orderIndex || idx + 1,
+                type: isMcq ? 'multiple_choice' : 'gap_fill',
+                prompt: q.content,
+                options: mcq ? mcq.options : undefined,
+                correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
+                paragraphRef: 'A',
+                points: Number(q.score) || 1,
+              };
+            });
           } else if (sKey === 'listening') {
             listeningTranscript = inst;
             listeningAudioUrl = modDetail.sourceAudioStorageKey || '';
-            try {
-              const qRes = await questionService.listQuestions(mod.id);
-              const fetchedQuestions = qRes.questions || [];
-              listeningQuestionsList = fetchedQuestions.map((q, idx) => {
-                const isMcq = q.questionType === 'MULTIPLE_CHOICE';
-                const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
-                const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
-                return {
-                  id: String(q.id),
-                  order: q.orderIndex || idx + 1,
-                  section: 'section1',
-                  type: isMcq ? 'multiple_choice' : 'short_answer',
-                  prompt: q.content,
-                  options: mcq ? mcq.options : undefined,
-                  correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
-                  points: Number(q.score) || 1,
-                };
-              });
-            } catch (qErr) {
-              console.warn('Failed to load listening questions for module:', qErr);
-            }
+            listeningQuestionsList = fetchedQuestions.map((q, idx) => {
+              const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+              const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
+              const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
+              return {
+                id: String(q.id),
+                order: q.orderIndex || idx + 1,
+                section: 'section1',
+                type: isMcq ? 'multiple_choice' : 'short_answer',
+                prompt: q.content,
+                options: mcq ? mcq.options : undefined,
+                correctAnswer: isMcq ? (mcq ? mcq.correctOptionContent : '') : shortAns,
+                points: Number(q.score) || 1,
+              };
+            });
           }
-        } catch (mErr) {
-          console.warn(`Failed to load module detail for ${mod.id}:`, mErr);
         }
       }
 

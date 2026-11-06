@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, isSubmissionGraded, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmissionListItem } from '../api/services/submission.service';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
@@ -94,24 +94,34 @@ const StudentAssignmentSpeaking: React.FC = () => {
           if (isMounted) setAssignment(currentAssignment);
         }
 
-        // 2. Fetch speaking module details
+        // 2. Fetch speaking module details & initial submission in parallel
         const speakingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
         const moduleId = speakingMod?.id || currentAssignment?.modules?.[0]?.id;
-        if (moduleId) {
-          try {
-            const mod = await moduleService.getModule(moduleId);
-            if (isMounted) setModuleDetail(mod);
-          } catch {
-            // Fallback
-          }
+        const urlSubmissionId = searchParams.get('submissionId');
+
+        const [modRes, initialSubRes] = await Promise.allSettled([
+          moduleId ? moduleService.getModule(moduleId) : Promise.reject('No module'),
+          urlSubmissionId && Number.isFinite(Number(urlSubmissionId))
+            ? submissionService.getSubmission(Number(urlSubmissionId))
+            : user?.id
+            ? submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10
+              })
+            : Promise.reject('No submission query')
+        ]);
+
+        if (!isMounted) return;
+
+        if (modRes.status === 'fulfilled') {
+          setModuleDetail(modRes.value);
         }
 
         // 3. Resolve or start submission attempt
-        const urlSubmissionId = searchParams.get('submissionId');
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
-          try {
-            const sub = await submissionService.getSubmission(Number(urlSubmissionId));
-            if (!isMounted) return;
+          if (initialSubRes.status === 'fulfilled' && 'id' in initialSubRes.value) {
+            const sub = initialSubRes.value as SubmissionDetail;
             const redirectRoute = getExamPageRedirectRoute(
               sub,
               'SPEAKING',
@@ -123,20 +133,23 @@ const StudentAssignmentSpeaking: React.FC = () => {
               return;
             }
             setSubmission(sub);
-          } catch (subErr: unknown) {
-            if (isMounted) {
-              const apiErr = parseApiError(subErr);
-              setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
-            }
+          } else if (initialSubRes.status === 'rejected') {
+            const apiErr = parseApiError(initialSubRes.reason);
+            setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
           }
         } else if (user?.id) {
           try {
-            const subList = await submissionService.listSubmissions({
-              assignmentId: numericId,
-              studentId: user.id,
-              limit: 10
-            });
-            const subs = subList.data || [];
+            let subs: SubmissionListItem[] = [];
+            if (initialSubRes.status === 'fulfilled' && 'data' in initialSubRes.value) {
+              subs = initialSubRes.value.data || [];
+            } else {
+              const subList = await submissionService.listSubmissions({
+                assignmentId: numericId,
+                studentId: user.id,
+                limit: 10
+              });
+              subs = subList.data || [];
+            }
             const inProgressItem = subs.find((s) => s.status === 'IN_PROGRESS');
 
             if (inProgressItem) {
