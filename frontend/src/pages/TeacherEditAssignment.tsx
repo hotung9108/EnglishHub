@@ -221,7 +221,7 @@ export const TeacherEditAssignment: React.FC = () => {
       const moduleDetailsResults = await Promise.all(
         modules.map(async (mod, mIdx) => {
           const modSkill = mod.skill?.toLowerCase() || '';
-          let sKey: AssignmentSkill = 'writing';
+          let sKey: AssignmentSkill;
           if (modSkill.includes('speak')) sKey = 'speaking';
           else if (modSkill.includes('read')) sKey = 'reading';
           else if (modSkill.includes('listen')) sKey = 'listening';

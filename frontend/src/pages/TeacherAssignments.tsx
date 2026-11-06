@@ -82,8 +82,8 @@ export const TeacherAssignments: React.FC = () => {
         const list = res.data || [];
         if (isMounted) {
           setClasses(list);
-          if (list.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(list[0].id));
+          if (list.length > 0) {
+            setSelectedClassId((prev) => prev || String(list[0].id));
           }
         }
       } catch (err) {
@@ -120,7 +120,7 @@ export const TeacherAssignments: React.FC = () => {
 
             const assignmentItems = await Promise.all(
               rawAssignments.map(async (raw): Promise<AssignmentDisplayItem> => {
-                let submissions: SubmissionListItem[] = [];
+                let submissions: SubmissionListItem[];
                 try {
                   const subRes = await submissionService.listSubmissions({ assignmentId: raw.id, limit: 100 });
                   submissions = subRes.data || [];

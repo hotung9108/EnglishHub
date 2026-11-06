@@ -179,7 +179,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
       if (assignDetail) setAssignment(assignDetail);
 
       const classesList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
-      let submissionsList: SubmissionListItem[] = subRes.status === 'fulfilled' ? (subRes.value.data || []) : [];
+      const submissionsList: SubmissionListItem[] = subRes.status === 'fulfilled' ? (subRes.value.data || []) : [];
 
       let rawMods: Array<{ id: number; skill: string; orderIndex?: number }> = [];
       if (modRes.status === 'fulfilled') {
