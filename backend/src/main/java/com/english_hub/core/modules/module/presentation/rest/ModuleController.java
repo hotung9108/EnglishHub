@@ -17,7 +17,11 @@ import com.english_hub.core.modules.module.presentation.rest.dto.UpdateModuleReq
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.List;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -115,12 +119,31 @@ public class ModuleController {
 	}
 
 	@GetMapping("/modules/{moduleId}/audio")
-	public ResponseEntity<byte[]> getModuleAudio(@PathVariable long moduleId) {
+	public ResponseEntity<?> getModuleAudio(
+			@PathVariable long moduleId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
 		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(moduleId);
+		ByteArrayResource resource = new ByteArrayResource(result.bytes());
+		MediaType mediaType = MediaType.parseMediaType(result.mimeType());
+
+		if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+			List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
+			if (!ranges.isEmpty()) {
+				HttpRange range = ranges.get(0);
+				ResourceRegion region = range.toResourceRegion(resource);
+				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+						.contentType(mediaType)
+						.header(HttpHeaders.ACCEPT_RANGES, "bytes")
+						.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+						.body(region);
+			}
+		}
+
 		return ResponseEntity.ok()
-				.contentType(MediaType.parseMediaType(result.mimeType()))
+				.contentType(mediaType)
+				.header(HttpHeaders.ACCEPT_RANGES, "bytes")
 				.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
 				.contentLength(result.bytes().length)
-				.body(result.bytes());
+				.body(resource);
 	}
 }
