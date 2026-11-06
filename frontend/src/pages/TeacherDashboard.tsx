@@ -78,32 +78,15 @@ export const TeacherDashboard: React.FC = () => {
         // 2. Fetch members, assignments and submissions for each class in parallel
         const enriched = await Promise.all(
           effectiveClasses.map(async (cls): Promise<EnrichedClassData> => {
-            let members: ClassMember[];
-            let assignments: AssignmentSummary[];
-            let submissions: SubmissionListItem[];
+            const [members, assignRes, rawSubmissions] = await Promise.all([
+              classService.listMembers(cls.id).catch(() => [] as ClassMember[]),
+              assignmentService.listAssignments(cls.id, { limit: 50 }).catch(() => ({ data: [] as AssignmentSummary[] })),
+              submissionService.listAllSubmissions({ classId: cls.id }).catch(() => [] as SubmissionListItem[]),
+            ]);
 
-            try {
-              members = await classService.listMembers(cls.id);
-            } catch {
-              members = [];
-            }
-
-            try {
-              const assignRes = await assignmentService.listAssignments(cls.id, { limit: 50 });
-              assignments = assignRes.data || [];
-            } catch {
-              assignments = [];
-            }
-
-            const classId = cls.id;
+            const assignments = assignRes.data || [];
             const assignmentIds = new Set(assignments.map((assignment) => assignment.id));
-            try {
-              const classSubmissions = await submissionService.listAllSubmissions({ classId });
-              submissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
-            } catch {
-              submissions = [];
-              console.warn('Failed to load class submissions', { classId });
-            }
+            const submissions = rawSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
 
             return {
               summary: cls,

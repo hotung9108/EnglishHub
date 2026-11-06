@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentSummary, type AssignmentDetail } from '../api/services/assignment.service';
+import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem, isSubmissionGraded, getSubmissionFinalScore } from '../api/services/submission.service';
 import {
-  getNextIncompleteModule,
   getStudentAssignmentActionRoute,
   isModuleSubmittedOrGraded,
 } from '../utils/examStepper.utils';
@@ -98,116 +97,103 @@ const StudentAssignments: React.FC = () => {
         const fetchedClasses = classRes.data || [];
         if (isMounted) setClasses(fetchedClasses);
 
-        // 2. Fetch assignments across all enrolled classes
+        // 2. Fetch student submissions once
+        let studentSubmissions: SubmissionListItem[] = [];
+        if (user?.id) {
+          try {
+            const subRes = await submissionService.listSubmissions({ studentId: user.id, limit: 100 });
+            studentSubmissions = subRes.data || [];
+          } catch {
+            studentSubmissions = [];
+          }
+        }
+
+        // 3. Fetch assignments across all enrolled classes and map in memory
         const assignmentPromises = fetchedClasses.map(async (cls) => {
           try {
             const res = await assignmentService.listAssignments(cls.id, { limit: 50 });
             const items = res.data || [];
-            return await Promise.all(
-              items.map(async (a: AssignmentSummary): Promise<StudentAssignmentDisplay> => {
-                let matchedSub: SubmissionListItem | undefined = undefined;
-                if (user?.id) {
-                  try {
-                    const subRes = await submissionService.listSubmissions({
-                      assignmentId: a.id,
-                      studentId: user.id,
-                      limit: 10
-                    });
-                    if (subRes.data && subRes.data.length > 0) {
-                      const subs = subRes.data;
-                      matchedSub = subs.find(s => isSubmissionGraded(s))
-                        || subs.find(s => getSubmissionFinalScore(s) !== null)
-                        || subs.find(s => s.status === 'SUBMITTED')
-                        || subs.find(s => s.status === 'IN_PROGRESS')
-                        || subs[0];
-                    }
-                  } catch {
-                    // Fallback
-                  }
+            return items.map((a: AssignmentSummary): StudentAssignmentDisplay => {
+              const classSubs = studentSubmissions.filter((s) => s.assignmentId === a.id);
+              let matchedSub: SubmissionListItem | undefined = undefined;
+              if (classSubs.length > 0) {
+                matchedSub = classSubs.find(s => isSubmissionGraded(s))
+                  || classSubs.find(s => getSubmissionFinalScore(s) !== null)
+                  || classSubs.find(s => s.status === 'SUBMITTED')
+                  || classSubs.find(s => s.status === 'IN_PROGRESS')
+                  || classSubs[0];
+              }
+
+              let displayStatus: AssignmentDisplayStatus = 'not_started';
+              let score: number | undefined = undefined;
+
+              if (matchedSub) {
+                const finalSc = getSubmissionFinalScore(matchedSub);
+                if (isSubmissionGraded(matchedSub) || finalSc !== null) {
+                  displayStatus = 'graded';
+                  score = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
+                } else if (matchedSub.status === 'SUBMITTED') {
+                  displayStatus = 'pending';
+                } else if (matchedSub.status === 'IN_PROGRESS') {
+                  displayStatus = 'in_progress';
                 }
+              }
 
-                let displayStatus: AssignmentDisplayStatus = 'not_started';
-                let score: number | undefined = undefined;
+              // Determine skill type from a.skills or fallback to title
+              let skillType = 'General Task';
+              const firstSkill = a.skills?.[0]?.toUpperCase();
+              if (firstSkill === 'SPEAKING') {
+                skillType = 'Speaking';
+              } else if (firstSkill === 'WRITING') {
+                skillType = 'Writing';
+              } else if (firstSkill === 'READING') {
+                skillType = 'Reading';
+              } else if (firstSkill === 'LISTENING') {
+                skillType = 'Listening';
+              } else {
+                const lowerTitle = a.title.toLowerCase();
+                if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
+                else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
+                else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
+                else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
+              }
 
-                if (matchedSub) {
-                  const finalSc = getSubmissionFinalScore(matchedSub);
-                  if (isSubmissionGraded(matchedSub) || finalSc !== null) {
-                    displayStatus = 'graded';
-                    score = finalSc !== null && finalSc !== undefined ? finalSc : undefined;
-                  } else if (matchedSub.status === 'SUBMITTED') {
-                    displayStatus = 'pending';
-                  } else if (matchedSub.status === 'IN_PROGRESS') {
-                    displayStatus = 'in_progress';
-                  }
+              // Determine active incomplete module skill when attempt is in_progress
+              let activeSkill: string | null = null;
+              if (displayStatus === 'in_progress') {
+                if (matchedSub?.modules && matchedSub.modules.length > 0) {
+                  const nextSubMod = matchedSub.modules.find(
+                    (sm) => !isModuleSubmittedOrGraded(sm)
+                  );
+                  activeSkill = nextSubMod?.skill ?? null;
+                } else if (skillType !== 'General Task') {
+                  activeSkill = skillType;
                 }
+              }
 
-                // Fetch assignment details to determine exact skill module
-                let detail: AssignmentDetail | null = null;
-                try {
-                  detail = await assignmentService.getAssignment(a.id);
-                } catch {
-                  // Fallback to title
-                }
+              // Calculate days left
+              let daysLeft = 3;
+              if (a.closeAt) {
+                const diffMs = new Date(a.closeAt).getTime() - Date.now();
+                daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+              }
 
-                // Determine skill type from module or title fallback
-                let skillType = 'General Task';
-                const modSkill = detail?.modules?.[0]?.skill?.toUpperCase();
-                if (modSkill === 'SPEAKING') {
-                  skillType = 'Speaking';
-                } else if (modSkill === 'WRITING') {
-                  skillType = 'Writing';
-                } else if (modSkill === 'READING') {
-                  skillType = 'Reading';
-                } else if (modSkill === 'LISTENING') {
-                  skillType = 'Listening';
-                } else {
-                  const lowerTitle = a.title.toLowerCase();
-                  if (lowerTitle.includes('speaking') || lowerTitle.includes('nói')) skillType = 'Speaking';
-                  else if (lowerTitle.includes('writing') || lowerTitle.includes('viết') || lowerTitle.includes('essay')) skillType = 'Writing';
-                  else if (lowerTitle.includes('reading') || lowerTitle.includes('đọc')) skillType = 'Reading';
-                  else if (lowerTitle.includes('listening') || lowerTitle.includes('nghe')) skillType = 'Listening';
-                }
-
-                // Determine active incomplete module skill when attempt is in_progress
-                let activeSkill: string | null = null;
-                if (displayStatus === 'in_progress') {
-                  if (detail?.modules && detail.modules.length > 0) {
-                    const nextMod = getNextIncompleteModule(detail.modules, matchedSub?.modules);
-                    activeSkill = nextMod?.skill ?? null;
-                  } else if (matchedSub?.modules && matchedSub.modules.length > 0) {
-                    const nextSubMod = matchedSub.modules.find(
-                      (sm) => !isModuleSubmittedOrGraded(sm)
-                    );
-                    activeSkill = nextSubMod?.skill ?? null;
-                  } else if (skillType !== 'General Task') {
-                    activeSkill = skillType;
-                  }
-                }
-
-                // Calculate days left
-                let daysLeft = 3;
-                if (a.closeAt) {
-                  const diffMs = new Date(a.closeAt).getTime() - Date.now();
-                  daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                }
-
-                return {
-                  id: a.id,
-                  classId: String(cls.id),
-                  className: cls.name,
-                  title: a.title,
-                  type: skillType,
-                  activeSkill,
-                  status: displayStatus,
-                  submissionId: matchedSub?.id,
-                  submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
-                  deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
-                  teacherName: 'Giảng viên phụ trách',
-                  score,
-                  daysLeft,
-                };
-              })
-            );
+              return {
+                id: a.id,
+                classId: String(cls.id),
+                className: cls.name,
+                title: a.title,
+                type: skillType,
+                activeSkill,
+                status: displayStatus,
+                submissionId: matchedSub?.id,
+                submittedOn: matchedSub?.submittedAt ? new Date(matchedSub.submittedAt).toLocaleDateString('vi-VN') : undefined,
+                deadline: a.closeAt ? new Date(a.closeAt).toLocaleDateString('vi-VN') : undefined,
+                teacherName: 'Giảng viên phụ trách',
+                score,
+                daysLeft,
+              };
+            });
           } catch {
             return [];
           }

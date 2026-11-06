@@ -82,8 +82,8 @@ export const TeacherAssignments: React.FC = () => {
         const list = res.data || [];
         if (isMounted) {
           setClasses(list);
-          if (list.length > 0 && !selectedClassId) {
-            setSelectedClassId(String(list[0].id));
+          if (list.length > 0) {
+            setSelectedClassId((prev) => prev || String(list[0].id));
           }
         }
       } catch (err) {
@@ -92,7 +92,7 @@ export const TeacherAssignments: React.FC = () => {
     };
     fetchClasses();
     return () => { isMounted = false; };
-  }, [selectedClassId]);
+  }, []); // Run once on mount to avoid re-triggering when selectedClassId changes
 
   // 2. Fetch Assignments for selected class (or all classes if 'all')
   useEffect(() => {
@@ -108,84 +108,80 @@ export const TeacherAssignments: React.FC = () => {
           ? classes.filter((c) => String(c.id) === selectedClassId)
           : classes;
 
-        const loadedItems: AssignmentDisplayItem[] = [];
+        const classResults = await Promise.all(
+          targetClasses.map(async (cls) => {
+            const [membersRes, assignRes] = await Promise.all([
+              classService.listMembers(cls.id).catch(() => []),
+              assignmentService.listAssignments(cls.id, { limit: 50 }).catch(() => ({ data: [] as AssignmentSummary[] })),
+            ]);
 
-        for (const cls of targetClasses) {
-          let membersCount = 0;
-          try {
-            const members = await classService.listMembers(cls.id);
-            membersCount = members.length;
-          } catch {
-            membersCount = 0;
-          }
+            const membersCount = Array.isArray(membersRes) ? membersRes.length : 0;
+            const rawAssignments: AssignmentSummary[] = assignRes.data || [];
 
-          let rawAssignments: AssignmentSummary[] = [];
-          try {
-            const assignRes = await assignmentService.listAssignments(cls.id, { limit: 50 });
-            rawAssignments = assignRes.data || [];
-          } catch {
-            rawAssignments = [];
-          }
+            const assignmentItems = await Promise.all(
+              rawAssignments.map(async (raw): Promise<AssignmentDisplayItem> => {
+                let submissions: SubmissionListItem[];
+                try {
+                  const subRes = await submissionService.listSubmissions({ assignmentId: raw.id, limit: 100 });
+                  submissions = subRes.data || [];
+                } catch {
+                  submissions = [];
+                }
 
-          for (const raw of rawAssignments) {
-            let submissions: SubmissionListItem[] = [];
-            try {
-              const subRes = await submissionService.listSubmissions({ assignmentId: raw.id, limit: 100 });
-              submissions = subRes.data || [];
-            } catch {
-              submissions = [];
-            }
+                const submittedCount = submissions.filter((s) => s.status !== 'IN_PROGRESS').length;
+                const pendingGradingCount = submissions.filter(
+                  (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
+                ).length;
 
-            const submittedCount = submissions.filter((s) => s.status !== 'IN_PROGRESS').length;
-            const pendingGradingCount = submissions.filter(
-              (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
-            ).length;
+                // Days left & Status
+                const closeDate = raw.closeAt ? new Date(raw.closeAt) : null;
+                let daysLeft: number | undefined = undefined;
+                let status: 'open' | 'closed' | 'upcoming' = 'open';
 
-            // Days left & Status
-            const closeDate = raw.closeAt ? new Date(raw.closeAt) : null;
-            let daysLeft: number | undefined = undefined;
-            let status: 'open' | 'closed' | 'upcoming' = 'open';
+                if (closeDate) {
+                  const msDiff = closeDate.getTime() - currentTimestamp;
+                  daysLeft = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+                  if (msDiff < 0) {
+                    status = 'closed';
+                  } else if (raw.status === 'DRAFT') {
+                    status = 'upcoming';
+                  } else {
+                    status = 'open';
+                  }
+                }
 
-            if (closeDate) {
-              const msDiff = closeDate.getTime() - currentTimestamp;
-              daysLeft = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-              if (msDiff < 0) {
-                status = 'closed';
-              } else if (raw.status === 'DRAFT') {
-                status = 'upcoming';
-              } else {
-                status = 'open';
-              }
-            }
+                const dueDateStr = closeDate
+                  ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  : (isVi ? 'Không thời hạn' : 'No deadline');
 
-            const dueDateStr = closeDate
-              ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
-              : (isVi ? 'Không thời hạn' : 'No deadline');
+                return {
+                  id: String(raw.id),
+                  code: `HW-${raw.id.toString().padStart(2, '0')}`,
+                  skills: raw.skills ?? [],
+                  title: raw.title,
+                  className: cls.name,
+                  dueDate: dueDateStr,
+                  daysLeft,
+                  totalStudents: membersCount,
+                  submittedCount,
+                  pendingGradingCount,
+                  status
+                };
+              })
+            );
 
-            loadedItems.push({
-              id: String(raw.id),
-              code: `HW-${raw.id.toString().padStart(2, '0')}`,
-              skills: raw.skills ?? [],
-              title: raw.title,
-              className: cls.name,
-              dueDate: dueDateStr,
-              daysLeft,
-              totalStudents: membersCount,
-              submittedCount,
-              pendingGradingCount,
-              status
-            });
-          }
-        }
+            return assignmentItems;
+          })
+        );
 
         if (isMounted) {
-          setAssignments(loadedItems);
+          setAssignments(classResults.flat());
         }
       } catch (err) {
         console.error('Failed to load assignments:', err);

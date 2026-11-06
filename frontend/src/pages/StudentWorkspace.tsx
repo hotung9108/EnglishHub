@@ -86,7 +86,7 @@ export const StudentWorkspace: React.FC = () => {
       setError(null);
 
       const [submissionsRes, classesRes] = await Promise.allSettled([
-        submissionService.listSubmissions({ studentId: user?.id, status: 'IN_PROGRESS' }),
+        submissionService.listSubmissions({ studentId: user?.id, status: 'IN_PROGRESS', limit: 50 }),
         classService.list()
       ]);
 
@@ -111,9 +111,10 @@ export const StudentWorkspace: React.FC = () => {
       const assignmentMap = new Map<string, AssignmentSummary & { className: string; classId: number }>();
       assignmentsWithClass.forEach(a => assignmentMap.set(String(a.id), a));
 
-      // Resolve real assignmentId for each in-progress submission
+      // Resolve real assignmentId for each in-progress submission (reuse sub.assignmentId if present)
       const detailedSubmissions = await Promise.all(
         submissions.map(async (sub) => {
+          if (sub.assignmentId) return sub;
           try {
             const detail = await submissionService.getSubmission(sub.id);
             return { ...sub, assignmentId: detail.assignmentId };

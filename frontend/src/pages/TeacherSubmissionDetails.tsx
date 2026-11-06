@@ -12,6 +12,7 @@ import { parseApiError } from '../api';
 import {
   submissionService,
   type SubmissionDetail,
+  type SubmissionListItem,
   type SubmissionModuleDetailResponse,
   isModuleGraded
 } from '../api/services/submission.service';
@@ -26,7 +27,7 @@ import {
   type GradingAnnotation
 } from '../api/services/answer-annotation.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
-import { classService, type ClassMember } from '../api/services/class.service';
+import { classService } from '../api/services/class.service';
 import { resolveAudioUrl } from '../utils/audioUrl.utils';
 import { extractTranscriptText, extractAnnotationSnippet } from '../utils/annotationSnippet.utils';
 
@@ -281,75 +282,67 @@ export const TeacherSubmissionDetails: React.FC = () => {
         const assignmentIdNum = Number(id);
         const studentIdNum = Number(studentId);
 
-        // 1. Fetch assignment detail
-        const assignRes = await assignmentService.getAssignment(assignmentIdNum);
-        if (isMounted) setAssignment(assignRes);
+        // 1. Fetch assignment detail & all submissions for this assignment in parallel
+        const [assignRes, allSubsRes] = await Promise.allSettled([
+          assignmentService.getAssignment(assignmentIdNum),
+          submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+        ]);
 
-        // 2. Fetch student profile/name via class members
-        let resolvedMember: ClassMember | undefined;
-        try {
-          const classRes = await classService.list({ limit: 100 });
-          const classesList = classRes.data || [];
+        if (!isMounted) return;
 
-          // 2a. Find class containing this assignment first
-          for (const cls of classesList) {
-            try {
-              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
-              if (assignList.data?.some((a) => a.id === assignmentIdNum)) {
-                const members = await classService.listMembers(cls.id);
-                resolvedMember = members.find((m) => m.studentId === studentIdNum);
-                if (resolvedMember) break;
-              }
-            } catch {
-              // ignore
-            }
-          }
+        if (assignRes.status === 'rejected') {
+          throw assignRes.reason;
+        }
 
-          // 2b. If not found in assigned class, check all teacher's classes
-          if (!resolvedMember) {
-            for (const cls of classesList) {
-              try {
-                const members = await classService.listMembers(cls.id);
-                const found = members.find((m) => m.studentId === studentIdNum);
-                if (found) {
-                  resolvedMember = found;
-                  break;
+        if (assignRes.status === 'fulfilled') {
+          setAssignment(assignRes.value);
+        }
+
+        const allSubsList: SubmissionListItem[] = allSubsRes.status === 'fulfilled' ? (allSubsRes.value.data || []) : [];
+
+        // Set sibling submissions for Prev/Next
+        const uniqueStudents = Array.from(
+          new Set(allSubsList.filter((s) => s.status !== 'IN_PROGRESS').map((s) => s.studentId))
+        ).map((sId) => ({ studentId: sId }));
+        setClassSubmissions(uniqueStudents);
+
+        // 2. Resolve student profile/name (prefer routeState if available to avoid heavy queries)
+        if (routeState?.studentName) {
+          setStudentInfo({
+            name: routeState.studentName,
+            email: routeState.studentEmail,
+            code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+          });
+        } else {
+          try {
+            const classRes = await classService.list({ limit: 100 });
+            const classesList = classRes.data || [];
+            const membersList = await Promise.all(
+              classesList.map(async (cls) => {
+                try {
+                  return await classService.listMembers(cls.id);
+                } catch {
+                  return [];
                 }
-              } catch {
-                // ignore
+              })
+            );
+            const resolvedMember = membersList.flat().find((m) => m.studentId === studentIdNum);
+            if (isMounted) {
+              if (resolvedMember) {
+                setStudentInfo({
+                  name: resolvedMember.fullName,
+                  email: resolvedMember.email,
+                  code: resolvedMember.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
+                });
+              } else {
+                setStudentInfo({
+                  name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
+                  code: `HV-${studentIdNum.toString().padStart(4, '0')}`
+                });
               }
             }
-          }
-
-          if (isMounted) {
-            if (resolvedMember) {
-              setStudentInfo({
-                name: resolvedMember.fullName,
-                email: resolvedMember.email || routeState?.studentEmail,
-                code: resolvedMember.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
-              });
-            } else if (routeState?.studentName) {
-              setStudentInfo({
-                name: routeState.studentName,
-                email: routeState.studentEmail,
-                code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
-              });
-            } else {
-              setStudentInfo({
-                name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
-                code: `HV-${studentIdNum.toString().padStart(4, '0')}`
-              });
-            }
-          }
-        } catch {
-          if (isMounted) {
-            if (routeState?.studentName) {
-              setStudentInfo({
-                name: routeState.studentName,
-                email: routeState.studentEmail,
-                code: routeState.studentCode || `HV-${studentIdNum.toString().padStart(4, '0')}`
-              });
-            } else {
+          } catch {
+            if (isMounted) {
               setStudentInfo({
                 name: isVi ? `Học viên #${studentIdNum}` : `Student #${studentIdNum}`,
                 code: `HV-${studentIdNum.toString().padStart(4, '0')}`
@@ -358,16 +351,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
           }
         }
 
-        // 3. Find submission for this student and assignment
-        const subListRes = await submissionService.listSubmissions({
-          assignmentId: assignmentIdNum,
-          studentId: studentIdNum,
-          limit: 10
-        });
-
-        const submissions = subListRes.data || [];
-        const completedSub = submissions.find(s => s.status === 'GRADED' || s.status === 'SUBMITTED');
-        const matchedSubItem = completedSub || (submissions.length > 0 ? submissions[0] : null);
+        // 3. Find submission for this student from the pre-fetched assignment submissions
+        const studentSubs = allSubsList.filter((s) => s.studentId === studentIdNum);
+        const completedSub = studentSubs.find((s) => s.status === 'GRADED' || s.status === 'SUBMITTED');
+        const matchedSubItem = completedSub || (studentSubs.length > 0 ? studentSubs[0] : null);
 
         if (!matchedSubItem) {
           if (isMounted) {
@@ -405,19 +392,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
           setSelectedModuleId(initialMod.id);
           await loadModuleData(initialMod.id);
-        }
-
-        // 5. Fetch sibling submissions for Prev/Next
-        try {
-          const siblingRes = await submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 });
-          if (isMounted && siblingRes.data) {
-            const uniqueStudents = Array.from(new Set(siblingRes.data.filter((s) => s.status !== 'IN_PROGRESS').map((s) => s.studentId))).map((sId) => ({
-              studentId: sId
-            }));
-            setClassSubmissions(uniqueStudents);
-          }
-        } catch {
-          // ignore
         }
       } catch (err) {
         console.error('Failed to load student submission details:', err);

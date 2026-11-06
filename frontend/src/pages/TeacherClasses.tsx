@@ -2,9 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
-import { classService, type ClassSummary } from '../api/services/class.service';
+import { classService, type ClassSummary, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
-import { submissionService } from '../api/services/submission.service';
+import { submissionService, type SubmissionListItem, type SubmissionModuleSummary } from '../api/services/submission.service';
 import { 
   BookOpen, Users, Search, Plus, 
   Calendar, MapPin, 
@@ -85,44 +85,25 @@ export const TeacherClasses: React.FC = () => {
 
         const loadedList = await Promise.all(
           targetClasses.map(async (cls): Promise<TeacherClassCardData> => {
-            let membersCount: number;
-            try {
-              const members = await classService.listMembers(cls.id);
-              membersCount = members.length;
-            } catch {
-              membersCount = 0;
-            }
+            const [membersRes, aRes, subRes] = await Promise.all([
+              classService.listMembers(cls.id).catch(() => [] as ClassMember[]),
+              assignmentService.listAssignments(cls.id, { limit: 50 }).catch(() => ({ data: [] as AssignmentSummary[] })),
+              submissionService.listSubmissions({ classId: cls.id, limit: 100 }).catch(() => ({ data: [] as SubmissionListItem[] })),
+            ]);
 
-            let assignments: AssignmentSummary[];
-            try {
-              const aRes = await assignmentService.listAssignments(cls.id, { limit: 50 });
-              assignments = aRes.data || [];
-            } catch {
-              assignments = [];
-            }
+            const membersCount = membersRes.length;
+            const assignments = aRes.data || [];
+            const allSubs = subRes.data || [];
 
-            let pendingCount = 0;
+            const pendingCount = allSubs.filter(
+              (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m: SubmissionModuleSummary) => m.grading?.status === 'PENDING'))
+            ).length;
+
             const gradedScores: number[] = [];
-
-            if (assignments.length > 0) {
-              const subPromises = assignments.map(async (a) => {
-                try {
-                  const subRes = await submissionService.listSubmissions({ assignmentId: a.id, limit: 50 });
-                  return subRes.data || [];
-                } catch {
-                  return [];
-                }
-              });
-              const allSubs = (await Promise.all(subPromises)).flat();
-              pendingCount = allSubs.filter(
-                (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
-              ).length;
-
-              for (const s of allSubs) {
-                for (const m of s.modules) {
-                  if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
-                    gradedScores.push(m.grading.finalScore);
-                  }
+            for (const s of allSubs) {
+              for (const m of s.modules) {
+                if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
+                  gradedScores.push(m.grading.finalScore);
                 }
               }
             }

@@ -126,42 +126,26 @@ export const TeacherClassProgress: React.FC = () => {
           targetClassSummary = allClasses[0];
         }
 
-        // 3. Fetch class detail
-        let classDetail: ClassDetail = targetClassSummary;
-        try {
-          classDetail = await classService.getDetail(targetClassSummary.id);
-        } catch {
-          // Fallback to summary
-        }
+        // 3-6. Fetch class detail, enrolled members, assignments, and submissions in parallel
+        const [detailRes, membersRes, assignmentsRes, subsRes] = await Promise.allSettled([
+          classService.getDetail(targetClassSummary.id),
+          classService.listMembers(targetClassSummary.id),
+          assignmentService.listAssignments(targetClassSummary.id, { limit: 100 }),
+          submissionService.listAllSubmissions({ classId: targetClassSummary.id })
+        ]);
+
         if (!isMounted) return;
+
+        const classDetail: ClassDetail = detailRes.status === 'fulfilled' ? detailRes.value : targetClassSummary;
         setCurrentClass(classDetail);
 
-        // 4. Fetch enrolled members
-        let members: ClassMember[] = [];
-        try {
-          members = await classService.listMembers(targetClassSummary.id);
-          if (!isMounted) return;
-          setEnrolledMembers(members);
-        } catch {
-          members = [];
-        }
-        if (!isMounted) return;
+        const members: ClassMember[] = membersRes.status === 'fulfilled' ? membersRes.value : [];
+        setEnrolledMembers(members);
 
-        // 5. Fetch assignments for this class
-        let rawAssignments: AssignmentSummary[] = [];
-        try {
-          const aRes = await assignmentService.listAssignments(targetClassSummary.id, { limit: 100 });
-          if (!isMounted) return;
-          rawAssignments = aRes.data || [];
-        } catch {
-          rawAssignments = [];
-        }
-        if (!isMounted) return;
+        const rawAssignments: AssignmentSummary[] = assignmentsRes.status === 'fulfilled' ? (assignmentsRes.value.data || []) : [];
 
-        // 6. Fetch class submissions, keeping only the assignments loaded above
+        const classSubmissions: SubmissionListItem[] = subsRes.status === 'fulfilled' ? subsRes.value : [];
         const assignmentIds = new Set(rawAssignments.map((assignment) => assignment.id));
-        const classSubmissions = await submissionService.listAllSubmissions({ classId: targetClassSummary.id });
-        if (!isMounted) return;
         const allSubmissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
         const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
         for (const submission of allSubmissions) {
