@@ -59,7 +59,7 @@ public final class ApiRoutePolicy {
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/classes/{classId}/assignments",
-					List.of("TEACHER", "STUDENT")),
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(
 					HttpMethod.POST,
 					"/api/v1/classes/{classId}/assignments",

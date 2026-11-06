@@ -1,12 +1,13 @@
 package com.english_hub.core.modules.assignment.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.english_hub.core.common.ApiException;
@@ -22,6 +23,8 @@ import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
 import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
+import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
+import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
@@ -33,8 +36,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentServiceTest {
@@ -158,14 +166,97 @@ class AssignmentServiceTest {
 	}
 
 	@Test
-	void adminIsForbiddenFromListingClassAssignments() {
+	void adminCanListClassAssignmentsWithAllStatuses() {
 		givenCaller(user(1L, UserRole.ADMIN));
 		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(List.of(
+				assignment(7L, 3L, AssignmentStatus.DRAFT),
+				assignment(6L, 3L, AssignmentStatus.PUBLISHED),
+				assignment(5L, 3L, AssignmentStatus.CLOSED)), 1, 20, 3);
+		when(assignmentRepository.findPage(eq(3L), eq(null), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(7L, 6L, 5L))).thenReturn(Map.of());
 
-		assertApiException(
-				() -> assignmentService.listAssignments(null, 3L, 1, 20),
-				"Bạn không có quyền thực hiện thao tác này.");
-		verify(assignmentRepository, never()).findPage(any(), any(), any());
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 1, 20);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		assertThat(result.assignmentPage().assignments()).extracting(Assignment::status)
+				.containsExactly(AssignmentStatus.DRAFT, AssignmentStatus.PUBLISHED, AssignmentStatus.CLOSED);
+		verify(assignmentRepository).findPage(eq(3L), eq(null), any());
+	}
+
+	@Test
+	void adminCanListAnEmptyClass() {
+		givenCaller(user(1L, UserRole.ADMIN));
+		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		when(assignmentRepository.findPage(eq(3L), eq(null), any()))
+				.thenReturn(new AssignmentPage(List.of(), 1, 20, 0));
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 1, 20);
+
+		assertThat(result.assignmentPage().assignments()).isEmpty();
+		assertThat(result.assignmentPage().total()).isZero();
+		assertThat(result.skillsByAssignmentId()).isEmpty();
+		verify(assignmentRepository, never()).findSkillsByAssignmentIds(any());
+	}
+
+	@ParameterizedTest(name = "admin reads {0} class with teacher {1}")
+	@CsvSource({"ACTIVE, 10", "COMPLETED, 10", "CANCELLED, 10", "ACTIVE,"})
+	void adminCanListClassesRegardlessOfStatusOrTeacher(ClassStatus status, Long teacherId) {
+		EnglishClass englishClass = new EnglishClass(
+				"Assignment class", "Intermediate", null, OPEN_AT.toLocalDate(), null, status, teacherId);
+		englishClass.setId(3L);
+		givenCaller(user(1L, UserRole.ADMIN));
+		when(classRepository.findAccess(englishClass.getId(), 1L)).thenReturn(Optional.of(
+				new ClassAccess(englishClass.getId(), englishClass.getTeacherId(), false)));
+		when(assignmentRepository.findPage(eq(3L), eq(null), any()))
+				.thenReturn(new AssignmentPage(List.of(), 1, 20, 0));
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 1, 20);
+
+		assertThat(result.assignmentPage().assignments()).isEmpty();
+		verify(classRepository).findAccess(3L, 1L);
+		verify(assignmentRepository).findPage(eq(3L), eq(null), any());
+	}
+
+	@ParameterizedTest
+	@EnumSource(AssignmentStatus.class)
+	void adminCanFilterClassAssignmentsByStatus(AssignmentStatus status) {
+		givenCaller(user(1L, UserRole.ADMIN));
+		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(List.of(assignment(5L, 3L, status)), 1, 20, 1);
+		when(assignmentRepository.findPage(eq(3L), eq(status), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L))).thenReturn(Map.of());
+
+		AssignmentListResult result = assignmentService.listAssignments(status.name(), 3L, 1, 20);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		verify(assignmentRepository).findPage(eq(3L), eq(status), any());
+	}
+
+	@Test
+	void adminGetsNotFoundForAnAbsentClass() {
+		givenCaller(user(1L, UserRole.ADMIN));
+		when(classRepository.findAccess(3L, 1L)).thenReturn(Optional.empty());
+
+		ApiException exception = assertThrows(ApiException.class,
+				() -> assignmentService.listAssignments(null, 3L, 1, 20));
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(exception).hasMessage("Không tìm thấy lớp học.");
+		verifyNoInteractions(assignmentRepository);
+	}
+
+	@ParameterizedTest(name = "admin account {0} is rejected before class access")
+	@ValueSource(strings = {"LOCKED", "SOFT_DELETED"})
+	void inactiveAdminCannotListClassAssignments(String accountState) {
+		when(currentUserProvider.requireActiveUser())
+				.thenThrow(ApiException.unauthorized("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
+
+		ApiException exception = assertThrows(ApiException.class,
+				() -> assignmentService.listAssignments(null, 3L, 1, 20));
+
+		assertThat(exception.getStatus()).as(accountState).isEqualTo(HttpStatus.UNAUTHORIZED);
+		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
 	@Test
@@ -233,9 +324,12 @@ class AssignmentServiceTest {
 	void adminCannotCreateAssignment() {
 		givenCaller(user(1L, UserRole.ADMIN));
 
-		assertApiException(
+		ApiException exception = assertApiException(
 				() -> assignmentService.createAssignment(3L, validCreateCommand()),
 				"Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
 	@Test
@@ -373,6 +467,18 @@ class AssignmentServiceTest {
 	}
 
 	@Test
+	void adminCannotUpdateAssignment() {
+		givenCaller(user(1L, UserRole.ADMIN));
+
+		ApiException exception = assertThrows(ApiException.class,
+				() -> assignmentService.updateAssignment(5L,
+						new UpdateAssignmentCommand("Updated", null, null, null, null)));
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(classRepository, assignmentRepository);
+	}
+
+	@Test
 	void teacherCannotUpdateAssignmentOwnedByAnotherTeacher() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
@@ -426,9 +532,12 @@ class AssignmentServiceTest {
 	void adminCannotDeleteAssignment() {
 		givenCaller(user(1L, UserRole.ADMIN));
 
-		assertApiException(
+		ApiException exception = assertApiException(
 				() -> assignmentService.deleteAssignment(5L),
 				"Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
 	@Test
@@ -473,9 +582,12 @@ class AssignmentServiceTest {
 	void adminCannotChangeAssignmentStatus() {
 		givenCaller(user(1L, UserRole.ADMIN));
 
-		assertApiException(
+		ApiException exception = assertApiException(
 				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED")),
 				"Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
 	@Test
@@ -530,10 +642,10 @@ class AssignmentServiceTest {
 		return user;
 	}
 
-	private void assertApiException(ThrowingOperation operation, String message) {
-		assertThatThrownBy(operation::run)
-				.isInstanceOf(ApiException.class)
-				.hasMessage(message);
+	private ApiException assertApiException(ThrowingOperation operation, String message) {
+		ApiException exception = assertThrows(ApiException.class, operation::run);
+		assertThat(exception).hasMessage(message);
+		return exception;
 	}
 
 	@FunctionalInterface

@@ -14,6 +14,7 @@ import Students from './pages/Students';
 import AddStudent from './pages/AddStudent';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import AdminSettings from './pages/AdminSettings';
 import TeacherClasses from './pages/TeacherClasses';
 import TeacherDetails from './pages/TeacherDetails';
 import StudentAssignments from './pages/StudentAssignments';
@@ -96,7 +97,7 @@ function App() {
             <Route path="students/:id" element={<StudentDetails />} />
             <Route path="reports" element={<AdminReports />} />
             <Route path="audit/gradings" element={<AdminGradingAuditLogs />} />
-            <Route path="settings" element={<Settings />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Route>
 

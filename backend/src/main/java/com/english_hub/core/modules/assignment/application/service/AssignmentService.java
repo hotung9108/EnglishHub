@@ -55,7 +55,11 @@ public class AssignmentService {
 	@Transactional(readOnly = true)
 	public AssignmentListResult listAssignments(String statusValue, long classId, int page, int limit) {
 		User caller = currentUserProvider.requireActiveUser();
-		requireClassAccess(classId, caller);
+		if (caller.role() == UserRole.ADMIN) {
+			classAccessOrThrow(classId, caller);
+		} else {
+			requireClassAccess(classId, caller);
+		}
 		AssignmentStatus status = parseStatusFilter(statusValue);
 		AssignmentPageRequest pageRequest = new AssignmentPageRequest(page, limit);
 		if (!pageRequest.isValid()) {
