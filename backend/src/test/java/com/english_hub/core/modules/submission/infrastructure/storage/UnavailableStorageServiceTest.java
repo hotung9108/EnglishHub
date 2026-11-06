@@ -28,4 +28,11 @@ class UnavailableStorageServiceTest {
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Lưu trữ chưa được cấu hình.");
 	}
+
+	@Test
+	void generatePresignedDownload_throwsClearError_whenStorageNotConfigured() {
+		assertThatThrownBy(() -> storageService.generatePresignedDownload("key", java.time.Duration.ofMinutes(15), null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Lưu trữ chưa được cấu hình.");
+	}
 }

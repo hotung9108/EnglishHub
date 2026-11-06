@@ -1,8 +1,10 @@
 package com.english_hub.core.modules.module.presentation.rest;
 
+import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
 import com.english_hub.core.modules.module.application.service.ModuleService;
+import com.english_hub.core.modules.module.presentation.rest.dto.AudioDownloadUrlResponse;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadConfirmRequest;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadConfirmResponse;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadUrlRequest;
@@ -69,7 +71,9 @@ public class ModuleController {
 
 	@GetMapping("/modules/{moduleId}")
 	public ResponseEntity<ModuleDetailResponse> getModule(@PathVariable long moduleId) {
-		return ResponseEntity.ok(ModuleDetailResponse.from(moduleService.getModule(moduleId)));
+		Module module = moduleService.getModule(moduleId);
+		String audioDownloadUrl = moduleService.resolveAudioDownloadUrl(module);
+		return ResponseEntity.ok(ModuleDetailResponse.from(module, audioDownloadUrl));
 	}
 
 	@PutMapping("/modules/{moduleId}")
@@ -116,46 +120,9 @@ public class ModuleController {
 				result.uploadStatus()));
 	}
 
-	@GetMapping("/modules/{moduleId}/audio")
-	public ResponseEntity<byte[]> getModuleAudio(
-			@PathVariable long moduleId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
-		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(moduleId);
-		byte[] allBytes = result.bytes();
-		int totalLength = allBytes.length;
-		MediaType mediaType = MediaType.parseMediaType(result.mimeType());
-
-		if (rangeHeader != null && rangeHeader.startsWith("bytes=") && totalLength > 0) {
-			String rangeSpec = rangeHeader.substring(6).trim();
-			int hyphenIndex = rangeSpec.indexOf('-');
-			if (hyphenIndex != -1) {
-				try {
-					String startStr = rangeSpec.substring(0, hyphenIndex).trim();
-					String endStr = rangeSpec.substring(hyphenIndex + 1).trim();
-					int start = startStr.isEmpty() ? 0 : Integer.parseInt(startStr);
-					int end = endStr.isEmpty() ? totalLength - 1 : Integer.parseInt(endStr);
-					if (start >= 0 && start <= end && start < totalLength) {
-						end = Math.min(end, totalLength - 1);
-						byte[] slice = Arrays.copyOfRange(allBytes, start, end + 1);
-						return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-								.contentType(mediaType)
-								.header(HttpHeaders.ACCEPT_RANGES, "bytes")
-								.header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength)
-								.header(HttpHeaders.CONTENT_LENGTH, String.valueOf(slice.length))
-								.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-								.body(slice);
-					}
-				} catch (NumberFormatException ignored) {
-					// Fall back to full audio content
-				}
-			}
-		}
-
-		return ResponseEntity.ok()
-				.contentType(mediaType)
-				.header(HttpHeaders.ACCEPT_RANGES, "bytes")
-				.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-				.contentLength(totalLength)
-				.body(allBytes);
+	@GetMapping("/modules/{moduleId}/audio-download-url")
+	public ResponseEntity<AudioDownloadUrlResponse> getAudioDownloadUrl(@PathVariable long moduleId) {
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(moduleId);
+		return ResponseEntity.ok(AudioDownloadUrlResponse.of("Lấy link tải audio thành công.", result));
 	}
 }

@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.submission.application.port;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 
 /**
@@ -25,6 +26,18 @@ public interface StorageService {
 	}
 
 	/**
+	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
+	 * authenticated read access with customizable duration and optional content disposition.
+	 */
+	default PresignedDownload generatePresignedDownload(String storageKey, Duration duration, String responseContentDisposition) {
+		return null;
+	}
+
+	default PresignedDownload generatePresignedDownload(String storageKey, Duration duration) {
+		return generatePresignedDownload(storageKey, duration, null);
+	}
+
+	/**
 	 * Fetches the raw bytes of the object directly from storage. Returns null if missing.
 	 */
 	default byte[] getObjectBytes(String storageKey) {
@@ -43,5 +56,8 @@ public interface StorageService {
 	void deleteObject(String storageKey);
 
 	record PresignedUpload(String uploadUrl, String storageKey, OffsetDateTime expiresAt) {
+	}
+
+	record PresignedDownload(String downloadUrl, String storageKey, OffsetDateTime expiresAt) {
 	}
 }

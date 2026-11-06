@@ -14,9 +14,14 @@ public record ModuleDetailResponse(
 		String sourceAudioStorageKey,
 		Integer sourceAudioDurationSeconds,
 		String sourceAudioMimeType,
-		String sourceAudioUploadStatus) {
+		String sourceAudioUploadStatus,
+		String sourceAudioDownloadUrl) {
 
 	public static ModuleDetailResponse from(Module module) {
+		return from(module, null);
+	}
+
+	public static ModuleDetailResponse from(Module module, String sourceAudioDownloadUrl) {
 		return new ModuleDetailResponse(
 				module.id(),
 				module.skill().name(),
@@ -28,6 +33,7 @@ public record ModuleDetailResponse(
 				module.sourceAudioStorageKey(),
 				module.sourceAudioDurationSeconds(),
 				module.sourceAudioMimeType(),
-				module.sourceAudioUploadStatus() == null ? null : module.sourceAudioUploadStatus().name());
+				module.sourceAudioUploadStatus() == null ? null : module.sourceAudioUploadStatus().name(),
+				sourceAudioDownloadUrl);
 	}
 }
