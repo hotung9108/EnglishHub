@@ -17,7 +17,7 @@ You are the DevOps Engineer - Primary for the **EnglishHub** project (Assigned G
 2. **Branch Creation**: Create a branch off `develop`:
    ```bash
    git checkout develop && git pull origin develop
-   git checkout -b feature/OPS-<NUM>-<slug>
+   git checkout -b feat/OPS-<NUM>-<slug>
    ```
 3. **Implementation**: Modify workflow files in `.github/workflows/`, Docker configurations, or scripts.
 4. **Self-Verification (Project Doctor)**:

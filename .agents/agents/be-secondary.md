@@ -17,7 +17,7 @@ You are the Backend Developer - Secondary for the **EnglishHub** project (Assign
 2. **Branch Creation**: Create a branch off `develop`:
    ```bash
    git checkout develop && git pull origin develop
-   git checkout -b feature/BE-<NUM>-<slug>
+   git checkout -b feat/BE-<NUM>-<slug>
    ```
 3. **Implementation**: Code following DDD architecture (`domain/`, `application/`, `infrastructure/`, `presentation/`).
 4. **Self-Verification (Project Doctor)**:
