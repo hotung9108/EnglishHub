@@ -25,8 +25,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -171,7 +169,7 @@ class ModuleControllerTest {
 		assertThat(response.getHeaders().getCacheControl()).contains("private");
 		assertThat(response.getHeaders().getContentLength()).isEqualTo(3);
 		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
-		assertThat(((ByteArrayResource) response.getBody()).getByteArray()).containsExactly((byte) 1, (byte) 2, (byte) 3);
+		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2, (byte) 3);
 	}
 
 	@Test
@@ -184,10 +182,8 @@ class ModuleControllerTest {
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PARTIAL_CONTENT);
 		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
 		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
-		assertThat(response.getBody()).isInstanceOf(ResourceRegion.class);
-		ResourceRegion region = (ResourceRegion) response.getBody();
-		assertThat(region.getPosition()).isEqualTo(0);
-		assertThat(region.getCount()).isEqualTo(2);
+		assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE)).isEqualTo("bytes 0-1/5");
+		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2);
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

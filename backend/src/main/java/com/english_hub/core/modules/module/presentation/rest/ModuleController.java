@@ -16,12 +16,10 @@ import com.english_hub.core.modules.module.presentation.rest.dto.ModuleSummaryRe
 import com.english_hub.core.modules.module.presentation.rest.dto.UpdateModuleRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRange;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -119,23 +117,37 @@ public class ModuleController {
 	}
 
 	@GetMapping("/modules/{moduleId}/audio")
-	public ResponseEntity<?> getModuleAudio(
+	public ResponseEntity<byte[]> getModuleAudio(
 			@PathVariable long moduleId,
 			@org.springframework.web.bind.annotation.RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
 		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(moduleId);
-		ByteArrayResource resource = new ByteArrayResource(result.bytes());
+		byte[] allBytes = result.bytes();
+		int totalLength = allBytes.length;
 		MediaType mediaType = MediaType.parseMediaType(result.mimeType());
 
-		if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
-			List<HttpRange> ranges = HttpRange.parseRanges(rangeHeader);
-			if (!ranges.isEmpty()) {
-				HttpRange range = ranges.get(0);
-				ResourceRegion region = range.toResourceRegion(resource);
-				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-						.contentType(mediaType)
-						.header(HttpHeaders.ACCEPT_RANGES, "bytes")
-						.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-						.body(region);
+		if (rangeHeader != null && rangeHeader.startsWith("bytes=") && totalLength > 0) {
+			String rangeSpec = rangeHeader.substring(6).trim();
+			int hyphenIndex = rangeSpec.indexOf('-');
+			if (hyphenIndex != -1) {
+				try {
+					String startStr = rangeSpec.substring(0, hyphenIndex).trim();
+					String endStr = rangeSpec.substring(hyphenIndex + 1).trim();
+					int start = startStr.isEmpty() ? 0 : Integer.parseInt(startStr);
+					int end = endStr.isEmpty() ? totalLength - 1 : Integer.parseInt(endStr);
+					if (start >= 0 && start <= end && start < totalLength) {
+						end = Math.min(end, totalLength - 1);
+						byte[] slice = Arrays.copyOfRange(allBytes, start, end + 1);
+						return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+								.contentType(mediaType)
+								.header(HttpHeaders.ACCEPT_RANGES, "bytes")
+								.header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + totalLength)
+								.header(HttpHeaders.CONTENT_LENGTH, String.valueOf(slice.length))
+								.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+								.body(slice);
+					}
+				} catch (NumberFormatException ignored) {
+					// Fall back to full audio content
+				}
 			}
 		}
 
@@ -143,7 +155,7 @@ public class ModuleController {
 				.contentType(mediaType)
 				.header(HttpHeaders.ACCEPT_RANGES, "bytes")
 				.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-				.contentLength(result.bytes().length)
-				.body(resource);
+				.contentLength(totalLength)
+				.body(allBytes);
 	}
 }
