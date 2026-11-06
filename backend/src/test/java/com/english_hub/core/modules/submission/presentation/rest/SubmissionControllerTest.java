@@ -257,7 +257,7 @@ class SubmissionControllerTest {
 	@Test
 	void mapsTheModuleDetailResultToAnOkResponse() {
 		JsonNode correctAnswer = new JsonMapper().readTree(
-				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"is_correct\":true}]}");
+				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"isCorrect\":true}]}");
 		JsonNode answerContent = new JsonMapper().readTree("{\"selectedOptionIds\":[1]}");
 		SubmissionModuleDetailResult result = new SubmissionModuleDetailResult(
 				150L,
@@ -288,6 +288,8 @@ class SubmissionControllerTest {
 		assertThat(body.questions().getFirst().id()).isEqualTo(21L);
 		assertThat(body.questions().getFirst().questionType()).isEqualTo("MULTIPLE_CHOICE");
 		assertThat(body.questions().getFirst().correctAnswer().get("options").get(0).get("id").asInt()).isEqualTo(1);
+		assertThat(body.questions().getFirst().correctAnswer().get("options").get(0).get("isCorrect").asBoolean())
+				.isTrue();
 		assertThat(body.answers()).hasSize(1);
 		assertThat(body.answers().getFirst().questionId()).isEqualTo(21L);
 		assertThat(body.answers().getFirst().content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);

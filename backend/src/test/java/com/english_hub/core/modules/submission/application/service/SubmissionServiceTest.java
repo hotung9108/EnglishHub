@@ -1387,19 +1387,17 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void submitModule_marksRecordingUploadingWhenNoAudioExists() {
+	void submitModule_throwsBadRequestWhenNoAudioExists() {
 		when(assignmentWindowRepository.findWindowById(5L))
 				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
-		when(answerRepository.bulkCreate(eq(103L), anyList())).thenAnswer(savedAnswers(1102L));
 
-		AnswerResult answer = submissionService.submitModule(103L, List.of()).answers().get(0);
+		assertThatThrownBy(() -> submissionService.submitModule(103L, List.of()))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Vui lòng tải lên file ghi âm trước khi nộp bài.");
 
-		assertThat(answer.audioStorageKey()).isNull();
-		assertThat(answer.audioMimeType()).isNull();
-		assertThat(answer.audioUploadStatus()).isEqualTo(UploadStatus.UPLOADING);
 		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
 		verify(storageService).objectExists("submissions/88/module-103/audio.mp3");
 		verify(storageService).objectExists("submissions/88/module-103/audio.wav");
@@ -1977,8 +1975,8 @@ class SubmissionServiceTest {
 		quizGrading.setId(77L);
 		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(quizGrading));
 		when(moduleQuestionRepository.findDetailsByModuleId(9L))
-				.thenReturn(List.of(questionDetail(21L)));
-		Answer answer = new Answer(150L, 21L, "{\"selectedOptionIds\":[1]}");
+				.thenReturn(List.of(questionDetail(21L), shortAnswerQuestionDetail("{\"correct_answer\":\"English\"}")));
+		Answer answer = new Answer(150L, 21L, "{\"selected_option_ids\":[1]}");
 		answer.setId(340L);
 		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(answer));
 
@@ -2000,10 +1998,12 @@ class SubmissionServiceTest {
 		assertThat(question.score()).isEqualByComparingTo("1");
 		assertThat(question.orderIndex()).isEqualTo(1);
 		assertThat(question.correctAnswer()).isNull();
+		assertThat(result.questions()).hasSize(2).allSatisfy(item -> assertThat(item.correctAnswer()).isNull());
 		AnswerResult answerResult = result.answers().getFirst();
 		assertThat(answerResult.id()).isEqualTo(340L);
 		assertThat(answerResult.questionId()).isEqualTo(21L);
 		assertThat(answerResult.content().get("selectedOptionIds").get(0).asInt()).isEqualTo(1);
+		assertThat(answerResult.content().has("selected_option_ids")).isFalse();
 	}
 
 	@Test
@@ -2018,7 +2018,8 @@ class SubmissionServiceTest {
 
 		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
 				.isInstanceOf(ApiException.class)
-				.hasMessage("Phần làm bài chưa được nộp.");
+				.hasMessage("Phần làm bài chưa được nộp.")
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 		verify(moduleQuestionRepository, never()).findDetailsByModuleId(anyLong());
 		verify(answerRepository, never()).findBySubmissionModuleId(anyLong());
 	}
@@ -2035,12 +2036,15 @@ class SubmissionServiceTest {
 
 		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
 				.isInstanceOf(ApiException.class)
-				.hasMessage("Phần làm bài chưa được nộp.");
+				.hasMessage("Phần làm bài chưa được nộp.")
+				.satisfies(exception -> assertThat(((ApiException) exception).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
 		verify(gradingRepository, never()).findBySubmissionModuleId(anyLong());
 	}
 
-	@Test
-	void getModuleDetailRevealsCorrectAnswersWhenGraded() {
+	@ParameterizedTest(name = "{0}, {1}, camelCase={2}, answered={3}")
+	@MethodSource("gradedModuleReadCases")
+	void getModuleDetailRevealsCorrectAnswersWhenGraded(
+			ModuleSkill skill, GradingMethod method, boolean camelCase, boolean answered) {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule gradedModule = module(9L);
 		gradedModule.setId(150L);
@@ -2050,19 +2054,85 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
-				.thenReturn(List.of(moduleInfo(9L, ModuleTaskType.QUIZ)));
-		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+				.thenReturn(List.of(moduleInfo(9L, skill, ModuleTaskType.QUIZ)));
+		Grading completedGrading = new Grading(150L, method, GradingStatus.COMPLETED,
+				BigDecimal.valueOf(8), BigDecimal.TEN, "AI feedback", "Final feedback");
+		completedGrading.setId(77L);
+		when(gradingRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(completedGrading));
+		String mcJson = questionDetail(21L).correctAnswer();
+		String saJson = "{\"correct_answer\":\"English\"}";
+		if (camelCase) {
+			mcJson = mcJson.replace("is_correct", "isCorrect");
+			saJson = saJson.replace("correct_answer", "correctAnswer");
+		}
+		QuestionDetail mcQuestion = new QuestionDetail(21L, 9L, QuestionType.MULTIPLE_CHOICE,
+				BigDecimal.ONE, 1, "Which word best describes...?", mcJson);
+		QuestionDetail saQuestion = shortAnswerQuestionDetail(saJson);
 		when(moduleQuestionRepository.findDetailsByModuleId(9L))
-				.thenReturn(List.of(questionDetail(21L)));
-		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
+				.thenReturn(List.of(mcQuestion, saQuestion));
+		String expectedAnswerContent = "{\"isCorrect\":true,\"selectedOptionIds\":[1],\"text\":\"English\",\"score\":1}";
+		String storedAnswerContent = camelCase ? expectedAnswerContent
+				: "{\"is_correct\":true,\"selected_option_ids\":[1],\"answer_text\":\"English\",\"score\":1}";
+		Answer answer = new Answer(150L, 21L, storedAnswerContent);
+		answer.setId(340L);
+		Answer unanswered = new Answer(150L, 22L, null);
+		unanswered.setId(341L);
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(answered ? List.of(answer, unanswered) : List.of());
 
 		SubmissionModuleDetailResult result = submissionService.getModuleDetail(150L);
 
 		assertThat(result.status()).isEqualTo(SubmissionStatus.GRADED);
+		assertThat(result.skill()).isEqualTo(skill);
+		assertThat(result.taskType()).isEqualTo(ModuleTaskType.QUIZ);
+		assertThat(result.grading()).isEqualTo(new GradingDetailResult(77L, method, GradingStatus.COMPLETED,
+				BigDecimal.valueOf(8), BigDecimal.TEN, "AI feedback", "Final feedback"));
+		assertThat(result.questions()).hasSize(2).allSatisfy(question ->
+				assertThat(question.score()).isEqualByComparingTo(BigDecimal.ONE));
 		JsonNode correctAnswer = result.questions().getFirst().correctAnswer();
 		assertThat(correctAnswer).isNotNull();
 		assertThat(correctAnswer.get("options").get(0).get("id").asInt()).isEqualTo(1);
-		assertThat(correctAnswer.get("options").get(0).get("is_correct").asBoolean()).isTrue();
+		assertThat(correctAnswer.get("options").get(0).get("isCorrect").asBoolean()).isTrue();
+		assertThat(correctAnswer.get("options").get(0).has("is_correct")).isFalse();
+		assertThat(result.questions().get(1).correctAnswer())
+				.isEqualTo(JSON_READER.readTree("{\"correctAnswer\":\"English\"}"));
+		if (camelCase) {
+			assertThat(correctAnswer).isEqualTo(JSON_READER.readTree(mcJson));
+			assertThat(result.questions().get(1).correctAnswer()).isEqualTo(JSON_READER.readTree(saJson));
+		}
+		if (answered) {
+			assertThat(result.answers()).hasSize(2);
+			assertThat(result.answers().getFirst().content()).isEqualTo(JSON_READER.readTree(expectedAnswerContent));
+			assertThat(result.answers().get(1).content()).isNull();
+		} else {
+			assertThat(result.answers()).isEmpty();
+		}
+		assertThat(submissionService.getModuleDetail(150L)).isEqualTo(result);
+		assertThat(mcQuestion.correctAnswer()).isEqualTo(mcJson);
+		assertThat(saQuestion.correctAnswer()).isEqualTo(saJson);
+		assertThat(answer.getContent()).isEqualTo(storedAnswerContent);
+		assertThat(unanswered.getContent()).isNull();
+		assertThat(gradedModule.getStatus()).isEqualTo(SubmissionStatus.GRADED);
+		assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.GRADED);
+		assertThat(completedGrading.getFinalScore()).isEqualByComparingTo("8");
+		verify(currentUserProvider, times(2)).requireActiveUser();
+		verify(submissionModuleRepository, times(2)).findById(150L);
+		verify(submissionRepository, times(2)).findById(5L);
+		verify(assignmentModuleRepository, times(2)).findModulesByAssignmentId(5L);
+		verify(gradingRepository, times(2)).findBySubmissionModuleId(150L);
+		verify(moduleQuestionRepository, times(2)).findDetailsByModuleId(9L);
+		verify(answerRepository, times(2)).findBySubmissionModuleId(150L);
+		verifyNoMoreInteractions(currentUserProvider, submissionModuleRepository, submissionRepository,
+				assignmentModuleRepository, gradingRepository, moduleQuestionRepository, answerRepository);
+		verifyNoInteractions(assignmentWindowRepository, classTeachingRepository, studentClassEnrollmentRepository,
+				storageService, eventPublisher);
+	}
+
+	static Stream<Arguments> gradedModuleReadCases() {
+		return Stream.of(
+				Arguments.of(ModuleSkill.READING, GradingMethod.AUTO, false, false),
+				Arguments.of(ModuleSkill.LISTENING, GradingMethod.AUTO, true, true),
+				Arguments.of(ModuleSkill.READING, GradingMethod.TEACHER_MANUAL, true, true),
+				Arguments.of(ModuleSkill.LISTENING, GradingMethod.TEACHER_MANUAL, false, true));
 	}
 
 	@Test
@@ -2109,8 +2179,10 @@ class SubmissionServiceTest {
 		assertThat(result.answers()).isEmpty();
 	}
 
-	@Test
-	void getModuleDetailReturnsEmptyQuestionsAndAnswersForEssay() {
+	@ParameterizedTest(name = "{0}, {1}")
+	@MethodSource("fileModuleReadCases")
+	void getModuleDetailPreservesAnswersWithoutQuestionId(
+			ModuleSkill skill, ModuleTaskType taskType, String content) {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule essayModule = submittedModule(10L);
 		essayModule.setId(151L);
@@ -2119,19 +2191,52 @@ class SubmissionServiceTest {
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
-				.thenReturn(List.of(moduleInfo(10L, ModuleTaskType.ESSAY)));
+				.thenReturn(List.of(moduleInfo(10L, skill, taskType)));
 		Grading essayGrading = grading(151L, GradingMethod.TEACHER_MANUAL, GradingStatus.PENDING);
 		essayGrading.setId(78L);
 		when(gradingRepository.findBySubmissionModuleId(151L)).thenReturn(List.of(essayGrading));
 		when(moduleQuestionRepository.findDetailsByModuleId(10L)).thenReturn(List.of());
-		when(answerRepository.findBySubmissionModuleId(151L)).thenReturn(List.of());
+		Answer answer = new Answer(151L, null, content);
+		answer.setId(341L);
+		answer.setDocStorageKey("submissions/88/module-10/essay.pdf");
+		answer.setDocMimeType("application/pdf");
+		answer.setDocUploadStatus(UploadStatus.READY);
+		answer.setAudioStorageKey("submissions/88/module-10/recording.webm");
+		answer.setAudioMimeType("audio/webm");
+		answer.setAudioUploadStatus(UploadStatus.READY);
+		when(answerRepository.findBySubmissionModuleId(151L)).thenReturn(List.of(answer));
 
 		SubmissionModuleDetailResult result = submissionService.getModuleDetail(151L);
 
-		assertThat(result.taskType()).isEqualTo(ModuleTaskType.ESSAY);
+		assertThat(result.skill()).isEqualTo(skill);
+		assertThat(result.taskType()).isEqualTo(taskType);
 		assertThat(result.questions()).isEmpty();
-		assertThat(result.answers()).isEmpty();
+		assertThat(result.answers()).containsExactly(new AnswerResult(341L, null,
+				content == null ? null : JSON_READER.valueToTree(content),
+				answer.getDocStorageKey(), answer.getDocMimeType(), answer.getDocUploadStatus(),
+				answer.getAudioStorageKey(), answer.getAudioMimeType(), answer.getAudioUploadStatus()));
+		assertThat(answer.getContent()).isEqualTo(content);
 		assertThat(result.grading().method()).isEqualTo(GradingMethod.TEACHER_MANUAL);
+		verify(answerRepository).findBySubmissionModuleId(151L);
+		verifyNoMoreInteractions(answerRepository);
+		verify(submissionRepository, never()).save(any());
+		verify(submissionModuleRepository, never()).save(any());
+		verify(gradingRepository, never()).save(any());
+	}
+
+	static Stream<Arguments> fileModuleReadCases() {
+		return Stream.of(
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, "Technology improves education."),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, "Tiếng Việt \"đúng\"\n答え"),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, ""),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, " \t\n"),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, "42"),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, "true"),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, "{\"answer_text\":\"Essay\",\"is_correct\":true}"),
+				Arguments.of(ModuleSkill.SPEAKING, ModuleTaskType.RECORDING, "{\"selected_option_ids\":[1],\"is_correct\":false}"),
+				Arguments.of(ModuleSkill.READING, ModuleTaskType.REWRITE, "\"{\\\"answer_text\\\":\\\"Essay\\\"}\""),
+				Arguments.of(ModuleSkill.WRITING, ModuleTaskType.ESSAY, null),
+				Arguments.of(ModuleSkill.SPEAKING, ModuleTaskType.RECORDING, "null"));
 	}
 
 	@Test
@@ -2581,6 +2686,11 @@ class SubmissionServiceTest {
 				"Which word best describes...?",
 				"{\"options\":[{\"id\":1,\"content\":\"Option A\",\"is_correct\":true},"
 						+ "{\"id\":2,\"content\":\"Option B\",\"is_correct\":false}]}");
+	}
+
+	private QuestionDetail shortAnswerQuestionDetail(String correctAnswer) {
+		return new QuestionDetail(22L, 9L, QuestionType.SHORT_ANSWER, BigDecimal.ONE, 2,
+				"Write the answer.", correctAnswer);
 	}
 
 	private ModuleInfo moduleInfo(Long moduleId, ModuleTaskType taskType) {

@@ -1,0 +1,67 @@
+name: PR Convention Linter
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - develop
+      - staging
+      - main
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  lint-pr:
+    name: Validate PR Title and Branch
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Check Branch and Title Convention
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          python3 -c "
+          import re, sys, os
+
+          title = os.environ.get('PR_TITLE', '').strip()
+          branch = os.environ.get('PR_BRANCH', '').strip()
+
+          title_pattern = r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\((FE|BE|OPS|QA|AI|PM)-[0-9]+\):\s.+'
+          branch_pattern = r'^(feature|fix|chore|docs|refactor)\/(FE|BE|OPS|QA|AI|PM)-[0-9]+-[a-z0-9-]+$'
+
+          print('==============================================')
+          print('      PR CONVENTION & BRANCH LINTER           ')
+          print('==============================================')
+          print(f'PR Title : \"{title}\"')
+          print(f'Branch   : \"{branch}\"')
+          print('----------------------------------------------')
+
+          # Skip branch check for release PRs from develop to staging or staging to main
+          is_release_pr = branch in ('develop', 'staging')
+
+          title_ok = bool(re.match(title_pattern, title, re.IGNORECASE))
+          branch_ok = is_release_pr or bool(re.match(branch_pattern, branch, re.IGNORECASE))
+
+          failed = False
+          if not title_ok:
+              print('::error::PR title does not match convention: type(ROLE-NUM): description (e.g. feat(FE-84): add audio studio)')
+              failed = True
+          else:
+              print('[PASS] PR Title format is compliant.')
+
+          if not branch_ok:
+              print('::error::Branch name does not match convention: feature/ROLE-NUM-slug (e.g. feature/FE-84-audio-player)')
+              failed = True
+          else:
+              print('[PASS] Branch name format is compliant.')
+
+          print('==============================================')
+          if failed:
+              print('STATUS: FAILED - Please update PR title or branch name.')
+              sys.exit(1)
+          else:
+              print('STATUS: PASSED - Convention checks compliant.')
+          "

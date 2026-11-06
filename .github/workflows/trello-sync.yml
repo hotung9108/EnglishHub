@@ -1,0 +1,179 @@
+name: Trello Auto-Sync Bot
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+    branches:
+      - develop
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  sync-trello:
+    name: Sync PR Status to Trello
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Sync Trello Card
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_API_TOKEN: ${{ secrets.TRELLO_API_TOKEN }}
+          TRELLO_BOARD_ID: ${{ vars.TRELLO_BOARD_ID || '6a7f2e4b7b1d207eee516457' }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_USER: ${{ github.event.pull_request.user.login }}
+        run: |
+          python3 - << 'EOF'
+          import json
+          import os
+          import re
+          import urllib.parse
+          import urllib.request
+          import sys
+
+          api_key = os.environ.get("TRELLO_API_KEY")
+          api_token = os.environ.get("TRELLO_API_TOKEN")
+          board_id = os.environ.get("TRELLO_BOARD_ID", "6a7f2e4b7b1d207eee516457")
+          pr_title = os.environ.get("PR_TITLE", "")
+          pr_branch = os.environ.get("PR_BRANCH", "")
+          pr_url = os.environ.get("PR_URL", "")
+          pr_number = os.environ.get("PR_NUMBER", "")
+          pr_action = os.environ.get("PR_ACTION", "")
+          pr_merged = os.environ.get("PR_MERGED", "false").lower() == "true"
+          pr_user = os.environ.get("PR_USER", "")
+
+          if not api_key or not api_token:
+              print("Notice: TRELLO_API_KEY or TRELLO_API_TOKEN not configured in GitHub Secrets. Skipping Trello sync.")
+              sys.exit(0)
+
+          # Clean diacritics / common typos in branch or title
+          clean_text = pr_title.replace('fĩ', 'fix').replace('fì', 'fix') + ' ' + pr_branch
+
+          # Extract canonical role tag (FE-46, BE-15, OPS-35, QA-20, etc.)
+          tag_match = re.search(r"\b((?:FE|BE|OPS|QA|AI|PM)-\d+)\b", clean_text, re.IGNORECASE)
+          card_tag = tag_match.group(1).upper() if tag_match else None
+
+          # Extract GitHub Issue numbers (#176, #192, ISSUE-176, etc.)
+          issue_numbers = re.findall(r"(?:ISSUE[\s\-_]*#?|#)(\d+)\b", clean_text, re.IGNORECASE)
+
+          print(f"Extracted info: CardTag='{card_tag}', IssueNumbers={issue_numbers}")
+
+          if not card_tag and not issue_numbers:
+              print(f"No card tag matching (FE|BE|OPS|QA|AI|PM)-NUM or Issue numbers found in: '{pr_title}' / '{pr_branch}'")
+              sys.exit(0)
+
+          def trello_request(endpoint, method="GET", params=None, data=None):
+              base = "https://api.trello.com/1"
+              query = {"key": api_key, "token": api_token}
+              if params:
+                  query.update(params)
+              url = f"{base}{endpoint}?{urllib.parse.urlencode(query)}"
+              
+              payload = None
+              headers = {"Accept": "application/json"}
+              if data:
+                  payload = json.dumps(data).encode("utf-8")
+                  headers["Content-Type"] = "application/json"
+                  
+              req = urllib.request.Request(url, data=payload, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req) as response:
+                      if response.status in (200, 201):
+                          res_body = response.read().decode("utf-8")
+                          return json.loads(res_body) if res_body else {}
+                      return {}
+              except urllib.error.HTTPError as e:
+                  print(f"HTTPError: {e.code} - {e.read().decode('utf-8')}")
+                  return None
+              except Exception as e:
+                  print(f"Request error: {e}")
+                  return None
+
+          # Fetch lists on the board
+          lists = trello_request(f"/boards/{board_id}/lists")
+          if not lists:
+              print(f"Failed to fetch lists for board {board_id}")
+              sys.exit(0)
+
+          review_list = next((l for l in lists if "review" in l["name"].lower()), None)
+          if not review_list:
+              print("Could not find a 'Review' list on the Trello board.")
+
+          # Find cards on the board
+          cards = trello_request(f"/boards/{board_id}/cards")
+          if not cards:
+              print(f"Failed to fetch cards for board {board_id}")
+              sys.exit(0)
+
+          # Multi-tier matching engine
+          target_card = None
+          match_reason = None
+
+          # Tier 1: Canonical [ROLE-NUM] match in card title
+          if card_tag:
+              target_card = next((c for c in cards if f"[{card_tag}]" in c["name"].upper() or f" {card_tag} " in f" {c['name'].upper()} "), None)
+              if target_card:
+                  match_reason = f"Tier 1 (Exact Tag: [{card_tag}])"
+
+          # Tier 2: Match by GitHub Issue number in card title (e.g. [FE-47][ISSUE #192])
+          if not target_card and issue_numbers:
+              for inum in issue_numbers:
+                  pattern = re.compile(rf"#\b{inum}\b")
+                  target_card = next((c for c in cards if pattern.search(c["name"])), None)
+                  if target_card:
+                      match_reason = f"Tier 2 (Issue #{inum} in Card Title)"
+                      break
+
+          # Tier 3: Match legacy role tag in card description (e.g. renumbered cards referencing [FE-72])
+          if not target_card and card_tag:
+              target_card = next((c for c in cards if f"[{card_tag}]" in c.get("desc", "").upper() or f"`{card_tag}`" in c.get("desc", "").upper()), None)
+              if target_card:
+                  match_reason = f"Tier 3 (Legacy Tag [{card_tag}] in Description)"
+
+          # Tier 4: Match Issue number in card description
+          if not target_card and issue_numbers:
+              for inum in issue_numbers:
+                  pattern = re.compile(rf"#\b{inum}\b")
+                  target_card = next((c for c in cards if pattern.search(c.get("desc", ""))), None)
+                  if target_card:
+                      match_reason = f"Tier 4 (Issue #{inum} in Description)"
+                      break
+
+          if not target_card:
+              print(f"Card matching tag [{card_tag}] or issues {issue_numbers} not found on board.")
+              sys.exit(0)
+
+          card_id = target_card["id"]
+          print(f"Successfully matched target card via {match_reason}: '{target_card['name']}' (ID: {card_id})")
+
+          # Attach PR URL if not already attached
+          attachments = trello_request(f"/cards/{card_id}/attachments") or []
+          already_attached = any(pr_url in (att.get("url") or "") for att in attachments)
+          if not already_attached and pr_url:
+              print(f"Attaching PR link {pr_url} to card...")
+              trello_request(f"/cards/{card_id}/attachments", method="POST", data={"url": pr_url, "name": f"GitHub PR #{pr_number}"})
+
+          if pr_action in ("opened", "reopened", "ready_for_review"):
+              # Move to Review list if found
+              if review_list and target_card.get("idList") != review_list["id"]:
+                  print(f"Moving card to '{review_list['name']}' list...")
+                  trello_request(f"/cards/{card_id}", method="PUT", data={"idList": review_list["id"]})
+
+              # Post comment tagging Tester
+              comment = f"@zawntsu Developer @{pr_user} opened PR #{pr_number} ({pr_url}). Ready for QA verification!"
+              print("Posting notification comment to card...")
+              trello_request(f"/cards/{card_id}/actions/comments", method="POST", data={"text": comment})
+
+          elif pr_action == "closed" and pr_merged:
+              comment = f"PR #{pr_number} has been merged into develop branch ({pr_url}) by @{pr_user}."
+              print("Posting merge comment to card...")
+              trello_request(f"/cards/{card_id}/actions/comments", method="POST", data={"text": comment})
+
+          print("Trello sync completed successfully.")
+          EOF

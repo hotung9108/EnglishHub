@@ -45,7 +45,7 @@ Học viên vào /student/assignments
 ---
 
 ## 5. Tài liệu liên quan
-- Task Tracker: [.agents/tasks/fe-primary/done/TASK-FE-50-FIX-WRITING-SUBMISSION-FLOW.md](file:///d:/Coding/EnglishHub/.agents/tasks/fe-primary/done/TASK-FE-50-FIX-WRITING-SUBMISSION-FLOW.md)
-- Bug Ticket Backend: [.agents/tasks/bugs/BUG-DOCX-MIME-TYPE-OVERFLOW.yaml](file:///d:/Coding/EnglishHub/.agents/tasks/bugs/BUG-DOCX-MIME-TYPE-OVERFLOW.yaml)
-- Hướng dẫn kiểm thử cho Tester: [production_artifacts/fe_to_tester/FE_50_WRITING_SUBMISSION_FLOW_TEST_GUIDE.md](file:///d:/Coding/EnglishHub/production_artifacts/fe_to_tester/FE_50_WRITING_SUBMISSION_FLOW_TEST_GUIDE.md)
+- Trello Card: `[FE-50] Fix Writing Submission Flow`
+- Backend Issue: `BUG-DOCX-MIME-TYPE-OVERFLOW` (Fixed)
+- Hướng dẫn kiểm thử cho Tester: [production_artifacts/fe_to_tester/FE_50_WRITING_SUBMISSION_FLOW_TEST_GUIDE.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/production_artifacts/fe_to_tester/FE_50_WRITING_SUBMISSION_FLOW_TEST_GUIDE.md)
 - Unit Tests: `frontend/src/api/__tests__/writing-document.test.ts`

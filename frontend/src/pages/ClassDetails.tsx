@@ -47,9 +47,11 @@ export const ClassDetails: React.FC = () => {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
-  const classNumericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 1 : 1;
+  const isValidId = typeof id === 'string' && /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) && Number(id) > 0;
+  const classNumericId = isValidId ? Number(id) : null;
 
   useEffect(() => {
+    if (classNumericId === null) return;
     let isMounted = true;
 
     const fetchClassData = async () => {
@@ -111,6 +113,7 @@ export const ClassDetails: React.FC = () => {
   }, [classNumericId, isVi]);
 
   const handleReloadAssignments = async () => {
+    if (classNumericId === null) return;
     try {
       setAssignmentsLoading(true);
       setAssignmentsError(null);
@@ -126,6 +129,7 @@ export const ClassDetails: React.FC = () => {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (classNumericId === null) return;
     try {
       setSavingSettings(true);
       setSettingsError(null);
@@ -144,6 +148,7 @@ export const ClassDetails: React.FC = () => {
   };
 
   const handleRemoveMember = async (memberId: number, memberName: string) => {
+    if (classNumericId === null) return;
     if (confirm(isVi ? `Xác nhận xóa học viên ${memberName} khỏi lớp?` : `Remove student ${memberName} from class?`)) {
       try {
         await classService.removeMember(classNumericId, memberId);
@@ -158,6 +163,17 @@ export const ClassDetails: React.FC = () => {
   const classCode = `ENG-${classNumericId}`;
   const maxCapacity = settingsForm.maxCapacity || 25;
   const enrolledCount = studentsRoster.length;
+
+  if (classNumericId === null) {
+    return (
+      <div className="adm-container">
+        <div className="adm-alert-error" role="alert">
+          <AlertCircle size={18} />
+          <span>{isVi ? 'ID lớp không hợp lệ' : 'Invalid class ID'}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="adm-container">
@@ -604,6 +620,7 @@ export const ClassDetails: React.FC = () => {
           classNameTitle={classDetail?.name}
           enrolledStudentIds={studentsRoster.map(s => s.studentId)}
           onSuccess={async () => {
+            if (classNumericId === null) return;
             try {
               const members = await classService.listMembers(classNumericId);
               setStudentsRoster(members);

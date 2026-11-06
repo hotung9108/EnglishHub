@@ -3,6 +3,8 @@ package com.english_hub.core.modules.submission.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.module.domain.service.AutoGradeEligibility;
+import com.english_hub.core.modules.submission.application.mapper.AnswerContentMapper;
+import com.english_hub.core.modules.submission.application.mapper.QuestionCorrectAnswerMapper;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.application.port.StorageService.PresignedUpload;
 import com.english_hub.core.modules.submission.application.page.SubmissionPageRequest;
@@ -86,6 +88,7 @@ public class SubmissionService {
 	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
 	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài.";
 	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
+	private static final String AUDIO_NOT_UPLOADED_MESSAGE = "Vui lòng tải lên file ghi âm trước khi nộp bài.";
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
@@ -335,6 +338,10 @@ public class SubmissionService {
 				.findFirst()
 				.orElse(null);
 
+		if (audio && found == null) {
+			throw ApiException.badRequest(AUDIO_NOT_UPLOADED_MESSAGE);
+		}
+
 		String matchedKey = found == null
 				? null
 				: storageKey(submission.getId(), submissionModule.getId(), filename, found.extension());
@@ -512,13 +519,16 @@ public class SubmissionService {
 						question.questionType(),
 						question.score(),
 						question.orderIndex(),
-						graded ? parseContent(question.correctAnswer()) : null))
+						graded ? QuestionCorrectAnswerMapper.toResponse(
+								question.questionType(), parseContent(question.correctAnswer())) : null))
 				.toList();
 		List<AnswerResult> answers = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
 				.map(answer -> new AnswerResult(
 						answer.getId(),
 						answer.getQuestionId(),
-						parseContent(answer.getContent()),
+						answer.getQuestionId() != null
+								? AnswerContentMapper.toResponse(parseContent(answer.getContent()))
+								: toTextContent(answer.getContent()),
 						answer.getDocStorageKey(),
 						answer.getDocMimeType(),
 						answer.getDocUploadStatus(),
@@ -638,6 +648,10 @@ public class SubmissionService {
 				grading.getMaxScoreSnapshot(),
 				grading.getAiFeedback(),
 				grading.getFinalFeedback());
+	}
+
+	private JsonNode toTextContent(String raw) {
+		return raw == null ? null : objectMapper.valueToTree(raw);
 	}
 
 	private JsonNode parseContent(String raw) {

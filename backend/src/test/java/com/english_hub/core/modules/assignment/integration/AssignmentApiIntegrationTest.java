@@ -125,7 +125,7 @@ class AssignmentApiIntegrationTest {
 	}
 
 	@Test
-	void listIsVisibleToOwnerAndMemberButNotOtherRoles() throws Exception {
+	void listIsVisibleToAdminOwnerAndMemberButNotNonOwnersOrNonMembers() throws Exception {
 		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
@@ -145,7 +145,10 @@ class AssignmentApiIntegrationTest {
 				.andExpect(status().isForbidden());
 		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
 					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
-				.andExpect(status().isForbidden());
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].id").value(assignmentId))
+				.andExpect(jsonPath("$.data[0].status").value("DRAFT"));
 	}
 
 	@Test

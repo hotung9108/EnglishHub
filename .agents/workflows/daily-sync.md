@@ -1,32 +1,30 @@
 ---
 name: daily-sync
-description: A workflow to summarize the current project status by reading role-based tasks in .agents/tasks/ and generating an executive report.
+description: A workflow to summarize the current project status, active PRs, handoffs, and sprint focus across all team members.
 ---
 
 # Daily Sync Workflow
 
-When triggered via `/daily-sync`, execute the following steps to provide a status update for the EnglishHub project across all roles and team members.
+When triggered via `/daily-sync`, execute the following steps to provide an executive status update for the EnglishHub project across all roles and team members.
 
 ## Steps:
-1. **Read Task Files**: List and read all `.yaml` files in `.agents/tasks/`:
-   - `.agents/tasks/pm/` (`active/` & `done/`)
-   - `.agents/tasks/be-primary/` (`active/` & `done/`)
-   - `.agents/tasks/be-secondary/` (`active/` & `done/`)
-   - `.agents/tasks/fe-primary/` (`active/` & `done/`)
-   - `.agents/tasks/fe-secondary/` (`active/` & `done/`)
-   - `.agents/tasks/devops-primary/` (`active/` & `done/`)
-   - `.agents/tasks/devops-secondary/` (`active/` & `done/`)
-   - `.agents/tasks/tester/` (`active/` & `done/`)
-   - `.agents/tasks/bugs/` (active vs fixed)
+1. **Analyze Repository State & Git Status**:
+   - Check current branch, unmerged branches, and recent commits.
+   - If Trello MCP is available, query cards in `Ongoing` and `Review` lists on board `Project1`.
+   - If GitHub MCP is available, query open Pull Requests targeting `develop`.
 
-2. **Analyze by Member & Role**:
-   - Map each directory to the team member via [.agents/rules/git-user-mapping.md](file:///d:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
-   - Summarize active vs completed tasks per member.
-   - For bugs, count active (To Do / In Progress) vs Fixed. Highlight High/Critical priority bugs.
+2. **Inspect Production Artifacts & Handoffs**:
+   - Check latest specs and briefings in `production_artifacts/pm_to_dev/`.
+   - Check pending developer handoffs in `production_artifacts/be_to_tester/` and `production_artifacts/fe_to_tester/`.
+   - Check latest test reports and bug validations in `production_artifacts/test_reports/`.
 
-3. **Report Generation**: Output a clean Markdown table summarizing:
-   - Progress per member: `Member (Role) | Active Tasks | Done Tasks | Current Focus`
-   - Active bugs requiring attention.
+3. **Analyze by Member & Role**:
+   - Map active items to team members via [.agents/rules/git-user-mapping.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
+   - Identify which cards are currently in `Ongoing`, which are in `Review` waiting for `@Zawn-Tsu`, and which have been verified to `Done`.
 
-4. **Action Items**: Suggest immediate next steps for each member today.
-5. **Output**: Display the report directly in the chat interface.
+4. **Report Generation**: Output a clean Markdown table summarizing:
+   - Progress per member: `Member (Role) | Active Branch / PR | Current Focus | Handoff Status`
+   - Review Queue: PRs waiting for QA approval.
+   - Blocker / Bug Alert: Any reported regressions or blockers.
+
+5. **Action Items**: Recommend top priority action items for the team today.
