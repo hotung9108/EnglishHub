@@ -119,7 +119,7 @@ sequenceDiagram
     participant GitHub as GitHub (PR & Issue)
     actor QA as Tester (@Zawn-Tsu)
 
-    Dev->>GitHub: Đẩy code lên nhánh fix/ hoặc feature/
+    Dev->>GitHub: Đẩy code lên nhánh fix/ hoặc feat/
     Dev->>GitHub: Mở Pull Request trỏ vào 'develop'
     Dev->>Trello: Tích đủ Checklist DoD kỹ thuật
     Dev->>Trello: Chuyển thẻ sang cột 'Review'
@@ -211,7 +211,7 @@ Bảng Trello `Project1` được cấu trúc thành các nhóm cột logic theo
    │ (Merge sau khi tích hợp ổn định)
   develop (Primary Integration Branch)
    ▲
-   ├── feature/<ROLE>-<NUMBER>-<slug>   (Tính năng mới)
+   ├── feat/<ROLE>-<NUMBER>-<slug>      (Tính năng mới, tương thích feature/...)
    ├── fix/<ROLE>-<NUMBER>-<slug>       (Sửa lỗi theo task Trello)
    └── docs/<slug>                      (Cập nhật tài liệu)
 ```
@@ -221,9 +221,9 @@ Bảng Trello `Project1` được cấu trúc thành các nhóm cột logic theo
 - **`develop`**: Nhánh tích hợp chính. Mọi Pull Request tính năng và bugfix **bắt buộc phải target vào `develop`**.
 
 ### 6.2. Quy tắc đặt tên Nhánh (Branch Naming)
-- **Tính năng mới**: `feature/<ROLE>-<NUMBER>-<kebab-case-desc>` hoặc `feat/...`
-  - *Ví dụ*: `feature/FE-40-teacher-grading-studio`
-  - *Ví dụ*: `feature/OPS-39-ci-ffmpeg-validation`
+- **Tính năng mới**: `feat/<ROLE>-<NUMBER>-<kebab-case-desc>` (chuẩn chính) hoặc `feature/...` (tương thích ngược)
+  - *Ví dụ*: `feat/FE-40-teacher-grading-studio`
+  - *Ví dụ*: `feat/OPS-39-ci-ffmpeg-validation`
 - **Sửa lỗi**: `fix/<ROLE>-<NUMBER>-<kebab-case-desc>`
   - *Ví dụ*: `fix/BE-64-soft-deleted-account-token-issuance`
   - *Ví dụ*: `fix/FE-57-student-writing-lost-text`

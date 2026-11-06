@@ -28,7 +28,7 @@ Detailed conventions are codified in [docs/guidelines/TRELLO_GITHUB_CONVENTION.m
 - `main`: Production-ready code.
 - `staging`: Staging pre-production environment.
 - `develop`: Integration branch for features and fixes.
-- `feature/<ROLE>-<NUMBER>-<slug>`: For new features (e.g., `feature/FE-40-teacher-grading-studio`).
+- `feat/<ROLE>-<NUMBER>-<slug>`: For new features (e.g., `feat/FE-40-teacher-grading-studio`, backwards-compatible with `feature/`).
 - `fix/<ROLE>-<NUMBER>-<slug>`: For bugfixes (e.g., `fix/BE-64-soft-deleted-account-token-issuance`).
 - `docs/<slug>`: For documentation updates.
 Commit messages must follow Conventional Commits (e.g., `feat(BE-66): dispatch auto grading when final submit finalizes modules`).
