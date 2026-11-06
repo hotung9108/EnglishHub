@@ -125,7 +125,7 @@ public final class ApiRoutePolicy {
 					List.of("TEACHER")),
 			new RouteRule(
 					HttpMethod.GET,
-					"/api/v1/modules/{moduleId}/audio",
+					"/api/v1/modules/{moduleId}/audio-download-url",
 					List.of("TEACHER", "STUDENT")),
 
 			// Submission
@@ -152,6 +152,14 @@ public final class ApiRoutePolicy {
 					HttpMethod.POST,
 					"/api/v1/submission-modules/{id}/document-upload-url",
 					List.of("STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/submission-modules/{id}/audio-download-url",
+					List.of("TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/submission-modules/{id}/document-download-url",
+					List.of("TEACHER", "STUDENT")),
 
 			// Grading
 			new RouteRule(

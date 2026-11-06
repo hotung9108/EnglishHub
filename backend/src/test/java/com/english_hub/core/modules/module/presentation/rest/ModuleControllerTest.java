@@ -158,32 +158,22 @@ class ModuleControllerTest {
 	}
 
 	@Test
-	void mapsModuleAudioStreamingResponseWithMimeTypeAndCacheHeader() {
-		when(moduleService.getModuleAudio(9L))
-				.thenReturn(new ModuleService.ModuleAudioResult(new byte[] {1, 2, 3}, "audio/wav"));
+	void mapsModuleAudioDownloadUrlResponse() {
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(moduleService.generateAudioDownloadUrl(9L))
+				.thenReturn(new ModuleService.AudioDownloadUrlResult(
+						9L, "https://storage.example.com/audio.mp3", "modules/9/audio.mp3", "audio/mpeg", 120, expiresAt));
 
-		var response = moduleController.getModuleAudio(9L, null);
+		var response = moduleController.getAudioDownloadUrl(9L);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
-		assertThat(response.getHeaders().getCacheControl()).contains("private");
-		assertThat(response.getHeaders().getContentLength()).isEqualTo(3);
-		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
-		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2, (byte) 3);
-	}
-
-	@Test
-	void mapsModuleAudioStreamingRangeRequestToPartialContent() {
-		when(moduleService.getModuleAudio(9L))
-				.thenReturn(new ModuleService.ModuleAudioResult(new byte[] {1, 2, 3, 4, 5}, "audio/wav"));
-
-		var response = moduleController.getModuleAudio(9L, "bytes=0-1");
-
-		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PARTIAL_CONTENT);
-		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
-		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
-		assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE)).isEqualTo("bytes 0-1/5");
-		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().message()).isEqualTo("Lấy link tải audio thành công.");
+		assertThat(response.getBody().downloadUrl()).isEqualTo("https://storage.example.com/audio.mp3");
+		assertThat(response.getBody().storageKey()).isEqualTo("modules/9/audio.mp3");
+		assertThat(response.getBody().mimeType()).isEqualTo("audio/mpeg");
+		assertThat(response.getBody().durationSeconds()).isEqualTo(120);
+		assertThat(response.getBody().expiresAt()).isEqualTo(expiresAt);
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

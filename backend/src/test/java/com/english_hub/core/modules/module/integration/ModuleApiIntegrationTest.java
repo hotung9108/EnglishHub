@@ -523,28 +523,24 @@ class ModuleApiIntegrationTest {
 		assertThat(moduleRepository.findById(listeningModuleId).orElseThrow().getSourceAudioUploadStatus())
 				.isEqualTo(UploadStatus.READY);
 
-		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
-				.andExpect(content().contentType("audio/mpeg"))
-				.andExpect(content().bytes(audioBytes));
+				.andExpect(jsonPath("$.message").value("Lấy link tải audio thành công."))
+				.andExpect(jsonPath("$.downloadUrl").isNotEmpty())
+				.andExpect(jsonPath("$.storageKey").value(storageKey))
+				.andExpect(jsonPath("$.mimeType").value("audio/mpeg"));
 
-		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isOk())
-				.andExpect(content().bytes(audioBytes));
-
-		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
-					.header("Authorization", bearer(studentId, UserRole.STUDENT))
-					.header("Range", "bytes=0-2"))
-				.andExpect(status().isPartialContent())
-				.andExpect(header().string("Content-Range", "bytes 0-2/6"))
-				.andExpect(content().bytes(new byte[] {'I', 'D', '3'}));
+				.andExpect(jsonPath("$.downloadUrl").isNotEmpty())
+				.andExpect(jsonPath("$.storageKey").value(storageKey));
 
 		for (UserRole blockedRole : new UserRole[] {UserRole.ADMIN, UserRole.TEACHER, UserRole.STUDENT}) {
 			Long blockedUser = blockedRole == UserRole.ADMIN ? adminId
 					: blockedRole == UserRole.TEACHER ? otherTeacherId : otherStudentId;
-			mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+			mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 						.header("Authorization", bearer(blockedUser, blockedRole)))
 					.andExpect(status().isForbidden());
 		}
@@ -606,7 +602,7 @@ class ModuleApiIntegrationTest {
 
 	@Test
 	void audioStreamReturnsNotFoundForMissingAudioOrObject() throws Exception {
-		mockMvc.perform(get("/api/v1/modules/{id}/audio", readingModuleId)
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", readingModuleId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Module chưa có file audio."));
@@ -616,7 +612,7 @@ class ModuleApiIntegrationTest {
 				"audio/mpeg", UploadStatus.READY);
 		moduleRepository.flush();
 
-		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error").value("Module chưa có file audio."));

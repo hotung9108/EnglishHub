@@ -24,6 +24,11 @@ public class UnavailableStorageService implements StorageService {
 	}
 
 	@Override
+	public PresignedDownload generatePresignedDownload(String storageKey, java.time.Duration duration, String responseContentDisposition) {
+		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
+	}
+
+	@Override
 	public byte[] getObjectBytes(String storageKey) {
 		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
 	}

@@ -75,14 +75,28 @@ public class S3StorageService implements StorageService, AutoCloseable {
 	}
 
 	@Override
-	public String generatePresignedGetUrl(String storageKey) {
+	public PresignedDownload generatePresignedDownload(String storageKey, Duration duration, String responseContentDisposition) {
+		Duration ttl = duration != null ? duration : PRESIGN_TTL;
+		GetObjectRequest.Builder getObjectBuilder = GetObjectRequest.builder()
+				.bucket(bucket)
+				.key(storageKey);
+		if (responseContentDisposition != null && !responseContentDisposition.isBlank()) {
+			getObjectBuilder.responseContentDisposition(responseContentDisposition);
+		}
 		PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(GetObjectPresignRequest.builder()
-				.signatureDuration(PRESIGN_TTL)
-				.getObjectRequest(getObject -> getObject
-						.bucket(bucket)
-						.key(storageKey))
+				.signatureDuration(ttl)
+				.getObjectRequest(getObjectBuilder.build())
 				.build());
-		return presigned.url().toString();
+		return new PresignedDownload(
+				presigned.url().toString(),
+				storageKey,
+				OffsetDateTime.ofInstant(presigned.expiration(), ZoneOffset.UTC));
+	}
+
+	@Override
+	public String generatePresignedGetUrl(String storageKey) {
+		PresignedDownload download = generatePresignedDownload(storageKey, PRESIGN_TTL, null);
+		return download != null ? download.downloadUrl() : null;
 	}
 
 	@Override
