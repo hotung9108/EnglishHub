@@ -639,6 +639,29 @@ test('SubmissionService - uploadDirectToStorage rewrites docker minio URLs to /s
   }
 });
 
+test('SubmissionService - uploadDirectToStorage throws when response is not ok', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    return new Response(null, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const dummyBlob = new Blob(['sample-audio-bytes'], { type: 'audio/webm' });
+    await assert.rejects(
+      async () => {
+        await new SubmissionService(new MockHttpClient()).uploadDirectToStorage(
+          'https://storage.example.com/presigned-put-url',
+          dummyBlob,
+          'audio/webm'
+        );
+      },
+      /Tải tệp lên kho lưu trữ thất bại \(HTTP 500\)/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 
 
 test('isModuleGraded accurately determines whether an individual module is graded', () => {

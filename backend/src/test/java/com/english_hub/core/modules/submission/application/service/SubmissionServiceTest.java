@@ -1387,19 +1387,17 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void submitModule_marksRecordingUploadingWhenNoAudioExists() {
+	void submitModule_throwsBadRequestWhenNoAudioExists() {
 		when(assignmentWindowRepository.findWindowById(5L))
 				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
-		when(answerRepository.bulkCreate(eq(103L), anyList())).thenAnswer(savedAnswers(1102L));
 
-		AnswerResult answer = submissionService.submitModule(103L, List.of()).answers().get(0);
+		assertThatThrownBy(() -> submissionService.submitModule(103L, List.of()))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Vui lòng tải lên file ghi âm trước khi nộp bài.");
 
-		assertThat(answer.audioStorageKey()).isNull();
-		assertThat(answer.audioMimeType()).isNull();
-		assertThat(answer.audioUploadStatus()).isEqualTo(UploadStatus.UPLOADING);
 		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
 		verify(storageService).objectExists("submissions/88/module-103/audio.mp3");
 		verify(storageService).objectExists("submissions/88/module-103/audio.wav");
