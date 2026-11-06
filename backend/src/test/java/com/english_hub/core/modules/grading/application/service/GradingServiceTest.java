@@ -3,7 +3,9 @@ package com.english_hub.core.modules.grading.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -36,7 +38,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -299,6 +306,102 @@ class GradingServiceTest {
 				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
 		verify(gradingRepository, never()).saveTeacherGrade(any());
 		verifyNoInteractions(gradingChangeLogRepository);
+	}
+
+	@Test
+	void owningStudentReceivesOnlyAcceptedAnnotationsFromBothSourcesInRepositoryOrder() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(gradingContextRepository.findByAnswerId(8L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		List<AnswerAnnotation> annotations = mixedAnnotations();
+		when(answerAnnotationRepository.findByAnswerId(8L)).thenReturn(annotations);
+
+		assertThat(gradingService.listAnnotations(8L))
+				.containsExactly(annotations.get(1), annotations.get(2), annotations.get(4));
+
+		InOrder reads = inOrder(currentUserProvider, gradingContextRepository, answerAnnotationRepository);
+		reads.verify(currentUserProvider).requireActiveUser();
+		reads.verify(gradingContextRepository).findByAnswerId(8L);
+		reads.verify(answerAnnotationRepository).findByAnswerId(8L);
+		reads.verifyNoMoreInteractions();
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = ReviewStatus.class, names = {"PENDING", "REJECTED"})
+	@NullSource
+	void owningStudentReceivesEmptyListWithoutAcceptedAnnotations(ReviewStatus status) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(gradingContextRepository.findByAnswerId(8L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		List<AnswerAnnotation> annotations = status == null
+				? List.of()
+				: List.of(annotation(1L, AnnotationSource.AI, status));
+		when(answerAnnotationRepository.findByAnswerId(8L)).thenReturn(annotations);
+
+		assertThat(gradingService.listAnnotations(8L)).isEmpty();
+
+		verify(answerAnnotationRepository).findByAnswerId(8L);
+	}
+
+	@Test
+	void owningTeacherReceivesEveryAnnotationInRepositoryOrder() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(20L, UserRole.TEACHER));
+		when(gradingContextRepository.findByAnswerId(8L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		List<AnswerAnnotation> annotations = mixedAnnotations();
+		when(answerAnnotationRepository.findByAnswerId(8L)).thenReturn(annotations);
+
+		assertThat(gradingService.listAnnotations(8L)).containsExactlyElementsOf(annotations);
+
+		verify(answerAnnotationRepository).findByAnswerId(8L);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = UserRole.class, names = {"STUDENT", "TEACHER"})
+	void nonOwnerCannotLoadAnnotations(UserRole role) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, role));
+		when(gradingContextRepository.findByAnswerId(8L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.listAnnotations(8L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+
+		verify(gradingContextRepository).findByAnswerId(8L);
+		verifyNoInteractions(answerAnnotationRepository);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = UserRole.class, names = {"STUDENT", "TEACHER"})
+	void missingAnswerReturnsNotFoundBeforeOwnershipCheck(UserRole role) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(99L, role));
+		when(gradingContextRepository.findByAnswerId(8L)).thenReturn(Optional.empty());
+
+		assertThatExceptionOfType(ApiException.class)
+				.isThrownBy(() -> gradingService.listAnnotations(8L))
+				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
+
+		verifyNoInteractions(answerAnnotationRepository);
+	}
+
+	@ParameterizedTest
+	@CsvSource({"PENDING, ACCEPTED", "ACCEPTED, REJECTED"})
+	void studentVisibilityReflectsLatestReviewStatus(ReviewStatus previous, ReviewStatus current) {
+		when(currentUserProvider.requireActiveUser()).thenReturn(user(41L, UserRole.STUDENT));
+		when(gradingContextRepository.findByAnswerId(8L))
+				.thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
+		AnswerAnnotation before = annotation(1L, AnnotationSource.AI, previous);
+		AnswerAnnotation after = before.withReviewStatus(current);
+		when(answerAnnotationRepository.findByAnswerId(8L))
+				.thenReturn(List.of(before))
+				.thenReturn(List.of(after));
+		List<AnswerAnnotation> visibleBefore = previous == ReviewStatus.ACCEPTED ? List.of(before) : List.of();
+		List<AnswerAnnotation> visibleAfter = current == ReviewStatus.ACCEPTED ? List.of(after) : List.of();
+
+		assertThat(gradingService.listAnnotations(8L)).containsExactlyElementsOf(visibleBefore);
+		assertThat(gradingService.listAnnotations(8L)).containsExactlyElementsOf(visibleAfter);
+
+		verify(answerAnnotationRepository, times(2)).findByAnswerId(8L);
 	}
 
 	@Test
@@ -724,6 +827,19 @@ class GradingServiceTest {
 		assertThatExceptionOfType(ApiException.class)
 				.isThrownBy(() -> gradingService.getById(5L))
 				.satisfies(exception -> assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	private List<AnswerAnnotation> mixedAnnotations() {
+		return List.of(
+				annotation(1L, AnnotationSource.AI, ReviewStatus.PENDING),
+				annotation(2L, AnnotationSource.AI, ReviewStatus.ACCEPTED),
+				annotation(3L, AnnotationSource.TEACHER, ReviewStatus.ACCEPTED),
+				annotation(4L, AnnotationSource.AI, ReviewStatus.REJECTED),
+				annotation(5L, AnnotationSource.AI, ReviewStatus.ACCEPTED));
+	}
+
+	private AnswerAnnotation annotation(Long id, AnnotationSource source, ReviewStatus status) {
+		return new AnswerAnnotation(id, 8L, source, 0, 5, "GRAMMAR", "Test comment", "Test fix", status);
 	}
 
 	private Grading grading(Long id, BigDecimal maxScore, BigDecimal finalScore, GradingStatus status) {

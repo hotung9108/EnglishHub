@@ -673,29 +673,64 @@ The two 403 rejection layers return the same body; status and body alone do not 
 ---
 
 ### GET `/api/v1/answers/{id}/annotations`
-Retrieve the list of annotations (error highlights) for an answer.
+Retrieve annotations for an existing answer, ordered by ascending annotation ID.
 
-**Path Params:** `id` (int64)
+**Authorization:** authenticated, active `STUDENT` owning the submission or `TEACHER`
+owning its class. Students receive **only `ACCEPTED`** annotations, including both
+`AI` and `TEACHER` sources. Owning teachers receive all review statuses:
+`PENDING`, `ACCEPTED`, and `REJECTED`. `ADMIN` is not allowed by this route policy.
 
-**Response:** `AnswerAnnotationListResponse`
+**Path Params:** `id` (int64 answer ID).
+
+**Response:** `200` with `{ "data": AnswerAnnotationResponse[] }`; no pagination.
+An empty permitted result is `200 { "data": [] }`, including when a student's
+answer has only pending/rejected annotations. Each item has exactly `id`,
+`source`, `startOffset`, `endOffset`, `errorType`, `comment`, `suggestedFix`,
+and `reviewStatus`; there is no `answerId` field in the item.
+
+**Errors:** `401` for unauthenticated callers; `403` for disallowed roles or
+non-owners; `404` for a missing answer after route authorization; `400` for an
+invalid ID format. Error body: `{ "error": "..." }`. The service resolves the
+answer before checking ownership and filters statuses only after access succeeds.
+
+Annotation-read permission does **not** grant access to
+`GET /api/v1/submission-modules/{id}/grading/ai-suggestion`, which is Teacher-only;
+a Student receives `403` there. The Teacher UI's fallback between existing GET
+responses is frontend behavior, not a new backend endpoint or annotation store.
 
 ---
 
 ### POST `/api/v1/answers/{id}/annotations`
-Create a new annotation for an answer.
+Create an annotation as the `TEACHER` owning the answer's class. `STUDENT` and
+`ADMIN` are not allowed. New annotations have `source = TEACHER` and
+`reviewStatus = ACCEPTED`.
 
-**Path Params:** `id` (int64)
+**Path Params:** `id` (int64 answer ID).
 
-**Request Body:** `CreateAnswerAnnotationRequest`
+**Request Body:** `CreateAnswerAnnotationRequest`. `startOffset` and `endOffset`
+are required integers; the range must be non-negative, non-inverted, and fit the
+answer content when its length is available. `errorType` is optional/nullable,
+maximum 50 characters under Java Bean Validation `@Size`; empty and whitespace-only
+strings are allowed and are not trimmed. `comment` and `suggestedFix` are optional/nullable.
 
-**Response:** `CreatedAnswerAnnotationResponse`
+**Response:** `201 { "message": "Đã thêm chú thích.", "id": <annotationId> }`.
+
+**Errors:** `400` for missing/invalid offsets or an oversized `errorType`,
+`401` without authentication, `403` for disallowed roles/non-owners, and `404`
+for a missing answer. An `errorType` longer than 50 is rejected before persistence:
+`400 { "error": "errorType không được vượt quá 50 ký tự." }`.
 
 ---
 
 ## 11. Annotations
 
 ### PATCH `/api/v1/annotations/{id}/review`
-Update the review status of an annotation.
+The owning `TEACHER` reviews one `AI` annotation with `ACCEPTED` or `REJECTED`.
+Only `reviewStatus` changes; annotation content is not edited. `PENDING` and
+reviewing a `TEACHER` annotation return `400`; missing annotation/answer returns
+`404`, and disallowed roles/non-owners return `403` (`401` without authentication).
+Success: `200 { "message": "Đã cập nhật trạng thái duyệt." }`. There is no bulk-review
+endpoint or requirement to review all annotations before finalizing a grade.
 
 **Path Params:** `id` (int64)
 
@@ -706,7 +741,9 @@ Update the review status of an annotation.
 ---
 
 ### DELETE `/api/v1/annotations/{id}`
-Delete an annotation.
+Delete an annotation as the owning `TEACHER` (either source). Success:
+`200 { "message": "Đã xoá chú thích." }`; errors: `401` unauthenticated,
+`403` disallowed role/non-owner, `404` missing annotation/answer.
 
 **Path Params:** `id` (int64)
 
@@ -1082,18 +1119,18 @@ Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writi
 #### `CreateAnswerAnnotationRequest`
 | Field | Type | Description |
 |-------|------|-------------|
-| `startOffset` | integer (int32) | Start position within the text |
-| `endOffset` | integer (int32) | End position within the text |
-| `errorType` | string | Error type (grammar, spelling…) |
-| `comment` | string | Teacher's comment |
-| `suggestedFix` | string | Suggested correction |
+| `startOffset` | integer (int32) | Required; start position within the text |
+| `endOffset` | integer (int32) | Required; end position within the text |
+| `errorType` | string or null | Optional; maximum 50; empty/whitespace allowed, no trim |
+| `comment` | string or null | Optional teacher comment |
+| `suggestedFix` | string or null | Optional suggested correction |
 
 ---
 
 #### `ReviewAnswerAnnotationRequest`
 | Field | Type | Description |
 |-------|------|-------------|
-| `reviewStatus` | string | Review status (ACCEPTED / REJECTED…) |
+| `reviewStatus` | string | Required review status: ACCEPTED / REJECTED |
 
 ---
 
@@ -1672,13 +1709,13 @@ Same structure as `AnswerResponse`.
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | int64 | Annotation ID |
-| `source` | string | Source (AI / MANUAL) |
+| `source` | string | Source: AI / TEACHER |
 | `startOffset` | integer (int32) | Start position in text |
 | `endOffset` | integer (int32) | End position in text |
-| `errorType` | string | Error type |
-| `comment` | string | Comment |
-| `suggestedFix` | string | Suggested correction |
-| `reviewStatus` | string | Review status |
+| `errorType` | string or null | Error type |
+| `comment` | string or null | Comment |
+| `suggestedFix` | string or null | Suggested correction |
+| `reviewStatus` | string | PENDING / ACCEPTED / REJECTED; Students receive ACCEPTED only |
 
 ---
 

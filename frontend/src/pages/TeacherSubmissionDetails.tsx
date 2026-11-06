@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getAnnotationErrorKind, type AnnotationErrorKind } from '../hooks/useStudentAnswerAnnotations';
 import { parseApiError } from '../api';
 import {
   submissionService,
@@ -69,6 +70,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
   const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
+  const [annotationError, setAnnotationError] = useState<AnnotationErrorKind | null>(null);
+  const [usingAnnotationFallback, setUsingAnnotationFallback] = useState(false);
   const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
   const [deletingAnnotationIds, setDeletingAnnotationIds] = useState<Record<number, boolean>>({});
   const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
@@ -202,6 +205,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
     // Fetch Annotations for current module answer
     try {
       setIsLoadingAnnotations(true);
+      setAnnotationError(null);
+      setUsingAnnotationFallback(false);
       const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
       if (targetAns?.id) {
         try {
@@ -210,6 +215,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           if (fetchedAnns.length > 0) {
             setAnnotations(fetchedAnns);
           } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setUsingAnnotationFallback(true);
             setAnnotations(
               currentAiSuggestion.annotations.map((a) => ({
                 id: a.id,
@@ -225,8 +231,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
           } else {
             setAnnotations([]);
           }
-        } catch {
+        } catch (error) {
+          setAnnotationError(getAnnotationErrorKind(error));
           if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+            setUsingAnnotationFallback(true);
             setAnnotations(
               currentAiSuggestion.annotations.map((a) => ({
                 id: a.id,
@@ -244,6 +252,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           }
         }
       } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
+        setUsingAnnotationFallback(true);
         setAnnotations(
           currentAiSuggestion.annotations.map((a) => ({
             id: a.id,
@@ -259,7 +268,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
       } else {
         setAnnotations([]);
       }
-    } catch {
+    } catch (error) {
+      setAnnotationError(getAnnotationErrorKind(error));
       setAnnotations([]);
     } finally {
       setIsLoadingAnnotations(false);
@@ -843,11 +853,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
           </div>
         )}
 
+        {usingAnnotationFallback && annotations.length > 0 && !isLoadingAnnotations && (
+          <div role="status" className="tsd-annotations-empty">
+            <AlertCircle size={18} /> {t('annotationStatus.fallback')}
+          </div>
+        )}
+
         {isLoadingAnnotations ? (
           <div className="tsd-annotations-loading">
             <RefreshCw size={18} className="animate-spin" />
             <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
           </div>
+        ) : annotationError && (!usingAnnotationFallback || annotations.length === 0) ? (
+          <div role="alert" className="tsd-annotations-empty">{t(`annotationStatus.${annotationError}`)}</div>
         ) : filteredAnnotations.length === 0 ? (
           <EmptyState
             title={

@@ -368,7 +368,13 @@ public class GradingService {
 		User caller = currentUserProvider.requireActiveUser();
 		GradingContext context = requireAnswerContext(answerId);
 		requireSubmissionReadAccess(context, caller);
-		return answerAnnotationRepository.findByAnswerId(answerId);
+		List<AnswerAnnotation> annotations = answerAnnotationRepository.findByAnswerId(answerId);
+		if (caller.role() == UserRole.STUDENT) {
+			return annotations.stream()
+					.filter(annotation -> annotation.reviewStatus() == ReviewStatus.ACCEPTED)
+					.toList();
+		}
+		return annotations;
 	}
 
 	@Transactional

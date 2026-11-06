@@ -1,3 +1,4 @@
+import { ApiClientError } from '../../api/core/errors';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -458,6 +459,7 @@ it('falls back to AI suggestion annotations when answer annotation service fails
   vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Annotation service down'));
   await setup();
   expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
 });
 
 it('shows empty state when no annotations exist', async () => {
@@ -505,11 +507,12 @@ it('clears annotations when submission module has no answers', async () => {
   expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
 });
 
-it('clears annotations when listAnnotations fails and AI suggestion has no annotations', async () => {
+it('shows a network error when listAnnotations fails and AI suggestion has no annotations', async () => {
   vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({ ...ai, annotations: [] });
   vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Network error'));
   await setup();
-  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+  expect(screen.getByText('Không tải được nhận xét. Vui lòng thử lại.')).toBeVisible();
+  expect(screen.queryByText('Chưa có gợi ý sửa lỗi từ AI')).not.toBeInTheDocument();
 });
 
 it('falls back to detail.aiFeedback when finalFeedback is absent', async () => {
@@ -622,3 +625,50 @@ it('handles AI refresh polling error gracefully', async () => {
   expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
   vi.useRealTimers();
 });
+
+
+it('does not warn when annotations come from GET', async () => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [{
+    id: 92, source: 'AI', startOffset: 0, endOffset: 5, errorType: 'GRAMMAR',
+    suggestedFix: null, comment: 'GET annotations result', reviewStatus: 'PENDING',
+  }] });
+  await setup();
+  expect(screen.getByText('GET annotations result')).toBeVisible();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+});
+
+it.each(['empty GET', 'missing answer'])('preserves the fallback trigger for %s', async trigger => {
+  if (trigger === 'missing answer') {
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({ ...moduleDetail, answers: [] });
+  }
+  await setup();
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
+  if (trigger === 'missing answer') expect(answerAnnotationService.listAnnotations).not.toHaveBeenCalled();
+});
+
+it.each([403, 404, 500])('keeps fallback annotations with a warning when GET returns %s', async status => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValue(new ApiClientError('GET failed', status));
+  await setup();
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
+});
+
+for (const fallback of ['empty', 'failed'] as const) {
+  it.each([
+    { status: 403, message: 'Bạn không có quyền xem nhận xét của bài này.' },
+    { status: 404, message: 'Không tìm thấy nhận xét của bài này.' },
+    { status: 500, message: 'Không tải được nhận xét. Vui lòng thử lại.' },
+  ])(`shows GET $status errors when fallback is ${fallback}`, async ({ status, message }) => {
+    vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValue(new ApiClientError('GET failed', status));
+    if (fallback === 'empty') {
+      vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({ ...ai, annotations: [] });
+    } else {
+      vi.mocked(gradingService.getAiSuggestion).mockRejectedValue(new Error('AI suggestion unavailable'));
+    }
+    await setup();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByText('Chưa có gợi ý sửa lỗi từ AI')).not.toBeInTheDocument();
+    expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+  });
+}
