@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -532,6 +533,13 @@ class ModuleApiIntegrationTest {
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isOk())
 				.andExpect(content().bytes(audioBytes));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/audio", listeningModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT))
+					.header("Range", "bytes=0-2"))
+				.andExpect(status().isPartialContent())
+				.andExpect(header().string("Content-Range", "bytes 0-2/6"))
+				.andExpect(content().bytes(new byte[] {'I', 'D', '3'}));
 
 		for (UserRole blockedRole : new UserRole[] {UserRole.ADMIN, UserRole.TEACHER, UserRole.STUDENT}) {
 			Long blockedUser = blockedRole == UserRole.ADMIN ? adminId

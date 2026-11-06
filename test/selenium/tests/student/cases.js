@@ -103,8 +103,19 @@ add(14, 'Nộp Reading đáp án sai', 'Nhập incorrect answer và nộp qua UI
   const snapshot = await readback(page, data, item, result, { text: 'incorrect answer', questionId: item.questionId });
   await expectAutoScore(page, data, snapshot.module.id, 0, result);
 });
-add(15, 'Nộp Listening câu trả lời ngắn', 'Mở Listening, điền daily practice và nộp.', 'Đáp án đúng được lưu, module/submission đã nộp. Không đánh giá chất lượng audio.', async (page, data, result) => {
-  const item = data.assignments.listening; await page.submitQuiz(item, 'daily practice');
+add(15, 'Nộp Listening câu trả lời ngắn', 'Mở Listening, kích hoạt phát audio, điền daily practice và nộp.', 'Phát audio thành công, đáp án đúng được lưu, module/submission đã nộp.', async (page, data, result) => {
+  const item = data.assignments.listening;
+  await page.start(item);
+  const playButtons = await page.driver.findElements(By.css('.exam-audio-play-btn'));
+  if (playButtons.length) {
+    await page.clickElement(playButtons[0], 'Phát audio Listening');
+    await page.driver.sleep(1000);
+  }
+  const inputs = await page.driver.findElements(By.css('.exam-short-answer-input'));
+  assert.ok(inputs.length, 'Listening SHORT_ANSWER question must render a text input');
+  await page.fill(By.css('.exam-short-answer-input'), 'daily practice');
+  await page.clickButton('Hoàn thành & Nộp bài');
+  await page.submissionNavigation(item);
   await readback(page, data, item, result, { text: 'daily practice', questionId: item.questionId });
 });
 add(16, 'Speaking: ghi âm và nộp bản ghi thật', 'Bắt đầu/dừng recorder, bấm Nộp bài; đối chiếu trạng thái và audio API.', 'Bài đã nộp và audioStorageKey/audioUploadStatus READY. Recorder mô phỏng không được tính Pass.', async (page, data, result) => {

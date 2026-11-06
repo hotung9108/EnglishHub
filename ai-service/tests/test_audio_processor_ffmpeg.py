@@ -165,6 +165,33 @@ def test_other_formats_use_same_converter(
     assert_directories_removed(converter_directories)
 
 
+@pytest.mark.parametrize("container,candidates,mime", [
+    ("webm", ("libopus",), "audio/webm"),
+    ("ogg", ("libvorbis", "libopus"), "audio/ogg"),
+])
+def test_ops45_transcode_webm_and_ogg_audio_without_errors(
+    tmp_path: Path, encoders: set[str], converter_directories: list[Path],
+    container: str, candidates: tuple[str, ...], mime: str,
+) -> None:
+    """[OPS-45] CI: Test tự động chuyển mã audio WebM/OGG qua AI Service — verify transcode không lỗi."""
+    encoder = choose_encoder(encoders, candidates)
+    source = generate_tone(tmp_path / f"ops45-tone.{container}", encoder, container)
+    raw_bytes = source.read_bytes()
+    assert len(raw_bytes) > 0
+
+    # 1. Direct audio bytes transcode to WAV
+    wav_bytes = asyncio.run(AudioProcessor.convert_to_wav(raw_bytes))
+    assert_wave_format(wav_bytes)
+
+    # 2. Ingest via base64 data-uri with proper mime-type
+    encoded_b64 = base64.b64encode(raw_bytes).decode("ascii")
+    data_uri = f"data:{mime};base64,{encoded_b64}"
+    processed_wav, returned_mime = asyncio.run(AudioProcessor.get_audio_bytes(audio_base64=data_uri))
+    assert returned_mime == "audio/wav"
+    assert_wave_format(processed_wav)
+    assert_directories_removed(converter_directories, expected=2)
+
+
 def test_empty_file_returns_400_before_conversion(
     tmp_path: Path, converter_directories: list[Path],
 ) -> None:

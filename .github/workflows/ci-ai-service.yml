@@ -42,15 +42,22 @@ jobs:
           cache: 'pip'
           cache-dependency-path: ai-service/requirements.txt
 
+      - name: Install System Dependencies (FFmpeg)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
       # tests/conftest.py tự bật MOCK_MODE nên không cần API key
-      - name: Run Tests
+      - name: Run Tests (including WebM/OGG transcode)
         run: pytest -v
 
       - name: Build AI Service image
         run: docker build -t ai-service:ci-test .
 
-      - name: Validate ffmpeg trong image
-        run: docker run --rm ai-service:ci-test ffmpeg -version
+      - name: Validate ffmpeg and transcode in container
+        run: |
+          docker run --rm ai-service:ci-test ffmpeg -version
+          docker run --rm ai-service:ci-test pytest -v tests/test_audio_processor_ffmpeg.py

@@ -26,6 +26,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -161,13 +162,28 @@ class ModuleControllerTest {
 		when(moduleService.getModuleAudio(9L))
 				.thenReturn(new ModuleService.ModuleAudioResult(new byte[] {1, 2, 3}, "audio/wav"));
 
-		var response = moduleController.getModuleAudio(9L);
+		var response = moduleController.getModuleAudio(9L, null);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
 		assertThat(response.getHeaders().getCacheControl()).contains("private");
 		assertThat(response.getHeaders().getContentLength()).isEqualTo(3);
-		assertThat(response.getBody()).containsExactly(1, 2, 3);
+		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2, (byte) 3);
+	}
+
+	@Test
+	void mapsModuleAudioStreamingRangeRequestToPartialContent() {
+		when(moduleService.getModuleAudio(9L))
+				.thenReturn(new ModuleService.ModuleAudioResult(new byte[] {1, 2, 3, 4, 5}, "audio/wav"));
+
+		var response = moduleController.getModuleAudio(9L, "bytes=0-1");
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PARTIAL_CONTENT);
+		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
+		assertThat(response.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES)).isEqualTo("bytes");
+		assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE)).isEqualTo("bytes 0-1/5");
+		assertThat(response.getBody()).containsExactly((byte) 1, (byte) 2);
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

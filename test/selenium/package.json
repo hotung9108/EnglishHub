@@ -24,6 +24,7 @@
     "test:student": "node run-student.js",
     "test:student:watch": "node run-student.js --watch",
     "prepare:student": "node run-student.js --prepare-only",
+    "test:student:audio": "node run-student.js --case=QA30-015 && node run-student.js --case=QA30-016",
     "docs:student": "node tools/document-student-cases.mjs"
   },
   "dependencies": {
