@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getAnnotationErrorKind, type AnnotationErrorKind } from '../hooks/useStudentAnswerAnnotations';
 import { parseApiError } from '../api';
 import {
   submissionService,
@@ -37,6 +38,18 @@ const getFileNameFromKey = (storageKey: string): string => {
   const baseName = storageKey.split('/').pop();
   return baseName || storageKey;
 };
+
+interface AnnotationRequestContext {
+  generation: number;
+  moduleId: number | null;
+  answerId: number | null;
+  isLoading: boolean;
+}
+
+interface AnnotationDataContext {
+  moduleId: number;
+  answerId: number | null;
+}
 
 export const TeacherSubmissionDetails: React.FC = () => {
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,7 +82,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
   const [annotations, setAnnotations] = useState<GradingAnnotation[]>([]);
+  const [annotationDataContext, setAnnotationDataContext] = useState<AnnotationDataContext | null>(null);
   const [isLoadingAnnotations, setIsLoadingAnnotations] = useState<boolean>(false);
+  const [annotationError, setAnnotationError] = useState<AnnotationErrorKind | null>(null);
+  const [usingAnnotationFallback, setUsingAnnotationFallback] = useState(false);
   const [reviewingAnnotationIds, setReviewingAnnotationIds] = useState<Record<number, boolean>>({});
   const [deletingAnnotationIds, setDeletingAnnotationIds] = useState<Record<number, boolean>>({});
   const [annotationFilter, setAnnotationFilter] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED'>('ALL');
@@ -80,6 +96,46 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [newAnnComment, setNewAnnComment] = useState<string>('');
   const [newAnnStartOffset, setNewAnnStartOffset] = useState<string>('0');
   const [newAnnEndOffset, setNewAnnEndOffset] = useState<string>('0');
+  const isMountedRef = useRef(false);
+  const moduleLoadGenerationRef = useRef(0);
+  const annotationRequestRef = useRef<AnnotationRequestContext>({
+    generation: 0,
+    moduleId: null,
+    answerId: null,
+    isLoading: false,
+  });
+  const submissionIdentityRef = useRef<string | null>(null);
+  const aiPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gradeNavigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const createRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const deleteRequestsRef = useRef(new Map<number, AnnotationRequestContext>());
+  const gradeRequestRef = useRef<AnnotationRequestContext | null>(null);
+  const annotationItemsRef = useRef<GradingAnnotation[]>([]);
+  useEffect(() => { annotationItemsRef.current = annotations; }, [annotations]);
+
+  const isCurrentAction = useCallback((context: AnnotationRequestContext) => {
+    const current = annotationRequestRef.current;
+    return isMountedRef.current &&
+      context.generation === moduleLoadGenerationRef.current &&
+      current.generation === context.generation &&
+      current.moduleId === context.moduleId &&
+      current.answerId === context.answerId && !current.isLoading;
+  }, []);
+
+  const cancelContextActions = useCallback(() => {
+    if (aiPollTimerRef.current !== null) clearTimeout(aiPollTimerRef.current);
+    if (gradeNavigationTimerRef.current !== null) clearTimeout(gradeNavigationTimerRef.current);
+    if (toastTimeoutRef.current !== null) clearTimeout(toastTimeoutRef.current);
+    aiPollTimerRef.current = null;
+    gradeNavigationTimerRef.current = null;
+    toastTimeoutRef.current = null;
+    aiRequestRef.current = null;
+    createRequestRef.current = null;
+    deleteRequestsRef.current.clear();
+    annotationItemsRef.current = [];
+    gradeRequestRef.current = null;
+  }, []);
   const [studentInfo, setStudentInfo] = useState<{ name: string; code: string; email?: string } | null>(() => {
     if (routeState?.studentName) {
       return {
@@ -127,6 +183,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   const showToast = (msg: string) => {
+    if (!isMountedRef.current) return;
     setToastMessage(msg);
 
     if (toastTimeoutRef.current !== null) {
@@ -134,33 +191,72 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
 
     toastTimeoutRef.current = setTimeout(() => {
-      setToastMessage(null);
+      if (isMountedRef.current) setToastMessage(null);
       toastTimeoutRef.current = null;
     }, 3500);
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      if (toastTimeoutRef.current !== null) {
-        clearTimeout(toastTimeoutRef.current);
-      }
+      isMountedRef.current = false;
+      moduleLoadGenerationRef.current += 1;
+      annotationRequestRef.current = {
+        generation: moduleLoadGenerationRef.current,
+        moduleId: null,
+        answerId: null,
+        isLoading: false,
+      };
+      cancelContextActions();
     };
-  }, []);
+  }, [cancelContextActions]);
 
   const loadModuleData = useCallback(async (targetModuleId: number) => {
+    if (!isMountedRef.current) return;
+
+    cancelContextActions();
+    setIsAnalyzingAi(false);
+    setIsSubmittingGrade(false);
+    setIsSubmittingAnnotation(false);
+    setDeletingAnnotationIds({});
+    setIsCreatingAnnotation(false);
+    setToastMessage(null);
+    const generation = ++moduleLoadGenerationRef.current;
+    annotationRequestRef.current = {
+      generation,
+      moduleId: targetModuleId,
+      answerId: null,
+      isLoading: true,
+    };
+    setAnnotationDataContext(null);
+    setAnnotations([]);
+    setIsLoadingAnnotations(true);
+    setAnnotationError(null);
+    setUsingAnnotationFallback(false);
+    setReviewingAnnotationIds({});
+
+    const isCurrentModuleLoad = () =>
+      isMountedRef.current &&
+      moduleLoadGenerationRef.current === generation &&
+      annotationRequestRef.current.generation === generation &&
+      annotationRequestRef.current.moduleId === targetModuleId;
+
     let currentModDetail: SubmissionModuleDetailResponse | null = null;
     let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
 
     try {
       const modDetailRes = await submissionService.getSubmissionModuleDetail(targetModuleId);
+      if (!isCurrentModuleLoad()) return;
       setModuleDetail(modDetailRes);
       currentModDetail = modDetailRes;
     } catch {
+      if (!isCurrentModuleLoad()) return;
       setModuleDetail(null);
     }
 
     try {
       const gradingRes = await gradingService.getBySubmissionModuleId(targetModuleId);
+      if (!isCurrentModuleLoad()) return;
       setGradingSummary(gradingRes);
       if (gradingRes.finalScore != null) {
         setFinalScoreInput(String(gradingRes.finalScore));
@@ -168,6 +264,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (gradingRes.id) {
         try {
           const detail = await gradingService.getById(gradingRes.id);
+          if (!isCurrentModuleLoad()) return;
           setGradingDetail(detail);
           if (detail.finalScore != null) {
             setFinalScoreInput(String(detail.finalScore));
@@ -178,16 +275,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
             setFeedbackText(detail.aiFeedback);
           }
         } catch {
+          if (!isCurrentModuleLoad()) return;
           // ignore
         }
       }
     } catch {
+      if (!isCurrentModuleLoad()) return;
       setGradingSummary(null);
       setGradingDetail(null);
     }
 
     try {
       const aiRes = await gradingService.getAiSuggestion(targetModuleId);
+      if (!isCurrentModuleLoad()) return;
       setAiSuggestion(aiRes);
       currentAiSuggestion = aiRes;
       if (aiRes.aiFeedback) {
@@ -197,75 +297,76 @@ export const TeacherSubmissionDetails: React.FC = () => {
         setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
       }
     } catch {
+      if (!isCurrentModuleLoad()) return;
       setAiSuggestion(null);
     }
 
     // Fetch Annotations for current module answer
+    const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
+    const targetAnswerId = targetAns?.id ?? null;
+    if (!isCurrentModuleLoad()) return;
+    annotationRequestRef.current = {
+      generation,
+      moduleId: targetModuleId,
+      answerId: targetAnswerId,
+      isLoading: true,
+    };
+    setAnnotationDataContext({ moduleId: targetModuleId, answerId: targetAnswerId });
+
+    const isCurrentAnnotationRequest = () =>
+      isCurrentModuleLoad() && annotationRequestRef.current.answerId === targetAnswerId;
+    const fallbackAnnotations = currentAiSuggestion?.annotations ?? [];
+    const applyFallbackAnnotations = () => {
+      if (fallbackAnnotations.length === 0) {
+        setAnnotations([]);
+        return;
+      }
+
+      setUsingAnnotationFallback(true);
+      setAnnotations(fallbackAnnotations.map((annotation) => ({
+        id: annotation.id,
+        source: annotation.source,
+        startOffset: annotation.startOffset,
+        endOffset: annotation.endOffset,
+        errorType: annotation.errorType || null,
+        comment: annotation.comment || null,
+        suggestedFix: annotation.suggestedFix || null,
+        reviewStatus: annotation.reviewStatus,
+      })));
+    };
+
     try {
-      setIsLoadingAnnotations(true);
-      const targetAns = currentModDetail?.answers?.find((a) => !!a.audioStorageKey) || currentModDetail?.answers?.[0];
-      if (targetAns?.id) {
+      if (targetAnswerId !== null) {
         try {
-          const annRes = await answerAnnotationService.listAnnotations(targetAns.id);
+          const annRes = await answerAnnotationService.listAnnotations(targetAnswerId);
+          if (!isCurrentAnnotationRequest()) return;
           const fetchedAnns = annRes.data || [];
           if (fetchedAnns.length > 0) {
             setAnnotations(fetchedAnns);
-          } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
-            setAnnotations(
-              currentAiSuggestion.annotations.map((a) => ({
-                id: a.id,
-                source: a.source,
-                startOffset: a.startOffset,
-                endOffset: a.endOffset,
-                errorType: a.errorType || null,
-                comment: a.comment || null,
-                suggestedFix: a.suggestedFix || null,
-                reviewStatus: a.reviewStatus,
-              }))
-            );
+          } else if (fallbackAnnotations.length > 0) {
+            applyFallbackAnnotations();
           } else {
             setAnnotations([]);
           }
-        } catch {
-          if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
-            setAnnotations(
-              currentAiSuggestion.annotations.map((a) => ({
-                id: a.id,
-                source: a.source,
-                startOffset: a.startOffset,
-                endOffset: a.endOffset,
-                errorType: a.errorType || null,
-                comment: a.comment || null,
-                suggestedFix: a.suggestedFix || null,
-                reviewStatus: a.reviewStatus,
-              }))
-            );
-          } else {
-            setAnnotations([]);
-          }
+        } catch (error) {
+          if (!isCurrentAnnotationRequest()) return;
+          setAnnotationError(getAnnotationErrorKind(error));
+          applyFallbackAnnotations();
         }
-      } else if (currentAiSuggestion?.annotations && currentAiSuggestion.annotations.length > 0) {
-        setAnnotations(
-          currentAiSuggestion.annotations.map((a) => ({
-            id: a.id,
-            source: a.source,
-            startOffset: a.startOffset,
-            endOffset: a.endOffset,
-            errorType: a.errorType || null,
-            comment: a.comment || null,
-            suggestedFix: a.suggestedFix || null,
-            reviewStatus: a.reviewStatus,
-          }))
-        );
+      } else if (fallbackAnnotations.length > 0) {
+        if (!isCurrentAnnotationRequest()) return;
+        applyFallbackAnnotations();
       } else {
+        if (!isCurrentAnnotationRequest()) return;
         setAnnotations([]);
       }
-    } catch {
-      setAnnotations([]);
     } finally {
-      setIsLoadingAnnotations(false);
+      if (isCurrentAnnotationRequest()) {
+        annotationRequestRef.current = { ...annotationRequestRef.current, isLoading: false };
+        setIsLoadingAnnotations(false);
+      }
     }
-  }, []);
+  }, [cancelContextActions]);
 
   const handleSelectModule = (modId: number) => {
     setSelectedModuleId(modId);
@@ -275,6 +376,30 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    const submissionIdentity = `${id ?? ''}:${studentId ?? ''}`;
+    if (submissionIdentityRef.current !== submissionIdentity) {
+      submissionIdentityRef.current = submissionIdentity;
+      cancelContextActions();
+      setIsAnalyzingAi(false);
+      setIsSubmittingGrade(false);
+      setIsSubmittingAnnotation(false);
+      setDeletingAnnotationIds({});
+      setIsCreatingAnnotation(false);
+      setToastMessage(null);
+      const generation = ++moduleLoadGenerationRef.current;
+      annotationRequestRef.current = {
+        generation,
+        moduleId: null,
+        answerId: null,
+        isLoading: false,
+      };
+      setAnnotationDataContext(null);
+      setAnnotations([]);
+      setIsLoadingAnnotations(false);
+      setAnnotationError(null);
+      setUsingAnnotationFallback(false);
+      setReviewingAnnotationIds({});
+    }
     if (!id || !studentId) return;
 
     const loadSubmissionData = async () => {
@@ -410,7 +535,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData, routeState]);
+  }, [id, studentId, isVi, reloadKey, searchParams, loadModuleData, routeState, cancelContextActions]);
 
   const activeModule = useMemo(() => {
     if (!submission?.modules || submission.modules.length === 0) return null;
@@ -444,26 +569,38 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   // Trigger AI Analyze
   const handleTriggerAiAnalyze = async () => {
+    const context = { ...annotationRequestRef.current };
     const targetModuleId = activeModule?.id;
-    if (!targetModuleId) return;
+    if (!targetModuleId || context.moduleId !== targetModuleId ||
+      !isCurrentAction(context) || aiRequestRef.current) return;
 
+    aiRequestRef.current = context;
     setIsAnalyzingAi(true);
     try {
       showToast(isVi ? 'Đang gửi yêu cầu chấm điểm bằng AI...' : 'Requesting AI grading...');
       await gradingService.requestAiAnalysis(targetModuleId);
+      if (!isCurrentAction(context)) return;
       showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
-      setTimeout(async () => {
+      aiPollTimerRef.current = setTimeout(async () => {
+        aiPollTimerRef.current = null;
+        if (!isCurrentAction(context)) return;
+        const loading = loadModuleData(targetModuleId);
+        const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
         try {
-          await loadModuleData(targetModuleId);
+          await loading;
+          if (!isCurrentAction(pollContext)) return;
           showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
         } catch (pollErr) {
+          if (!isCurrentAction(pollContext)) return;
           console.error('Error refreshing grading after AI:', pollErr);
         } finally {
-          setIsAnalyzingAi(false);
+          if (isCurrentAction(pollContext)) setIsAnalyzingAi(false);
         }
       }, 3500);
     } catch (err) {
+      if (!isCurrentAction(context)) return;
+      aiRequestRef.current = null;
       console.error('Failed to trigger AI analyze:', err);
       const parsed = parseApiError(err);
       showToast(parsed.message || (isVi ? 'Lỗi khi kích hoạt AI. Vui lòng thử lại.' : 'Failed to trigger AI analysis.'));
@@ -473,18 +610,22 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   // Submit Grade
   const handleSaveGrade = async (isFinalize: boolean) => {
+    const context = { ...annotationRequestRef.current };
     const gradingId = gradingSummary?.id;
     if (!gradingId) {
+      if (!isMountedRef.current || (!isCurrentAction(context) && !(context.moduleId === null && submission?.status === 'IN_PROGRESS'))) return;
       showToast(isVi ? 'Chưa tìm thấy bản ghi chấm điểm của bài này.' : 'Grading record not found.');
       return;
     }
 
+    if (!isCurrentAction(context) || context.moduleId !== activeModule?.id || gradeRequestRef.current) return;
     const scoreNum = parseFloat(finalScoreInput);
     if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
       showToast(isVi ? 'Điểm số không hợp lệ (thang 0.0 - 10.0)!' : 'Invalid score (range 0.0 - 10.0)!');
       return;
     }
 
+    gradeRequestRef.current = context;
     setIsSubmittingGrade(true);
     try {
       await gradingService.submitGrade(gradingId, {
@@ -493,19 +634,27 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
       });
 
+      if (!isCurrentAction(context)) return;
       showToast(isVi
         ? (isFinalize ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Đã lưu bản nháp nhận xét!')
         : (isFinalize ? 'Grade finalized and published to student!' : 'Grading draft saved!'));
 
       if (isFinalize) {
-        setTimeout(() => navigate(`/teacher/assignments/${id}`), 1000);
+        gradeNavigationTimerRef.current = setTimeout(() => {
+          gradeNavigationTimerRef.current = null;
+          if (isCurrentAction(context)) navigate(`/teacher/assignments/${id}`);
+        }, 1000);
       }
     } catch (err) {
+      if (!isCurrentAction(context)) return;
       console.error('Failed to submit grade:', err);
       const parsed = parseApiError(err);
       showToast(parsed.message || (isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!'));
     } finally {
-      setIsSubmittingGrade(false);
+      if (isCurrentAction(context)) {
+        gradeRequestRef.current = null;
+        setIsSubmittingGrade(false);
+      }
     }
   };
 
@@ -522,6 +671,24 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const targetAnswer = useMemo(() => {
     return moduleDetail?.answers?.find((a) => !!a.audioStorageKey) || moduleDetail?.answers?.[0] || null;
   }, [moduleDetail]);
+
+  const annotationsMatchCurrentAnswer = Boolean(
+    annotationDataContext &&
+    activeModule?.id === annotationDataContext.moduleId &&
+    (targetAnswer?.id ?? null) === annotationDataContext.answerId
+  );
+  const currentAnnotations = useMemo(
+    () => (annotationsMatchCurrentAnswer ? annotations : []),
+    [annotationsMatchCurrentAnswer, annotations]
+  );
+  const currentAnnotationError = annotationsMatchCurrentAnswer ? annotationError : null;
+  const usingCurrentAnnotationFallback = annotationsMatchCurrentAnswer && usingAnnotationFallback;
+  const canReviewCurrentAnnotations = Boolean(
+    annotationsMatchCurrentAnswer &&
+    annotationDataContext?.answerId !== null &&
+    annotationDataContext?.answerId !== undefined &&
+    !isLoadingAnnotations
+  );
 
   // Extract attached documents (for Writing or file uploads)
   const attachedDocAnswers = useMemo(() => {
@@ -556,9 +723,36 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [studentAnswerText]);
 
   const handleReviewAnnotation = async (annotationId: number, status: 'ACCEPTED' | 'REJECTED') => {
+    const currentModuleId = activeModule?.id;
+    const currentAnswerId = targetAnswer?.id ?? null;
+    const requestContext = annotationRequestRef.current;
+    if (
+      !isMountedRef.current ||
+      currentModuleId == null ||
+      currentAnswerId === null ||
+      isLoadingAnnotations ||
+      requestContext.isLoading ||
+      requestContext.moduleId !== currentModuleId ||
+      requestContext.answerId !== currentAnswerId ||
+      !annotationsMatchCurrentAnswer ||
+      !annotations.some((annotation) => annotation.id === annotationId)
+    ) {
+      return;
+    }
+
+    const generation = requestContext.generation;
+    const isCurrentReview = () =>
+      isMountedRef.current &&
+      moduleLoadGenerationRef.current === generation &&
+      annotationRequestRef.current.generation === generation &&
+      annotationRequestRef.current.moduleId === currentModuleId &&
+      annotationRequestRef.current.answerId === currentAnswerId &&
+      !annotationRequestRef.current.isLoading;
+
     setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
     try {
       await answerAnnotationService.reviewAnnotation(annotationId, { reviewStatus: status });
+      if (!isCurrentReview()) return;
       setAnnotations((prev) =>
         prev.map((ann) => (ann.id === annotationId ? { ...ann, reviewStatus: status } : ann))
       );
@@ -568,16 +762,21 @@ export const TeacherSubmissionDetails: React.FC = () => {
           : (status === 'ACCEPTED' ? 'AI annotation accepted.' : 'AI annotation rejected.')
       );
     } catch (err) {
+      if (!isCurrentReview()) return;
       console.error('Failed to review annotation:', err);
       const parsed = parseApiError(err);
       showToast(parsed.message || (isVi ? 'Không thể cập nhật trạng thái duyệt.' : 'Failed to update review status.'));
     } finally {
-      setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      if (isCurrentReview()) {
+        setReviewingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      }
     }
   };
 
   const handleCreateAnnotation = async () => {
-    if (!targetAnswer?.id) return;
+    const context = { ...annotationRequestRef.current };
+    if (!targetAnswer?.id || !isCurrentAction(context) || context.moduleId !== activeModule?.id ||
+      context.answerId !== targetAnswer.id || createRequestRef.current) return;
     if (!newAnnComment.trim()) {
       showToast(isVi ? 'Vui lòng nhập nhận xét cho chú thích.' : 'Please enter a comment.');
       return;
@@ -585,6 +784,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     const startNum = Math.max(0, parseInt(newAnnStartOffset, 10) || 0);
     const endNum = Math.max(startNum, parseInt(newAnnEndOffset, 10) || startNum);
 
+    createRequestRef.current = context;
     setIsSubmittingAnnotation(true);
     try {
       const res = await answerAnnotationService.createAnnotation(targetAnswer.id, {
@@ -594,6 +794,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
         comment: newAnnComment.trim(),
         suggestedFix: newAnnSuggestedFix.trim() || null,
       });
+      if (!isCurrentAction(context)) return;
+      if (res?.id == null) throw new Error(isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.');
       const createdItem: GradingAnnotation = {
         id: res.id,
         source: 'TEACHER',
@@ -612,42 +814,56 @@ export const TeacherSubmissionDetails: React.FC = () => {
       setIsCreatingAnnotation(false);
       showToast(isVi ? 'Đã thêm chú thích mới.' : 'Annotation added.');
     } catch (err) {
+      if (!isCurrentAction(context)) return;
       console.error('Failed to create annotation:', err);
       const parsed = parseApiError(err);
       showToast(parsed.message || (isVi ? 'Không thể thêm chú thích.' : 'Failed to add annotation.'));
     } finally {
-      setIsSubmittingAnnotation(false);
+      if (isCurrentAction(context)) {
+        createRequestRef.current = null;
+        setIsSubmittingAnnotation(false);
+      }
     }
   };
 
   const handleDeleteAnnotation = async (annotationId: number) => {
+    const context = { ...annotationRequestRef.current };
+    if (!isCurrentAction(context) || context.moduleId !== activeModule?.id ||
+      context.answerId !== (targetAnswer?.id ?? null) ||
+      !annotationItemsRef.current.some(annotation => annotation.id === annotationId) || deleteRequestsRef.current.has(annotationId)) return;
+    deleteRequestsRef.current.set(annotationId, context);
     setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: true }));
     try {
       await answerAnnotationService.deleteAnnotation(annotationId);
+      if (!isCurrentAction(context)) return;
       setAnnotations((prev) => prev.filter((ann) => ann.id !== annotationId));
       showToast(isVi ? 'Đã xóa chú thích.' : 'Annotation deleted.');
     } catch (err) {
+      if (!isCurrentAction(context)) return;
       console.error('Failed to delete annotation:', err);
       const parsed = parseApiError(err);
       showToast(parsed.message || (isVi ? 'Không thể xóa chú thích.' : 'Failed to delete annotation.'));
     } finally {
-      setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      if (isCurrentAction(context)) {
+        deleteRequestsRef.current.delete(annotationId);
+        setDeletingAnnotationIds((prev) => ({ ...prev, [annotationId]: false }));
+      }
     }
   };
 
   const filteredAnnotations = useMemo(() => {
-    if (annotationFilter === 'ALL') return annotations;
-    return annotations.filter((a) => a.reviewStatus === annotationFilter);
-  }, [annotations, annotationFilter]);
+    if (annotationFilter === 'ALL') return currentAnnotations;
+    return currentAnnotations.filter((a) => a.reviewStatus === annotationFilter);
+  }, [currentAnnotations, annotationFilter]);
 
   const annotationCounts = useMemo(() => {
     return {
-      all: annotations.length,
-      pending: annotations.filter((a) => a.reviewStatus === 'PENDING').length,
-      accepted: annotations.filter((a) => a.reviewStatus === 'ACCEPTED').length,
-      rejected: annotations.filter((a) => a.reviewStatus === 'REJECTED').length,
+      all: currentAnnotations.length,
+      pending: currentAnnotations.filter((a) => a.reviewStatus === 'PENDING').length,
+      accepted: currentAnnotations.filter((a) => a.reviewStatus === 'ACCEPTED').length,
+      rejected: currentAnnotations.filter((a) => a.reviewStatus === 'REJECTED').length,
     };
-  }, [annotations]);
+  }, [currentAnnotations]);
 
   const transcriptText = useMemo(() => {
     const rawTranscript = aiSuggestion?.transcript ?? gradingDetail?.aiTranscript;
@@ -671,7 +887,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <h4 className="tsd-annotations-title">
                 {isVi ? 'Gợi ý sửa lỗi theo đoạn' : 'Segment Annotations'}
               </h4>
-              <span className="tsd-annotations-counter">{annotations.length}</span>
+              <span className="tsd-annotations-counter">{currentAnnotations.length}</span>
             </div>
 
             {targetAnswer?.id && (
@@ -687,7 +903,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
             )}
           </div>
 
-          {annotations.length > 0 && (
+          {currentAnnotations.length > 0 && (
             <div className="tsd-annotations-filter-bar">
               <button
                 type="button"
@@ -817,20 +1033,28 @@ export const TeacherSubmissionDetails: React.FC = () => {
           </div>
         )}
 
+        {usingCurrentAnnotationFallback && currentAnnotations.length > 0 && !isLoadingAnnotations && (
+          <div role="status" className="tsd-annotations-empty">
+            <AlertCircle size={18} /> {t('annotationStatus.fallback')}
+          </div>
+        )}
+
         {isLoadingAnnotations ? (
           <div className="tsd-annotations-loading">
             <RefreshCw size={18} className="animate-spin" />
             <span>{isVi ? 'Đang tải gợi ý sửa lỗi...' : 'Loading AI annotations...'}</span>
           </div>
+        ) : currentAnnotationError && (!usingCurrentAnnotationFallback || currentAnnotations.length === 0) ? (
+          <div role="alert" className="tsd-annotations-empty">{t(`annotationStatus.${currentAnnotationError}`)}</div>
         ) : filteredAnnotations.length === 0 ? (
           <EmptyState
             title={
-              annotations.length === 0
+              currentAnnotations.length === 0
                 ? (isVi ? 'Chưa có gợi ý sửa lỗi từ AI' : 'No AI annotations available')
                 : (isVi ? 'Không có gợi ý trong bộ lọc này' : 'No annotations in this filter')
             }
             description={
-              annotations.length === 0
+              currentAnnotations.length === 0
                 ? (isVi ? 'AI chưa phát hiện lỗi cần chú thích hoặc bài làm chưa được phân tích bằng AI.' : 'AI has not identified segment errors or submission has not been analyzed.')
                 : undefined
             }
@@ -903,7 +1127,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                           variant={ann.reviewStatus === 'ACCEPTED' ? 'primary' : 'secondary'}
                           icon={CheckCircle2}
                           loading={isReviewing}
-                          disabled={isReviewing || isDeleting}
+                          disabled={isReviewing || isDeleting || !canReviewCurrentAnnotations}
                           onClick={() => handleReviewAnnotation(ann.id, 'ACCEPTED')}
                           className="tsd-btn-review-accept"
                         >
@@ -915,7 +1139,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                           variant={ann.reviewStatus === 'REJECTED' ? 'danger' : 'ghost'}
                           icon={XCircle}
                           loading={isReviewing}
-                          disabled={isReviewing || isDeleting}
+                          disabled={isReviewing || isDeleting || !canReviewCurrentAnnotations}
                           onClick={() => handleReviewAnnotation(ann.id, 'REJECTED')}
                           className="tsd-btn-review-reject"
                         >
