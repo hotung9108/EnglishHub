@@ -238,7 +238,7 @@ jobs:
             sleep 5
           done
 
-      - name: Audio Stream Smoke Test [OPS-44]
+      - name: Audio Smoke Test [OPS-46]
         run: |
           chmod +x test/scripts/smoke-test-audio-stream.sh
           ./test/scripts/smoke-test-audio-stream.sh https://api-staging.hotung9108.me

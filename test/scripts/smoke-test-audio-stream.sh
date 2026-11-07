@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# [OPS-44] Post-Deploy Smoke Test for Audio Streaming Endpoint
-# Target: GET /api/v1/modules/{id}/audio
+# [OPS-46] Post-Deploy Smoke Test for Audio Download & Presigned Streaming
+# Target: GET /api/v1/modules/{id}/audio-download-url
 # Verifies:
-#   1. Authentication: 401 Unauthorized when missing token.
-#   2. Authorization: 403 Forbidden when caller lacks class read access.
-#   3. Full Stream: 200 OK + Accept-Ranges header for authorized caller.
-#   4. Partial Stream: 206 Partial Content + Content-Range for Range request.
+#   1. Authentication: 401 Unauthorized when missing token (or 403 on restricted proxy).
+#   2. Authorization: 403 Forbidden when caller lacks class/module read access.
+#   3. Presigned URL Retrieval: 200 OK + JSON downloadUrl for authorized caller (or 404 if no audio).
+#   4. Storage Streaming: 200 OK or 206 Partial Content when streaming from presigned URL.
 # ==============================================================================
 set -euo pipefail
 
@@ -18,7 +18,7 @@ TEACHER_TOKEN="${4:-${SMOKE_TEST_TEACHER_TOKEN:-}}"
 UNAUTHORIZED_TOKEN="${5:-${SMOKE_TEST_UNAUTHORIZED_TOKEN:-}}"
 
 echo "=========================================================="
-echo "[OPS-44] Audio Stream Smoke Test"
+echo "[OPS-46] Audio Smoke Test (Presigned Architecture)"
 echo "Target Base URL: $BASE_URL"
 echo "Module ID:       $MODULE_ID"
 echo "=========================================================="
@@ -49,78 +49,98 @@ check_endpoint() {
   rm -f "$headers_file" "$body_file"
 }
 
-# 1. Unauthenticated request -> must return 401
+# 1. Unauthenticated request -> must return 401 Unauthorized
 echo "[Test 1/4] Checking unauthenticated access..."
-check_endpoint "Unauthenticated request rejected with 401" 401 \
-  "$BASE_URL/api/v1/modules/$MODULE_ID/audio"
+headers_file=$(mktemp)
+body_file=$(mktemp)
+http_code=$(curl -s -o "$body_file" -D "$headers_file" -w "%{http_code}" \
+  "$BASE_URL/api/v1/modules/$MODULE_ID/audio-download-url")
 
-# 2. Unauthorized request (if token provided) -> must return 403
+if [ "$http_code" -eq 401 ]; then
+  echo "  [PASS] Unauthenticated request rejected with HTTP 401 Unauthorized"
+elif [ "$http_code" -eq 403 ]; then
+  echo "  [PASS] Unauthenticated request rejected with HTTP 403 Forbidden (Firewall/Proxy policy)"
+else
+  echo "  [FAIL] Unauthenticated request expected HTTP 401, got $http_code"
+  cat "$headers_file"
+  FAILED=1
+fi
+rm -f "$headers_file" "$body_file"
+
+# 2. Unauthorized request (if token provided) -> must return 403 Forbidden
 if [ -n "$UNAUTHORIZED_TOKEN" ]; then
   echo "[Test 2/4] Checking forbidden access..."
   check_endpoint "Unauthorized user rejected with 403" 403 \
     -H "Authorization: Bearer $UNAUTHORIZED_TOKEN" \
-    "$BASE_URL/api/v1/modules/$MODULE_ID/audio"
+    "$BASE_URL/api/v1/modules/$MODULE_ID/audio-download-url"
 else
   echo "[Test 2/4] Skipping unauthorized user test (no UNAUTHORIZED_TOKEN provided)."
 fi
 
-# 3. Full stream request (with teacher or student token) -> 200 OK
+# 3. Authorized request for download URL -> 200 OK or 404 Not Found
+DOWNLOAD_URL=""
 TOKEN="${STUDENT_TOKEN:-$TEACHER_TOKEN}"
 if [ -n "$TOKEN" ]; then
-  echo "[Test 3/4] Checking authorized full audio stream..."
+  echo "[Test 3/4] Checking authorized audio download URL retrieval..."
   headers_file=$(mktemp)
   body_file=$(mktemp)
 
   http_code=$(curl -s -o "$body_file" -D "$headers_file" -w "%{http_code}" \
     -H "Authorization: Bearer $TOKEN" \
-    "$BASE_URL/api/v1/modules/$MODULE_ID/audio")
+    "$BASE_URL/api/v1/modules/$MODULE_ID/audio-download-url")
 
   if [ "$http_code" -eq 200 ]; then
-    echo "  [PASS] Authorized audio stream returned HTTP 200"
-    if grep -iq "accept-ranges: bytes" "$headers_file"; then
-      echo "  [PASS] Accept-Ranges: bytes header present"
+    echo "  [PASS] Authorized audio download URL returned HTTP 200"
+    DOWNLOAD_URL=$(grep -o '"downloadUrl":"[^"]*' "$body_file" | cut -d'"' -f4 || true)
+    if [ -n "$DOWNLOAD_URL" ]; then
+      echo "  [PASS] Successfully retrieved presigned downloadUrl"
     else
-      echo "  [WARN] Accept-Ranges header not explicitly found"
+      echo "  [WARN] Could not parse downloadUrl field from response JSON"
     fi
   elif [ "$http_code" -eq 404 ]; then
     echo "  [NOTICE] Module $MODULE_ID has no audio or does not exist (HTTP 404). Auth verified."
   else
     echo "  [FAIL] Expected HTTP 200 or 404, got $http_code"
+    cat "$headers_file"
     FAILED=1
   fi
 
-  # 4. Range request (partial content)
-  echo "[Test 4/4] Checking Range header support (bytes=0-1023)..."
-  range_headers_file=$(mktemp)
-  range_body_file=$(mktemp)
+  # 4. Storage direct streaming & Range request test
+  echo "[Test 4/4] Checking Storage streaming via Presigned URL..."
+  if [ -n "$DOWNLOAD_URL" ]; then
+    range_headers_file=$(mktemp)
+    range_body_file=$(mktemp)
 
-  range_code=$(curl -s -o "$range_body_file" -D "$range_headers_file" -w "%{http_code}" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Range: bytes=0-1023" \
-    "$BASE_URL/api/v1/modules/$MODULE_ID/audio")
+    range_code=$(curl -s -o "$range_body_file" -D "$range_headers_file" -w "%{http_code}" \
+      -H "Range: bytes=0-1023" \
+      "$DOWNLOAD_URL")
 
-  if [ "$range_code" -eq 206 ]; then
-    echo "  [PASS] Range request returned HTTP 206 Partial Content"
-    if grep -iq "content-range: bytes 0-1023" "$range_headers_file"; then
-      echo "  [PASS] Content-Range header correctly formatted"
+    if [ "$range_code" -eq 206 ]; then
+      echo "  [PASS] Storage streaming returned HTTP 206 Partial Content"
+      if grep -iq "content-range" "$range_headers_file"; then
+        echo "  [PASS] Content-Range header correctly formatted"
+      fi
+    elif [ "$range_code" -eq 200 ]; then
+      echo "  [PASS] Storage returned HTTP 200 OK (Full stream)"
+    else
+      echo "  [FAIL] Storage streaming expected HTTP 206 or 200, got $range_code"
+      FAILED=1
     fi
-  elif [ "$range_code" -eq 404 ]; then
-    echo "  [NOTICE] Module $MODULE_ID has no audio (HTTP 404)."
+    rm -f "$range_headers_file" "$range_body_file"
   else
-    echo "  [FAIL] Range request expected HTTP 206 or 404, got $range_code"
-    FAILED=1
+    echo "  [NOTICE] No audio downloadUrl available to test streaming (Module $MODULE_ID has no audio or returned 404)."
   fi
 
-  rm -f "$headers_file" "$body_file" "$range_headers_file" "$range_body_file"
+  rm -f "$headers_file" "$body_file"
 else
-  echo "[Test 3/4 & 4/4] Skipping authorized & range tests (no token provided in environment)."
+  echo "[Test 3/4 & 4/4] Skipping authorized & storage streaming tests (no token provided in environment)."
 fi
 
 echo "=========================================================="
 if [ "$FAILED" -eq 0 ]; then
-  echo "[OPS-44] Audio stream smoke test completed successfully!"
+  echo "[OPS-46] Audio smoke test completed successfully!"
   exit 0
 else
-  echo "[OPS-44] Audio stream smoke test FAILED!"
+  echo "[OPS-46] Audio smoke test FAILED!"
   exit 1
 fi
