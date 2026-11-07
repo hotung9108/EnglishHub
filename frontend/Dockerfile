@@ -17,8 +17,9 @@ COPY . .
 # Port mặc định của Vite Dev Server
 EXPOSE 5173
 
-# Chạy Vite Dev Server với cờ host để cho phép kết nối từ bên ngoài container
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+# Chạy Vite Dev Server với cờ host để cho phép kết nối từ bên ngoài container,
+# tự động chạy npm install để đồng bộ dependencies khi có gói mới trong volume
+CMD ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 5173"]
 
 # ==========================================
 # Stage 2: Production Build
