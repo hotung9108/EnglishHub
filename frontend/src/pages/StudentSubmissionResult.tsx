@@ -84,6 +84,20 @@ function extractAnswerText(answers: SubmittedAnswerItem[] | undefined): string {
   return extractAnswerContentText(answers);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- exported for focused retry-selection coverage
+export function resolveRetryModuleId(
+  modules: SubmissionDetail['modules'] | undefined,
+  selectedModuleId: number | null,
+  moduleDetailId: number | undefined,
+): number | null {
+  if (!modules?.length) return null;
+
+  return modules.find(module => module.id === selectedModuleId)?.id
+    ?? modules.find(module => module.id === moduleDetailId)?.id
+    ?? modules[0]?.id
+    ?? null;
+}
+
 export const StudentSubmissionResult: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -100,6 +114,8 @@ export const StudentSubmissionResult: React.FC = () => {
   const [attempts, setAttempts] = useState<SubmissionListItem[]>([]);
   const [isLoadingAnnotationAnswer, setIsLoadingAnnotationAnswer] = useState(false);
   const annotationLoadId = useRef(0);
+  const moduleLoaderMounted = useRef(false);
+  const retryRequestId = useRef<number | null>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +123,7 @@ export const StudentSubmissionResult: React.FC = () => {
 
   // Tab & skill selection
   const [selectedSkill, setSelectedSkill] = useState<SubmissionSkill>('WRITING');
+  const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<'all' | StudentAnnotationCategory>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
@@ -121,9 +138,20 @@ export const StudentSubmissionResult: React.FC = () => {
     return location.pathname.includes('/assignments/');
   }, [location.pathname]);
 
+  useEffect(() => {
+    moduleLoaderMounted.current = true;
+    return () => { moduleLoaderMounted.current = false; };
+  }, []);
+
   // Load active module details when selectedSkill changes or subModule changes
   const loadModuleData = useCallback(async (subModuleId: number) => {
+    if (!moduleLoaderMounted.current) return;
     const loadId = ++annotationLoadId.current;
+    const isCurrentLoad = () => moduleLoaderMounted.current && loadId === annotationLoadId.current;
+    setSelectedModuleId(subModuleId);
+    setGradingResult(null);
+    setError(null);
+    setIsLoading(true);
     setModuleDetail(null);
     setIsLoadingAnnotationAnswer(true);
     try {
@@ -132,7 +160,11 @@ export const StudentSubmissionResult: React.FC = () => {
         gradingService.getStudentGradingResult(subModuleId)
       ]);
 
+      if (!isCurrentLoad()) return;
       setGradingResult(gradingRes.status === 'fulfilled' ? gradingRes.value : null);
+      if (gradingRes.status === 'rejected') {
+        setError('Không thể tải kết quả chấm bài. Vui lòng thử lại.');
+      }
 
       if (modRes.status === 'fulfilled') {
         const modValue = modRes.value;
@@ -147,14 +179,20 @@ export const StudentSubmissionResult: React.FC = () => {
             // Non-critical
           }
         }
-        if (loadId === annotationLoadId.current) setModuleDetail(modValue);
-      } else if (loadId === annotationLoadId.current) {
+        if (isCurrentLoad()) setModuleDetail(modValue);
+      } else if (isCurrentLoad()) {
         setModuleDetail(null);
       }
     } catch {
-      // Continue without crashing
+      if (isCurrentLoad()) {
+        setGradingResult(null);
+        setError('Không thể tải kết quả chấm bài. Vui lòng thử lại.');
+      }
     } finally {
-      if (loadId === annotationLoadId.current) setIsLoadingAnnotationAnswer(false);
+      if (isCurrentLoad()) {
+        setIsLoadingAnnotationAnswer(false);
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -185,16 +223,37 @@ export const StudentSubmissionResult: React.FC = () => {
   }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, t]);
 
   const [reloadKey, setReloadKey] = useState(0);
-  const handleRetry = () => setReloadKey((k) => k + 1);
+  const handleRetry = () => {
+    const currentModuleId = resolveRetryModuleId(submission?.modules, selectedModuleId, moduleDetail?.id);
+    if (currentModuleId !== null) {
+      if (retryRequestId.current === annotationLoadId.current) return;
+      const moduleLoad = loadModuleData(currentModuleId);
+      const requestId = annotationLoadId.current;
+      retryRequestId.current = requestId;
+      void moduleLoad.finally(() => {
+        if (retryRequestId.current === requestId) retryRequestId.current = null;
+      });
+      return;
+    }
+
+    annotationLoadId.current++;
+    setGradingResult(null);
+    setError(null);
+    setIsLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   useEffect(() => {
     let isMounted = true;
     const annotationRequests = annotationLoadId;
 
     const loadData = async () => {
+      let moduleLoadStarted = false;
+      setGradingResult(null);
       setIsLoading(true);
       setError(null);
       setNoSubmissionFound(false);
+      setSelectedModuleId(null);
 
       try {
         let currentSubmission: SubmissionDetail | null = null;
@@ -263,11 +322,12 @@ export const StudentSubmissionResult: React.FC = () => {
 
         if (isMounted) setSubmission(currentSubmission);
 
-        if (currentSubmission && currentSubmission.modules && currentSubmission.modules.length > 0) {
+        if (isMounted && currentSubmission && currentSubmission.modules && currentSubmission.modules.length > 0) {
           const firstMod = currentSubmission.modules[0];
           if (firstMod.skill && isMounted) {
             setSelectedSkill(firstMod.skill);
           }
+          moduleLoadStarted = true;
           await loadModuleData(firstMod.id);
         }
       } catch (err: unknown) {
@@ -275,7 +335,7 @@ export const StudentSubmissionResult: React.FC = () => {
         const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu kết quả chấm bài.';
         setError(msg);
       } finally {
-        if (isMounted) {
+        if (isMounted && !moduleLoadStarted) {
           setIsLoading(false);
         }
       }
@@ -291,20 +351,40 @@ export const StudentSubmissionResult: React.FC = () => {
 
   // Handle switching attempts
   const handleSelectAttempt = async (attemptId: number) => {
+    let loadId = ++annotationLoadId.current;
+    setSubmission(null);
+    setGradingResult(null);
+    setModuleDetail(null);
+    setSelectedModuleId(null);
+    setError(null);
     setIsLoading(true);
+    setIsLoadingAnnotationAnswer(true);
+    setSelectedAnnotationId(null);
     setActiveFilter('all');
+    setNoSubmissionFound(false);
     try {
       const sub = await submissionService.getSubmission(attemptId);
+      if (!moduleLoaderMounted.current || loadId !== annotationLoadId.current) return;
       setSubmission(sub);
       const subModule = sub.modules?.[0];
       if (subModule) {
         if (subModule.skill) setSelectedSkill(subModule.skill);
-        await loadModuleData(subModule.id);
+        const moduleLoad = loadModuleData(subModule.id);
+        loadId = annotationLoadId.current;
+        await moduleLoad;
       }
     } catch {
-      // Continue
+      if (!moduleLoaderMounted.current || loadId !== annotationLoadId.current) return;
+      setSubmission(null);
+      setModuleDetail(null);
+      setGradingResult(null);
+      setSelectedModuleId(null);
+      setError('Không thể tải lần nộp đã chọn. Vui lòng thử lại.');
     } finally {
-      setIsLoading(false);
+      if (moduleLoaderMounted.current && loadId === annotationLoadId.current) {
+        setIsLoadingAnnotationAnswer(false);
+        setIsLoading(false);
+      }
     }
   };
 
@@ -314,20 +394,17 @@ export const StudentSubmissionResult: React.FC = () => {
     setActiveFilter('all');
     const targetModule = submission?.modules?.find(m => m.skill === skill);
     if (targetModule) {
-      setIsLoading(true);
-      try {
-        await loadModuleData(targetModule.id);
-      } finally {
-        setIsLoading(false);
-      }
+      await loadModuleData(targetModule.id);
     }
   };
 
   // Compute active module
   const activeSubModule = useMemo(() => {
     if (!submission?.modules || submission.modules.length === 0) return null;
-    return submission.modules.find(m => m.skill === selectedSkill) || submission.modules[0];
-  }, [submission, selectedSkill]);
+    return submission.modules.find(module => module.id === selectedModuleId)
+      || submission.modules.find(module => module.skill === selectedSkill)
+      || submission.modules[0];
+  }, [submission, selectedModuleId, selectedSkill]);
 
   const rawScore = gradingResult?.finalScore ?? null;
   const maxScore = gradingResult?.maxScoreSnapshot ?? null;
@@ -575,6 +652,43 @@ export const StudentSubmissionResult: React.FC = () => {
               Làm bài tập ngay
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (submission && (!submission.modules || submission.modules.length === 0) && !isLoading) {
+    return (
+      <div className="student-result-page">
+        <div className="result-breadcrumbs">
+          <button
+            type="button"
+            className="result-back-btn"
+            onClick={() => navigate('/student/assignments')}
+          >
+            <ArrowLeft size={14} />
+            <span>{t('studentResult.backToList')}</span>
+          </button>
+          <span className="result-crumb-sep">/</span>
+          <span className="result-crumb-link">
+            {assignment?.title || t('studentResult.assignmentDetails')}
+          </span>
+          <span className="result-crumb-sep">/</span>
+          <span className="result-crumb-current">
+            {t('studentResult.resultAndFeedback')}
+          </span>
+        </div>
+
+        <div role="status" className="result-card p-24 result-empty-card">
+          <AlertCircle size={48} className="result-empty-icon" />
+          <h2 className="result-empty-title">
+            {isVi ? 'Chưa có dữ liệu mô-đun' : 'No module data available'}
+          </h2>
+          <p className="result-empty-desc">
+            {isVi
+              ? 'Lần nộp này chưa có mô-đun bài tập để hiển thị kết quả.'
+              : 'This submission has no assignment modules to display.'}
+          </p>
         </div>
       </div>
     );
