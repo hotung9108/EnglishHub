@@ -32,7 +32,6 @@ import com.english_hub.core.modules.grading.infrastructure.client.dto.FluencyMet
 import com.english_hub.core.modules.grading.infrastructure.client.dto.TextMetricsDto;
 import com.english_hub.core.modules.grading.infrastructure.client.dto.WritingCriteriaScoresDto;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
-import org.springframework.core.io.Resource;
 import org.springframework.test.util.ReflectionTestUtils;
 import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.submission.infrastructure.persistence.repository.SpringDataAnswerRepository;
@@ -624,7 +623,7 @@ class GradingAiAnalysisServiceImplTest {
 		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
 		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
 		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
-		when(storageService.getObjectBytes("submissions/202/essay.docx")).thenReturn("Sample Docx Content".getBytes());
+		when(storageService.generatePresignedGetUrl("submissions/202/essay.docx")).thenReturn("https://storage.example.com/essay.docx?presigned=true");
 
 		AiWritingAnalysisResponse aiResponse = new AiWritingAnalysisResponse(
 				submissionModuleId,
@@ -637,18 +636,15 @@ class GradingAiAnalysisServiceImplTest {
 				"openrouter"
 		);
 
-		when(aiServiceClient.analyzeWritingUpload(
-				eq(submissionModuleId),
-				any(Resource.class),
-				eq("essay.docx"),
-				eq("Upload your IELTS essay docx"),
-				eq("Standard academic rubric"),
-				eq(9.0),
-				any(),
-				any()
-		)).thenReturn(aiResponse);
+		ArgumentCaptor<AiWritingAnalysisRequest> requestCaptor = ArgumentCaptor.forClass(AiWritingAnalysisRequest.class);
+		when(aiServiceClient.analyzeWriting(requestCaptor.capture())).thenReturn(aiResponse);
 
 		service.analyzeSubmittedModule(submissionModuleId);
+
+		AiWritingAnalysisRequest captured = requestCaptor.getValue();
+		assertThat(captured.submissionModuleId()).isEqualTo(submissionModuleId);
+		assertThat(captured.content()).isNull();
+		assertThat(captured.documentUrl()).isEqualTo("https://storage.example.com/essay.docx?presigned=true");
 
 		ArgumentCaptor<Grading> gradingCaptor = ArgumentCaptor.forClass(Grading.class);
 		ArgumentCaptor<List> annotationsCaptor = ArgumentCaptor.forClass(List.class);

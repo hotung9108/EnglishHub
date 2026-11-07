@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, ConfigDict
+from pydantic.alias_generators import to_camel
 from app.schemas.base import CamelModel
 
 
@@ -36,15 +37,35 @@ class AnnotationItem(CamelModel):
 
 
 class AnalyzeSpeakingRequest(CamelModel):
-    submission_module_id: int
-    audio_url: Optional[str] = None
-    audio_base64: Optional[str] = None
-    audio_storage_key: Optional[str] = None
-    module_instructions: Optional[str] = None
-    ai_instruction_snapshot: Optional[str] = None
-    max_score: float = 9.0
+    submission_module_id: int = Field(..., description="ID phần nộp bài")
+    audio_url: Optional[str] = Field(None, description="Presigned URL để tải tệp âm thanh (.mp3, .wav, .m4a, .webm, .ogg)")
+    audio_storage_key: Optional[str] = Field(None, description="Khóa lưu trữ âm thanh trên Storage")
+    module_instructions: Optional[str] = Field(None, description="Đề bài hoặc yêu cầu câu hỏi")
+    ai_instruction_snapshot: Optional[str] = Field(None, description="Tiêu chí chấm hoặc rubric tùy chỉnh")
+    max_score: float = Field(9.0, description="Thang điểm tối đa")
     model: Optional[str] = Field(None, description="Tùy chọn ghi đè model AI (ví dụ: google/gemini-2.5-flash, gemini-1.5-pro)")
-    ai_provider: Optional[str] = Field(None, description="Tùy chọn ghi đè AI provider ('openrouter' hoặc 'gemini')")
+    ai_provider: Optional[str] = Field(None, description="Tùy chọn ghi đè AI provider ('openrouter', 'gemini' hoặc 'mock')")
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        serialize_by_alias=True,
+        from_attributes=True,
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "submissionModuleId": 14,
+                    "audioUrl": "https://storage.example.com/audio/sample_speaking.mp3?presigned=true",
+                    "audioStorageKey": "submissions/speaking_14.mp3",
+                    "moduleInstructions": "Describe a book you enjoyed reading recently.",
+                    "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
+                    "maxScore": 9.0,
+                    "aiProvider": "mock"
+                }
+            ]
+        }
+    )
 
 
 class AnalyzeSpeakingResponse(CamelModel):
