@@ -23,14 +23,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -143,23 +141,14 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			throw new IllegalStateException("No audio storage key found for answer " + answer.getId());
 		}
 
-		String presignedGetUrl = null;
-		String audioBase64 = null;
+		String presignedGetUrl;
 		try {
 			presignedGetUrl = storageService.generatePresignedGetUrl(storageKey);
 		} catch (Exception ex) {
-			LOGGER.warn("Failed to generate presigned GET URL for storageKey {}: {}", storageKey, ex.getMessage());
+			throw new IllegalStateException("Failed to generate presigned GET URL for storageKey " + storageKey + ": " + ex.getMessage(), ex);
 		}
-
 		if (presignedGetUrl == null || presignedGetUrl.isBlank()) {
-			try {
-				byte[] audioBytes = storageService.getObjectBytes(storageKey);
-				if (audioBytes != null && audioBytes.length > 0) {
-					audioBase64 = Base64.getEncoder().encodeToString(audioBytes);
-				}
-			} catch (Exception ex) {
-				LOGGER.warn("Failed to fetch object bytes for storageKey {}: {}", storageKey, ex.getMessage());
-			}
+			throw new IllegalStateException("Presigned GET URL returned blank for storageKey " + storageKey);
 		}
 
 		double maxScore = grading.maxScoreSnapshot() != null ? grading.maxScoreSnapshot().doubleValue() : 9.0;
@@ -169,7 +158,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 		AiSpeakingAnalysisRequest request = new AiSpeakingAnalysisRequest(
 				submissionModuleId,
 				presignedGetUrl,
-				audioBase64,
+				null,
 				storageKey,
 				moduleInstructions,
 				grading.aiInstructionSnapshot(),
@@ -230,6 +219,7 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			AiWritingAnalysisRequest request = new AiWritingAnalysisRequest(
 					submissionModuleId,
 					content,
+					null,
 					moduleInstructions,
 					grading.aiInstructionSnapshot(),
 					maxScore,
@@ -238,29 +228,26 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 			);
 			response = aiServiceClient.analyzeWriting(request);
 		} else if (docStorageKey != null && !docStorageKey.isBlank()) {
-			byte[] docBytes = storageService.getObjectBytes(docStorageKey);
-			if (docBytes == null || docBytes.length == 0) {
-				throw new IllegalStateException("Document bytes empty or not found for storageKey " + docStorageKey);
+			String presignedDocUrl;
+			try {
+				presignedDocUrl = storageService.generatePresignedGetUrl(docStorageKey);
+			} catch (Exception ex) {
+				throw new IllegalStateException("Failed to generate presigned GET URL for docStorageKey " + docStorageKey + ": " + ex.getMessage(), ex);
 			}
-			String filename = docStorageKey.contains("/")
-					? docStorageKey.substring(docStorageKey.lastIndexOf('/') + 1)
-					: docStorageKey;
-			ByteArrayResource resource = new ByteArrayResource(docBytes) {
-				@Override
-				public String getFilename() {
-					return filename;
-				}
-			};
-			response = aiServiceClient.analyzeWritingUpload(
+			if (presignedDocUrl == null || presignedDocUrl.isBlank()) {
+				throw new IllegalStateException("Presigned GET URL returned blank for docStorageKey " + docStorageKey);
+			}
+			AiWritingAnalysisRequest request = new AiWritingAnalysisRequest(
 					submissionModuleId,
-					resource,
-					filename,
+					null,
+					presignedDocUrl,
 					moduleInstructions,
 					grading.aiInstructionSnapshot(),
 					maxScore,
 					targetModel,
 					targetProvider
 			);
+			response = aiServiceClient.analyzeWriting(request);
 		} else {
 			throw new IllegalStateException("Neither essay content nor docStorageKey found for answer " + answer.getId());
 		}

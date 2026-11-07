@@ -10,14 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -78,46 +75,6 @@ public class AiServiceClientImpl implements AiServiceClient {
 						.header("X-Internal-Secret", internalSecret)
 						.contentType(MediaType.APPLICATION_JSON)
 						.body(request)
-						.retrieve()
-						.body(AiWritingAnalysisResponse.class)
-		);
-	}
-
-	@Override
-	public AiWritingAnalysisResponse analyzeWritingUpload(
-			long submissionModuleId,
-			Resource documentFile,
-			String filename,
-			String moduleInstructions,
-			String aiInstructionSnapshot,
-			Double maxScore,
-			String model,
-			String aiProvider) {
-		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
-		parts.add("file", documentFile);
-		parts.add("submissionModuleId", String.valueOf(submissionModuleId));
-		if (moduleInstructions != null && !moduleInstructions.isBlank()) {
-			parts.add("moduleInstructions", moduleInstructions);
-		}
-		if (aiInstructionSnapshot != null && !aiInstructionSnapshot.isBlank()) {
-			parts.add("aiInstructionSnapshot", aiInstructionSnapshot);
-		}
-		if (maxScore != null) {
-			parts.add("maxScore", String.valueOf(maxScore));
-		}
-		if (model != null && !model.isBlank()) {
-			parts.add("model", model);
-		}
-		if (aiProvider != null && !aiProvider.isBlank()) {
-			parts.add("aiProvider", aiProvider);
-		}
-
-		return executeWithRetry("analyze writing upload (" + filename + ")", () ->
-				restClient.post()
-						.uri("/api/v1/analyze/writing/upload")
-						.header("X-Internal-Secret", internalSecret)
-						.contentType(MediaType.MULTIPART_FORM_DATA)
-						.body(parts)
 						.retrieve()
 						.body(AiWritingAnalysisResponse.class)
 		);

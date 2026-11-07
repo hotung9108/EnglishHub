@@ -180,6 +180,27 @@ class AiServiceClientTest {
 	}
 
 	@Test
+	void serializeWritingRequest_withDocumentUrl_producesValidCamelCaseJson() throws Exception {
+		AiWritingAnalysisRequest request = new AiWritingAnalysisRequest(
+				202L,
+				null,
+				"https://storage.example.com/essay.docx?presigned=true",
+				"Write an essay about community service",
+				"IELTS Band 7 rubric",
+				9.0,
+				"google/gemini-2.5-flash",
+				"openrouter"
+		);
+
+		String json = objectMapper.writeValueAsString(request);
+		JsonNode tree = objectMapper.readTree(json);
+
+		assertThat(tree.get("submissionModuleId").asLong()).isEqualTo(202L);
+		assertThat(tree.has("content")).isFalse();
+		assertThat(tree.get("documentUrl").asText()).isEqualTo("https://storage.example.com/essay.docx?presigned=true");
+	}
+
+	@Test
 	void deserializeWritingResponse_matchesPythonFastApiContract() throws Exception {
 		String jsonResponse = """
 				{
