@@ -49,11 +49,20 @@ import com.english_hub.core.modules.submission.application.port.StorageService;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -80,20 +89,38 @@ class AiServiceMockFlowIntegrationTest {
 			.withUsername("test")
 			.withPassword("test");
 
+	private static final HttpServer MOCK_AI_SERVER;
+
+	static {
+		try {
+			MOCK_AI_SERVER = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+			configureMockEndpoints(MOCK_AI_SERVER);
+			MOCK_AI_SERVER.start();
+		} catch (IOException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
+
+	@AfterAll
+	static void stopMockAiServer() {
+		if (MOCK_AI_SERVER != null) {
+			MOCK_AI_SERVER.stop(0);
+		}
+	}
+
 	@DynamicPropertySource
 	static void registerProperties(DynamicPropertyRegistry registry) {
 		registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
 		registry.add("spring.datasource.username", POSTGRES::getUsername);
 		registry.add("spring.datasource.password", POSTGRES::getPassword);
-		// Point to running AI Service on port 8001 (mock mode)
-		registry.add("app.ai-service.base-url", () -> "http://localhost:8001");
+		// Point to embedded self-contained mock HTTP server (hermetic & CI-friendly)
+		registry.add("app.ai-service.base-url", () -> "http://127.0.0.1:" + MOCK_AI_SERVER.getAddress().getPort());
 	}
 
 	@Autowired private MockMvc mockMvc;
 	@Autowired private AiServiceClient aiServiceClient;
 	@Autowired private GradingAiAnalysisService gradingAiAnalysisService;
-	@MockitoBean
-	private StorageService storageService;
+	@MockitoBean private StorageService storageService;
 	@Autowired private UserRepository userRepository;
 	@Autowired private TeacherProfileRepository teacherProfileRepository;
 	@Autowired private StudentProfileRepository studentProfileRepository;
@@ -404,5 +431,122 @@ class AiServiceMockFlowIntegrationTest {
 		return "Bearer " + jwtTokenService.createAccessToken(
 				userId,
 				com.english_hub.core.modules.user.domain.model.UserRole.valueOf(role.name()));
+	}
+
+	private static void configureMockEndpoints(HttpServer server) {
+		Pattern subIdPattern = Pattern.compile("\"submissionModuleId\"\\s*:\\s*(\\d+)");
+
+		server.createContext("/api/v1/analyze/speaking", exchange -> {
+			if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				long subId = extractSubmissionModuleId(body, subIdPattern);
+				String responseJson = """
+						{
+						  "submissionModuleId": %d,
+						  "overallScore": 7.0,
+						  "aiFeedback": "The answer is relevant and easy to follow. Practise consistent pronunciation and keep a steady speaking pace.",
+						  "aiTranscript": [
+						    { "word": "I", "start": 0.0, "end": 0.3, "confidence": 0.95 },
+						    { "word": "usually", "start": 0.3, "end": 0.8, "confidence": 0.93 },
+						    { "word": "study", "start": 0.8, "end": 1.2, "confidence": 0.94 },
+						    { "word": "English", "start": 1.2, "end": 1.8, "confidence": 0.92 }
+						  ],
+						  "fluencyMetrics": {
+						    "wordsPerMinute": 130.5,
+						    "pauseCount": 2,
+						    "totalDurationSeconds": 45.0,
+						    "phonationTimeRatio": 0.85
+						  },
+						  "criteriaScores": {
+						    "fluencyAndCoherence": 7.0,
+						    "lexicalResource": 7.5,
+						    "grammaticalRangeAndAccuracy": 7.0,
+						    "pronunciation": 6.5,
+						    "overallScore": 7.0
+						  },
+						  "annotations": [
+						    {
+						      "startOffset": 0,
+						      "endOffset": 1,
+						      "errorType": "PRONUNCIATION",
+						      "comment": "Good vowel clarity",
+						      "suggestedFix": null
+						    }
+						  ],
+						  "modelUsed": "gemini-3.1-flash-lite",
+						  "providerUsed": "gemini-mock"
+						}
+						""".formatted(subId);
+				sendJsonResponse(exchange, 200, responseJson);
+			} else {
+				exchange.sendResponseHeaders(405, -1);
+			}
+		});
+
+		server.createContext("/api/v1/analyze/writing", exchange -> {
+			if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				long subId = extractSubmissionModuleId(body, subIdPattern);
+				String responseJson = """
+						{
+						  "submissionModuleId": %d,
+						  "overallScore": 7.5,
+						  "aiFeedback": "Your response addresses the topic clearly. Review the highlighted grammar points before revising it.",
+						  "textMetrics": {
+						    "wordCount": 35,
+						    "sentenceCount": 3,
+						    "averageSentenceLength": 11.6,
+						    "lexicalDiversity": 0.78,
+						    "fleschKincaidGrade": 8.5
+						  },
+						  "criteriaScores": {
+						    "taskResponse": 7.5,
+						    "coherenceAndCohesion": 7.0,
+						    "lexicalResource": 7.5,
+						    "grammaticalRangeAndAccuracy": 8.0,
+						    "overallScore": 7.5
+						  },
+						  "annotations": [
+						    {
+						      "startOffset": 0,
+						      "endOffset": 11,
+						      "errorType": "GRAMMAR",
+						      "comment": "Well-structured opening clause.",
+						      "suggestedFix": null
+						    }
+						  ],
+						  "modelUsed": "gemini-3.1-flash-lite",
+						  "providerUsed": "gemini-mock"
+						}
+						""".formatted(subId);
+				sendJsonResponse(exchange, 200, responseJson);
+			} else {
+				exchange.sendResponseHeaders(405, -1);
+			}
+		});
+
+		server.createContext("/health", exchange -> {
+			sendJsonResponse(exchange, 200, "{\"status\":\"ok\",\"mockMode\":true}");
+		});
+	}
+
+	private static long extractSubmissionModuleId(String body, Pattern pattern) {
+		Matcher matcher = pattern.matcher(body);
+		if (matcher.find()) {
+			try {
+				return Long.parseLong(matcher.group(1));
+			} catch (NumberFormatException ignored) {
+			}
+		}
+		return 1L;
+	}
+
+	private static void sendJsonResponse(HttpExchange exchange, int statusCode, String responseJson) throws IOException {
+		byte[] bytes = responseJson.getBytes(StandardCharsets.UTF_8);
+		exchange.getResponseHeaders().set("Content-Type", "application/json");
+		exchange.sendResponseHeaders(statusCode, bytes.length);
+		try (OutputStream os = exchange.getResponseBody()) {
+			os.write(bytes);
+		}
 	}
 }
