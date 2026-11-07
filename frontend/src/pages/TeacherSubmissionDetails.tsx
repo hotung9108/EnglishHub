@@ -279,10 +279,51 @@ export const TeacherSubmissionDetails: React.FC = () => {
           // ignore
         }
       }
+
+      if (gradingRes.status === 'COMPLETED') {
+        try {
+          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
+          if (localDraft) {
+            const parsed = JSON.parse(localDraft);
+            if (parsed && typeof parsed === 'object') {
+              if (parsed.score != null && parsed.score !== '') {
+                setFinalScoreInput(String(parsed.score));
+              }
+              if (parsed.feedback != null && parsed.feedback !== '') {
+                setFeedbackText(String(parsed.feedback));
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
     } catch {
       if (!isCurrentModuleLoad()) return;
       setGradingSummary(null);
       setGradingDetail(null);
+      try {
+        const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
+        if (localDraft) {
+          const parsed = JSON.parse(localDraft);
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.score != null && parsed.score !== '') {
+              setFinalScoreInput(String(parsed.score));
+            }
+            if (parsed.feedback != null && parsed.feedback !== '') {
+              setFeedbackText(String(parsed.feedback));
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     try {
@@ -619,9 +660,31 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
 
     if (!isCurrentAction(context) || context.moduleId !== activeModule?.id || gradeRequestRef.current) return;
-    const scoreNum = parseFloat(finalScoreInput);
+    const normalizedScoreStr = finalScoreInput.trim().replace(',', '.');
+    const scoreNum = parseFloat(normalizedScoreStr);
     if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
       showToast(isVi ? 'Điểm số không hợp lệ (thang 0.0 - 10.0)!' : 'Invalid score (range 0.0 - 10.0)!');
+      return;
+    }
+
+    // 1. If saving draft: persist locally and do NOT call submitGrade to avoid premature finalization
+    if (!isFinalize) {
+      const targetModuleId = activeModule?.id;
+      if (targetModuleId) {
+        try {
+          localStorage.setItem(
+            `eh_draft_grading_${targetModuleId}`,
+            JSON.stringify({
+              score: normalizedScoreStr,
+              feedback: feedbackText,
+              updatedAt: new Date().toISOString(),
+            })
+          );
+        } catch (e) {
+          console.warn('Failed to save grading draft to localStorage', e);
+        }
+      }
+      showToast(isVi ? 'Đã lưu bản nháp nhận xét!' : 'Grading draft saved!');
       return;
     }
 
@@ -631,13 +694,23 @@ export const TeacherSubmissionDetails: React.FC = () => {
       await gradingService.submitGrade(gradingId, {
         finalScore: scoreNum,
         finalFeedback: feedbackText
-
       });
 
       if (!isCurrentAction(context)) return;
+
+      // Clear local draft upon successful publication
+      const targetModuleId = activeModule?.id;
+      if (targetModuleId) {
+        try {
+          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+        } catch {
+          // ignore
+        }
+      }
+
       showToast(isVi
-        ? (isFinalize ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Đã lưu bản nháp nhận xét!')
-        : (isFinalize ? 'Grade finalized and published to student!' : 'Grading draft saved!'));
+        ? 'Đã lưu điểm và trả bài cho học viên thành công!'
+        : 'Grade finalized and published to student!');
 
       if (isFinalize) {
         gradeNavigationTimerRef.current = setTimeout(() => {
@@ -1474,7 +1547,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <div className="tsd-score-input-wrap">
                   <input
                     type="number"
-                    step="0.5"
+                    step="any"
                     min="0"
                     max="10"
                     placeholder="0.0"
@@ -1588,7 +1661,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <div className="tsd-score-input-wrap">
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   min="0"
                   max="10"
                   placeholder="0.0"

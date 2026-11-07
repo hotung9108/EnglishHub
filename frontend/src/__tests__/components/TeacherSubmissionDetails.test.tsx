@@ -192,6 +192,52 @@ describe('TeacherSubmissionDetails', () => {
     expect(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' })).toBeEnabled();
   });
 
+  it('saves grading draft locally without calling submitGrade and preserves draft', async () => {
+    localStorage.clear();
+    const { user, score, container } = await setup();
+    await user.clear(score);
+    await user.type(score, '8.2');
+    const feedbackInput = container.querySelector('textarea')!;
+    await user.clear(feedbackInput);
+    await user.type(feedbackInput, 'Draft feedback from teacher');
+
+    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp nhận xét' }));
+
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+    expect(screen.getByText('Đã lưu bản nháp nhận xét!')).toBeVisible();
+
+    const saved = localStorage.getItem('eh_draft_grading_50');
+    expect(saved).not.toBeNull();
+    const parsed = JSON.parse(saved!);
+    expect(parsed.score).toBe('8.2');
+    expect(parsed.feedback).toBe('Draft feedback from teacher');
+  });
+
+  it('restores grading draft from localStorage on load', async () => {
+    localStorage.setItem('eh_draft_grading_50', JSON.stringify({
+      score: '9.3',
+      feedback: 'Restored draft note',
+    }));
+    const { score, container } = await setup();
+    expect(score).toHaveValue(9.3);
+    const feedbackInput = container.querySelector('textarea')!;
+    expect(feedbackInput).toHaveValue('Restored draft note');
+    localStorage.clear();
+  });
+
+  it('clears local draft upon successful finalization', async () => {
+    localStorage.setItem('eh_draft_grading_50', JSON.stringify({
+      score: '8.5',
+      feedback: 'Draft before final',
+    }));
+    vi.mocked(gradingService.submitGrade).mockResolvedValue({ message: 'Saved' });
+    const { user } = await setup();
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    expect(gradingService.submitGrade).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('eh_draft_grading_50')).toBeNull();
+  });
+
 
 
 
