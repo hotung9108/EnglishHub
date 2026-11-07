@@ -1,4 +1,4 @@
-/* EnglishHub Student Portal: Ecosystem Pages Styles (Workspace, Feedback, Grades, Analytics) */
+﻿/* EnglishHub Student Portal: Ecosystem Pages Styles (Workspace, Feedback, Grades, Analytics) */
 
 .std-eco-container {
   max-width: 1280px;
@@ -362,7 +362,7 @@
 }
 
 .std-eco-btn-primary:hover {
-  background-color: #1d4ed8;
+  background-color: var(--eh-primary-hover, #133D30);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
@@ -513,7 +513,7 @@
 
 .grade-score-pill.good {
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--eh-primary, #1B4D3E);
   border: 1px solid #bfdbfe;
 }
 
@@ -562,7 +562,7 @@
 .workspace-progress-fill {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  background: linear-gradient(90deg, #1B4D3E, #133D30);
   transition: width 0.4s ease;
 }
 
@@ -643,7 +643,7 @@
 }
 
 .feedback-reviewer-avatar.teacher {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #1B4D3E 0%, #133D30 100%);
 }
 
 .feedback-reviewer-avatar.ai {
@@ -711,7 +711,7 @@
 .analytics-diagnostic-card.recommendation {
   background-color: #eff6ff;
   border: 1px solid #bfdbfe;
-  color: #1e40af;
+  color: var(--eh-primary-hover, #133D30);
 }
 
 /* Scoped Analytics Elements */
@@ -792,7 +792,7 @@
   height: 38px;
   border-radius: 10px;
   background-color: #eff6ff;
-  color: #2563eb;
+  color: var(--eh-primary, #1B4D3E);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -830,7 +830,7 @@
 .analytics-radar-fill {
   height: 100%;
   border-radius: 6px;
-  background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+  background: linear-gradient(90deg, #1B4D3E 0%, #C5A880 100%);
   transition: width 0.6s ease;
 }
 

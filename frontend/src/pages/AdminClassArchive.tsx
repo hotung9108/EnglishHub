@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import { userService } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
-import { Button, Pagination } from '../components/common';
+import { Button, Pagination, ConfirmModal, useToast } from '../components/common';
 
 interface ArchivedClassItem {
   id: number;
@@ -19,6 +19,7 @@ export const AdminClassArchive: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,8 @@ export const AdminClassArchive: React.FC = () => {
   const [classes, setClasses] = useState<ArchivedClassItem[]>([]);
   const [detailsMap, setDetailsMap] = useState<Record<number, { memberCount: number; endDate: string }>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+  const [restoreTarget, setRestoreTarget] = useState<ArchivedClassItem | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -160,14 +163,22 @@ export const AdminClassArchive: React.FC = () => {
     };
   }, [paginatedClasses, detailsMap]);
 
-  const handleRestore = async (cls: ArchivedClassItem) => {
-    if (confirm(isVi ? `Xác nhận mở lại lớp ${cls.name} (${cls.code}) về trạng thái ACTIVE?` : `Restore class ${cls.name} to ACTIVE status?`)) {
-      try {
-        await classService.update(cls.id, { status: 'ACTIVE' });
-        setRefreshKey(prev => prev + 1);
-      } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : isVi ? 'Không thể khôi phục lớp học.' : 'Failed to restore class.');
-      }
+  const handleRestore = (cls: ArchivedClassItem) => {
+    setRestoreTarget(cls);
+  };
+
+  const executeRestore = async () => {
+    if (!restoreTarget) return;
+    setIsRestoring(true);
+    try {
+      await classService.update(restoreTarget.id, { status: 'ACTIVE' });
+      setRefreshKey(prev => prev + 1);
+      toastSuccess(isVi ? `Đã mở lại lớp ${restoreTarget.name} thành công.` : `Successfully restored class ${restoreTarget.name}.`);
+      setRestoreTarget(null);
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể khôi phục lớp học.' : 'Failed to restore class.');
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -334,6 +345,24 @@ export const AdminClassArchive: React.FC = () => {
           />
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(restoreTarget)}
+        title={isVi ? 'Khôi phục lớp học' : 'Restore Class'}
+        message={
+          restoreTarget
+            ? isVi
+              ? `Xác nhận mở lại lớp ${restoreTarget.name} (${restoreTarget.code}) về trạng thái hoạt động (ACTIVE)?`
+              : `Confirm restoring class ${restoreTarget.name} (${restoreTarget.code}) to ACTIVE status?`
+            : ''
+        }
+        confirmText={isVi ? 'Mở lại lớp' : 'Restore'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant="primary"
+        isLoading={isRestoring}
+        onConfirm={executeRestore}
+        onCancel={() => setRestoreTarget(null)}
+      />
     </div>
   );
 };

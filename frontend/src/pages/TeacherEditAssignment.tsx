@@ -723,11 +723,11 @@ export const TeacherEditAssignment: React.FC = () => {
   if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
-        <RefreshCw size={36} color="#4f46e5" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+        <RefreshCw size={36} color="var(--eh-primary, #1B4D3E)" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
+        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--eh-text-primary, #262320)', fontFamily: "var(--eh-font-serif, 'Lora', serif)" }}>
           {isVi ? 'Đang tải thông tin bài tập từ hệ thống...' : 'Loading assignment details...'}
         </h3>
-        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--eh-text-secondary, #736B63)' }}>
           {isVi ? 'Đang đồng bộ nội dung đề bài, hạn nộp và lớp học.' : 'Syncing instructions, deadlines, and classroom.'}
         </p>
       </div>

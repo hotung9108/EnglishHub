@@ -11,10 +11,12 @@ import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
 import { Button, EmptyState, Pagination } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 
 export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [roleFilter, setRoleFilter] = useState<'All' | 'STUDENT' | 'TEACHER' | 'ADMIN'>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
@@ -194,8 +196,13 @@ export const Accounts: React.FC = () => {
     try {
       await userService.updateStatus(user.id, nextStatus);
       await refetch();
+      toastSuccess(
+        isVi
+          ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${user.email} thành công.`
+          : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} account ${user.email}.`
+      );
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : isVi ? 'Không thể thay đổi trạng thái tài khoản.' : 'Failed to update account status.');
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể thay đổi trạng thái tài khoản.' : 'Failed to update account status.');
     }
   };
 

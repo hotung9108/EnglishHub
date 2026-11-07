@@ -9,6 +9,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, EmptyState, Skeleton } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -50,6 +51,7 @@ export const StudentWorkspace: React.FC = () => {
   const { language } = useLanguage();
   const { user } = useAuth();
   const isVi = language === 'vi';
+  const { info: toastInfo } = useToast();
 
   const [activeTab, setActiveTab] = useState<'drafts' | 'notes' | 'resources'>('drafts');
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
@@ -702,7 +704,7 @@ export const StudentWorkspace: React.FC = () => {
                     variant="secondary"
                     size="sm"
                     icon={<Download size={14} />}
-                    onClick={() => alert(isVi ? `Đang bắt đầu tải: ${res.title}` : `Downloading: ${res.title}`)}
+                    onClick={() => toastInfo(isVi ? `Đang bắt đầu tải: ${res.title}` : `Downloading: ${res.title}`)}
                   >
                     {isVi ? 'Tải về' : 'Download'}
                   </Button>

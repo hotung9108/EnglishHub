@@ -12,7 +12,9 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  History
+  History,
+  Shield,
+  Library
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -78,6 +80,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         title: t('sectionManagement'),
         items: [
           { path: '/admin/accounts', label: t('menuAccounts'), icon: Users },
+          { path: '/admin/roles', label: language === 'vi' ? 'Phân quyền' : 'Roles', icon: Shield },
           { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
           { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
           { path: '/admin/students', label: t('menuStudents'), icon: Users },
@@ -103,6 +106,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+          { path: '/teacher/exam-bank', label: language === 'vi' ? 'Ngân hàng đề thi' : 'Exam Bank', icon: Library },
         ]
       },
       {
@@ -131,6 +135,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
           { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
+          { path: '/student/analytics', label: language === 'vi' ? 'Phân tích học tập' : 'Analytics', icon: BarChart3 },
         ]
       }
     ]

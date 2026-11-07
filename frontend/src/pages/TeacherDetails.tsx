@@ -6,6 +6,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
 import type { UserListItem } from '../api/services/user.service';
@@ -26,6 +27,7 @@ export const TeacherDetails: React.FC = () => {
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,12 +119,13 @@ export const TeacherDetails: React.FC = () => {
     try {
       await userService.updateUser(teacherUser.id, {});
       setPasswordSuccess(true);
+      toastSuccess(isVi ? 'Đổi mật khẩu thành công.' : 'Password updated successfully.');
       setTimeout(() => {
         setPasswordSuccess(false);
         setNewPassword('');
       }, 1500);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : isVi ? 'Không thể đổi mật khẩu.' : 'Failed to update password.');
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi mật khẩu.' : 'Failed to update password.');
     }
   };
 
@@ -132,14 +135,14 @@ export const TeacherDetails: React.FC = () => {
     try {
       await userService.updateStatus(teacherUser.id, nextStatus);
       setIsSuspended(nextStatus === 'LOCKED');
-      setStatusMessage(
-        nextStatus === 'LOCKED'
-          ? (isVi ? 'Đã tạm khóa tài khoản giảng viên.' : 'Teacher account suspended.')
-          : (isVi ? 'Đã mở khóa tài khoản giảng viên.' : 'Teacher account reactivated.')
-      );
+      const msg = nextStatus === 'LOCKED'
+        ? (isVi ? 'Đã tạm khóa tài khoản giảng viên.' : 'Teacher account suspended.')
+        : (isVi ? 'Đã mở khóa tài khoản giảng viên.' : 'Teacher account reactivated.');
+      setStatusMessage(msg);
+      toastSuccess(msg);
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
     }
   };
 

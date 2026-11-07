@@ -1,4 +1,4 @@
-/* === Sidebar === */
+﻿/* === Sidebar === */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -202,7 +202,7 @@
 
 .topbar-search-input:focus {
   background-color: var(--surface, #FFFFFF);
-  border-color: var(--accent, #4F46E5);
+  border-color: var(--eh-primary, #1B4D3E);
   box-shadow: var(--focus-ring);
 }
 

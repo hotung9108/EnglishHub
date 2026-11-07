@@ -11,7 +11,41 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   const location = useLocation();
 
   if (isLoading) {
-    return <div>Loading...</div>; // TODO: Replace with a proper loading spinner
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          backgroundColor: '#FAF8F5',
+          gap: '16px',
+        }}
+      >
+        <div
+          className="eh-spinner"
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #E6DFD5',
+            borderTopColor: '#1B4D3E',
+            borderRadius: '50%',
+            animation: 'ehSpin 800ms linear infinite',
+          }}
+        />
+        <span
+          style={{
+            fontSize: '14px',
+            color: '#736B63',
+            fontFamily: "var(--eh-font-serif, 'Lora', serif)",
+            letterSpacing: '0.02em',
+          }}
+        >
+          EnglishHub
+        </span>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !user) {

@@ -26,13 +26,13 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
   const getSkillIcon = (skill: string) => {
     switch (skill) {
       case 'writing':
-        return <PenTool size={18} color="#2563eb" />;
+        return <PenTool size={18} color="var(--eh-skill-writing, #8C5E14)" />;
       case 'speaking':
-        return <Mic size={18} color="#9333ea" />;
+        return <Mic size={18} color="var(--eh-skill-speaking, #5B21B6)" />;
       case 'reading':
-        return <BookOpen size={18} color="#16a34a" />;
+        return <BookOpen size={18} color="var(--eh-skill-reading, #16533D)" />;
       default:
-        return <Headphones size={18} color="#0d9488" />;
+        return <Headphones size={18} color="var(--eh-skill-listening, #1E3A8A)" />;
     }
   };
 
@@ -49,7 +49,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
                 fontSize: '13px', 
                 fontWeight: 700, 
                 textTransform: 'uppercase',
-                color: exam.skill === 'writing' ? '#2563eb' : exam.skill === 'speaking' ? '#9333ea' : exam.skill === 'reading' ? '#16a34a' : '#0d9488'
+                color: exam.skill === 'writing' ? 'var(--eh-skill-writing, #8C5E14)' : exam.skill === 'speaking' ? 'var(--eh-skill-speaking, #5B21B6)' : exam.skill === 'reading' ? 'var(--eh-skill-reading, #16533D)' : 'var(--eh-skill-listening, #1E3A8A)'
               }}>
                 {exam.skill}
               </span>
@@ -58,8 +58,8 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               fontSize: '12px', 
               padding: '2px 8px', 
               borderRadius: '4px', 
-              backgroundColor: '#eff6ff', 
-              color: '#1d4ed8', 
+              backgroundColor: 'var(--eh-primary-light, #EAF0E8)', 
+              color: 'var(--eh-primary, #1B4D3E)', 
               fontWeight: 600 
             }}>
               {exam.format}
@@ -110,11 +110,11 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               </div>
 
               {exam.details.rubricsSummary && (
-                <div style={{ padding: '14px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1d4ed8', display: 'block', marginBottom: '4px' }}>
+                <div style={{ padding: '14px', backgroundColor: 'var(--eh-primary-subtle, #f2f6f1)', borderRadius: '8px', border: '1px solid var(--eh-primary-border, #c2d9c5)' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--eh-primary, #1B4D3E)', display: 'block', marginBottom: '4px' }}>
                     {isVi ? 'Cấu hình tiêu chí chấm điểm chuẩn:' : 'Official Rubrics:'}
                   </span>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#1e3a8a' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--eh-text-primary, #262320)' }}>
                     {exam.details.rubricsSummary}
                   </p>
                 </div>

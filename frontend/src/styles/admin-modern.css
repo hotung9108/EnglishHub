@@ -1,4 +1,4 @@
-/* ================================================================
+﻿/* ================================================================
    EnglishHub Modern Admin Design System (Mobbin Web Inspired)
    Prefix: .adm-*
    Patterns: Linear, Stripe, Supabase, Vercel
@@ -680,7 +680,7 @@
   color: var(--on-surface-variant);
 }
 
-/* Modern Stepper Indicator (Step Cards / Ô Step) */
+/* Modern Stepper Indicator (Step Cards / Ã” Step) */
 .adm-stepper {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -697,7 +697,7 @@
 }
 
 /* ==========================================================================
-   Progress Stepper with Circles & Connecting Lines (Thanh tiến độ ô tròn & đường nối)
+   Progress Stepper with Circles & Connecting Lines (Thanh tiáº¿n Ä‘á»™ Ã´ trÃ²n & Ä‘Æ°á»ng ná»‘i)
    ========================================================================== */
 .adm-stepper-card {
   background-color: var(--surface, #FFFFFF);
@@ -1039,7 +1039,7 @@
   height: 44px;
   border-radius: var(--radius-md, 12px);
   background: var(--primary-fixed, #eff6ff);
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1077,7 +1077,7 @@
 .adm-gh-btn-export:hover {
   background: var(--surface-container-low, #f8fafc);
   border-color: var(--primary-fixed-dim, #bfdbfe);
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
@@ -1085,7 +1085,7 @@
 /* KPI Bento Grid Variants */
 .adm-gh-kpi-icon-blue {
   background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-gh-kpi-icon-emerald {
@@ -1152,7 +1152,7 @@
 }
 
 .adm-gh-search-input:focus {
-  border-color: var(--primary, #2563eb);
+  border-color: var(--eh-primary, #1B4D3E);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -1270,9 +1270,9 @@
 }
 
 .adm-gh-pill.active {
-  background: var(--primary, #2563eb);
+  background: var(--eh-primary, #1B4D3E);
   color: #ffffff;
-  border-color: var(--primary, #2563eb);
+  border-color: var(--eh-primary, #1B4D3E);
   box-shadow: 0 3px 10px -2px rgba(37, 99, 235, 0.35);
 }
 
@@ -1371,7 +1371,7 @@
   width: 34px;
   height: 34px;
   border-radius: var(--radius-full, 9999px);
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #1B4D3E 0%, #133D30 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1419,7 +1419,7 @@
 .adm-gh-student-code {
   font-family: monospace;
   font-size: 11.5px;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-gh-assignment-wrap {
@@ -1504,7 +1504,7 @@
   font-family: monospace;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   background: #eff6ff;
   padding: 3px 8px;
   border-radius: var(--radius-sm, 6px);
@@ -1574,7 +1574,7 @@
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--outline-variant, #e2e8f0);
   background: var(--surface, #ffffff);
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
@@ -1584,7 +1584,7 @@
 
 .adm-gh-btn-detail:hover {
   background: var(--primary-fixed, #eff6ff);
-  border-color: var(--primary, #2563eb);
+  border-color: var(--eh-primary, #1B4D3E);
   transform: translateY(-1px);
 }
 
@@ -1629,7 +1629,7 @@
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--outline-variant, #e2e8f0);
   background: var(--surface, #ffffff);
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -1638,7 +1638,7 @@
 
 .adm-gh-empty-btn:hover {
   background: var(--primary-fixed, #eff6ff);
-  border-color: var(--primary, #2563eb);
+  border-color: var(--eh-primary, #1B4D3E);
 }
 
 /* Table Footer / Summary */
@@ -1748,7 +1748,7 @@
 }
 
 .adm-gh-drawer-quote {
-  border-left: 4px solid var(--primary, #2563eb);
+  border-left: 4px solid var(--eh-primary, #1B4D3E);
   background: var(--surface-container-low, #f8fafc);
   border-radius: 0 var(--radius-md, 8px) var(--radius-md, 8px) 0;
   padding: 12px 16px;
@@ -1784,7 +1784,7 @@
 .adm-gh-drawer-rubric-score {
   font-family: monospace;
   font-weight: 700;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-gh-kpi-value-row {
@@ -1825,7 +1825,7 @@
   gap: 6px;
   padding: 9px 18px;
   border-radius: var(--radius-md, 10px);
-  background: var(--primary, #2563eb);
+  background: var(--eh-primary, #1B4D3E);
   color: #ffffff;
   font-size: 13.5px;
   font-weight: 600;
@@ -1836,7 +1836,7 @@
 }
 
 .adm-gh-btn-primary:hover {
-  background: #1d4ed8;
+  background: var(--eh-primary-hover, #133D30);
   transform: translateY(-1px);
 }
 
@@ -1966,7 +1966,7 @@
   font-size: 32px;
   font-weight: 800;
   font-family: monospace;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   line-height: 1;
 }
 
@@ -1977,8 +1977,8 @@
   font-weight: 700;
   padding: 3px 10px;
   border-radius: var(--radius-full, 9999px);
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--eh-primary-light, #EAF0E8);
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-gh-drawer-submission-preview {
@@ -1994,7 +1994,7 @@
 }
 
 .adm-gh-drawer-feedback-box {
-  border-left: 4px solid var(--primary, #2563eb);
+  border-left: 4px solid var(--eh-primary, #1B4D3E);
   background: var(--surface-container-low, #f8fafc);
   border-radius: 0 var(--radius-md, 8px) var(--radius-md, 8px) 0;
   padding: 14px 18px;
@@ -2026,7 +2026,7 @@
   padding: 3px 10px;
   border-radius: var(--radius-full, 9999px);
   background: var(--surface-container-high, #f1f5f9);
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   border: 1px solid rgba(37, 99, 235, 0.15);
   letter-spacing: 0.02em;
 }
@@ -2171,7 +2171,7 @@
 }
 
 .adm-rep-select:focus {
-  border-color: var(--primary, #2563eb);
+  border-color: var(--eh-primary, #1B4D3E);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
@@ -2302,7 +2302,7 @@
 }
 
 .adm-rep-dot-expert { background-color: #10b981; }
-.adm-rep-dot-good { background-color: #3b82f6; }
+.adm-rep-dot-good { background-color: var(--eh-primary, #1B4D3E); }
 .adm-rep-dot-comp { background-color: #f59e0b; }
 .adm-rep-dot-modest { background-color: #f43f5e; }
 
@@ -2331,7 +2331,7 @@
 
 .adm-rep-bar-good {
   width: 45%;
-  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  background: linear-gradient(90deg, #1B4D3E, #133D30);
 }
 
 .adm-rep-bar-comp {
@@ -2387,7 +2387,7 @@
   font-size: 26px;
   font-weight: 800;
   font-family: monospace;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   line-height: 1;
 }
 
@@ -2401,7 +2401,7 @@
 .adm-rep-skill-bar-fill {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(90deg, #1B4D3E, #133D30);
 }
 
 .adm-rep-skill-footer {
@@ -2431,7 +2431,7 @@
 
 .adm-rep-class-title {
   font-weight: 700;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
   font-size: 13.5px;
 }
 
@@ -2455,7 +2455,7 @@
   font-family: monospace;
   font-size: 13.5px;
   font-weight: 800;
-  color: #1d4ed8;
+  color: var(--eh-primary-hover, #133D30);
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   padding: 3px 10px;
@@ -2489,7 +2489,7 @@
 .adm-rep-progress-fill {
   height: 100%;
   border-radius: 9999px;
-  background: #2563eb;
+  background: var(--eh-primary, #1B4D3E);
 }
 
 /* --- Spotlight Cards (Top vs At-risk) --- */
@@ -2548,7 +2548,7 @@
   flex-shrink: 0;
 }
 
-.adm-rep-av-blue { background: #dbeafe; color: #1e40af; }
+.adm-rep-av-blue { background: var(--eh-primary-light, #EAF0E8); color: var(--eh-primary, #1B4D3E); }
 .adm-rep-av-violet { background: #ede9fe; color: #5b21b6; }
 .adm-rep-av-emerald { background: #d1fae5; color: #065f46; }
 .adm-rep-av-amber { background: #fef3c7; color: #92400e; }
@@ -2638,7 +2638,7 @@
   gap: 6px;
   font-size: 11.5px;
   font-weight: 700;
-  color: #4f46e5;
+  color: var(--eh-primary, #1B4D3E);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2691,7 +2691,7 @@
 .adm-rep-ai-metric-val {
   font-size: 16px;
   font-weight: 800;
-  color: #4f46e5;
+  color: var(--eh-primary, #1B4D3E);
   font-family: monospace;
 }
 
@@ -2721,7 +2721,7 @@
 .adm-rep-outlier-title {
   font-size: 14.5px;
   font-weight: 600;
-  color: var(--primary, #2563eb);
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-rep-outlier-badge-pos {
@@ -2756,7 +2756,7 @@
   background: var(--surface-container-low, #f8fafc);
   padding: 10px 14px;
   border-radius: var(--radius-sm, 8px);
-  border-left: 3px solid var(--primary, #2563eb);
+  border-left: 3px solid var(--eh-primary, #1B4D3E);
   line-height: 1.5;
 }
 
@@ -2769,7 +2769,7 @@
 
 .adm-rep-mae-good {
   background-color: #eff6ff;
-  color: #1d4ed8;
+  color: var(--eh-primary-hover, #133D30);
   font-weight: 700;
 }
 
@@ -2788,7 +2788,7 @@
 /* --- KPI Icon Background Wrappers --- */
 .adm-rep-kpi-icon-blue {
   background-color: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .adm-rep-kpi-icon-green {

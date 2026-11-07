@@ -346,6 +346,7 @@ export const TeacherCreateAssignment: React.FC = () => {
           createdModuleId = modRes.id;
         } catch (modErr) {
           console.warn(`Module creation fallback for ${skill}:`, modErr);
+          throw modErr;
         }
 
         // Upload audio file if skill is listening

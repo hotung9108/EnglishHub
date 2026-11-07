@@ -4,6 +4,7 @@ import type {
   ListeningConfig, ListeningQuestionItem 
 } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useToast } from '../../common/ToastContext';
 
 interface SkillListeningEditorProps {
   config: ListeningConfig;
@@ -13,6 +14,7 @@ interface SkillListeningEditorProps {
 export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ config, onChange }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const { error: toastError } = useToast();
 
   const updateField = <K extends keyof ListeningConfig>(key: K, value: ListeningConfig[K]) => {
     onChange({ ...config, [key]: value });
@@ -68,7 +70,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
     const isAudioType = file.type.startsWith('audio/') || hasValidExt;
 
     if (!isAudioType) {
-      alert(isVi ? 'Vui lòng chọn tệp âm thanh hợp lệ (.mp3, .wav, .m4a).' : 'Please select a valid audio file (.mp3, .wav, .m4a).');
+      toastError(isVi ? 'Vui lòng chọn tệp âm thanh hợp lệ (.mp3, .wav, .m4a).' : 'Please select a valid audio file (.mp3, .wav, .m4a).');
       return;
     }
 
