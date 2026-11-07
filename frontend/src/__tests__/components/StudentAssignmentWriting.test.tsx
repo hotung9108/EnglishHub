@@ -14,7 +14,7 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { getAssignment: vi.fn() } }));
 vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn() } }));
 vi.mock('../../api/services/submission.service', () => ({ submissionService: {
-  listSubmissions: vi.fn(), getSubmission: vi.fn(), startAttempt: vi.fn(), submitModule: vi.fn(), submitSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getDocumentUploadUrl: vi.fn(),
+  listSubmissions: vi.fn(), getSubmission: vi.fn(), startAttempt: vi.fn(), submitModule: vi.fn(), submitSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getDocumentUploadUrl: vi.fn(), uploadDocument: vi.fn(),
 } }));
 
 beforeEach(() => {
@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.mocked(submissionService.getSubmission).mockResolvedValue({ id: 40, studentId: 5, assignmentId: 12, status: 'IN_PROGRESS', submittedAt: null, createdAt: '2026-10-22T00:00:00Z', modules: [{ id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'IN_PROGRESS', grading: null }], attemptNumber: 2 });
   vi.mocked(submissionService.startAttempt).mockResolvedValue({ id: 40, assignmentId: 12, attemptNumber: 1, status: 'IN_PROGRESS', createdAt: '2026-10-21T10:00:00Z', modules: [] });
   vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({ id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'IN_PROGRESS', grading: null, answers: [], questions: [{ id: 91, content: 'Describe your city.', questionType: 'SHORT_ANSWER', score: 10, orderIndex: 1 }] });
+  vi.mocked(submissionService.uploadDocument).mockResolvedValue({ uploadUrl: 'https://storage.local/upload/essay.txt', storageKey: 'submissions/40/module-50/essay.txt', expiresAt: '2026-10-22T12:00:00Z' });
   vi.mocked(submissionService.submitModule).mockResolvedValue({ message: 'Saved', submissionModuleId: 50, status: 'SUBMITTED', answers: [] });
   vi.mocked(submissionService.submitSubmission).mockResolvedValue({ message: 'Submitted', status: 'SUBMITTED', submittedAt: '2026-10-21T10:00:00Z' });
 });
@@ -112,10 +113,14 @@ describe('StudentAssignmentWriting', () => {
     localStorage.setItem('eh_draft_writing_12', 'Old draft');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ })); });
     expect(screen.getByText(/Nộp bài thành công!/)).toBeVisible();
-    // Assert text persistence without blessing the currently hard-coded ID.
-    // Actual question mapping is required by a separate red reproduction.
+    expect(submissionService.uploadDocument).toHaveBeenCalledWith(
+      50,
+      expect.objectContaining({ name: 'essay.txt', type: 'text/plain;charset=utf-8' }),
+      'text/plain'
+    );
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(50, {
-      answers: [expect.objectContaining({ content: { text: 'My essay text' } })],
+      storageKey: 'submissions/40/module-50/essay.txt',
+      answers: [],
     });
     expect(submissionService.submitSubmission).toHaveBeenCalledExactlyOnceWith(40);
     expect(vi.mocked(submissionService.submitModule).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(submissionService.submitSubmission).mock.invocationCallOrder[0]);
@@ -206,15 +211,14 @@ it.each(['application/pdf', ''])('waits for file upload before submitting (%s)',
   const { container, user } = await setup();
   const file = new File(['essay'], 'essay.pdf', { type });
   fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
-  const pending = deferred<Awaited<ReturnType<typeof submissionService.getDocumentUploadUrl>>>();
-  vi.mocked(submissionService.getDocumentUploadUrl).mockReturnValueOnce(pending.promise);
-  const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 200 }));
+  const pending = deferred<Awaited<ReturnType<typeof submissionService.uploadDocument>>>();
+  vi.mocked(submissionService.uploadDocument).mockReturnValueOnce(pending.promise);
   await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
-  expect(submissionService.getDocumentUploadUrl).toHaveBeenCalledExactlyOnceWith(50, 'application/pdf');
+  expect(submissionService.uploadDocument).toHaveBeenCalledExactlyOnceWith(50, file, 'application/pdf');
   expect(submissionService.submitModule).not.toHaveBeenCalled();
   await act(async () => { pending.resolve({ uploadUrl: 'https://storage.example.test/upload', storageKey: 'essay.pdf', expiresAt: '2026-10-22T12:00:00Z' }); await pending.promise; });
   await waitFor(() => expect(submissionService.submitSubmission).toHaveBeenCalledWith(40));
-  expect(fetchMock).toHaveBeenCalledExactlyOnceWith('https://storage.example.test/upload', { method: 'PUT', body: file, headers: { 'Content-Type': type || 'application/octet-stream' } });
+  expect(submissionService.submitModule).toHaveBeenCalledWith(50, { storageKey: 'essay.pdf', answers: [] });
 });
 it.each(['IN_PROGRESS', 'SUBMITTED', 'GRADED'] as const)('handles remaining Reading module in state %s', async status => {
   vi.mocked(assignmentService.getAssignment).mockResolvedValue({ id: 12, title: 'Combined', status: 'PUBLISHED', modules: [{ id: 30, skill: 'WRITING' }, { id: 31, skill: 'READING' }] });
@@ -298,14 +302,9 @@ it('handles storage upload failures and MinIO rewrites', async () => {
   const { container, user } = await setup();
   const file = new File(['essay'], 'essay.pdf', { type: 'application/pdf' });
   fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
-  vi.mocked(submissionService.getDocumentUploadUrl).mockResolvedValueOnce({
-    uploadUrl: 'http://minio:9000/test/essay.pdf',
-    storageKey: 'essay.pdf',
-    expiresAt: '2026-10-22T12:00:00Z',
-  });
-  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 500 }));
+  vi.mocked(submissionService.uploadDocument).mockRejectedValueOnce(new Error('Tải tệp lên kho lưu trữ thất bại.'));
   await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
-  expect(await screen.findByText(/Lỗi tải tệp đính kèm/)).toBeVisible();
+  expect(await screen.findByText(/Lỗi tải tệp đính kèm: Tải tệp lên kho lưu trữ thất bại/)).toBeVisible();
 });
 
 it('reports failure when submitModule fails', async () => {
@@ -328,14 +327,17 @@ it('allows submitting with uploaded file even when editor text is empty', async 
   const { container, user } = await setup();
   const file = new File(['essay'], 'essay.pdf', { type: 'application/pdf' });
   fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [file] } });
-  vi.mocked(submissionService.getDocumentUploadUrl).mockResolvedValueOnce({
+  vi.mocked(submissionService.uploadDocument).mockResolvedValueOnce({
     uploadUrl: 'https://storage.example.test/upload',
-    storageKey: 'essay.pdf',
+    storageKey: 'submissions/40/module-50/essay.pdf',
     expiresAt: '2026-10-22T12:00:00Z',
   });
-  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 200 }));
   await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
-  expect(submissionService.submitModule).toHaveBeenCalled();
+  expect(submissionService.uploadDocument).toHaveBeenCalledWith(50, file, 'application/pdf');
+  expect(submissionService.submitModule).toHaveBeenCalledWith(50, {
+    storageKey: 'submissions/40/module-50/essay.pdf',
+    answers: [],
+  });
 });
 
 it('navigates to assignment result when submission id is missing on final submit', async () => {

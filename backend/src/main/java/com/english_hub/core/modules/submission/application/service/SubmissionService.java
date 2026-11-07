@@ -388,7 +388,8 @@ public class SubmissionService {
 	private List<FileCandidate> documentCandidates() {
 		return List.of(
 				new FileCandidate("pdf", "application/pdf"),
-				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+				new FileCandidate("txt", "text/plain"));
 	}
 
 	private record FileCandidate(String extension, String mimeType) {
@@ -747,6 +748,9 @@ public class SubmissionService {
 		}
 		if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)) {
 			return "docx";
+		}
+		if ("text/plain".equals(mimeType)) {
+			return "txt";
 		}
 		throw ApiException.badRequest(UNSUPPORTED_FILE_MESSAGE);
 	}
