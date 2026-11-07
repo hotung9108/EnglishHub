@@ -1,3 +1,6 @@
+import type { MouseEvent } from 'react';
+import type { ButtonProps } from '../../components/common/Button';
+import { ApiClientError } from '../../api/core/errors';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,6 +12,17 @@ import { classService } from '../../api/services/class.service';
 import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 import { deferred } from '../deferred';
+
+const { buttonCallbacks } = vi.hoisted(() => ({ buttonCallbacks: new Map<string, () => void>() }));
+vi.mock('../../components/common/Button', async original => {
+  const actual = await original<typeof import('../../components/common/Button')>();
+  return { ...actual, Button: (props: ButtonProps) => {
+    if (props.onClick) {
+      buttonCallbacks.set(props.className || String(props.children), () => props.onClick?.({} as MouseEvent<HTMLButtonElement>));
+    }
+    return <actual.Button {...props} />;
+  } };
+});
 
 vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { getAssignment: vi.fn(), listAssignments: vi.fn() } }));
 vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn() } }));
@@ -31,6 +45,7 @@ const ai: AiGradingSuggestionResponse = {
 };
 
 beforeEach(() => {
+  buttonCallbacks.clear();
   vi.mocked(assignmentService.getAssignment).mockResolvedValue({ id: 12, title: 'Weekly writing', status: 'PUBLISHED', modules: [] });
   vi.mocked(classService.list).mockResolvedValue({ data: [], pagination: { page: 1, limit: 100, total: 0 } });
   vi.mocked(submissionService.listSubmissions).mockResolvedValue({ data: [5, 6, 7].map((studentId, index) => ({ id: 40 + index, assignmentId: 12, studentId, attemptNumber: 1, status: 'SUBMITTED', submittedAt: null, modules: [] })), pagination: { page: 1, limit: 100, total: 3 } });
@@ -175,6 +190,52 @@ describe('TeacherSubmissionDetails', () => {
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
     expect(await screen.findByText('Offline')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' })).toBeEnabled();
+  });
+
+  it('saves grading draft locally without calling submitGrade and preserves draft', async () => {
+    localStorage.clear();
+    const { user, score, container } = await setup();
+    await user.clear(score);
+    await user.type(score, '8.2');
+    const feedbackInput = container.querySelector('textarea')!;
+    await user.clear(feedbackInput);
+    await user.type(feedbackInput, 'Draft feedback from teacher');
+
+    await user.click(screen.getByRole('button', { name: 'Lưu bản nháp nhận xét' }));
+
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+    expect(screen.getByText('Đã lưu bản nháp nhận xét!')).toBeVisible();
+
+    const saved = localStorage.getItem('eh_draft_grading_50');
+    expect(saved).not.toBeNull();
+    const parsed = JSON.parse(saved!);
+    expect(parsed.score).toBe('8.2');
+    expect(parsed.feedback).toBe('Draft feedback from teacher');
+  });
+
+  it('restores grading draft from localStorage on load', async () => {
+    localStorage.setItem('eh_draft_grading_50', JSON.stringify({
+      score: '9.3',
+      feedback: 'Restored draft note',
+    }));
+    const { score, container } = await setup();
+    expect(score).toHaveValue(9.3);
+    const feedbackInput = container.querySelector('textarea')!;
+    expect(feedbackInput).toHaveValue('Restored draft note');
+    localStorage.clear();
+  });
+
+  it('clears local draft upon successful finalization', async () => {
+    localStorage.setItem('eh_draft_grading_50', JSON.stringify({
+      score: '8.5',
+      feedback: 'Draft before final',
+    }));
+    vi.mocked(gradingService.submitGrade).mockResolvedValue({ message: 'Saved' });
+    const { user } = await setup();
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    expect(gradingService.submitGrade).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('eh_draft_grading_50')).toBeNull();
   });
 
 
@@ -458,6 +519,7 @@ it('falls back to AI suggestion annotations when answer annotation service fails
   vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Annotation service down'));
   await setup();
   expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
 });
 
 it('shows empty state when no annotations exist', async () => {
@@ -505,11 +567,12 @@ it('clears annotations when submission module has no answers', async () => {
   expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
 });
 
-it('clears annotations when listAnnotations fails and AI suggestion has no annotations', async () => {
+it('shows a network error when listAnnotations fails and AI suggestion has no annotations', async () => {
   vi.mocked(gradingService.getAiSuggestion).mockResolvedValueOnce({ ...ai, annotations: [] });
   vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValueOnce(new Error('Network error'));
   await setup();
-  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+  expect(screen.getByText('Không tải được nhận xét. Vui lòng thử lại.')).toBeVisible();
+  expect(screen.queryByText('Chưa có gợi ý sửa lỗi từ AI')).not.toBeInTheDocument();
 });
 
 it('falls back to detail.aiFeedback when finalFeedback is absent', async () => {
@@ -621,4 +684,714 @@ it('handles AI refresh polling error gracefully', async () => {
   await act(() => vi.advanceTimersByTimeAsync(3500));
   expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
   vi.useRealTimers();
+});
+
+
+it('does not warn when annotations come from GET', async () => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [{
+    id: 92, source: 'AI', startOffset: 0, endOffset: 5, errorType: 'GRAMMAR',
+    suggestedFix: null, comment: 'GET annotations result', reviewStatus: 'PENDING',
+  }] });
+  await setup();
+  expect(screen.getByText('GET annotations result')).toBeVisible();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+});
+
+it.each(['empty GET', 'missing answer'])('preserves the fallback trigger for %s', async trigger => {
+  if (trigger === 'missing answer') {
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({ ...moduleDetail, answers: [] });
+  }
+  await setup();
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
+  if (trigger === 'missing answer') expect(answerAnnotationService.listAnnotations).not.toHaveBeenCalled();
+});
+
+it.each([403, 404, 500])('keeps fallback annotations with a warning when GET returns %s', async status => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValue(new ApiClientError('GET failed', status));
+  await setup();
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
+});
+
+for (const fallback of ['empty', 'failed'] as const) {
+  it.each([
+    { status: 403, message: 'Bạn không có quyền xem nhận xét của bài này.' },
+    { status: 404, message: 'Không tìm thấy nhận xét của bài này.' },
+    { status: 500, message: 'Không tải được nhận xét. Vui lòng thử lại.' },
+  ])(`shows GET $status errors when fallback is ${fallback}`, async ({ status, message }) => {
+    vi.mocked(answerAnnotationService.listAnnotations).mockRejectedValue(new ApiClientError('GET failed', status));
+    if (fallback === 'empty') {
+      vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({ ...ai, annotations: [] });
+    } else {
+      vi.mocked(gradingService.getAiSuggestion).mockRejectedValue(new Error('AI suggestion unavailable'));
+    }
+    await setup();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByText('Chưa có gợi ý sửa lỗi từ AI')).not.toBeInTheDocument();
+    expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+  });
+}
+
+type AnnotationListResult = Awaited<ReturnType<typeof answerAnnotationService.listAnnotations>>;
+
+function controlledRequest<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function makeAnnotation(id: number, comment: string, reviewStatus: GradingAnnotation['reviewStatus'] = 'PENDING'): GradingAnnotation {
+  return {
+    id,
+    source: 'AI',
+    startOffset: 0,
+    endOffset: 5,
+    errorType: 'GRAMMAR',
+    comment,
+    suggestedFix: null,
+    reviewStatus,
+  };
+}
+
+function makeModuleDetail(moduleId: number, answerId: number, skill: SubmissionModuleDetailResponse['skill']): SubmissionModuleDetailResponse {
+  return {
+    ...moduleDetail,
+    id: moduleId,
+    skill,
+    answers: [{ id: answerId, questionId: 1, content: `Answer ${answerId}` }],
+  };
+}
+
+const twoModules: SubmissionDetail = {
+  ...submission,
+  modules: [
+    { ...submission.modules[0], id: 50, skill: 'WRITING' },
+    { ...submission.modules[0], id: 51, skill: 'SPEAKING', taskType: 'RECORDING' },
+  ],
+};
+
+it('clears the previous module immediately and ignores its late annotation response', async () => {
+  const previousAnnotation = makeAnnotation(101, 'Previous module annotation');
+  const currentAnnotation = makeAnnotation(102, 'Current module annotation');
+  const previousRequest = controlledRequest<AnnotationListResult>();
+  const currentRequest = controlledRequest<AnnotationListResult>();
+  let previousAnswerCalls = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(answerId => {
+    if (answerId === 60) {
+      previousAnswerCalls += 1;
+      return previousAnswerCalls === 1
+        ? Promise.resolve({ data: [previousAnnotation] })
+        : previousRequest.promise;
+    }
+    return currentRequest.promise;
+  });
+
+  const { user } = await (async () => {
+    const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+    await screen.findByRole('spinbutton');
+    return { ...result, user: userEvent.setup() };
+  })();
+  expect(screen.getByText('Previous module annotation')).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(previousAnswerCalls).toBeGreaterThan(1));
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  await waitFor(() => expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(61));
+
+  expect(screen.queryByText('Previous module annotation')).not.toBeInTheDocument();
+  expect(screen.getByText('Đang tải gợi ý sửa lỗi...')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Từ chối' })).not.toBeInTheDocument();
+
+  await act(async () => {
+    currentRequest.resolve({ data: [currentAnnotation] });
+    await currentRequest.promise;
+  });
+  expect(await screen.findByText('Current module annotation')).toBeVisible();
+
+  await act(async () => {
+    previousRequest.resolve({ data: [previousAnnotation] });
+    await previousRequest.promise;
+  });
+  expect(screen.getByText('Current module annotation')).toBeVisible();
+  expect(screen.queryByText('Previous module annotation')).not.toBeInTheDocument();
+});
+
+it('ignores stale responses in a rapid A to B to A to C module sequence', async () => {
+  const aAnnotation = makeAnnotation(201, 'A annotation');
+  const bAnnotation = makeAnnotation(202, 'B annotation');
+  const cAnnotation = makeAnnotation(203, 'C annotation');
+  const secondARequest = controlledRequest<AnnotationListResult>();
+  const bRequest = controlledRequest<AnnotationListResult>();
+  const cRequest = controlledRequest<AnnotationListResult>();
+  let aCalls = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...submission,
+    modules: [
+      ...twoModules.modules,
+      { ...submission.modules[0], id: 52, skill: 'READING', taskType: 'QUIZ' },
+    ],
+  });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId => {
+    if (moduleId === 50) return makeModuleDetail(50, 60, 'WRITING');
+    if (moduleId === 51) return makeModuleDetail(51, 61, 'SPEAKING');
+    return makeModuleDetail(52, 62, 'READING');
+  });
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(answerId => {
+    if (answerId === 60) {
+      aCalls += 1;
+      return aCalls === 1 ? Promise.resolve({ data: [aAnnotation] }) : secondARequest.promise;
+    }
+    if (answerId === 61) return bRequest.promise;
+    return cRequest.promise;
+  });
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  expect(screen.getByText('A annotation')).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  await waitFor(() => expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(61));
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(aCalls).toBeGreaterThan(1));
+  expect(screen.queryByText('A annotation')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'READING' }));
+  await waitFor(() => expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(62));
+
+  await act(async () => {
+    cRequest.resolve({ data: [cAnnotation] });
+    await cRequest.promise;
+  });
+  expect(await screen.findByText('C annotation')).toBeVisible();
+  await act(async () => {
+    bRequest.resolve({ data: [bAnnotation] });
+    secondARequest.resolve({ data: [aAnnotation] });
+    await Promise.all([bRequest.promise, secondARequest.promise]);
+  });
+
+  expect(screen.getByText('C annotation')).toBeVisible();
+  expect(screen.queryByText('A annotation')).not.toBeInTheDocument();
+  expect(screen.queryByText('B annotation')).not.toBeInTheDocument();
+  expect(aCalls).toBeGreaterThanOrEqual(2);
+  result.unmount();
+});
+
+it('clears and reloads annotations when the answer changes within the same module and when returning', async () => {
+  const firstAnswerAnnotation = makeAnnotation(301, 'First answer annotation');
+  const nextAnswerAnnotation = makeAnnotation(302, 'Next answer annotation');
+  const nextModuleDetail = controlledRequest<SubmissionModuleDetailResponse>();
+  const previousModuleDetail = controlledRequest<SubmissionModuleDetailResponse>();
+  let moduleDetailCalls = 0;
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(() => {
+    moduleDetailCalls += 1;
+    if (moduleDetailCalls === 1) return Promise.resolve(makeModuleDetail(50, 60, 'WRITING'));
+    if (moduleDetailCalls === 2) return nextModuleDetail.promise;
+    return previousModuleDetail.promise;
+  });
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(answerId =>
+    Promise.resolve({ data: [answerId === 60 ? firstAnswerAnnotation : nextAnswerAnnotation] }));
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  expect(screen.getByText('First answer annotation')).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: /Tiếp/ }));
+  await waitFor(() => expect(moduleDetailCalls).toBe(2));
+  expect(screen.queryByText('First answer annotation')).not.toBeInTheDocument();
+  await act(async () => {
+    nextModuleDetail.resolve(makeModuleDetail(50, 61, 'WRITING'));
+    await nextModuleDetail.promise;
+  });
+  expect(await screen.findByText('Next answer annotation')).toBeVisible();
+  expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(61);
+
+  await user.click(screen.getByRole('button', { name: /Trước/ }));
+  await waitFor(() => expect(moduleDetailCalls).toBe(3));
+  expect(screen.queryByText('Next answer annotation')).not.toBeInTheDocument();
+  await act(async () => {
+    previousModuleDetail.resolve(makeModuleDetail(50, 60, 'WRITING'));
+    await previousModuleDetail.promise;
+  });
+  expect(await screen.findByText('First answer annotation')).toBeVisible();
+  expect(vi.mocked(answerAnnotationService.listAnnotations).mock.calls.filter(([answerId]) => answerId === 60)).toHaveLength(2);
+  result.unmount();
+});
+
+it.each([
+  ['403', new ApiClientError('Old answer forbidden', 403)],
+  ['404', new ApiClientError('Old answer missing', 404)],
+  ['network', new Error('Old answer network failure')],
+] as const)('ignores a stale annotation GET %s failure after switching modules', async (_kind, staleError) => {
+  const previousRequest = controlledRequest<AnnotationListResult>();
+  const currentAnnotation = makeAnnotation(401, 'Current answer survives');
+  let previousAnswerCalls = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(answerId => {
+    if (answerId === 60) {
+      previousAnswerCalls += 1;
+      return previousAnswerCalls === 1
+        ? Promise.resolve({ data: [makeAnnotation(400, 'Previous answer') ] })
+        : previousRequest.promise;
+    }
+    return Promise.resolve({ data: [currentAnnotation] });
+  });
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(previousAnswerCalls).toBeGreaterThan(1));
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  expect(await screen.findByText('Current answer survives')).toBeVisible();
+
+  await act(async () => {
+    previousRequest.reject(staleError);
+    await previousRequest.promise.catch(() => undefined);
+  });
+  expect(screen.getByText('Current answer survives')).toBeVisible();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+  result.unmount();
+});
+
+it('does not apply a stale AI-suggestion fallback or warning to the selected answer', async () => {
+  const staleFallback = { ...ai, annotations: [{ ...ai.annotations[0], id: 501, comment: 'Old AI fallback' }] };
+  const previousGet = controlledRequest<AnnotationListResult>();
+  let aiCallsForA = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(gradingService.getAiSuggestion).mockImplementation(async moduleId => {
+    if (moduleId === 50) {
+      aiCallsForA += 1;
+      return aiCallsForA === 1 ? { ...ai, annotations: [] } : staleFallback;
+    }
+    return { ...ai, annotations: [] };
+  });
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(answerId => {
+    if (answerId === 60) return aiCallsForA === 1 ? Promise.resolve({ data: [] }) : previousGet.promise;
+    return Promise.resolve({ data: [] });
+  });
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(answerAnnotationService.listAnnotations).toHaveBeenCalledTimes(2));
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  await waitFor(() => expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(61));
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+  expect(screen.queryByText('Old AI fallback')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+
+  await act(async () => {
+    previousGet.resolve({ data: [] });
+    await previousGet.promise;
+  });
+  expect(screen.getByText('Chưa có gợi ý sửa lỗi từ AI')).toBeVisible();
+  expect(screen.queryByText('Old AI fallback')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+  result.unmount();
+});
+
+it('ignores an AI suggestion that resolves after another module is selected', async () => {
+  const lateSuggestion = controlledRequest<AiGradingSuggestionResponse>();
+  const currentAnnotation = makeAnnotation(551, 'Current module GET annotation');
+  let suggestionCallsForA = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(gradingService.getAiSuggestion).mockImplementation(moduleId => {
+    if (moduleId === 50) {
+      suggestionCallsForA += 1;
+      return suggestionCallsForA === 1
+        ? Promise.resolve({ ...ai, annotations: [] })
+        : lateSuggestion.promise;
+    }
+    return Promise.resolve({ ...ai, annotations: [] });
+  });
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(async answerId => ({
+    data: answerId === 61 ? [currentAnnotation] : [],
+  }));
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(suggestionCallsForA).toBeGreaterThan(1));
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  expect(await screen.findByText('Current module GET annotation')).toBeVisible();
+
+  await act(async () => {
+    lateSuggestion.resolve({
+      ...ai,
+      annotations: [{ ...ai.annotations[0], id: 552, comment: 'Late AI suggestion annotation' }],
+    });
+    await lateSuggestion.promise;
+  });
+  expect(screen.getByText('Current module GET annotation')).toBeVisible();
+  expect(screen.queryByText('Late AI suggestion annotation')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).not.toBeInTheDocument();
+  result.unmount();
+});
+
+it.each([
+  ['no answers', []],
+  ['undefined answerId', [{ id: undefined, questionId: 1, content: 'Undefined id' }]],
+  ['null answerId', [{ id: null, questionId: 1, content: 'Null id' }]],
+  ['missing answerId', [{ questionId: 1, content: 'Missing id' }]],
+] as const)('keeps fallback review controls disabled for %s', async (_case, answers) => {
+  const malformedAnswers = answers as unknown as SubmissionModuleDetailResponse['answers'];
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({ ...moduleDetail, answers: malformedAnswers });
+  await setup();
+
+  expect(screen.getByText('Fix spelling')).toBeVisible();
+  expect(screen.getByText('Đang hiển thị dữ liệu nhận xét dự phòng từ gợi ý AI.')).toBeVisible();
+  expect(answerAnnotationService.listAnnotations).not.toHaveBeenCalled();
+  const accept = screen.getByRole('button', { name: 'Duyệt' });
+  const reject = screen.getByRole('button', { name: 'Từ chối' });
+  expect(accept).toBeDisabled();
+  expect(reject).toBeDisabled();
+  await act(async () => {
+    buttonCallbacks.get('tsd-btn-review-accept')!();
+    buttonCallbacks.get('tsd-btn-review-reject')!();
+  });
+  expect(answerAnnotationService.reviewAnnotation).not.toHaveBeenCalled();
+});
+
+it.each(['ACCEPTED', 'REJECTED'] as const)('ignores a late %s response after switching to another answer', async status => {
+  const previousReview = controlledRequest<{ message: string }>();
+  const currentAnnotation = makeAnnotation(602, 'Current pending annotation');
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(async answerId => ({
+    data: [answerId === 60 ? makeAnnotation(601, 'Previous pending annotation') : currentAnnotation],
+  }));
+  vi.mocked(answerAnnotationService.reviewAnnotation).mockReturnValueOnce(previousReview.promise);
+
+  const result = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  const user = userEvent.setup();
+  await screen.findByRole('spinbutton');
+  const reviewButton = screen.getByRole('button', { name: status === 'ACCEPTED' ? 'Duyệt' : 'Từ chối' });
+  await user.click(reviewButton);
+  expect(answerAnnotationService.reviewAnnotation).toHaveBeenCalledWith(601, { reviewStatus: status });
+
+  await user.click(screen.getByRole('button', { name: 'SPEAKING' }));
+  expect(await screen.findByText('Current pending annotation')).toBeVisible();
+  await act(async () => {
+    previousReview.resolve({ message: 'Updated' });
+    await previousReview.promise;
+  });
+
+  expect(screen.getByText('Current pending annotation')).toBeVisible();
+  expect(screen.getByText('Chờ duyệt')).toBeVisible();
+  expect(screen.queryByText(status === 'ACCEPTED' ? 'Đã duyệt gợi ý của AI.' : 'Đã từ chối gợi ý của AI.')).not.toBeInTheDocument();
+  result.unmount();
+});
+
+it('does not update annotation state after unmount while a GET is pending', async () => {
+  const pendingGet = controlledRequest<AnnotationListResult>();
+  let answerCalls = 0;
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING'));
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(() => {
+    answerCalls += 1;
+    return answerCalls === 1
+      ? Promise.resolve({ data: [makeAnnotation(701, 'Loaded before unmount')] })
+      : pendingGet.promise;
+  });
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const { container, unmount, user } = await setup();
+  const reviewAfterUnmount = buttonCallbacks.get('tsd-btn-review-accept')!;
+  await user.click(screen.getByRole('button', { name: 'WRITING' }));
+  await waitFor(() => expect(answerCalls).toBeGreaterThan(1));
+  const getCalls = vi.mocked(gradingService.getAiSuggestion).mock.calls.length;
+  unmount();
+
+  await act(async () => {
+    pendingGet.resolve({ data: [makeAnnotation(702, 'Arrived after unmount')] });
+    await pendingGet.promise;
+  });
+  await act(async () => { reviewAfterUnmount(); });
+  expect(answerAnnotationService.reviewAnnotation).not.toHaveBeenCalled();
+  expect(gradingService.getAiSuggestion).toHaveBeenCalledTimes(getCalls);
+  expect(container).toBeEmptyDOMElement();
+  expect(screen.queryByText('Arrived after unmount')).not.toBeInTheDocument();
+  expect(consoleError).not.toHaveBeenCalled();
+  consoleError.mockRestore();
+});
+
+it('keeps all four annotation filters and valid Accept/Reject flows working', async () => {
+  vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [
+    makeAnnotation(801, 'Pending annotation', 'PENDING'),
+    makeAnnotation(802, 'Accepted annotation', 'ACCEPTED'),
+    makeAnnotation(803, 'Rejected annotation', 'REJECTED'),
+  ] });
+  vi.mocked(answerAnnotationService.reviewAnnotation).mockResolvedValue({ message: 'Updated' });
+  const { user } = await setup();
+
+  await user.click(screen.getByRole('button', { name: /Chờ duyệt/ }));
+  expect(screen.getByText('Pending annotation')).toBeVisible();
+  expect(screen.queryByText('Accepted annotation')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Đã duyệt/ }));
+  expect(screen.getByText('Accepted annotation')).toBeVisible();
+  expect(screen.queryByText('Pending annotation')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Đã từ chối/ }));
+  expect(screen.getByText('Rejected annotation')).toBeVisible();
+  expect(screen.queryByText('Accepted annotation')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Tất cả/ }));
+  expect(screen.getByText('Pending annotation')).toBeVisible();
+  expect(screen.getByText('Accepted annotation')).toBeVisible();
+  expect(screen.getByText('Rejected annotation')).toBeVisible();
+
+  await user.click(screen.getAllByRole('button', { name: 'Duyệt' })[0]);
+  expect(answerAnnotationService.reviewAnnotation).toHaveBeenCalledWith(801, { reviewStatus: 'ACCEPTED' });
+  await user.click(screen.getAllByRole('button', { name: 'Từ chối' })[0]);
+  expect(answerAnnotationService.reviewAnnotation).toHaveBeenCalledWith(801, { reviewStatus: 'REJECTED' });
+});
+
+async function remediationSetup() {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...twoModules, modules: [
+    ...twoModules.modules, { ...submission.modules[0], id: 52, skill: 'READING', taskType: 'QUIZ' },
+  ] });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async id =>
+    ({ ...makeModuleDetail(id, id + 10, id === 50 ? 'WRITING' : id === 51 ? 'SPEAKING' : 'READING'),
+      ...(id === 51 ? { answers: [{ id: 61, questionId: null, content: null, audioStorageKey: 'module-b.webm' }] } : {}) }));
+  vi.mocked(gradingService.getBySubmissionModuleId).mockImplementation(async id => ({ id: id + 30, method: 'AUTO', status: 'COMPLETED', finalScore: id === 50 ? 7 : 9 }));
+  vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(async id => ({ data: [makeAnnotation(id, `Answer note ${id}`)] }));
+  const view = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
+  await screen.findByText('Answer note 60');
+  return { ...view, user: userEvent.setup() };
+}
+
+async function selectRemediationModule(name: string, answerId: number) {
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name })); });
+  expect(screen.getByText(`Answer note ${answerId}`)).toBeVisible();
+}
+
+async function prepareCreate(comment: string) {
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Thêm chú thích' })); });
+  fireEvent.change(screen.getByPlaceholderText('Giải thích lỗi hoặc hướng dẫn sửa...'), { target: { value: comment } });
+  return buttonCallbacks.get('Lưu chú thích')!;
+}
+
+it.each(['switch', 'return', 'unmount'] as const)('R3 timer cancellation on %s', async mode => {
+  const view = await remediationSetup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await act(async () => { buttonCallbacks.get('Chấm lại bằng AI')!(); });
+  expect(vi.getTimerCount()).toBeGreaterThan(0);
+  if (mode === 'unmount') view.unmount();
+  else {
+    await selectRemediationModule('SPEAKING', 61);
+    if (mode === 'return') await selectRemediationModule('WRITING', 60);
+  }
+  const calls = vi.mocked(submissionService.getSubmissionModuleDetail).mock.calls.length;
+  expect(vi.getTimerCount()).toBe(0);
+  await act(() => vi.advanceTimersByTimeAsync(3500));
+  expect(submissionService.getSubmissionModuleDetail).toHaveBeenCalledTimes(calls);
+  if (mode === 'switch') {
+    expect(screen.getByText('Answer note 61')).toBeVisible();
+    expect(screen.getByRole('spinbutton')).toHaveValue(9);
+    expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('module-b.webm'));
+  }
+  if (mode === 'unmount') expect(view.container).toBeEmptyDOMElement();
+});
+
+it('R3 AI repeated callback sends one request and one poll', async () => {
+  await remediationSetup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const callback = buttonCallbacks.get('Chấm lại bằng AI')!;
+  await act(async () => { callback(); callback(); });
+  expect(gradingService.requestAiAnalysis).toHaveBeenCalledTimes(1);
+  const calls = vi.mocked(submissionService.getSubmissionModuleDetail).mock.calls.length;
+  await act(() => vi.advanceTimersByTimeAsync(3500));
+  expect(submissionService.getSubmissionModuleDetail).toHaveBeenCalledTimes(calls + 1);
+  expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
+});
+
+it.each(['success', 'error', 'unmount'] as const)('R3 pending AI %s cannot schedule work in another context', async outcome => {
+  const view = await remediationSetup();
+  const pending = controlledRequest<{ message: string }>();
+  vi.mocked(gradingService.requestAiAnalysis).mockReturnValue(pending.promise);
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await act(async () => { buttonCallbacks.get('Chấm lại bằng AI')!(); });
+  if (outcome === 'unmount') view.unmount();
+  else await selectRemediationModule('SPEAKING', 61);
+  await act(async () => {
+    if (outcome !== 'error') pending.resolve({ message: 'Queued' });
+    else pending.reject(new Error('Old AI error'));
+  });
+  expect(vi.getTimerCount()).toBe(0);
+  if (outcome === 'unmount') expect(view.container).toBeEmptyDOMElement();
+  else expect(screen.getByText('Answer note 61')).toBeVisible();
+  expect(screen.queryByText('Old AI error')).not.toBeInTheDocument();
+});
+
+it.each(['response', 'navigation timer', 'unmount timer', 'stale callback'] as const)('R3 grade %s cannot apply after switching context', async mode => {
+  const view = await remediationSetup();
+  const pending = controlledRequest<{ message: string }>();
+  vi.mocked(gradingService.submitGrade).mockReturnValue(pending.promise);
+  const callback = buttonCallbacks.get('Lưu & Gửi điểm cho học sinh')!;
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  if (mode !== 'stale callback') await act(async () => { callback(); });
+  if (mode === 'navigation timer' || mode === 'unmount timer') await act(async () => pending.resolve({ message: 'Saved' }));
+  if (mode === 'unmount timer') view.unmount();
+  else await selectRemediationModule('SPEAKING', 61);
+  if (mode === 'stale callback') {
+    await act(async () => { callback(); });
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+  } else if (mode === 'response') await act(async () => pending.resolve({ message: 'Saved' }));
+  expect(vi.getTimerCount()).toBe(0);
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  if (mode === 'unmount timer') expect(view.container).toBeEmptyDOMElement();
+  else expect(screen.getByTestId('location')).toHaveTextContent('/submissions/5');
+  expect(screen.queryByText('Đã lưu điểm và trả bài cho học viên thành công!')).not.toBeInTheDocument();
+});
+
+for (const operation of ['create', 'delete'] as const) {
+  it.each(['success', 'error', 'unmount', 'rapid'] as const)(`R3 ${operation} ignores old %s`, async outcome => {
+    const view = await remediationSetup();
+    const pending = controlledRequest<{ id: number; message: string }>();
+    vi.mocked(answerAnnotationService.createAnnotation).mockReturnValue(pending.promise);
+    vi.mocked(answerAnnotationService.deleteAnnotation).mockReturnValue(pending.promise);
+    const callback = operation === 'create' ? await prepareCreate('Old created item') : buttonCallbacks.get('tsd-btn-delete-ann')!;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await act(async () => { callback(); });
+    if (outcome === 'unmount') view.unmount();
+    else {
+      await selectRemediationModule('SPEAKING', 61);
+      if (outcome === 'rapid') {
+        await selectRemediationModule('WRITING', 60);
+        await selectRemediationModule('READING', 62);
+      }
+    }
+    const apiCalls = vi.mocked(answerAnnotationService.createAnnotation).mock.calls.length + vi.mocked(answerAnnotationService.deleteAnnotation).mock.calls.length;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await act(async () => {
+      if (outcome === 'error') pending.reject(new Error('Old mutation error'));
+      else pending.resolve({ id: 999, message: 'Updated' });
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(screen.queryByText('Old created item')).not.toBeInTheDocument();
+    expect(screen.queryByText('Old mutation error')).not.toBeInTheDocument();
+    if (outcome === 'unmount') {
+      expect(view.container).toBeEmptyDOMElement();
+      await act(async () => { callback(); });
+      expect(vi.mocked(answerAnnotationService.createAnnotation).mock.calls.length + vi.mocked(answerAnnotationService.deleteAnnotation).mock.calls.length).toBe(apiCalls);
+    } else expect(screen.getByText(`Answer note ${outcome === 'rapid' ? 62 : 61}`)).toBeVisible();
+    consoleError.mockRestore();
+  });
+
+  it(`R3 ${operation} old finally cannot unlock a new operation on the same answer`, async () => {
+    await remediationSetup();
+    const oldRequest = controlledRequest<{ id: number; message: string }>();
+    const newRequest = controlledRequest<{ id: number; message: string }>();
+    if (operation === 'create') vi.mocked(answerAnnotationService.createAnnotation).mockReturnValueOnce(oldRequest.promise).mockReturnValue(newRequest.promise);
+    else vi.mocked(answerAnnotationService.deleteAnnotation).mockReturnValueOnce(oldRequest.promise).mockReturnValue(newRequest.promise);
+    const first = operation === 'create' ? await prepareCreate('First item') : buttonCallbacks.get('tsd-btn-delete-ann')!;
+    await act(async () => { first(); });
+    await selectRemediationModule('SPEAKING', 61);
+    await selectRemediationModule('WRITING', 60);
+    const second = operation === 'create' ? await prepareCreate('Second item') : buttonCallbacks.get('tsd-btn-delete-ann')!;
+    await act(async () => { second(); });
+    await act(async () => oldRequest.resolve({ id: 998, message: 'Old done' }));
+    expect(screen.getByRole('button', { name: operation === 'create' ? 'Lưu chú thích' : 'Xóa' })).toBeDisabled();
+    await act(async () => newRequest.resolve({ id: 999, message: 'New done' }));
+    if (operation === 'create') expect(screen.getByText('Second item')).toBeVisible();
+    else expect(screen.queryByText('Answer note 60')).not.toBeInTheDocument();
+  });
+
+  it(`R3 ${operation} double callback sends one valid request`, async () => {
+    await remediationSetup();
+    const pending = controlledRequest<{ id: number; message: string }>();
+    vi.mocked(answerAnnotationService.createAnnotation).mockReturnValue(pending.promise);
+    vi.mocked(answerAnnotationService.deleteAnnotation).mockReturnValue(pending.promise);
+    const callback = operation === 'create' ? await prepareCreate('Valid item') : buttonCallbacks.get('tsd-btn-delete-ann')!;
+    await act(async () => { callback(); callback(); });
+    const service = operation === 'create' ? answerAnnotationService.createAnnotation : answerAnnotationService.deleteAnnotation;
+    expect(service).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve({ id: 999, message: 'Updated' }));
+    if (operation === 'create') expect(screen.getByText('Valid item')).toBeVisible();
+    else expect(screen.queryByText('Answer note 60')).not.toBeInTheDocument();
+  });
+}
+
+it.each(['loading', 'mismatch', 'unmount'] as const)('R3 real callbacks reject %s context', async mode => {
+  const view = await remediationSetup();
+  const create = await prepareCreate('Do not send');
+  const review = buttonCallbacks.get('tsd-btn-review-accept')!;
+  const remove = buttonCallbacks.get('tsd-btn-delete-ann')!;
+  if (mode === 'unmount') view.unmount();
+  else if (mode === 'loading') {
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockReturnValue(controlledRequest<SubmissionModuleDetailResponse>().promise);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'WRITING' })); });
+  } else await selectRemediationModule('SPEAKING', 61);
+  await act(async () => { create(); review(); remove(); });
+  expect(answerAnnotationService.createAnnotation).not.toHaveBeenCalled();
+  expect(answerAnnotationService.reviewAnnotation).not.toHaveBeenCalled();
+  expect(answerAnnotationService.deleteAnnotation).not.toHaveBeenCalled();
+});
+
+it.each([null, {}])('R3 invalid Create response %j does not add an item and releases loading', async response => {
+  await remediationSetup();
+  vi.mocked(answerAnnotationService.createAnnotation).mockResolvedValue(response as unknown as Awaited<ReturnType<typeof answerAnnotationService.createAnnotation>>);
+  const create = await prepareCreate('Invalid item');
+  await act(async () => { create(); });
+  expect(screen.queryByText('Invalid item', { selector: '.tsd-ann-comment-val' })).not.toBeInTheDocument();
+  expect(screen.getByText('Không thể thêm chú thích.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Lưu chú thích' })).toBeEnabled();
+});
+
+it('R3 Delete refuses an id no longer in the current list', async () => {
+  await remediationSetup();
+  vi.mocked(answerAnnotationService.deleteAnnotation).mockResolvedValue({ message: 'Deleted' });
+  const remove = buttonCallbacks.get('tsd-btn-delete-ann')!;
+  await act(async () => { remove(); });
+  expect(screen.queryByText('Answer note 60')).not.toBeInTheDocument();
+  await act(async () => { remove(); });
+  expect(answerAnnotationService.deleteAnnotation).toHaveBeenCalledTimes(1);
+});
+
+it('R3 polling response cannot toast after switching during the refresh', async () => {
+  await remediationSetup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  await act(async () => { buttonCallbacks.get('Chấm lại bằng AI')!(); });
+  const pending = controlledRequest<SubmissionModuleDetailResponse>();
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(id => id === 50 ? pending.promise : Promise.resolve({
+    ...makeModuleDetail(51, 61, 'SPEAKING'), answers: [{ id: 61, questionId: null, content: null, audioStorageKey: 'module-b.webm' }],
+  }));
+  await act(() => vi.advanceTimersByTimeAsync(3500));
+  await selectRemediationModule('SPEAKING', 61);
+  await act(async () => pending.resolve(makeModuleDetail(50, 60, 'WRITING')));
+  expect(screen.getByText('Answer note 61')).toBeVisible();
+  expect(screen.queryByText('AI đã hoàn thành chấm điểm!')).not.toBeInTheDocument();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it.each([undefined, null])('R3 Create callback rejects missing answerId %s', async answerId => {
+  await remediationSetup();
+  const create = await prepareCreate('Old draft');
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+    ...moduleDetail, answers: [{ id: answerId, questionId: 1, content: 'Missing id' } as unknown as SubmissionModuleDetailResponse['answers'][number]],
+  });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'WRITING' })); });
+  await act(async () => { create(); });
+  expect(answerAnnotationService.createAnnotation).not.toHaveBeenCalled();
 });

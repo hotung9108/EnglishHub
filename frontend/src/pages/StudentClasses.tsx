@@ -50,8 +50,8 @@ const StudentClasses: React.FC = () => {
         setError(null);
 
         const [classesRes, submissionsRes] = await Promise.allSettled([
-          classService.list(),
-          submissionService.listSubmissions({ studentId: user?.id })
+          classService.list({ limit: 100 }),
+          submissionService.listSubmissions({ studentId: user?.id, limit: 100 })
         ]);
 
         if (!isMounted) return;

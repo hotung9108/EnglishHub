@@ -54,7 +54,7 @@ Bang diem Project Doctor danh gia cac hang muc sau:
 
 | Hang muc | Lenh thuc thi | Yeu cau vuot qua |
 | :--- | :--- | :--- |
-| **Git Branch Naming** | `git rev-parse --abbrev-ref HEAD` | Nhanh phai theo chuan `feature/ROLE-NUM-slug`, `fix/ROLE-NUM-slug`, `develop`, `staging`, `main`, hoac `docs/slug`. |
+| **Git Branch Naming** | `git rev-parse --abbrev-ref HEAD` | Nhanh phai theo chuan `feat/ROLE-NUM-slug` (hoac `feature/...`), `fix/ROLE-NUM-slug`, `develop`, `staging`, `main`, hoac `docs/slug`. |
 | **Git Working Tree** | `git status --porcelain` | Canh bao neu co tep chua duoc quan ly hoac commit chua dong bo. |
 | **Commit Message** | `git log -1` | Tuan thu Conventional Commits: `type(ROLE-NUM): mo ta`. |
 | **Frontend Types** | `npm run test:ui:types` | Khong co loi TypeScript compilation nao trong `frontend/`. |
@@ -73,7 +73,7 @@ Bang diem Project Doctor danh gia cac hang muc sau:
 - **Cach khac phuc**:
   Doi ten nhanh theo quy uoc:
   ```bash
-  git branch -m feature/FE-84-teacher-studio-audio
+  git branch -m feat/FE-84-teacher-studio-audio
   # hoac
   git branch -m fix/BE-74-auth-token-validation
   ```

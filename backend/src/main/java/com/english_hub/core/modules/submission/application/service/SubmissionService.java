@@ -40,6 +40,7 @@ import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,10 +90,10 @@ public class SubmissionService {
 	private static final String SUBMITTED_FINAL_MESSAGE = "Nộp bài thành công.";
 	private static final String MODULE_NOT_FOUND_MESSAGE = "Không tìm thấy phần làm bài.";
 	private static final String AUDIO_UPLOAD_MESSAGE = "Không thể upload ghi âm cho phần làm bài này.";
-	private static final String AUDIO_NOT_UPLOADED_MESSAGE = "Vui lòng tải lên file ghi âm trước khi nộp bài.";
 	private static final String DOCUMENT_UPLOAD_MESSAGE = "Không thể upload tài liệu cho phần làm bài này.";
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
+	private static final Duration SUBMISSION_DOWNLOAD_TTL = Duration.ofMinutes(30);
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -338,10 +340,6 @@ public class SubmissionService {
 				.findFirst()
 				.orElse(null);
 
-		if (audio && found == null) {
-			throw ApiException.badRequest(AUDIO_NOT_UPLOADED_MESSAGE);
-		}
-
 		String matchedKey = found == null
 				? null
 				: storageKey(submission.getId(), submissionModule.getId(), filename, found.extension());
@@ -390,7 +388,8 @@ public class SubmissionService {
 	private List<FileCandidate> documentCandidates() {
 		return List.of(
 				new FileCandidate("pdf", "application/pdf"),
-				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+				new FileCandidate("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+				new FileCandidate("txt", "text/plain"));
 	}
 
 	private record FileCandidate(String extension, String mimeType) {
@@ -534,7 +533,9 @@ public class SubmissionService {
 						answer.getDocUploadStatus(),
 						answer.getAudioStorageKey(),
 						answer.getAudioMimeType(),
-						answer.getAudioUploadStatus()))
+						answer.getAudioUploadStatus(),
+						resolveSubmissionAudioDownloadUrl(answer),
+						resolveSubmissionDocDownloadUrl(answer, null)))
 				.toList();
 		return new SubmissionModuleDetailResult(
 				submissionModule.getId(),
@@ -545,6 +546,126 @@ public class SubmissionService {
 				grading,
 				questions,
 				answers);
+	}
+
+	@Transactional(readOnly = true)
+	public SubmissionFileDownloadResult generateSubmissionAudioDownloadUrl(long submissionModuleId) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		verifyReadAccess(submission, caller);
+
+		Answer answer = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.filter(a -> a.getAudioStorageKey() != null && !a.getAudioStorageKey().isBlank())
+				.findFirst()
+				.orElseThrow(() -> ApiException.notFound("Bài nộp chưa có file audio."));
+
+		StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+				answer.getAudioStorageKey(), SUBMISSION_DOWNLOAD_TTL, null);
+		if (download == null) {
+			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo liên kết tải audio.");
+		}
+
+		String fileName = answer.getAudioStorageKey().substring(answer.getAudioStorageKey().lastIndexOf('/') + 1);
+		return new SubmissionFileDownloadResult(
+				submissionModuleId,
+				download.downloadUrl(),
+				answer.getAudioStorageKey(),
+				fileName,
+				answer.getAudioMimeType(),
+				download.expiresAt());
+	}
+
+	@Transactional(readOnly = true)
+	public SubmissionFileDownloadResult generateSubmissionDocumentDownloadUrl(long submissionModuleId, String mode) {
+		User caller = currentUserProvider.requireActiveUser();
+		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.STUDENT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		SubmissionModule submissionModule = submissionModuleRepository.findById(submissionModuleId)
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
+				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
+		verifyReadAccess(submission, caller);
+
+		Answer answer = answerRepository.findBySubmissionModuleId(submissionModuleId).stream()
+				.filter(a -> a.getDocStorageKey() != null && !a.getDocStorageKey().isBlank())
+				.findFirst()
+				.orElseThrow(() -> ApiException.notFound("Bài nộp chưa có file tài liệu."));
+
+		String fileName = extractOriginalFileName(answer);
+		String disposition = "download".equalsIgnoreCase(mode)
+				? "attachment; filename=\"" + fileName + "\""
+				: "inline";
+
+		StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+				answer.getDocStorageKey(), SUBMISSION_DOWNLOAD_TTL, disposition);
+		if (download == null) {
+			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo liên kết tải tài liệu.");
+		}
+
+		return new SubmissionFileDownloadResult(
+				submissionModuleId,
+				download.downloadUrl(),
+				answer.getDocStorageKey(),
+				fileName,
+				answer.getDocMimeType(),
+				download.expiresAt());
+	}
+
+	private String resolveSubmissionAudioDownloadUrl(Answer answer) {
+		if (answer == null || answer.getAudioStorageKey() == null || answer.getAudioStorageKey().isBlank()) {
+			return null;
+		}
+		try {
+			StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+					answer.getAudioStorageKey(), SUBMISSION_DOWNLOAD_TTL, null);
+			return download != null ? download.downloadUrl() : null;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
+
+	private String resolveSubmissionDocDownloadUrl(Answer answer, String mode) {
+		if (answer == null || answer.getDocStorageKey() == null || answer.getDocStorageKey().isBlank()) {
+			return null;
+		}
+		try {
+			String disposition = "download".equalsIgnoreCase(mode)
+					? "attachment; filename=\"" + extractOriginalFileName(answer) + "\""
+					: "inline";
+			StorageService.PresignedDownload download = storageService.generatePresignedDownload(
+					answer.getDocStorageKey(), SUBMISSION_DOWNLOAD_TTL, disposition);
+			return download != null ? download.downloadUrl() : null;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
+
+	private String extractOriginalFileName(Answer answer) {
+		if (answer.getContent() != null) {
+			try {
+				tools.jackson.databind.JsonNode node = parseContent(answer.getContent());
+				if (node != null && node.has("fileName") && !node.get("fileName").asText().isBlank()) {
+					return node.get("fileName").asText().trim();
+				}
+			} catch (Exception ignored) {
+				// Fall back to storage key
+			}
+		}
+		if (answer.getDocStorageKey() != null) {
+			int idx = answer.getDocStorageKey().lastIndexOf('/');
+			if (idx != -1 && idx < answer.getDocStorageKey().length() - 1) {
+				return answer.getDocStorageKey().substring(idx + 1);
+			}
+			return answer.getDocStorageKey();
+		}
+		return "bai-lam.pdf";
 	}
 
 	@Transactional(readOnly = true)
@@ -627,6 +748,9 @@ public class SubmissionService {
 		}
 		if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)) {
 			return "docx";
+		}
+		if ("text/plain".equals(mimeType)) {
+			return "txt";
 		}
 		throw ApiException.badRequest(UNSUPPORTED_FILE_MESSAGE);
 	}
@@ -965,7 +1089,42 @@ public class SubmissionService {
 			UploadStatus docUploadStatus,
 			String audioStorageKey,
 			String audioMimeType,
-			UploadStatus audioUploadStatus) {
+			UploadStatus audioUploadStatus,
+			String audioDownloadUrl,
+			String docDownloadUrl) {
+
+		public AnswerResult(
+				Long id,
+				Long questionId,
+				JsonNode content,
+				String docStorageKey,
+				String docMimeType,
+				UploadStatus docUploadStatus,
+				String audioStorageKey,
+				String audioMimeType,
+				UploadStatus audioUploadStatus) {
+			this(
+					id,
+					questionId,
+					content,
+					docStorageKey,
+					docMimeType,
+					docUploadStatus,
+					audioStorageKey,
+					audioMimeType,
+					audioUploadStatus,
+					null,
+					null);
+		}
+	}
+
+	public record SubmissionFileDownloadResult(
+			Long submissionModuleId,
+			String downloadUrl,
+			String storageKey,
+			String fileName,
+			String mimeType,
+			OffsetDateTime expiresAt) {
 	}
 
 	public record AnswerPayload(Long questionId, QuestionType questionType, Map<String, Object> content) {

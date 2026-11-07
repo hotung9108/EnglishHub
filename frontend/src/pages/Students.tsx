@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
   Loader2, AlertCircle
@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useUsers } from '../hooks/useUsers';
+import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
@@ -33,6 +34,12 @@ export const Students: React.FC = () => {
     initialLimit: 10,
   });
 
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
+
+  useEffect(() => {
+    setQuery(debouncedSearchQuery.trim());
+  }, [debouncedSearchQuery, setQuery]);
+
   const studentsData = useMemo(() => {
     return users.map((st: UserListItem) => ({
       id: st.id,
@@ -55,7 +62,6 @@ export const Students: React.FC = () => {
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    setQuery(query.trim());
   };
 
   const handlePageSizeChange = (size: number) => {

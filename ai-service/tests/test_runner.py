@@ -36,12 +36,12 @@ class TestSpeakingApi(unittest.TestCase):
         self.assertIn("openrouterConfigured", data)
         self.assertIn("openrouterModel", data)
 
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
     @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
-    def test_analyze_speaking_qa21_benchmark(self, converter: AsyncMock):
-        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+    def test_analyze_speaking_qa21_benchmark(self, converter: AsyncMock, downloader: AsyncMock):
         payload = {
             "submissionModuleId": 14,
-            "audioBase64": mock_audio_b64,
+            "audioUrl": "https://storage.example.com/speaking/14.mp3?presigned=true",
             "audioStorageKey": "submissions/speaking_14.mp3",
             "moduleInstructions": "Describe a book you enjoyed reading recently.",
             "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
@@ -49,7 +49,8 @@ class TestSpeakingApi(unittest.TestCase):
         }
 
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
-        converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/14.mp3?presigned=true")
+        converter.assert_awaited_once_with(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
 
         data = response.json()
@@ -89,52 +90,53 @@ class TestSpeakingApi(unittest.TestCase):
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
         self.assertEqual(response.status_code, 400)
 
-    def test_analyze_speaking_direct_upload(self):
-        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
-        files = {
-            "file": ("test.mp3", fake_audio, "audio/mp3")
-        }
-        data = {
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_presigned_url(self, converter: AsyncMock, downloader: AsyncMock):
+        payload = {
             "submissionModuleId": 14,
-            "maxScore": "9.0"
+            "audioUrl": "https://storage.example.com/speaking/14.mp3?presigned=true",
+            "maxScore": 9.0
         }
-        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/14.mp3?presigned=true")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         res_json = response.json()
         self.assertEqual(res_json["submissionModuleId"], 14)
         self.assertGreaterEqual(res_json["overallScore"], 6.5)
 
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
     @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
-    def test_analyze_speaking_dynamic_model_and_provider(self, converter: AsyncMock):
-        mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
+    def test_analyze_speaking_dynamic_model_and_provider(self, converter: AsyncMock, downloader: AsyncMock):
         payload = {
             "submissionModuleId": 15,
-            "audioBase64": mock_audio_b64,
+            "audioUrl": "https://storage.example.com/speaking/15.mp3?presigned=true",
             "moduleInstructions": "Describe your favorite hobby.",
             "maxScore": 9.0,
             "model": "anthropic/claude-3.5-sonnet",
             "aiProvider": "openrouter"
         }
         response = self.client.post("/api/v1/analyze/speaking", json=payload)
-        converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/15.mp3?presigned=true")
+        converter.assert_awaited_once_with(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         data = response.json()
         self.assertEqual(data["submissionModuleId"], 15)
         self.assertEqual(data["modelUsed"], "anthropic/claude-3.5-sonnet")
         self.assertEqual(data["providerUsed"], "openrouter-mock")
 
-    def test_analyze_speaking_direct_upload_with_custom_model(self):
-        fake_audio = b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes"
-        files = {
-            "file": ("test.mp3", fake_audio, "audio/mp3")
-        }
-        data = {
+    @patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00samplemockbytes")
+    @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
+    def test_analyze_speaking_presigned_url_with_custom_model(self, converter: AsyncMock, downloader: AsyncMock):
+        payload = {
             "submissionModuleId": 16,
-            "maxScore": "9.0",
+            "audioUrl": "https://storage.example.com/speaking/16.mp3?presigned=true",
+            "maxScore": 9.0,
             "model": "google/gemini-1.5-pro",
             "aiProvider": "gemini"
         }
-        response = self.client.post("/api/v1/analyze/speaking/upload", files=files, data=data)
+        response = self.client.post("/api/v1/analyze/speaking", json=payload)
+        downloader.assert_awaited_once_with("https://storage.example.com/speaking/16.mp3?presigned=true")
         self.assertEqual(response.status_code, 200, f"Error: {response.text}")
         res_json = response.json()
         self.assertEqual(res_json["submissionModuleId"], 16)

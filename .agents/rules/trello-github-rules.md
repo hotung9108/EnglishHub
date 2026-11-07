@@ -51,7 +51,7 @@ Tất cả các AI Agent (`@pm`, `@be-primary`, `@be-secondary`, `@fe-primary`, 
 ## 3. Quy tắc Git Flow & Pull Request
 - **Nhánh tích hợp chính**: Luôn luôn target PR vào nhánh **`develop`** (không mở trực tiếp vào `staging` hay `main` ngoại trừ release deploy).
 - **Quy tắc đặt tên nhánh**:
-  - Tính năng: `feature/<ROLE>-<NUMBER>-<slug>`
+  - Tính năng: `feat/<ROLE>-<NUMBER>-<slug>` (tương thích ngược: `feature/<ROLE>-<NUMBER>-<slug>`)
   - Sửa lỗi: `fix/<ROLE>-<NUMBER>-<slug>`
   - Tài liệu: `docs/<slug>`
 - **Conventional Commits**:

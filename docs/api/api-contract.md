@@ -1,3 +1,4 @@
+
 # EnglishHub API contract — User & Admin
 
 Cập nhật ngày **29/10/2026**, đối chiếu source tại commit `81d40f0`.
@@ -13,6 +14,7 @@ commit. Các ví dụ là dữ liệu minh hoạ, không phải response thu đ�
 | Phân hệ | Tài liệu |
 | --- | --- |
 | User / Admin User | Contract chi tiết trong file này |
+| Answer annotations (FE-48) | [Contract annotation bên dưới](#fe-48-answer-annotations) |
 | Auth, Class, Assignment, Module, Question, Grading, Evaluation, Reports | [EnglishHub_API_docs_eng.md](EnglishHub_API_docs_eng.md) — tài liệu tham khảo, chưa được rà soát toàn bộ trong lần cập nhật này |
 | Submission / Answer | [api_v4_design_chapter_6_submissions_answers.md](api_v4_design_chapter_6_submissions_answers.md) |
 | Upload audio / document | [file-upload-guide-module-audio-and-submission-files.md](file-upload-guide-module-audio-and-submission-files.md) |
@@ -270,3 +272,102 @@ Khi đổi API User/Admin, cùng PR cần cập nhật contract, DTO/type/servic
 ảnh hưởng và hướng dẫn kiểm thử. So sánh response thực tế với shape trong file
 này; TypeScript generic trong `http.get<T>()` không validate JSON lúc runtime.
 Những phân hệ ngoài phạm vi cần được đối chiếu riêng trước khi coi là đồng bộ.
+
+
+## FE-48: Answer annotations
+
+Đối chiếu ngày **06/11/2026** với working tree nhánh
+`fix/FE-48-ai-annotation-review-flow`, baseline `d86cd955`, có thay đổi L1–L3
+chưa commit. Phần này chỉ bổ sung annotation; các phần User/Admin phía trên giữ
+nguyên phạm vi riêng, không áp dụng envelope của User cho annotation.
+
+### Endpoint và quyền
+
+Tất cả path dưới đây có prefix `/api/v1`. Caller phải đăng nhập, đang hoạt động.
+
+| Method | Path | Quyền theo route và service | Thành công |
+| --- | --- | --- | --- |
+| GET | `/answers/{answerId}/annotations` | Student sở hữu bài; Teacher sở hữu lớp của bài | 200 `{data: AnswerAnnotation[]}` |
+| POST | `/answers/{answerId}/annotations` | Chỉ Teacher sở hữu lớp | 201 `{message, id}` |
+| PATCH | `/annotations/{id}/review` | Chỉ Teacher sở hữu lớp; annotation source AI | 200 `{message}` |
+| DELETE | `/annotations/{id}` | Chỉ Teacher sở hữu lớp; AI hoặc TEACHER | 200 `{message}` |
+
+**Admin không được cấp quyền annotation**: route policy trả 403, kể cả khi
+service dùng chung có nhánh đọc Admin cho nghiệp vụ khác. Student không được
+POST/PATCH/DELETE annotation.
+
+GET tìm answer trước, kiểm ownership sau, rồi mới tải/lọc danh sách:
+Student chỉ nhận `reviewStatus = ACCEPTED` của **cả AI và TEACHER**; Teacher chủ
+lớp vẫn nhận đủ `PENDING`, `ACCEPTED`, `REJECTED`. ID annotation tăng dần; không
+thêm pagination. Không có annotation được phép xem là **200 `{data: []}`**,
+không phải 403/404. Đổi trạng thái duyệt có hiệu lực ở lần GET tiếp theo.
+
+### Response annotation
+
+```ts
+type AnswerAnnotation = {
+  id: number;
+  source: 'AI' | 'TEACHER';
+  startOffset: number;
+  endOffset: number;
+  errorType: string | null;
+  comment: string | null;
+  suggestedFix: string | null;
+  reviewStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+};
+type AnswerAnnotationListResponse = { data: AnswerAnnotation[] };
+```
+
+Đúng tám field trên; không có `answerId` trong từng item, không dùng `MANUAL`
+làm source. FE lấy answerId từ module detail để gọi endpoint.
+
+### Tạo và duyệt
+
+POST nhận `startOffset`, `endOffset` bắt buộc, kiểu integer; start >= 0,
+end >= start, không vượt độ dài content khi BE có độ dài. `errorType`, `comment`,
+`suggestedFix` optional/nullable. `errorType` tối đa **50 ký tự theo @Size của Java**;
+null, thiếu field, chuỗi rỗng và whitespace vẫn hợp lệ; không tự trim.
+
+Vượt giới hạn errorType trả **400 trước persistence**:
+
+```json
+{"error":"errorType không được vượt quá 50 ký tự."}
+```
+
+Tạo thành công trả 201 `{message, id}`; source mặc định TEACHER, reviewStatus
+mặc định ACCEPTED. PATCH nhận `{reviewStatus: "ACCEPTED"}` hoặc `"REJECTED"`,
+chỉ đổi trạng thái một annotation AI. Không sửa nội dung, không bulk Accept/Reject,
+không bắt duyệt hết annotation mới được chốt điểm.
+
+| HTTP | Ý nghĩa trong annotation API |
+| --- | --- |
+| 200 | GET thành công, kể cả danh sách rỗng; PATCH/DELETE thành công |
+| 201 | POST tạo thành công |
+| 400 | ID sai kiểu, body/range/reviewStatus không hợp lệ, review source TEACHER, hoặc errorType > 50 |
+| 401 | Chưa đăng nhập/token không hợp lệ, caller không hoạt động |
+| 403 | Vai trò bị route chặn hoặc không sở hữu bài/lớp |
+| 404 | Answer/annotation không tồn tại sau khi qua quyền route |
+| 500 | Lỗi hệ thống; không phải kết quả đúng của errorType quá dài |
+
+Lỗi dùng `{error: string}`. `PENDING` không phải trạng thái hợp lệ cho request
+review. Range hoặc trạng thái sai không được diễn giải thành danh sách rỗng.
+
+### Tích hợp FE và ranh giới phạm vi
+
+- Quyền GET annotation không cấp quyền
+  `GET /submission-modules/{id}/grading/ai-suggestion`: route này chỉ cho Teacher;
+  Student và Admin bị 403. Student Result không gọi nó.
+- Student lấy điểm/feedback qua `getStudentGradingResult`, có gate COMPLETED và
+  allowlist bảy field **ở FE**. FE-48 không bổ sung gate COMPLETED tại BE.
+- Fallback annotation của Teacher giữa các GET hiện có là logic FE, không phải
+  endpoint, nguồn lưu annotation hoặc contract BE mới. GET annotations lỗi mà
+  fallback có dữ liệu phải có cảnh báo nguồn dự phòng; không có dữ liệu dự phòng
+  thì hiển thị loại lỗi, không coi là rỗng.
+- Offset giữ nguyên hành vi hiện có; FE-48 không chuẩn hóa hệ tọa độ offset.
+
+Nguồn: [GradingController](../../backend/src/main/java/com/english_hub/core/modules/grading/presentation/rest/GradingController.java),
+[GradingService](../../backend/src/main/java/com/english_hub/core/modules/grading/application/service/GradingService.java),
+[DTO annotation](../../backend/src/main/java/com/english_hub/core/modules/grading/presentation/rest/dto/CreateAnswerAnnotationRequest.java),
+[ApiRoutePolicy](../../backend/src/main/java/com/english_hub/core/infrastructure/security/ApiRoutePolicy.java),
+[AnswerAnnotationJpaAdapter](../../backend/src/main/java/com/english_hub/core/modules/grading/infrastructure/adapter/AnswerAnnotationJpaAdapter.java),
+[grading service FE](../../frontend/src/api/services/grading.service.ts).

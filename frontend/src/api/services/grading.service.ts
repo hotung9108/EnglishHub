@@ -31,7 +31,7 @@ export interface GradingDetailResponse {
 
 export interface AiGradingAnnotation {
   id: number;
-  answerId: number;
+  answerId?: number;
   source: 'AI' | 'TEACHER';
   reviewStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   startOffset: number;

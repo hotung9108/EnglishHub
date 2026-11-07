@@ -30,13 +30,12 @@ def test_health_check():
     assert "openrouterModel" in data
 
 
+@patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
 @patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"mock converted audio")
-def test_analyze_speaking_qa21_benchmark(converter: AsyncMock):
-    mock_audio_b64 = base64.b64encode(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes").decode("ascii")
-
+def test_analyze_speaking_qa21_benchmark(converter: AsyncMock, downloader: AsyncMock):
     payload = {
         "submissionModuleId": 14,
-        "audioBase64": mock_audio_b64,
+        "audioUrl": "https://storage.example.com/speaking/14.mp3?presigned=true",
         "audioStorageKey": "submissions/speaking_14.mp3",
         "moduleInstructions": "Describe a book you enjoyed reading recently.",
         "aiInstructionSnapshot": "Standard IELTS Speaking Part 2 Rubric",
@@ -45,7 +44,8 @@ def test_analyze_speaking_qa21_benchmark(converter: AsyncMock):
     }
 
     response = client.post("/api/v1/analyze/speaking", json=payload)
-    converter.assert_awaited_once_with(base64.b64decode(mock_audio_b64))
+    downloader.assert_awaited_once_with("https://storage.example.com/speaking/14.mp3?presigned=true")
+    converter.assert_awaited_once_with(b"ID3\x03\x00\x00\x00\x00\x00\x00mockaudiobytes")
     assert response.status_code == 200, f"Expected 200, got: {response.text}"
     
     data = response.json()

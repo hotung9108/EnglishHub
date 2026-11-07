@@ -39,6 +39,21 @@ test('getBackendDocumentMimeType - normalizes DOCX Word files and types', () => 
   );
 });
 
+test('getBackendDocumentMimeType - normalizes TXT text files and types', () => {
+  assert.strictEqual(
+    getBackendDocumentMimeType({ name: 'essay.txt', type: 'text/plain;charset=utf-8' }),
+    'text/plain'
+  );
+  assert.strictEqual(
+    getBackendDocumentMimeType({ name: 'MY_ESSAY.TXT', type: '' }),
+    'text/plain'
+  );
+  assert.strictEqual(
+    getBackendDocumentMimeType({ name: 'document.txt', type: 'application/octet-stream' }),
+    'text/plain'
+  );
+});
+
 test('SubmissionService - submitModule sends document storageKey and answers for Writing', async () => {
   const http = new MockHttpClient();
   const response: SubmitModuleResponse = {
@@ -89,6 +104,44 @@ test('SubmissionService - submitModule sends document storageKey and answers for
             },
           },
         ],
+      },
+      options: undefined,
+    },
+  ]);
+});
+
+test('SubmissionService - submitModule sends document storageKey with empty answers for Writing (FE-74)', async () => {
+  const http = new MockHttpClient();
+  const response: SubmitModuleResponse = {
+    message: 'Nộp phần thi bài viết thành công.',
+    submissionModuleId: 89,
+    status: 'SUBMITTED',
+    answers: [
+      {
+        id: 202,
+        questionId: null,
+        content: null,
+        docStorageKey: 'submissions/12/module-89/essay.txt',
+        docMimeType: 'text/plain',
+        docUploadStatus: 'READY',
+      },
+    ],
+  };
+  http.mockResponse = response;
+
+  const result = await new SubmissionService(http).submitModule(89, {
+    storageKey: 'submissions/12/module-89/essay.txt',
+    answers: [],
+  });
+
+  assert.strictEqual(result, response);
+  assert.deepStrictEqual(http.calls, [
+    {
+      method: 'POST',
+      url: '/submission-modules/89/submit',
+      data: {
+        storageKey: 'submissions/12/module-89/essay.txt',
+        answers: [],
       },
       options: undefined,
     },

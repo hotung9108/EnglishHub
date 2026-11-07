@@ -80,7 +80,7 @@ export const StudentGrades: React.FC = () => {
       setError(null);
 
       const [submissionsRes, classesRes, progressRes] = await Promise.allSettled([
-        submissionService.listSubmissions({ studentId: user?.id }),
+        submissionService.listSubmissions({ studentId: user?.id, limit: 100 }),
         classService.list(),
         user?.id ? reportService.getStudentProgress(Number(user.id)) : Promise.reject('No user')
       ]);
@@ -88,16 +88,19 @@ export const StudentGrades: React.FC = () => {
       const submissions: SubmissionListItem[] = submissionsRes.status === 'fulfilled' 
         ? (submissionsRes.value?.data || (Array.isArray(submissionsRes.value) ? submissionsRes.value : [])) 
         : [];
-      const classes: ClassSummary[] = classesRes.status === 'fulfilled'
+      const classes: ClassSummary[] = classesRes.status === 'fulfilled' 
         ? (classesRes.value?.data || (Array.isArray(classesRes.value) ? classesRes.value : []))
         : [];
 
       // Fetch assignments from all enrolled classes
+      const assignmentToClassMap = new Map<string, string>();
       const assignments = (await Promise.all(
         classes.map(async (c) => {
           try {
             const res = await assignmentService.listAssignments(c.id);
-            return res.data || [];
+            const list = res.data || [];
+            list.forEach(a => assignmentToClassMap.set(String(a.id), c.name));
+            return list;
           } catch {
             return [];
           }
@@ -113,7 +116,7 @@ export const StudentGrades: React.FC = () => {
       const rows: GradeRow[] = submissions.map((sub, idx) => {
         const assignmentIdStr = String(sub.assignmentId || sub.id);
         const assignment = assignmentMap.get(assignmentIdStr);
-        const classTitle = classes.length > 0 ? (classes[0].name) : (isVi ? 'Lớp Tiếng Anh Tổng Quát' : 'General English Class');
+        const classTitle = assignmentToClassMap.get(assignmentIdStr) || (classes.length > 0 ? (classes[0].name) : (isVi ? 'Lớp Tiếng Anh Tổng Quát' : 'General English Class'));
         
         let detectedSkill: 'Writing' | 'Speaking' | 'Reading' | 'Listening' = 'Writing';
         const titleLower = (assignment?.title || '').toLowerCase();

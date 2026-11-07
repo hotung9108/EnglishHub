@@ -310,9 +310,43 @@ class SubmissionUploadUrlApiIntegrationTest {
 		mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url", essaySubmissionModuleId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
 						.contentType(MediaType.APPLICATION_JSON)
-						.content("{\"mimeType\":\"text/plain\"}"))
+						.content("{\"mimeType\":\"image/png\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Định dạng file không được hỗ trợ."));
+	}
+
+	@Test
+	void submitModule_marksEssayAnswerReadyWhenTextPlainDocumentUploaded() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		String storageKey = "submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.txt";
+
+		String response = mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url",
+						essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"text/plain\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.storageKey").value(storageKey))
+				.andReturn().getResponse().getContentAsString();
+
+		HttpClient.newHttpClient().send(HttpRequest.newBuilder()
+				.uri(URI.create(jsonString(response, "uploadUrl")))
+				.header("Content-Type", "text/plain")
+				.PUT(HttpRequest.BodyPublishers.ofByteArray(PAYLOAD))
+				.build(), HttpResponse.BodyHandlers.discarding());
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/submit", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].questionId").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].content").value(nullValue()))
+				.andExpect(jsonPath("$.answers[0].docStorageKey").value(storageKey))
+				.andExpect(jsonPath("$.answers[0].docMimeType").value("text/plain"))
+				.andExpect(jsonPath("$.answers[0].docUploadStatus").value("READY"));
 	}
 
 	@Test
@@ -499,7 +533,7 @@ class SubmissionUploadUrlApiIntegrationTest {
 	}
 
 	@Test
-	void submitModule_rejectsRecordingAnswerWhenNoAudioUploaded() throws Exception {
+	void submitModule_allowsRecordingAnswerWhenNoAudioUploaded() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
 
@@ -507,8 +541,9 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{}"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Vui lòng tải lên file ghi âm trước khi nộp bài."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].audioStorageKey").doesNotExist());
 	}
 
 	@Test

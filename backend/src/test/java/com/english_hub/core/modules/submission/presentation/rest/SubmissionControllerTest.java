@@ -330,4 +330,50 @@ class SubmissionControllerTest {
 		assertThat(body.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
 		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:00:00Z"));
 	}
+
+	@Test
+	void mapsTheAudioDownloadUrlResultToAnOkResponse() {
+		SubmissionService.SubmissionFileDownloadResult result = new SubmissionService.SubmissionFileDownloadResult(
+				150L,
+				"https://bucket/audio.webm?X-Amz-Signature=xyz",
+				"submissions/88/module-150/audio.webm",
+				"audio.webm",
+				"audio/webm",
+				OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+		when(submissionService.generateSubmissionAudioDownloadUrl(150L)).thenReturn(result);
+
+		var response = submissionController.getSubmissionAudioDownloadUrl(150L);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		var body = response.getBody();
+		assertThat(body).isNotNull();
+		assertThat(body.submissionModuleId()).isEqualTo(150L);
+		assertThat(body.downloadUrl()).isEqualTo("https://bucket/audio.webm?X-Amz-Signature=xyz");
+		assertThat(body.fileName()).isEqualTo("audio.webm");
+		assertThat(body.mimeType()).isEqualTo("audio/webm");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+	}
+
+	@Test
+	void mapsTheDocumentDownloadUrlResultToAnOkResponse() {
+		SubmissionService.SubmissionFileDownloadResult result = new SubmissionService.SubmissionFileDownloadResult(
+				151L,
+				"https://bucket/essay.pdf?X-Amz-Signature=xyz",
+				"submissions/88/module-151/essay.pdf",
+				"my_essay.pdf",
+				"application/pdf",
+				OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+		when(submissionService.generateSubmissionDocumentDownloadUrl(151L, "download")).thenReturn(result);
+
+		var response = submissionController.getSubmissionDocumentDownloadUrl(151L, "download");
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		var body = response.getBody();
+		assertThat(body).isNotNull();
+		assertThat(body.submissionModuleId()).isEqualTo(151L);
+		assertThat(body.downloadUrl()).isEqualTo("https://bucket/essay.pdf?X-Amz-Signature=xyz");
+		assertThat(body.fileName()).isEqualTo("my_essay.pdf");
+		assertThat(body.mimeType()).isEqualTo("application/pdf");
+		assertThat(body.expiresAt()).isEqualTo(OffsetDateTime.parse("2026-09-24T10:30:00Z"));
+	}
 }

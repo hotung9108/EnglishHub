@@ -1,8 +1,10 @@
 package com.english_hub.core.modules.module.presentation.rest;
 
+import com.english_hub.core.modules.module.domain.model.Module;
 import com.english_hub.core.modules.module.application.command.CreateModuleCommand;
 import com.english_hub.core.modules.module.application.command.UpdateModuleCommand;
 import com.english_hub.core.modules.module.application.service.ModuleService;
+import com.english_hub.core.modules.module.presentation.rest.dto.AudioDownloadUrlResponse;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadConfirmRequest;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadConfirmResponse;
 import com.english_hub.core.modules.module.presentation.rest.dto.AudioUploadUrlRequest;
@@ -16,8 +18,10 @@ import com.english_hub.core.modules.module.presentation.rest.dto.ModuleSummaryRe
 import com.english_hub.core.modules.module.presentation.rest.dto.UpdateModuleRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -67,7 +71,9 @@ public class ModuleController {
 
 	@GetMapping("/modules/{moduleId}")
 	public ResponseEntity<ModuleDetailResponse> getModule(@PathVariable long moduleId) {
-		return ResponseEntity.ok(ModuleDetailResponse.from(moduleService.getModule(moduleId)));
+		Module module = moduleService.getModule(moduleId);
+		String audioDownloadUrl = moduleService.resolveAudioDownloadUrl(module);
+		return ResponseEntity.ok(ModuleDetailResponse.from(module, audioDownloadUrl));
 	}
 
 	@PutMapping("/modules/{moduleId}")
@@ -114,13 +120,9 @@ public class ModuleController {
 				result.uploadStatus()));
 	}
 
-	@GetMapping("/modules/{moduleId}/audio")
-	public ResponseEntity<byte[]> getModuleAudio(@PathVariable long moduleId) {
-		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(moduleId);
-		return ResponseEntity.ok()
-				.contentType(MediaType.parseMediaType(result.mimeType()))
-				.cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-				.contentLength(result.bytes().length)
-				.body(result.bytes());
+	@GetMapping("/modules/{moduleId}/audio-download-url")
+	public ResponseEntity<AudioDownloadUrlResponse> getAudioDownloadUrl(@PathVariable long moduleId) {
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(moduleId);
+		return ResponseEntity.ok(AudioDownloadUrlResponse.of("Lấy link tải audio thành công.", result));
 	}
 }

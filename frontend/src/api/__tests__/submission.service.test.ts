@@ -548,6 +548,131 @@ test('SubmissionService - audio and document upload URLs', async () => {
   assert.strictEqual(docResult, docResponse);
 });
 
+test('SubmissionService - audio and document download URLs', async () => {
+  const http = new MockHttpClient();
+  const audioDownloadRes = {
+    submissionModuleId: 44,
+    downloadUrl: 'http://minio:9000/englishhub-dev/submissions/1/audio.webm',
+    storageKey: 'submissions/1/audio.webm',
+    fileName: 'audio.webm',
+    mimeType: 'audio/webm',
+    expiresAt: '2026-11-07T12:00:00Z',
+  };
+  http.mockResponse = audioDownloadRes;
+
+  const audioResult = await new SubmissionService(http).getAudioDownloadUrl(44);
+  assert.strictEqual(http.calls[0].url, '/submission-modules/44/audio-download-url');
+  assert.strictEqual(http.calls[0].method, 'GET');
+  assert.strictEqual(audioResult.downloadUrl, '/s3-upload/englishhub-dev/submissions/1/audio.webm');
+
+  const docDownloadRes = {
+    submissionModuleId: 44,
+    downloadUrl: 'https://s3.example.com/submissions/1/essay.pdf',
+    storageKey: 'submissions/1/essay.pdf',
+    fileName: 'essay.pdf',
+    mimeType: 'application/pdf',
+    expiresAt: '2026-11-07T12:00:00Z',
+  };
+  http.mockResponse = docDownloadRes;
+
+  const docResult = await new SubmissionService(http).getDocumentDownloadUrl(44, 'preview');
+  assert.strictEqual(http.calls[1].url, '/submission-modules/44/document-download-url?mode=preview');
+  assert.strictEqual(http.calls[1].method, 'GET');
+  assert.strictEqual(docResult.downloadUrl, 'https://s3.example.com/submissions/1/essay.pdf');
+});
+
+test('SubmissionService - getAudioFileBlob and getDocumentFileBlob (consolidated 2-in-1)', async () => {
+  const http = new MockHttpClient();
+  const service = new SubmissionService(http);
+
+  http.mockResponse = {
+    submissionModuleId: 44,
+    downloadUrl: 'https://s3.example.com/submissions/1/audio.webm',
+    storageKey: 'submissions/1/audio.webm',
+    fileName: 'audio.webm',
+    mimeType: 'audio/webm',
+    expiresAt: '2026-11-07T12:00:00Z',
+  };
+
+  const originalFetch = globalThis.fetch;
+  let interceptedUrl = '';
+
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    interceptedUrl = String(url);
+    return new Response(new Blob(['student-audio-bytes'], { type: 'audio/webm' }), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const audioBlob = await service.getAudioFileBlob(44);
+    assert.strictEqual(http.calls[0].url, '/submission-modules/44/audio-download-url');
+    assert.strictEqual(interceptedUrl, 'https://s3.example.com/submissions/1/audio.webm');
+    assert.strictEqual(audioBlob.size, 19);
+
+    http.mockResponse = {
+      submissionModuleId: 45,
+      downloadUrl: 'https://s3.example.com/submissions/1/essay.pdf',
+      storageKey: 'submissions/1/essay.pdf',
+      fileName: 'essay.pdf',
+      mimeType: 'application/pdf',
+      expiresAt: '2026-11-07T12:00:00Z',
+    };
+
+    const docBlob = await service.getDocumentFileBlob(45, 'download');
+    assert.strictEqual(http.calls[1].url, '/submission-modules/45/document-download-url?mode=download');
+    assert.strictEqual(interceptedUrl, 'https://s3.example.com/submissions/1/essay.pdf');
+    assert.strictEqual(docBlob.size, 19);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('SubmissionService - uploadAudio and uploadDocument consolidated 2-in-1 flows', async () => {
+  const http = new MockHttpClient();
+  const service = new SubmissionService(http);
+
+  http.mockResponse = {
+    uploadUrl: 'http://minio:9000/englishhub-dev/submissions/1/speaking.webm',
+    storageKey: 'submissions/1/speaking.webm',
+    expiresAt: '2026-11-07T12:00:00Z',
+  };
+
+  const originalFetch = globalThis.fetch;
+  let putTargetUrl = '';
+  let putContentType = '';
+
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    putTargetUrl = String(url);
+    putContentType = (init?.headers as Record<string, string>)?.['Content-Type'] || '';
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const audioBlob = new Blob(['speaking-bytes'], { type: 'audio/webm' });
+    const audioRes = await service.uploadAudio(44, audioBlob);
+
+    assert.strictEqual(http.calls[0].url, '/submission-modules/44/audio-upload-url');
+    assert.strictEqual(putTargetUrl, '/s3-upload/englishhub-dev/submissions/1/speaking.webm');
+    assert.strictEqual(putContentType, 'audio/webm');
+    assert.strictEqual(audioRes.storageKey, 'submissions/1/speaking.webm');
+
+    http.mockResponse = {
+      uploadUrl: 'https://s3.example.com/submissions/1/essay.pdf',
+      storageKey: 'submissions/1/essay.pdf',
+      expiresAt: '2026-11-07T12:00:00Z',
+    };
+
+    const docFile = new File(['pdf-bytes'], 'essay.pdf', { type: 'application/pdf' });
+    const docRes = await service.uploadDocument(45, docFile);
+
+    assert.strictEqual(http.calls[1].url, '/submission-modules/45/document-upload-url');
+    assert.strictEqual(putTargetUrl, 'https://s3.example.com/submissions/1/essay.pdf');
+    assert.strictEqual(putContentType, 'application/pdf');
+    assert.strictEqual(docRes.storageKey, 'submissions/1/essay.pdf');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('SubmissionService - submitModule sends audioStorageKey when submitting speaking module', async () => {
   const http = new MockHttpClient();
   const response: SubmitModuleResponse = {

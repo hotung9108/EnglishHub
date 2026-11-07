@@ -259,6 +259,9 @@ export function getBackendDocumentMimeType(file: { name?: string; type?: string 
   ) {
     return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   }
+  if (fileName.endsWith('.txt') || fileType.startsWith('text/plain')) {
+    return 'text/plain';
+  }
   return 'application/pdf';
 }
 

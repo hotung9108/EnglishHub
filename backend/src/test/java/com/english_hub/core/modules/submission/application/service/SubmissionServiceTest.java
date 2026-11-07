@@ -92,6 +92,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -1387,16 +1388,20 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void submitModule_throwsBadRequestWhenNoAudioExists() {
+	void submitModule_allowsEmptySubmissionWhenNoAudioExists() {
 		when(assignmentWindowRepository.findWindowById(5L))
 				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		ownedInProgressModule(103L, 88L, 12L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(12L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(answerRepository.bulkCreate(eq(103L), anyList()))
+				.thenAnswer(invocation -> invocation.getArgument(1));
 
-		assertThatThrownBy(() -> submissionService.submitModule(103L, List.of()))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Vui lòng tải lên file ghi âm trước khi nộp bài.");
+		SubmitModuleResult result = submissionService.submitModule(103L, List.of());
+
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(result.answers()).hasSize(1);
+		assertThat(result.answers().get(0).audioStorageKey()).isNull();
 
 		verify(storageService).objectExists("submissions/88/module-103/audio.webm");
 		verify(storageService).objectExists("submissions/88/module-103/audio.mp3");
@@ -2337,6 +2342,87 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void generateSubmissionAudioDownloadUrlReturnsUrlForStudentOwner() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(sm));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		Answer answer = new Answer(
+				150L, null, null,
+				"submissions/88/module-150/audio.webm", "audio/webm", UploadStatus.READY,
+				null, null, null);
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(answer));
+
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-09-24T10:30:00Z");
+		when(storageService.generatePresignedDownload(eq("submissions/88/module-150/audio.webm"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://bucket/audio.webm?signed", "submissions/88/module-150/audio.webm", expiresAt));
+
+		SubmissionService.SubmissionFileDownloadResult result =
+				submissionService.generateSubmissionAudioDownloadUrl(150L);
+
+		assertThat(result.submissionModuleId()).isEqualTo(150L);
+		assertThat(result.downloadUrl()).isEqualTo("https://bucket/audio.webm?signed");
+		assertThat(result.fileName()).isEqualTo("audio.webm");
+		assertThat(result.mimeType()).isEqualTo("audio/webm");
+	}
+
+	@Test
+	void generateSubmissionAudioDownloadUrlRejectsAdmin() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+
+		assertThatThrownBy(() -> submissionService.generateSubmissionAudioDownloadUrl(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void generateSubmissionAudioDownloadUrlRejectsAnotherStudent() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(sm));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.generateSubmissionAudioDownloadUrl(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void generateSubmissionDocumentDownloadUrlReturnsUrlWithAttachmentDispositionForDownloadMode() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(151L);
+		when(submissionModuleRepository.findById(151L)).thenReturn(Optional.of(sm));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		Answer answer = new Answer(
+				151L, null, "{\"fileName\":\"My_Essay.docx\"}",
+				null, null, null,
+				"submissions/88/module-151/essay.docx", "application/docx", UploadStatus.READY);
+		when(answerRepository.findBySubmissionModuleId(151L)).thenReturn(List.of(answer));
+
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-09-24T10:30:00Z");
+		when(storageService.generatePresignedDownload(eq("submissions/88/module-151/essay.docx"), any(), eq("attachment; filename=\"My_Essay.docx\"")))
+				.thenReturn(new StorageService.PresignedDownload("https://bucket/essay.docx?signed", "submissions/88/module-151/essay.docx", expiresAt));
+
+		SubmissionService.SubmissionFileDownloadResult result =
+				submissionService.generateSubmissionDocumentDownloadUrl(151L, "download");
+
+		assertThat(result.submissionModuleId()).isEqualTo(151L);
+		assertThat(result.downloadUrl()).isEqualTo("https://bucket/essay.docx?signed");
+		assertThat(result.fileName()).isEqualTo("My_Essay.docx");
+	}
+
+	@Test
 	void getAudioUploadUrl_buildsStorageKeyAndForwardsToStorage() {
 		SubmissionModule module = ownedInProgressModule(150L, 88L, 9L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -2490,9 +2576,24 @@ class SubmissionServiceTest {
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
 
-		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "text/plain"))
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "image/png"))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Định dạng file không được hỗ trợ.");
+	}
+
+	@Test
+	void getDocumentUploadUrl_generatesPresignedUrlForTextPlain() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.txt", "text/plain"))
+				.thenReturn(presigned("https://storage.local/upload/essay.txt", "submissions/88/module-151/essay.txt"));
+
+		UploadUrlResult result = submissionService.getDocumentUploadUrl(151L, "text/plain");
+
+		assertThat(result.uploadUrl()).isEqualTo("https://storage.local/upload/essay.txt");
+		assertThat(result.storageKey()).isEqualTo("submissions/88/module-151/essay.txt");
+		assertThat(result.expiresAt()).isEqualTo(EXPIRES_AT);
 	}
 
 	@Test

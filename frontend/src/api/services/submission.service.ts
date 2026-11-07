@@ -1,6 +1,11 @@
 import { httpClient } from '../core/client';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 import type { AssignmentSkill } from './assignment.service';
+import {
+  fetchFileBlobFromPresignedUrl,
+  normalizeStorageUrl,
+  uploadDirectToStorage as uploadDirectStorageHelper,
+} from '../../utils/storage.utils';
 
 export type SubmissionStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'GRADED';
 export type SubmissionGradingStatus = 'PENDING' | 'AI_GRADED' | 'COMPLETED' | 'FAILED';
@@ -106,6 +111,19 @@ export interface SubmittedAnswerItem {
   audioStorageKey?: string | null;
   audioMimeType?: string | null;
   audioUploadStatus?: string | null;
+  audioDownloadUrl?: string | null;
+  docDownloadUrl?: string | null;
+}
+
+export type AnswerDetailResponse = SubmittedAnswerItem;
+
+export interface SubmissionFileDownloadUrlResponse {
+  submissionModuleId: number;
+  downloadUrl: string;
+  storageKey: string;
+  fileName: string;
+  mimeType: string;
+  expiresAt: string;
 }
 
 export interface SubmitModuleAnswerPayload {
@@ -421,6 +439,123 @@ export class SubmissionService {
   }
 
   /**
+   * Step 1: Requests a temporary presigned GET URL to stream or download a student speaking audio submission.
+   */
+  async getAudioDownloadUrl(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionFileDownloadUrlResponse> {
+    const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/audio-download-url`,
+      options
+    );
+    return {
+      ...res,
+      downloadUrl: normalizeStorageUrl(res.downloadUrl),
+    };
+  }
+
+  /**
+   * Step 1: Requests a temporary presigned GET URL to stream or download a student essay document submission.
+   */
+  async getDocumentDownloadUrl(
+    submissionModuleId: number,
+    mode?: string,
+    options?: ApiRequestOptions
+  ): Promise<SubmissionFileDownloadUrlResponse> {
+    const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
+    const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
+      `/submission-modules/${submissionModuleId}/document-download-url${query}`,
+      options
+    );
+    return {
+      ...res,
+      downloadUrl: normalizeStorageUrl(res.downloadUrl),
+    };
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to retrieve a student speaking submission audio file as a Blob.
+   * Step 1: Calls backend API to create a presigned GET URL.
+   * Step 2: Uses the presigned URL to fetch file binary data (Blob).
+   */
+  async getAudioFileBlob(
+    submissionModuleId: number,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    const { downloadUrl } = await this.getAudioDownloadUrl(submissionModuleId, options);
+    return fetchFileBlobFromPresignedUrl(downloadUrl);
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to retrieve a student essay submission document as a Blob.
+   * Step 1: Calls backend API to create a presigned GET URL.
+   * Step 2: Uses the presigned URL to fetch file binary data (Blob).
+   */
+  async getDocumentFileBlob(
+    submissionModuleId: number,
+    mode?: string,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    const { downloadUrl } = await this.getDocumentDownloadUrl(submissionModuleId, mode, options);
+    return fetchFileBlobFromPresignedUrl(downloadUrl);
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to upload a student speaking recording.
+   * Step 1: Calls backend API to request a presigned PUT URL and storageKey.
+   * Step 2: Uploads audio binary data directly to the object storage URL.
+   * Returns { uploadUrl, storageKey, expiresAt } ready for submitModule.
+   */
+  async uploadAudio(
+    submissionModuleId: number,
+    fileOrBlob: Blob | File,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    const resolvedMime = mimeType || fileOrBlob.type || 'audio/webm';
+    const uploadRes = await this.getAudioUploadUrl(submissionModuleId, resolvedMime, requestOptions);
+    await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
+    return uploadRes;
+  }
+
+  /**
+   * Consolidated 2-in-1 helper to upload a student essay document.
+   * Step 1: Calls backend API to request a presigned PUT URL and storageKey.
+   * Step 2: Uploads document binary data directly to the object storage URL.
+   * Returns { uploadUrl, storageKey, expiresAt } ready for submitModule.
+   */
+  async uploadDocument(
+    submissionModuleId: number,
+    fileOrBlob: Blob | File,
+    mimeTypeOrOptions?: string | ApiRequestOptions,
+    options?: ApiRequestOptions
+  ): Promise<UploadUrlResponse> {
+    let mimeType: string | undefined;
+    let requestOptions: ApiRequestOptions | undefined = options;
+
+    if (typeof mimeTypeOrOptions === 'string') {
+      mimeType = mimeTypeOrOptions;
+    } else if (mimeTypeOrOptions && typeof mimeTypeOrOptions === 'object') {
+      requestOptions = mimeTypeOrOptions;
+    }
+
+    const resolvedMime = mimeType || fileOrBlob.type || 'application/pdf';
+    const uploadRes = await this.getDocumentUploadUrl(submissionModuleId, resolvedMime, requestOptions);
+    await this.uploadDirectToStorage(uploadRes.uploadUrl, fileOrBlob, resolvedMime);
+    return uploadRes;
+  }
+
+  /**
    * Uploads raw binary data (Blob or File) directly to a presigned S3/MinIO upload URL.
    * Direct PUT to object storage does not send backend auth headers so as not to break S3 presigned URL signature.
    */
@@ -429,23 +564,7 @@ export class SubmissionService {
     fileOrBlob: Blob | File,
     mimeType: string
   ): Promise<void> {
-    let targetUrl = uploadUrl;
-    // When running in dev environments where backend returns internal Docker hostname (http://minio:9000),
-    // route through Vite dev proxy (/s3-upload) so browser can resolve and keep Host signature intact.
-    if (uploadUrl.includes('//minio:9000/')) {
-      targetUrl = uploadUrl.replace(/^https?:\/\/minio:9000/, '/s3-upload');
-    }
-
-    const response = await fetch(targetUrl, {
-      method: 'PUT',
-      body: fileOrBlob,
-      headers: {
-        'Content-Type': mimeType,
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Tải tệp lên kho lưu trữ thất bại (HTTP ${response.status}).`);
-    }
+    return uploadDirectStorageHelper(uploadUrl, fileOrBlob, mimeType);
   }
 }
 

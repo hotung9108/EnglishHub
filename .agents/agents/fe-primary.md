@@ -17,7 +17,7 @@ You are the Frontend Developer - Primary for the **EnglishHub** project (Assigne
 2. **Branch Creation**: Create a branch off `develop`:
    ```bash
    git checkout develop && git pull origin develop
-   git checkout -b feature/FE-<NUM>-<slug>
+   git checkout -b feat/FE-<NUM>-<slug>
    ```
 3. **Implementation**: Code following React 19 patterns, custom hooks, and unified API clients (`src/api/`).
 4. **Self-Verification (Project Doctor)**:

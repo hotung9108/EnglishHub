@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
   X, Check, Lock, Unlock, Shield,
@@ -7,6 +7,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { validateFullName } from '../utils/nameValidation';
 import { useUsers } from '../hooks/useUsers';
+import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
 import { Button, EmptyState, Pagination } from '../components/common';
@@ -36,6 +37,12 @@ export const Accounts: React.FC = () => {
     initialLimit: 10,
     initialRole: undefined,
   });
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 350);
+
+  useEffect(() => {
+    setQuery(debouncedSearchQuery.trim());
+  }, [debouncedSearchQuery, setQuery]);
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -68,7 +75,6 @@ export const Accounts: React.FC = () => {
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    setQuery(query.trim());
   };
 
   const handlePageSizeChange = (newSize: number) => {
