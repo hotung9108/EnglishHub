@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-022",
+  "title": "Lưu cài đặt lớp và kiểm tra bền vững",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không thấy thẻ lớp QA31-editClass-2be98c1e51c0",
+  "actualUrl": "https://staging.hotung9108.me/admin/classes",
+  "startedAt": "2026-11-06T13:31:45.559Z",
+  "finishedAt": "2026-11-06T13:31:51.899Z"
+}

@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-008",
+  "title": "Accounts khóa rồi mở lại tài khoản QA",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Expected one row action /Mở khóa|Unlock/\n\n0 !== 1\n",
+  "actualUrl": "https://staging.hotung9108.me/admin/accounts",
+  "startedAt": "2026-11-04T13:56:03.625Z",
+  "finishedAt": "2026-11-04T13:56:23.811Z"
+}

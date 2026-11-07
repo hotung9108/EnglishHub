@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-038",
+  "title": "Accounts tạo Student phải lưu đúng vai trò STUDENT",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Missing button /Thêm tài khoản mới|Add new account/i\nWait timed out after 30159ms",
+  "actualUrl": "http://localhost:5173/admin/accounts",
+  "startedAt": "2026-11-07T05:23:28.509Z",
+  "finishedAt": "2026-11-07T05:24:08.720Z"
+}

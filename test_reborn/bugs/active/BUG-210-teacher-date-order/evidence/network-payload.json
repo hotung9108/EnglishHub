@@ -1,0 +1,14 @@
+{
+  "request": {
+    "url": "/api/v1/assignments",
+    "method": "POST",
+    "body": {
+      "title": "Edge Case - Inverted Dates",
+      "classId": 12,
+      "openDate": "2026-11-10T10:00:00.000Z",
+      "closeDate": "2026-11-05T10:00:00.000Z",
+      "status": "PUBLISHED"
+    }
+  },
+  "bugStatus": "CONFIRMED_ISSUE_210"
+}

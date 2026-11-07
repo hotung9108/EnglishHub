@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-037",
+  "title": "Xuất báo cáo lớp thành file",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không có file export hoàn tất sau 60 giây. Cần đối chiếu handler/network; toast không chứng minh tải file.",
+  "actualUrl": "http://localhost:5173/teacher/classes/85/progress",
+  "startedAt": "2026-11-07T05:22:28.044Z",
+  "finishedAt": "2026-11-07T05:22:34.245Z"
+}

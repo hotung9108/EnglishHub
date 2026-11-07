@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-026",
+  "title": "Reports lọc giáo viên QA",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Dropdown chưa có option 1503 sau khi chờ dữ liệu API\nWait timed out after 30444ms",
+  "actualUrl": "https://staging.hotung9108.me/admin/reports",
+  "startedAt": "2026-11-06T13:32:23.181Z",
+  "finishedAt": "2026-11-06T13:33:00.074Z"
+}

@@ -1,0 +1,569 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 12 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo lớp có giáo viên phụ trách",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Thêm học viên vào lớp fixture",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo lớp chưa gán giáo viên",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture ownedAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture deleteAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture draftToPublishAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture publishedToCloseAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture draftJumpAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture publishedBackAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture closedBackAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo fixture statusInvalidAssignmentId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "Chuyển fixture publishedToCloseAssignmentId sang PUBLISHED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedToCloseAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "Chuyển fixture publishedBackAssignmentId sang PUBLISHED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedBackAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "Chuyển fixture closedBackAssignmentId sang PUBLISHED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{closedBackAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "Chuyển fixture closedBackAssignmentId sang CLOSED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{closedBackAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1497] [TC_ASSIGNMENT_01] Giáo viên phụ trách lớp — xem danh sách phân trang — trả 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1498] [TC_ASSIGNMENT_02] Giáo viên phụ trách lớp — lọc DRAFT — chỉ nhận bài tập DRAFT",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?status=DRAFT",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1499] [TC_ASSIGNMENT_03] Giáo viên phụ trách lớp — lọc PUBLISHED — chỉ nhận bài tập PUBLISHED",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?status=PUBLISHED",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1500] [TC_ASSIGNMENT_04] Giáo viên phụ trách lớp — lọc CLOSED — chỉ nhận bài tập CLOSED",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?status=CLOSED",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1501] [TC_ASSIGNMENT_05] Giáo viên phụ trách lớp — status filter không hợp lệ — trả 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?status=ARCHIVED",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1502] [TC_ASSIGNMENT_06] Giáo viên phụ trách lớp — page bằng 0 — trả 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?page=0&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1503] [TC_ASSIGNMENT_07] Giáo viên phụ trách lớp — page âm — trả 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?page=-1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1504] [TC_ASSIGNMENT_08] Giáo viên phụ trách lớp — limit bằng 0 — trả 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?page=1&limit=0",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1505] [TC_ASSIGNMENT_09] Giáo viên phụ trách lớp — limit vượt 100 — trả 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments?page=1&limit=101",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1506] [TC_ASSIGNMENT_10] Giáo viên — liệt kê lớp không tồn tại — trả 404",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1507] [TC_ASSIGNMENT_11] Giáo viên không phụ trách lớp — liệt kê bài tập lớp khác — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1508] [TC_ASSIGNMENT_12] Học viên là thành viên lớp — liệt kê bài tập lớp của mình — trả 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1509] [TC_ASSIGNMENT_13] Học viên ngoài lớp — liệt kê bài tập — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1510] [TC_ASSIGNMENT_14] Quản trị viên — liệt kê bài tập — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1511] [TC_ASSIGNMENT_15] Không token — liệt kê bài tập — trả 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1512] [TC_ASSIGNMENT_16] Bearer token sai — liệt kê bài tập — trả 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1513] [TC_ASSIGNMENT_17] Giáo viên phụ trách lớp — xem chi tiết bài tập — trả 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1514] [TC_ASSIGNMENT_18] Giáo viên phụ trách lớp — xem chi tiết — không lộ credential",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1515] [TC_ASSIGNMENT_19] Học viên là thành viên lớp — xem chi tiết bài tập — trả 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1516] [TC_ASSIGNMENT_20] Học viên ngoài lớp — xem chi tiết bài tập — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1517] [TC_ASSIGNMENT_21] Giáo viên không phụ trách lớp — xem chi tiết bài tập — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1518] [TC_ASSIGNMENT_22] Quản trị viên — xem chi tiết bài tập — bị chặn 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1519] [TC_ASSIGNMENT_23] Giáo viên — xem bài tập không tồn tại — trả 404",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{missingId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1520] [TC_ASSIGNMENT_24] Không token — xem chi tiết bài tập — trả 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1521] [TC_ASSIGNMENT_25] Bearer token sai — xem chi tiết bài tập — trả 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase #1522] [TC_ASSIGNMENT_26] Giáo viên phụ trách lớp — tạo bài tập hợp lệ — trả 201 và lưu DRAFT",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1523] [TC_ASSIGNMENT_27] Giáo viên phụ trách lớp — tạo title có khoảng trắng đầu cuối — title được trim",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1524] [TC_ASSIGNMENT_28] Giáo viên phụ trách lớp — title rỗng — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1525] [TC_ASSIGNMENT_29] Giáo viên phụ trách lớp — thiếu title — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1526] [TC_ASSIGNMENT_30] Giáo viên phụ trách lớp — title 201 ký tự — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1527] [TC_ASSIGNMENT_31] Giáo viên phụ trách lớp — thiếu openAt — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1528] [TC_ASSIGNMENT_32] Giáo viên phụ trách lớp — thiếu closeAt — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1529] [TC_ASSIGNMENT_33] Giáo viên phụ trách lớp — openAt bằng closeAt — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1530] [TC_ASSIGNMENT_34] Giáo viên phụ trách lớp — openAt sau closeAt — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1531] [TC_ASSIGNMENT_35] Giáo viên phụ trách lớp — maxSubmissions bằng 0 — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1532] [TC_ASSIGNMENT_36] Giáo viên phụ trách lớp — maxSubmissions âm — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1533] [TC_ASSIGNMENT_37] Giáo viên phụ trách lớp — JSON malformed — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1534] [TC_ASSIGNMENT_38] Giáo viên — tạo vào lớp không tồn tại — trả 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1535] [TC_ASSIGNMENT_39] Giáo viên — tạo vào lớp chưa gán Giáo viên — trả 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{unassignedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1536] [TC_ASSIGNMENT_40] Giáo viên không phụ trách lớp — tạo vào lớp khác — bị chặn 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1537] [TC_ASSIGNMENT_41] Học viên — tạo bài tập — bị chặn 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1538] [TC_ASSIGNMENT_42] Quản trị viên — tạo bài tập — bị chặn 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1539] [TC_ASSIGNMENT_43] Không token — tạo bài tập — trả 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1540] [TC_ASSIGNMENT_44] Bearer token sai — tạo bài tập — trả 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{ownedClassId}}/assignments",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1541] [TC_ASSIGNMENT_45] Giáo viên phụ trách lớp — cập nhật hợp lệ — dữ liệu được lưu",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1542] [TC_ASSIGNMENT_46] Giáo viên phụ trách lớp — body rỗng — trả 400",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1543] [TC_ASSIGNMENT_47] Giáo viên phụ trách lớp — title chỉ khoảng trắng — trả 400",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1544] [TC_ASSIGNMENT_48] Giáo viên phụ trách lớp — title 201 ký tự — trả 400",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1545] [TC_ASSIGNMENT_49] Giáo viên phụ trách lớp — thời gian không hợp lệ — trả 400",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1546] [TC_ASSIGNMENT_50] Giáo viên phụ trách lớp — maxSubmissions âm — trả 400",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1547] [TC_ASSIGNMENT_51] Giáo viên không phụ trách lớp — cập nhật bài tập lớp khác — bị chặn 403",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1548] [TC_ASSIGNMENT_52] Học viên là thành viên lớp — cập nhật bài tập — bị chặn 403",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1549] [TC_ASSIGNMENT_53] Quản trị viên — cập nhật bài tập — bị chặn 403",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1550] [TC_ASSIGNMENT_54] Giáo viên — cập nhật bài tập không tồn tại — trả 404",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{missingId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1551] [TC_ASSIGNMENT_55] Không token — cập nhật bài tập — trả 401",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1552] [TC_ASSIGNMENT_56] Bearer token sai — cập nhật bài tập — trả 401",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1553] [TC_ASSIGNMENT_57] Giáo viên phụ trách lớp — DRAFT sang PUBLISHED — trạng thái được lưu",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{draftToPublishAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1554] [TC_ASSIGNMENT_58] Giáo viên phụ trách lớp — PUBLISHED sang CLOSED — trạng thái được lưu",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedToCloseAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1555] [TC_ASSIGNMENT_59] Giáo viên phụ trách lớp — DRAFT nhảy thẳng CLOSED — trả 400",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{draftJumpAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1556] [TC_ASSIGNMENT_60] Giáo viên phụ trách lớp — PUBLISHED quay về DRAFT — trả 400",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedBackAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1557] [TC_ASSIGNMENT_61] Giáo viên phụ trách lớp — CLOSED quay về PUBLISHED — trả 400",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{closedBackAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1558] [TC_ASSIGNMENT_62] Giáo viên phụ trách lớp — status enum sai — trả 400",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{statusInvalidAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1559] [TC_ASSIGNMENT_63] Giáo viên phụ trách lớp — thiếu status — trả 400",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{statusInvalidAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1560] [TC_ASSIGNMENT_64] Giáo viên không phụ trách lớp — đổi status bài tập lớp khác — bị chặn 403",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1561] [TC_ASSIGNMENT_65] Học viên — đổi status bài tập — bị chặn 403",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1562] [TC_ASSIGNMENT_66] Quản trị viên — đổi status bài tập — bị chặn 403",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1563] [TC_ASSIGNMENT_67] Giáo viên — đổi status bài tập không tồn tại — trả 404",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{missingId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1564] [TC_ASSIGNMENT_68] Không token — đổi status bài tập — trả 401",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1565] [TC_ASSIGNMENT_69] Bearer token sai — đổi status bài tập — trả 401",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}/status",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1566] [TC_ASSIGNMENT_70] Giáo viên phụ trách lớp — xóa mềm bài tập — detail và list không còn",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{deleteAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1567] [TC_ASSIGNMENT_71] Giáo viên không phụ trách lớp — xóa bài tập lớp khác — bị chặn 403",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1568] [TC_ASSIGNMENT_72] Học viên — xóa bài tập — bị chặn 403",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1569] [TC_ASSIGNMENT_73] Quản trị viên — xóa bài tập — bị chặn 403",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1570] [TC_ASSIGNMENT_74] Giáo viên — xóa bài tập không tồn tại — trả 404",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{missingId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1571] [TC_ASSIGNMENT_75] Không token — xóa bài tập — trả 401",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase #1572] [TC_ASSIGNMENT_76] Bearer token sai — xóa bài tập — trả 401",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "Dọn dẹp fixture BE-15",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{ownedAssignmentId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "QA19 CONTROL 12 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

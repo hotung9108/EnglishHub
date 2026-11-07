@@ -1,0 +1,95 @@
+{
+  "project": "EnglishHub API Black-box Test Suites",
+  "sourceOfTruth": "docs/core/01.SRS.md & 03.TP.md",
+  "qaseProjectCode": "EAM",
+  "suites": [
+    {
+      "id": "common-auth",
+      "role": "common",
+      "suiteName": "Authentication & Session Management",
+      "useCases": ["UC01", "UC02"],
+      "qaseSuiteId": 8,
+      "collection": "common/auth/collection.json",
+      "environment": "common/auth/environment.staging.json",
+      "endpointsDoc": "common/auth/endpoints.json",
+      "description": "Đăng nhập, đăng xuất, cấp và thu hồi token, kiểm tra hết hạn session"
+    },
+    {
+      "id": "common-profile",
+      "role": "common",
+      "suiteName": "User Profile Management",
+      "useCases": ["UC03"],
+      "qaseSuiteId": 10,
+      "collection": "common/profile/collection.json",
+      "environment": "common/profile/environment.staging.json",
+      "endpointsDoc": "common/profile/endpoints.json",
+      "description": "Cập nhật thông tin cá nhân, đổi mật khẩu, quản lý hồ sơ người dùng"
+    },
+    {
+      "id": "admin-account",
+      "role": "admin",
+      "suiteName": "Admin User & Role Management",
+      "useCases": ["UC04", "UC05", "UC06", "UC07"],
+      "qaseSuiteId": 9,
+      "collection": "admin/account-management/collection.json",
+      "environment": "admin/account-management/environment.staging.json",
+      "endpointsDoc": "admin/account-management/endpoints.json",
+      "description": "Quản lý tài khoản người dùng, phân quyền Admin/Teacher/Student, tìm kiếm hồ sơ"
+    },
+    {
+      "id": "admin-class",
+      "role": "admin",
+      "suiteName": "Admin Class & Member Management",
+      "useCases": ["UC08", "UC09"],
+      "qaseSuiteId": 11,
+      "collection": "admin/class-management/collection.json",
+      "environment": "admin/class-management/environment.staging.json",
+      "endpointsDoc": "admin/class-management/endpoints.json",
+      "description": "Quản lý lớp học, phân công giáo viên, thêm và xóa học viên khỏi lớp"
+    },
+    {
+      "id": "teacher-assignment",
+      "role": "teacher",
+      "suiteName": "Teacher Assignment Lifecycle",
+      "useCases": ["UC11", "UC12", "UC13", "UC14"],
+      "qaseSuiteId": 12,
+      "collection": "teacher/assignment-lifecycle/collection.json",
+      "environment": "teacher/assignment-lifecycle/environment.staging.json",
+      "endpointsDoc": "teacher/assignment-lifecycle/endpoints.json",
+      "description": "CRUD bài tập, tạo bài 4 kỹ năng, kiểm tra lịch mở/đóng bài tập, đổi trạng thái"
+    },
+    {
+      "id": "teacher-grading",
+      "role": "teacher",
+      "suiteName": "Teacher Grading & AI Analysis",
+      "useCases": ["UC24", "UC25", "UC26", "UC27", "UC31"],
+      "qaseSuiteId": 15,
+      "collection": "teacher/grading-ai/collection.json",
+      "environment": "teacher/grading-ai/environment.staging.json",
+      "endpointsDoc": "teacher/grading-ai/endpoints.json",
+      "description": "Chấm điểm thủ công, yêu cầu AI phân tích Writing/Speaking, quản lý annotations"
+    },
+    {
+      "id": "student-submission",
+      "role": "student",
+      "suiteName": "Student Submissions & Exam Flow",
+      "useCases": ["UC15", "UC16", "UC17", "UC18", "UC19", "UC20", "UC21", "UC22", "UC23"],
+      "qaseSuiteId": 13,
+      "collection": "student/submissions/collection.json",
+      "environment": "student/submissions/environment.staging.json",
+      "endpointsDoc": "student/submissions/endpoints.json",
+      "description": "Nộp bài luận Writing, tải lên audio Speaking, làm trắc nghiệm, nộp lại bài"
+    },
+    {
+      "id": "student-evaluation",
+      "role": "student",
+      "suiteName": "Student Evaluations & Progress Tracking",
+      "useCases": ["UC34", "UC35"],
+      "qaseSuiteId": 14,
+      "collection": "student/evaluations/collection.json",
+      "environment": "student/evaluations/environment.staging.json",
+      "endpointsDoc": "student/evaluations/endpoints.json",
+      "description": "Xem đánh giá học tập, theo dõi tiến độ hoàn thành và nhận xét của giáo viên"
+    }
+  ]
+}

@@ -30,3 +30,28 @@ __pycache__/
 # Local MCP configs containing secrets
 .agents/plugins/**/mcp_config.json
 !.agents/plugins/**/mcp_config.example.json
+
+# Private environment credentials
+*.private.json
+**/*.private.json
+
+# Test caches, reports, and execution artifacts
+test_reborn/.cache/
+test_reborn/reports/
+test/**/.cache/
+test/**/reports/
+test/selenium/student/
+test/selenium/teacher/
+test/api/history/
+test/reports/
+test/tools/
+.local/
+production_artifacts/test_reports/history/
+
+# Legacy fragmented API suites & bugs notes
+test/api/collections/
+test/api/environments/
+test/api/staging/
+test/api/suites/
+test/bugs/
+

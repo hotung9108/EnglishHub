@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-014",
+  "title": "Students tìm học viên QA mới",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Không thấy dòng QA [REDACTED]\nWait timed out after 30159ms",
+  "actualUrl": "https://staging.hotung9108.me/admin/students",
+  "startedAt": "2026-11-04T08:06:07.551Z",
+  "finishedAt": "2026-11-04T08:06:44.073Z"
+}

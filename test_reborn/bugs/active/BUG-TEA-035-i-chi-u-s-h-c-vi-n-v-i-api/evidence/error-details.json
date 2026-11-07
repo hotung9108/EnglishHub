@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-035",
+  "title": "Đối chiếu số học viên với API",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:08.982Z",
+  "finishedAt": "2026-11-04T07:18:09.463Z"
+}

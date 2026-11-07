@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-046",
+  "title": "Tùy chọn giao diện lưu qua reload",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:15.942Z",
+  "finishedAt": "2026-11-04T07:18:16.453Z"
+}

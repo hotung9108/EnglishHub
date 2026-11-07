@@ -1,0 +1,425 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 11 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo classMainId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo classUnassignedId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo classUpdId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo classBlockId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo emptyClassId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Tạo classAddId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "Thêm member chính",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "Thêm member chặn xóa",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classBlockId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1264 | Admin xem danh sách có phân trang",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1265 | Giáo viên chỉ thấy lớp được phân công",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1266 | Học viên thành viên thấy lớp mình tham gia",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1267 | Học viên không phải thành viên không thấy lớp",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1268 | Lọc status=ACTIVE",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?status=ACTIVE&limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1269 | Lọc status=COMPLETED",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?status=COMPLETED&limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1270 | Lọc status=CANCELLED",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?status=CANCELLED&limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1271 | Từ chối status filter sai",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?status=FROZEN",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1272 | Từ chối page=0",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?page=0&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1273 | Từ chối limit=0",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes?page=1&limit=0",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1274 | Không có token",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1319 | S11-ID-01 - Tạo lớp có teacherId rỗng phải trả 4xx, không được 5xx",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1320 | S11-ID-02 - Cập nhật lớp có teacherId rỗng phải trả 4xx, không được 5xx",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1321 | S11-ID-03 - Thêm học viên có studentId rỗng phải trả 4xx, không được 5xx",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1322 | S11-ID-04 - Thiếu classId trên URL phải trả 4xx, không được 5xx",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/.",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1323 | S11-ID-05 - Thiếu memberId trên URL phải trả 4xx, không được 5xx",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members/.",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1275 | Chi tiết lớp có giáo viên và thành viênCount",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1276 | Chi tiết lớp chưa có giáo viên",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classUnassignedId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1277 | Lớp không tồn tại",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1278 | Học viên không phải thành viên xem chi tiết lớp",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1279 | Tạo lớp hợp lệ",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1280 | Từ chối name rỗng",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1281 | Từ chối endDate trước startDate",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1282 | Từ chối giáo viênId không tồn tại",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1283 | Từ chối giáo viênId là học viên",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1284 | Từ chối name 151 ký tự",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1285 | Chấp nhận name đúng 150 ký tự (biên)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1286 | Từ chối tên lớp trùng (cần xác nhận rule)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1287 | Giáo viên không được tạo lớp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1288 | Học viên không được tạo lớp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1289 | Cập nhật level, status, giáo viên hợp lệ",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1290 | Dữ liệu update được lưu",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1291 | Từ chối body rỗng",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1292 | Từ chối status không hợp lệ",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1293 | Từ chối endDate trước startDate",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1294 | Chuyển status COMPLETED và xác nhận đã lưu",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1295 | Update lớp không tồn tại",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1296 | Update giáo viênId không tồn tại",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1297 | Giáo viên không được update lớp",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/classes/{{classUpdId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1298 | Không xóa lớp còn thành viên",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classBlockId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1299 | Lớp vẫn còn nguyên sau khi bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classBlockId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1300 | Xóa lớp rỗng",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{emptyClassId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1301 | Lớp đã xóa không còn",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{emptyClassId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1302 | Xóa lớp không tồn tại",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1303 | Giáo viên không được xóa lớp",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1304 | Liệt kê thành viên lớp",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}/members",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1305 | Lớp không tồn tại",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}/members",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1306 | Học viên không phải thành viên xem thành viên lớp",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}/members",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1307 | Thêm học viên hợp lệ",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1308 | Từ chối thiếu học viênId",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1309 | Từ chối thêm trùng",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1310 | Lớp không tồn tại",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{missingId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1311 | Học viên không tồn tại",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1312 | Từ chối học viênId là giáo viên",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1313 | Giáo viên thêm thành viên vào lớp học thành công",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1314 | Xóa thành viên hợp lệ",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members/{{memberAddId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1315 | Member không còn trong danh sách",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1316 | Xóa thành viên thuộc lớp khác",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classAddId}}/members/{{memberMainId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "EAM-1317 | Member lớp khác không bị ảnh hưởng",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{classMainId}}/members",
+      "mayMutate": false
+    },
+    {
+      "name": "EAM-1318 | Giáo viên xóa thành viên khỏi lớp học thành công",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/classes/{{classBlockId}}/members/{{memberBlockId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "QA19 CONTROL 11 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

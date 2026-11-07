@@ -1,0 +1,221 @@
+{
+  "requests": [
+    {
+      "name": "[Qase:661] UAPI-01 - Admin xem hồ sơ cá nhân (GET /users/me)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:662] UAPI-02 - Teacher và Student chỉ xem hồ sơ của chính mình",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:663] UAPI-03 - Từ chối khi thiếu hoặc sai token",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:664] UAPI-04 - User LOCKED không xem được hồ sơ bằng token cũ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:665] UAPI-05 - Cập nhật họ tên của chính mình",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:666] UAPI-06 - Cập nhật phone và avatarUrl",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:667] UAPI-07 - Từ chối cập nhật profile rỗng",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:668] UAPI-08 - Từ chối fullName rỗng hoặc toàn khoảng trắng",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:669] UAPI-09 - Trim dữ liệu profile trước khi lưu",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:670] UAPI-10 - Không cho đổi email role status id qua profile",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:671] UAPI-11 - Từ chối cập nhật profile khi chưa xác thực",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:672] UAPI-12 - Đổi mật khẩu thành công",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:673] UAPI-13 - Từ chối đổi mật khẩu khi currentPassword sai",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:674] UAPI-14 - Từ chối đổi mật khẩu khi thiếu hoặc rỗng field",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:675] UAPI-15 - Từ chối mật khẩu mới dưới 8 ký tự",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:676] UAPI-16 - Từ chối mật khẩu thiếu chữ hoa hoặc chữ số",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:677] UAPI-17 - Mật khẩu mới có hiệu lực sau khi đổi",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:694] UAPI-34 - User LOCKED hoặc không token không đổi được password",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:678] UAPI-18 - Admin xem danh sách user với phân trang mặc định",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:679] UAPI-19 - Admin lọc user theo từ khóa và role",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:680] UAPI-20 - Kiểm tra biên phân trang danh sách user",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:681] UAPI-21 - Từ chối filter role không tồn tại",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:682] UAPI-22 - Non-admin không xem được danh sách user",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:683] UAPI-23 - Admin tạo tài khoản teacher",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:684] UAPI-24 - Admin tạo tài khoản student kèm profile",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:685] UAPI-25 - Từ chối tạo user khi body sai hoặc thiếu field",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:686] UAPI-26 - Từ chối email sai/trùng; tạo ADMIN hợp lệ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:687] UAPI-27 - Từ chối password không đạt rule khi tạo user",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:688] UAPI-28 - Admin cập nhật student seed",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:689] UAPI-29 - Admin khóa và mở khóa student seed",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:690] UAPI-30 - Update delete status với ID không tồn tại",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:691] UAPI-31 - Từ chối status không hợp lệ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:692] UAPI-32 - Admin xóa student seed",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:693] UAPI-33 - Non-admin không sửa khóa xóa được user",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:695] UAPI-35 - Không lộ dữ liệu nhạy cảm và password được hash",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "QA19 CONTROL 9 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

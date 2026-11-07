@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-042",
+  "title": "Student profile khóa rồi mở khóa đúng danh tính QA",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không thấy thẻ lớp QA31-baseClass-2be98c1e51c0",
+  "actualUrl": "https://staging.hotung9108.me/admin/classes",
+  "startedAt": "2026-11-06T13:36:43.277Z",
+  "finishedAt": "2026-11-06T13:36:56.019Z"
+}

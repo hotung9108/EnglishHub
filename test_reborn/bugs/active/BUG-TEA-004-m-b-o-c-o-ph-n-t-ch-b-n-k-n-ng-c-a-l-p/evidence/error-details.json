@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-004",
+  "title": "Mở báo cáo phân tích bốn kỹ năng của lớp",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(xpath, //main//button[normalize-space(.)='Phân tích 4KN & AI Insights' or normalize-space(.)='4-Skill Analytics & AI'])\nWait timed out after 30185ms",
+  "actualUrl": "https://staging.hotung9108.me/teacher/classes/120/progress",
+  "startedAt": "2026-11-04T13:54:34.592Z",
+  "finishedAt": "2026-11-04T13:55:29.315Z"
+}

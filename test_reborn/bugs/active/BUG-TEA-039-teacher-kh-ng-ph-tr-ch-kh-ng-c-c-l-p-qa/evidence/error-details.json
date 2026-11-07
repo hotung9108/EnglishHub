@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-039",
+  "title": "Teacher không phụ trách không đọc được lớp QA ngoài quyền",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "UI phải từ chối lớp ngoài quyền và không lộ tên lớp/bài QA\nWait timed out after 30189ms",
+  "actualUrl": "http://localhost:5173/teacher/classes/110/progress",
+  "startedAt": "2026-11-07T05:22:41.635Z",
+  "finishedAt": "2026-11-07T05:23:20.216Z"
+}

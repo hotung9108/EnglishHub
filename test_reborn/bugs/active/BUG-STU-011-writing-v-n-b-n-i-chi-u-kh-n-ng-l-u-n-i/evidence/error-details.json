@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-011",
+  "title": "Writing văn bản: đối chiếu khả năng lưu nội dung",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "CONTRACT_GAP_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "Writing UI offers text-only submission, but WRITING/ESSAY API stores files and did not retain the essay. Review the FE/BE contract; UI success alone is not a pass.",
+  "actualUrl": "http://localhost:5173/student/submissions/1439",
+  "startedAt": "2026-11-07T05:15:59.758Z",
+  "finishedAt": "2026-11-07T05:16:17.023Z"
+}

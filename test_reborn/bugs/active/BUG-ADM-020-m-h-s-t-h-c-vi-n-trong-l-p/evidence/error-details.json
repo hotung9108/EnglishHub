@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-020",
+  "title": "Mở hồ sơ từ học viên trong lớp",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không thấy thẻ lớp QA31-baseClass-2be98c1e51c0",
+  "actualUrl": "https://staging.hotung9108.me/admin/classes",
+  "startedAt": "2026-11-06T13:31:31.824Z",
+  "finishedAt": "2026-11-06T13:31:39.460Z"
+}

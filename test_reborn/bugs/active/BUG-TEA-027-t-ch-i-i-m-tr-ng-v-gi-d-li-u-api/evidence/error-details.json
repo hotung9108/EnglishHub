@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-027",
+  "title": "Từ chối điểm trống và giữ dữ liệu API",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:03.760Z",
+  "finishedAt": "2026-11-04T07:18:04.324Z"
+}
