@@ -168,50 +168,21 @@ export const StudentSubmissionResult: React.FC = () => {
 
       if (modRes.status === 'fulfilled') {
         const modValue = modRes.value;
-        loadedModDetail = modValue;
         const needQuestions = (!modValue.questions || modValue.questions.length === 0) && !!modValue.moduleId;
-        const needGradingDetail = !!modValue.grading?.id;
 
-        if (needQuestions || needGradingDetail) {
-          const [qRes, gdRes] = await Promise.allSettled([
-            needQuestions ? questionService.listQuestions(modValue.moduleId!) : Promise.reject('No questions needed'),
-            needGradingDetail ? gradingService.getById(modValue.grading!.id) : Promise.reject('No grading detail needed')
-          ]);
-          if (!isCurrentLoad()) return;
-          if (qRes.status === 'fulfilled') {
-            const qList = qRes.value.questions || qRes.value.data || [];
+        if (needQuestions) {
+          try {
+            const qRes = await questionService.listQuestions(modValue.moduleId!);
+            if (!isCurrentLoad()) return;
+            const qList = qRes.questions || qRes.data || [];
             if (qList.length > 0) {
               modValue.questions = qList;
             }
-          }
-          if (gdRes.status === 'fulfilled') {
-            loadedGradingDetail = gdRes.value;
-            setGradingDetail(gdRes.value);
+          } catch {
+            if (!isCurrentLoad()) return;
           }
         }
         setModuleDetail(modValue);
-      }
-
-      if (sugRes.status === 'fulfilled') {
-        setAiSuggestion(sugRes.value);
-      } else {
-        setAiSuggestion(null);
-      }
-
-      // Fetch annotations via answerAnnotationService (allowed for both TEACHER and STUDENT)
-      let rawAnnotations: GradingAnnotation[] = [];
-      const targetAnswer =
-        loadedModDetail?.answers?.find((a) => !!a.audioStorageKey) ||
-        loadedModDetail?.answers?.[0];
-
-      if (targetAnswer?.id) {
-        try {
-          const annRes = await answerAnnotationService.listAnnotations(targetAnswer.id);
-          if (!isCurrentLoad()) return;
-          rawAnnotations = annRes.data || [];
-        } catch {
-          rawAnnotations = [];
-        }
       }
     } catch {
       if (isCurrentLoad()) {
