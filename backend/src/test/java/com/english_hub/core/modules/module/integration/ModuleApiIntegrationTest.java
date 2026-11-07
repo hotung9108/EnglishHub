@@ -55,6 +55,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -483,6 +484,8 @@ class ModuleApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không thể xoá module đã có bài nộp."));
 	}
 
+	// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+	@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 	@Test
 	void listeningAudioPresignedUploadConfirmAndStreamRoundTrip() throws Exception {
 		String uploadUrlResponse = mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
@@ -546,6 +549,8 @@ class ModuleApiIntegrationTest {
 		}
 	}
 
+	// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+	@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 	@Test
 	void confirmWithoutDirectUploadMarksFailedAndGuardsMatchUploadUrlStep() throws Exception {
 		String uploadUrlResponse = mockMvc.perform(post("/api/v1/modules/{id}/audio", listeningModuleId)
@@ -600,6 +605,8 @@ class ModuleApiIntegrationTest {
 		}
 	}
 
+	// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+	@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 	@Test
 	void audioStreamReturnsNotFoundForMissingAudioOrObject() throws Exception {
 		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", readingModuleId)
@@ -624,6 +631,8 @@ class ModuleApiIntegrationTest {
 	 * (NOT_SUPPORTED suspends the test transaction), the after-commit hooks
 	 * fire per request, and everything created is deleted again at the end.
 	 */
+	// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+	@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 	@Test
 	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	void reuploadAndModuleDeletionCleanUpStoredAudioObjects() throws Exception {
