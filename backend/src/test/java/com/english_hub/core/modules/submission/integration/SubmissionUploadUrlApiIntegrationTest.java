@@ -499,7 +499,7 @@ class SubmissionUploadUrlApiIntegrationTest {
 	}
 
 	@Test
-	void submitModule_rejectsRecordingAnswerWhenNoAudioUploaded() throws Exception {
+	void submitModule_allowsRecordingAnswerWhenNoAudioUploaded() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
 
@@ -507,8 +507,9 @@ class SubmissionUploadUrlApiIntegrationTest {
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{}"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Vui lòng tải lên file ghi âm trước khi nộp bài."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"))
+				.andExpect(jsonPath("$.answers[0].audioStorageKey").doesNotExist());
 	}
 
 	@Test
