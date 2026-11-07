@@ -10,11 +10,11 @@ Hệ thống tự động phát hiện danh tính của bạn thông qua lệnh 
 
 | Thành viên (Git User) | Vai trò chính thức | Tiền tố nhánh (Branch Prefix) | Phạm vi phụ trách chính |
 | :--- | :--- | :--- | :--- |
-| **`doanthaison2706`** | Backend Primary (`@be-primary`) | `feature/BE-*`, `fix/BE-*` | Domain Driven Design, Spring Boot API, Database Migration |
-| **`tuanpham21105`** | Backend Secondary (`@be-secondary`) & DevOps Primary (`@devops-primary`) | `feature/BE-*`, `feature/OPS-*` | AI Service integration, CI/CD Pipeline, Docker Staging |
-| **`Zawn-Tsu`** | QA / Tester (`@tester`) | `feature/QA-*`, `fix/QA-*` | Kiểm thử tính năng, duyệt PR duy nhất, nghiệm thu Trello |
-| **`Maloque18705`** | Frontend (`@fe-primary`, `@fe-secondary`) | `feature/FE-*`, `fix/FE-*` | Giao diện React 19, TypeScript, Vitest coverage > 80% |
-| **`hotung9108`** | Product Manager (`@pm`) & DevOps Secondary (`@devops-secondary`) | `docs/*`, `feature/OPS-*` | Backlog Trello, Feature Specs, GitHub Ruleset, Production |
+| **`doanthaison2706`** | Backend Primary (`@be-primary`) | `feat/BE-*`, `fix/BE-*` | Domain Driven Design, Spring Boot API, Database Migration |
+| **`tuanpham21105`** | Backend Secondary (`@be-secondary`) & DevOps Primary (`@devops-primary`) | `feat/BE-*`, `feat/OPS-*` | AI Service integration, CI/CD Pipeline, Docker Staging |
+| **`Zawn-Tsu`** | QA / Tester (`@tester`) | `feat/QA-*`, `fix/QA-*` | Kiểm thử tính năng, duyệt PR duy nhất, nghiệm thu Trello |
+| **`Maloque18705`** | Frontend (`@fe-primary`, `@fe-secondary`) | `feat/FE-*`, `fix/FE-*` | Giao diện React 19, TypeScript, Vitest coverage > 80% |
+| **`hotung9108`** | Product Manager (`@pm`) & DevOps Secondary (`@devops-secondary`) | `docs/*`, `feat/OPS-*` | Backlog Trello, Feature Specs, GitHub Ruleset, Production |
 
 ---
 
@@ -60,7 +60,7 @@ Dự án áp dụng mô hình quản lý tập trung trên Trello và GitHub, lo
    ```bash
    git checkout develop
    git pull origin develop
-   git checkout -b feature/FE-84-teacher-audio-player
+   git checkout -b feat/FE-84-teacher-audio-player
    ```
 3. **Phát triển mã nguồn**: Lập trình và viết Unit Test (Coverage > 80%).
 4. **Tự kiểm tra bằng Project Doctor**:

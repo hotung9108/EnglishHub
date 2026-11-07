@@ -168,20 +168,50 @@ export const StudentSubmissionResult: React.FC = () => {
 
       if (modRes.status === 'fulfilled') {
         const modValue = modRes.value;
-        if ((!modValue.questions || modValue.questions.length === 0) && modValue.moduleId) {
-          try {
-            const qRes = await questionService.listQuestions(modValue.moduleId);
-            const qList = qRes.questions || qRes.data || [];
+        loadedModDetail = modValue;
+        const needQuestions = (!modValue.questions || modValue.questions.length === 0) && !!modValue.moduleId;
+        const needGradingDetail = !!modValue.grading?.id;
+
+        if (needQuestions || needGradingDetail) {
+          const [qRes, gdRes] = await Promise.allSettled([
+            needQuestions ? questionService.listQuestions(modValue.moduleId!) : Promise.reject('No questions needed'),
+            needGradingDetail ? gradingService.getById(modValue.grading!.id) : Promise.reject('No grading detail needed')
+          ]);
+          if (!isCurrentLoad()) return;
+          if (qRes.status === 'fulfilled') {
+            const qList = qRes.value.questions || qRes.value.data || [];
             if (qList.length > 0) {
               modValue.questions = qList;
             }
-          } catch {
-            // Non-critical
+          }
+          if (gdRes.status === 'fulfilled') {
+            loadedGradingDetail = gdRes.value;
+            setGradingDetail(gdRes.value);
           }
         }
-        if (isCurrentLoad()) setModuleDetail(modValue);
-      } else if (isCurrentLoad()) {
-        setModuleDetail(null);
+        setModuleDetail(modValue);
+      }
+
+      if (sugRes.status === 'fulfilled') {
+        setAiSuggestion(sugRes.value);
+      } else {
+        setAiSuggestion(null);
+      }
+
+      // Fetch annotations via answerAnnotationService (allowed for both TEACHER and STUDENT)
+      let rawAnnotations: GradingAnnotation[] = [];
+      const targetAnswer =
+        loadedModDetail?.answers?.find((a) => !!a.audioStorageKey) ||
+        loadedModDetail?.answers?.[0];
+
+      if (targetAnswer?.id) {
+        try {
+          const annRes = await answerAnnotationService.listAnnotations(targetAnswer.id);
+          if (!isCurrentLoad()) return;
+          rawAnnotations = annRes.data || [];
+        } catch {
+          rawAnnotations = [];
+        }
       }
     } catch {
       if (isCurrentLoad()) {
@@ -262,43 +292,44 @@ export const StudentSubmissionResult: React.FC = () => {
         if (isAssignmentRoute) {
           // Path is /student/assignments/:id/result -> numericId is assignmentId
           targetAssignmentId = numericId;
-          try {
-            const asg = await assignmentService.getAssignment(targetAssignmentId);
-            if (isMounted) setAssignment(asg);
-          } catch {
-            // Continue
-          }
+          const [asgRes, listRes] = await Promise.allSettled([
+            assignmentService.getAssignment(targetAssignmentId),
+            user?.id
+              ? submissionService.listSubmissions({
+                  assignmentId: targetAssignmentId,
+                  studentId: user.id,
+                  limit: 10
+                })
+              : Promise.reject('No user')
+          ]);
 
-          if (user?.id) {
-            const listRes = await submissionService.listSubmissions({
-              assignmentId: targetAssignmentId,
-              studentId: user.id,
-              limit: 10
-            });
-            if (listRes.data && listRes.data.length > 0) {
-              if (isMounted) setAttempts(listRes.data);
-              currentSubmission = await submissionService.getSubmission(listRes.data[0].id);
-            } else {
-              if (isMounted) setNoSubmissionFound(true);
-            }
+          if (isMounted && asgRes.status === 'fulfilled') setAssignment(asgRes.value);
+
+          if (listRes.status === 'fulfilled' && listRes.value.data && listRes.value.data.length > 0) {
+            if (isMounted) setAttempts(listRes.value.data);
+            currentSubmission = await submissionService.getSubmission(listRes.value.data[0].id);
+          } else {
+            if (isMounted) setNoSubmissionFound(true);
           }
         } else {
           // Path is /student/submissions/:id -> numericId is submissionId
           try {
             currentSubmission = await submissionService.getSubmission(numericId);
             targetAssignmentId = currentSubmission.assignmentId;
-            const asg = await assignmentService.getAssignment(targetAssignmentId);
-            if (isMounted) setAssignment(asg);
+            const [asgRes, listRes] = await Promise.allSettled([
+              assignmentService.getAssignment(targetAssignmentId),
+              user?.id
+                ? submissionService.listSubmissions({
+                    assignmentId: targetAssignmentId,
+                    studentId: user.id,
+                    limit: 10
+                  })
+                : Promise.reject('No user')
+            ]);
 
-            if (user?.id) {
-              const listRes = await submissionService.listSubmissions({
-                assignmentId: targetAssignmentId,
-                studentId: user.id,
-                limit: 10
-              });
-              if (listRes.data && listRes.data.length > 0) {
-                if (isMounted) setAttempts(listRes.data);
-              }
+            if (isMounted && asgRes.status === 'fulfilled') setAssignment(asgRes.value);
+            if (isMounted && listRes.status === 'fulfilled' && listRes.value.data && listRes.value.data.length > 0) {
+              setAttempts(listRes.value.data);
             }
           } catch {
             // If not found as submission, try assignment

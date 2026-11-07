@@ -49,15 +49,14 @@ export const TeacherDetails: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const [usersRes, classesRes] = await Promise.allSettled([
-          userService.listUsers({ role: 'TEACHER', limit: 100 }),
+        const [userRes, classesRes] = await Promise.allSettled([
+          userService.getUserById(numericId),
           classService.list({ page: 1, limit: 100 })
         ]);
 
         if (!isMounted) return;
 
-        const users: UserListItem[] = usersRes.status === 'fulfilled' ? usersRes.value.data : [];
-        const found = users.find(u => u.id === numericId) || null;
+        const found: UserListItem | null = userRes.status === 'fulfilled' ? userRes.value : null;
 
         if (found) {
           setTeacherUser(found);

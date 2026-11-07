@@ -26,6 +26,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -157,17 +158,22 @@ class ModuleControllerTest {
 	}
 
 	@Test
-	void mapsModuleAudioStreamingResponseWithMimeTypeAndCacheHeader() {
-		when(moduleService.getModuleAudio(9L))
-				.thenReturn(new ModuleService.ModuleAudioResult(new byte[] {1, 2, 3}, "audio/wav"));
+	void mapsModuleAudioDownloadUrlResponse() {
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(moduleService.generateAudioDownloadUrl(9L))
+				.thenReturn(new ModuleService.AudioDownloadUrlResult(
+						9L, "https://storage.example.com/audio.mp3", "modules/9/audio.mp3", "audio/mpeg", 120, expiresAt));
 
-		var response = moduleController.getModuleAudio(9L);
+		var response = moduleController.getAudioDownloadUrl(9L);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.valueOf("audio/wav"));
-		assertThat(response.getHeaders().getCacheControl()).contains("private");
-		assertThat(response.getHeaders().getContentLength()).isEqualTo(3);
-		assertThat(response.getBody()).containsExactly(1, 2, 3);
+		assertThat(response.getBody()).isNotNull();
+		assertThat(response.getBody().message()).isEqualTo("Lấy link tải audio thành công.");
+		assertThat(response.getBody().downloadUrl()).isEqualTo("https://storage.example.com/audio.mp3");
+		assertThat(response.getBody().storageKey()).isEqualTo("modules/9/audio.mp3");
+		assertThat(response.getBody().mimeType()).isEqualTo("audio/mpeg");
+		assertThat(response.getBody().durationSeconds()).isEqualTo(120);
+		assertThat(response.getBody().expiresAt()).isEqualTo(expiresAt);
 	}
 
 	private Module module(Long id, ModuleSkill skill, int orderIndex) {

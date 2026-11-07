@@ -92,6 +92,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -2334,6 +2335,87 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Không tìm thấy phần làm bài.");
+	}
+
+	@Test
+	void generateSubmissionAudioDownloadUrlReturnsUrlForStudentOwner() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(sm));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		Answer answer = new Answer(
+				150L, null, null,
+				"submissions/88/module-150/audio.webm", "audio/webm", UploadStatus.READY,
+				null, null, null);
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of(answer));
+
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-09-24T10:30:00Z");
+		when(storageService.generatePresignedDownload(eq("submissions/88/module-150/audio.webm"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://bucket/audio.webm?signed", "submissions/88/module-150/audio.webm", expiresAt));
+
+		SubmissionService.SubmissionFileDownloadResult result =
+				submissionService.generateSubmissionAudioDownloadUrl(150L);
+
+		assertThat(result.submissionModuleId()).isEqualTo(150L);
+		assertThat(result.downloadUrl()).isEqualTo("https://bucket/audio.webm?signed");
+		assertThat(result.fileName()).isEqualTo("audio.webm");
+		assertThat(result.mimeType()).isEqualTo("audio/webm");
+	}
+
+	@Test
+	void generateSubmissionAudioDownloadUrlRejectsAdmin() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(admin(1L));
+
+		assertThatThrownBy(() -> submissionService.generateSubmissionAudioDownloadUrl(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void generateSubmissionAudioDownloadUrlRejectsAnotherStudent() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(150L);
+		when(submissionModuleRepository.findById(150L)).thenReturn(Optional.of(sm));
+		Submission foreign = submission(5L, 99L, 1);
+		foreign.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(foreign));
+
+		assertThatThrownBy(() -> submissionService.generateSubmissionAudioDownloadUrl(150L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
+	}
+
+	@Test
+	void generateSubmissionDocumentDownloadUrlReturnsUrlWithAttachmentDispositionForDownloadMode() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
+		SubmissionModule sm = submittedModule(9L);
+		sm.setId(151L);
+		when(submissionModuleRepository.findById(151L)).thenReturn(Optional.of(sm));
+		Submission submission = submittedSubmission(5L, 41L, 1);
+		submission.setId(88L);
+		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+
+		Answer answer = new Answer(
+				151L, null, "{\"fileName\":\"My_Essay.docx\"}",
+				null, null, null,
+				"submissions/88/module-151/essay.docx", "application/docx", UploadStatus.READY);
+		when(answerRepository.findBySubmissionModuleId(151L)).thenReturn(List.of(answer));
+
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-09-24T10:30:00Z");
+		when(storageService.generatePresignedDownload(eq("submissions/88/module-151/essay.docx"), any(), eq("attachment; filename=\"My_Essay.docx\"")))
+				.thenReturn(new StorageService.PresignedDownload("https://bucket/essay.docx?signed", "submissions/88/module-151/essay.docx", expiresAt));
+
+		SubmissionService.SubmissionFileDownloadResult result =
+				submissionService.generateSubmissionDocumentDownloadUrl(151L, "download");
+
+		assertThat(result.submissionModuleId()).isEqualTo(151L);
+		assertThat(result.downloadUrl()).isEqualTo("https://bucket/essay.docx?signed");
+		assertThat(result.fileName()).isEqualTo("My_Essay.docx");
 	}
 
 	@Test

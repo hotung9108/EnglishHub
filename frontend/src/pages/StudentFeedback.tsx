@@ -96,24 +96,39 @@ export const StudentFeedback: React.FC = () => {
         const classMap = new Map<number, string>();
         classes.forEach(c => classMap.set(c.id, c.name));
 
-        // 2. Fetch assignments for each class to map assignmentId -> Assignment & Class
+        // 2. Fetch assignments for each class and top graded submissions in parallel
         const assignmentMap = new Map<string, AssignmentSummary>();
         const assignmentClassMap = new Map<string, string>();
 
-        await Promise.all(
-          classes.map(async (c) => {
-            try {
-              const res = await assignmentService.listAssignments(c.id);
-              const asgs = res.data || [];
-              asgs.forEach(a => {
-                assignmentMap.set(String(a.id), a);
-                assignmentClassMap.set(String(a.id), c.name);
-              });
-            } catch {
-              // Non-critical
-            }
-          })
-        );
+        const gradedSubmissions = submissions
+          .filter(sub => hasAnyGradedModule(sub) || isSubmissionGraded(sub))
+          .sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime())
+          .slice(0, 15);
+
+        const [assignmentsResults, submissionDetails] = await Promise.all([
+          Promise.allSettled(
+            classes.map(async (c) => {
+              try {
+                const res = await assignmentService.listAssignments(c.id);
+                return { classId: c.id, className: c.name, assignments: res.data || [] };
+              } catch {
+                return { classId: c.id, className: c.name, assignments: [] };
+              }
+            })
+          ),
+          Promise.allSettled(
+            gradedSubmissions.map(sub => submissionService.getSubmission(sub.id))
+          )
+        ]);
+
+        assignmentsResults.forEach((item) => {
+          if (item.status === 'fulfilled') {
+            item.value.assignments.forEach(a => {
+              assignmentMap.set(String(a.id), a);
+              assignmentClassMap.set(String(a.id), item.value.className);
+            });
+          }
+        });
 
         const dynamicList: FeedbackEntry[] = [];
 
@@ -143,15 +158,6 @@ export const StudentFeedback: React.FC = () => {
             actionLabel: isVi ? 'Xem thông tin lớp học' : 'View Class Details'
           });
         });
-
-        // 4. Process Graded Submissions (Fetch detail to get real finalFeedback & aiFeedback)
-        const gradedSubmissions = submissions
-          .filter(sub => hasAnyGradedModule(sub) || isSubmissionGraded(sub))
-          .slice(0, 50);
-
-        const submissionDetails = await Promise.allSettled(
-          gradedSubmissions.map(sub => submissionService.getSubmission(sub.id))
-        );
 
         submissionDetails.forEach((res) => {
           if (res.status !== 'fulfilled' || !res.value) return;

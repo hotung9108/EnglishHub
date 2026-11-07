@@ -4,6 +4,7 @@ except ImportError:
     pytest = None
 import os
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.main import app
@@ -122,17 +123,19 @@ def test_analyze_writing_empty_content_rejects_422():
     assert response.status_code == 422
 
 
-def test_analyze_writing_upload_txt():
-    """Kiểm tra upload trực tiếp file tài liệu (.txt) để chấm điểm."""
-    essay_bytes = QA21_ESSAY.encode("utf-8")
-    files = {"file": ("student_essay.txt", essay_bytes, "text/plain")}
-    data = {
-        "submissionModuleId": "15",
+@patch("app.api.v1.endpoints.writing._download_document", new_callable=AsyncMock)
+def test_analyze_writing_presigned_url(mock_download: AsyncMock):
+    """Kiểm tra chấm bài Viết qua Presigned URL documentUrl (.txt)."""
+    mock_download.return_value = QA21_ESSAY.encode("utf-8")
+    payload = {
+        "submissionModuleId": 15,
+        "documentUrl": "https://storage.example.com/submissions/essay.txt?presigned=true",
         "aiProvider": "mock",
-        "maxScore": "9.0"
+        "maxScore": 9.0
     }
-    response = client.post("/api/v1/analyze/writing/upload", files=files, data=data)
-    assert response.status_code == 200
+    response = client.post("/api/v1/analyze/writing", json=payload)
+    assert response.status_code == 200, f"Error: {response.text}"
+    mock_download.assert_awaited_once_with("https://storage.example.com/submissions/essay.txt?presigned=true")
     res = response.json()
     assert res["overallScore"] == 6.5
     assert res["criteriaScores"]["taskResponse"] == 7.0

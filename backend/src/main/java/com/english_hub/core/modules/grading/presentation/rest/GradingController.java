@@ -17,6 +17,8 @@ import com.english_hub.core.modules.grading.presentation.rest.dto.PaginationResp
 import com.english_hub.core.modules.grading.presentation.rest.dto.ReviewAnswerAnnotationRequest;
 import com.english_hub.core.modules.grading.presentation.rest.dto.SubmissionModuleGradingResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.UpdateFinalGradeRequest;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
+@Tag(name = "Grading", description = "Quản lý chấm điểm bài tập, phân tích AI và duyệt lỗi")
 public class GradingController {
 
 	private final GradingService gradingService;
@@ -42,11 +45,13 @@ public class GradingController {
 	}
 
 	@GetMapping("/submission-modules/{id}/grading")
+	@Operation(summary = "Lấy thông tin bản chấm điểm theo submission module ID")
 	public ResponseEntity<SubmissionModuleGradingResponse> getBySubmissionModule(@PathVariable long id) {
 		return ResponseEntity.ok(SubmissionModuleGradingResponse.from(gradingService.getBySubmissionModuleId(id)));
 	}
 
 	@PostMapping("/submission-modules/{id}/grading/ai-analyze")
+	@Operation(summary = "Yêu cầu AI phân tích và chấm điểm bài tập Nói / Viết (bất đồng bộ)")
 	public ResponseEntity<GradingMessageResponse> requestAiAnalysis(@PathVariable long id) {
 		gradingService.requestAiAnalysis(id);
 		return ResponseEntity.status(HttpStatus.ACCEPTED)
@@ -54,11 +59,13 @@ public class GradingController {
 	}
 
 	@GetMapping("/submission-modules/{id}/grading/ai-suggestion")
+	@Operation(summary = "Lấy gợi ý chấm điểm, rubric và danh sách annotations từ AI")
 	public ResponseEntity<AiGradingSuggestionResponse> getAiSuggestion(@PathVariable long id) {
 		return ResponseEntity.ok(gradingService.getAiSuggestion(id));
 	}
 
 	@PutMapping("/gradings/{id}")
+	@Operation(summary = "Giáo viên cập nhật điểm số và nhận xét chính thức")
 	public ResponseEntity<GradingMessageResponse> updateFinalGrade(
 			@PathVariable long id,
 			@Valid @RequestBody UpdateFinalGradeRequest request) {
@@ -67,11 +74,13 @@ public class GradingController {
 	}
 
 	@GetMapping("/gradings/{id}")
+	@Operation(summary = "Lấy chi tiết bản chấm theo grading ID")
 	public ResponseEntity<GradingDetailResponse> getById(@PathVariable long id) {
 		return ResponseEntity.ok(GradingDetailResponse.from(gradingService.getById(id)));
 	}
 
 	@GetMapping("/gradings")
+	@Operation(summary = "Danh sách bản chấm điểm có lọc theo lớp, học viên, trạng thái và phân trang")
 	public ResponseEntity<GradingListResponse> listGradings(
 			@RequestParam(required = false) Long classId,
 			@RequestParam(required = false) Long studentId,
@@ -85,12 +94,14 @@ public class GradingController {
 	}
 
 	@GetMapping("/answers/{id}/annotations")
+	@Operation(summary = "Danh sách chú thích / lỗi phát hiện của một câu trả lời")
 	public ResponseEntity<AnswerAnnotationListResponse> listAnnotations(@PathVariable long id) {
 		return ResponseEntity.ok(new AnswerAnnotationListResponse(
 				gradingService.listAnnotations(id).stream().map(AnswerAnnotationResponse::from).toList()));
 	}
 
 	@PostMapping("/answers/{id}/annotations")
+	@Operation(summary = "Giáo viên tạo chú thích / lỗi thủ công trên bài làm của học viên")
 	public ResponseEntity<CreatedAnswerAnnotationResponse> createAnnotation(
 			@PathVariable long id,
 			@Valid @RequestBody CreateAnswerAnnotationRequest request) {
@@ -106,6 +117,7 @@ public class GradingController {
 	}
 
 	@PatchMapping("/annotations/{id}/review")
+	@Operation(summary = "Duyệt hoặc từ chối gợi ý sửa lỗi của AI (ACCEPT / REJECT)")
 	public ResponseEntity<GradingMessageResponse> reviewAnnotation(
 			@PathVariable long id,
 			@Valid @RequestBody ReviewAnswerAnnotationRequest request) {
@@ -114,12 +126,14 @@ public class GradingController {
 	}
 
 	@DeleteMapping("/annotations/{id}")
+	@Operation(summary = "Xóa một chú thích / gợi ý sửa lỗi")
 	public ResponseEntity<GradingMessageResponse> deleteAnnotation(@PathVariable long id) {
 		gradingService.deleteAnnotation(id);
 		return ResponseEntity.ok(new GradingMessageResponse("Đã xoá chú thích."));
 	}
 
 	@GetMapping("/gradings/{id}/change-logs")
+	@Operation(summary = "Xem lịch sử thay đổi điểm số của bản chấm")
 	public ResponseEntity<GradingChangeLogListResponse> listChangeLogs(@PathVariable long id) {
 		return ResponseEntity.ok(new GradingChangeLogListResponse(
 				gradingService.listChangeLogs(id).stream().map(GradingChangeLogResponse::from).toList()));

@@ -17,7 +17,7 @@ You are the DevOps Engineer - Secondary for the **EnglishHub** project (Assigned
 2. **Branch Creation**: Create a branch off `develop`:
    ```bash
    git checkout develop && git pull origin develop
-   git checkout -b feature/OPS-<NUM>-<slug>
+   git checkout -b feat/OPS-<NUM>-<slug>
    ```
 3. **Implementation**: Maintain GitHub Actions, Docker configs, or environment scripts.
 4. **Self-Verification (Project Doctor)**:

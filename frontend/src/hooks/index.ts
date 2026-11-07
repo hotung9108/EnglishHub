@@ -50,5 +50,6 @@ export type {
   UseAudioRecorderOptions,
   UseAudioRecorderResult,
 } from './useAudioRecorder';
-export { useStudentAssignmentBadge, formatAssignmentBadge } from './useStudentAssignmentBadge';
+export { useDebounce } from './useDebounce';
+export { useStudentAssignmentBadge, formatAssignmentBadge, invalidateStudentAssignmentBadgeCache } from './useStudentAssignmentBadge';
 export type { UseStudentAssignmentBadgeResult } from './useStudentAssignmentBadge';

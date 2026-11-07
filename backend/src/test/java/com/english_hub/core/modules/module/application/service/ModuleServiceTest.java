@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -460,16 +461,20 @@ class ModuleServiceTest {
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignmentAndClass(5L, 3L, 10L);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
-		when(storageService.getObjectBytes("modules/9/audio/new.mp3")).thenReturn(new byte[] {1, 2, 3});
+		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", expiresAt));
 
-		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(9L);
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(9L);
 
-		assertThat(result.bytes()).containsExactly(1, 2, 3);
+		assertThat(result.downloadUrl()).isEqualTo("https://storage.example.com/audio.mp3");
 		assertThat(result.mimeType()).isEqualTo("audio/mpeg");
+		assertThat(result.expiresAt()).isEqualTo(expiresAt);
 	}
 
 	@Test
-	void streamingFallsBackToMpegMimeTypeWhenModuleHasNone() {
+	void downloadUrlFallsBackToMpegMimeTypeWhenModuleHasNone() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Module module = new Module(
 				9L, 5L, ModuleSkill.LISTENING, ModuleTaskType.QUIZ, 2,
@@ -477,56 +482,59 @@ class ModuleServiceTest {
 				"modules/9/audio/new.mp3", null, null, ModuleUploadStatus.READY, null);
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignmentAndClass(5L, 3L, 10L);
-		when(storageService.getObjectBytes("modules/9/audio/new.mp3")).thenReturn(new byte[] {1});
+		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
+		when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+				.thenReturn(new StorageService.PresignedDownload("https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", expiresAt));
 
-		ModuleService.ModuleAudioResult result = moduleService.getModuleAudio(9L);
+		ModuleService.AudioDownloadUrlResult result = moduleService.generateAudioDownloadUrl(9L);
 
 		assertThat(result.mimeType()).isEqualTo("audio/mpeg");
 	}
 
 	@Test
-	void streamingReturnsNotFoundWhenModuleHasNoAudio() {
-		givenCaller(user(10L, UserRole.TEACHER));
-		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2)));
-		givenAssignmentAndClass(5L, 3L, 10L);
-
-		assertThatThrownBy(() -> moduleService.getModuleAudio(9L))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Module chưa có file audio.");
-	}
-
-	@Test
-	void streamingReturnsNotFoundWhenStoredObjectIsGone() {
+	void downloadUrlReturnsNotFoundWhenStoredObjectIsGone() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/gone.mp3");
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignmentAndClass(5L, 3L, 10L);
-		when(storageService.getObjectBytes("modules/9/audio/gone.mp3")).thenReturn(null);
+		when(storageService.objectExists("modules/9/audio/gone.mp3")).thenReturn(false);
 
-		assertThatThrownBy(() -> moduleService.getModuleAudio(9L))
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Module chưa có file audio.");
 	}
 
 	@Test
-	void adminCannotStreamListeningAudio() {
+	void downloadUrlReturnsNotFoundWhenModuleHasNoAudio() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2)));
+		givenAssignmentAndClass(5L, 3L, 10L);
+
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Module chưa có file audio.");
+	}
+
+	@Test
+	void adminCannotGetListeningAudioDownloadUrl() {
 		givenCaller(user(1L, UserRole.ADMIN));
 		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignment(5L, 3L);
 
-		assertApiException(() -> moduleService.getModuleAudio(9L), "Bạn không có quyền thực hiện thao tác này.");
+		assertApiException(() -> moduleService.generateAudioDownloadUrl(9L), "Bạn không có quyền thực hiện thao tác này.");
 	}
 
 	@Test
-	void foreignStudentCannotStreamListeningAudio() {
+	void foreignStudentCannotGetListeningAudioDownloadUrl() {
 		givenCaller(user(42L, UserRole.STUDENT));
 		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
 		givenAssignmentAndClass(5L, 3L, 10L);
 
-		assertApiException(() -> moduleService.getModuleAudio(9L), "Bạn không có quyền thực hiện thao tác này.");
-		verify(storageService, never()).getObjectBytes(anyString());
+		assertApiException(() -> moduleService.generateAudioDownloadUrl(9L), "Bạn không có quyền thực hiện thao tác này.");
+		verify(storageService, never()).generatePresignedDownload(anyString(), any(), any());
 	}
 
 	@Test

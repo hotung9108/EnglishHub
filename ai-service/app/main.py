@@ -2,7 +2,8 @@ import logging
 import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.core.lifespan import lifespan
@@ -25,9 +26,9 @@ def _get_internal_secret() -> str:
 
 class InternalSecretMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Exclude health-check endpoints from middleware check
+        # Exclude documentation and health-check endpoints from middleware check
         path = request.url.path
-        if path in ("/health", "/ping", "/docs", "/redoc", "/openapi.json"):
+        if path in ("/health", "/ping", "/docs", "/redoc", "/openapi.json", "/swagger", "/swagger-ui.html"):
             return await call_next(request)
         internal_secret = _get_internal_secret()
         # Nếu không cấu hình secret, bỏ qua kiểm tra (dev/test local)
@@ -42,7 +43,7 @@ class InternalSecretMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-# Khởi tạo FastAPI với Lifespan Context Manager theo Mục 3.3 convention-ai.md
+# Khởi tạo FastAPI với Swagger UI (/docs và /swagger-ui.html)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -50,8 +51,47 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "tryItOutEnabled": True,
+        "docExpansion": "list",
+    },
     lifespan=lifespan
 )
+
+
+def custom_openapi():
+    """Tự động tích hợp nút Authorize vào giao diện Swagger UI cho X-Internal-Secret."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["components"] = openapi_schema.get("components", {})
+    openapi_schema["components"]["securitySchemes"] = {
+        "InternalSecretAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Internal-Secret",
+            "description": "Internal Secret Key for microservice authentication (để trống nếu chạy local không set INTERNAL_SECRET)."
+        }
+    }
+    openapi_schema["security"] = [{"InternalSecretAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+
+@app.get("/swagger-ui.html", include_in_schema=False)
+@app.get("/swagger", include_in_schema=False)
+async def swagger_ui_redirect():
+    """Hỗ trợ đường dẫn quen thuộc /swagger-ui.html tương tự như Spring Boot."""
+    return RedirectResponse(url="/docs")
 
 # Đăng ký Global Exception Handlers theo Mục 7.1 convention-ai.md
 register_exception_handlers(app)

@@ -4,6 +4,7 @@ import com.english_hub.core.modules.submission.application.service.SubmissionSer
 import com.english_hub.core.modules.submission.application.service.SubmissionService.AnswerPayload;
 import com.english_hub.core.modules.submission.presentation.rest.dto.StartSubmissionResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionDetailResponse;
+import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionFileDownloadUrlResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionListResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmissionModuleDetailResponse;
 import com.english_hub.core.modules.submission.presentation.rest.dto.SubmitModuleRequest;
@@ -95,5 +96,18 @@ public class SubmissionController {
 			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
 		String mimeType = request == null ? null : request.mimeType();
 		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getDocumentUploadUrl(id, mimeType)));
+	}
+
+	@GetMapping("/submission-modules/{id}/audio-download-url")
+	public ResponseEntity<SubmissionFileDownloadUrlResponse> getSubmissionAudioDownloadUrl(@PathVariable long id) {
+		return ResponseEntity.ok(
+				SubmissionFileDownloadUrlResponse.from(submissionService.generateSubmissionAudioDownloadUrl(id)));
+	}
+
+	@GetMapping("/submission-modules/{id}/document-download-url")
+	public ResponseEntity<SubmissionFileDownloadUrlResponse> getSubmissionDocumentDownloadUrl(
+			@PathVariable long id, @RequestParam(value = "mode", required = false) String mode) {
+		return ResponseEntity.ok(
+				SubmissionFileDownloadUrlResponse.from(submissionService.generateSubmissionDocumentDownloadUrl(id, mode)));
 	}
 }

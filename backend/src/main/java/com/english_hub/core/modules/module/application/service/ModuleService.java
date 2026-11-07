@@ -19,6 +19,7 @@ import com.english_hub.core.modules.submission.application.port.StorageService.P
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +28,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class ModuleService {
 	private static final String AUDIO_CONFIRM_MISMATCH_MESSAGE = "storageKey không khớp với module.";
 	private static final String AUDIO_NOT_AVAILABLE_MESSAGE = "Module chưa có file audio.";
 	private static final String DEFAULT_AUDIO_MIME_TYPE = "audio/mpeg";
+	private static final Duration AUDIO_DOWNLOAD_TTL = Duration.ofHours(2);
 	private static final BigDecimal DEFAULT_MAX_SCORE = BigDecimal.TEN;
 	/**
 	 * Allowed listening-audio mime types mapped to their storage extension.
@@ -246,29 +249,53 @@ public class ModuleService {
 		return new AudioUploadConfirmResult(storageKey, status.name());
 	}
 
+	public String resolveAudioDownloadUrl(Module module) {
+		if (module == null
+				|| module.sourceAudioStorageKey() == null
+				|| module.sourceAudioStorageKey().isBlank()
+				|| module.sourceAudioUploadStatus() != ModuleUploadStatus.READY
+				|| !storageService.objectExists(module.sourceAudioStorageKey())) {
+			return null;
+		}
+		try {
+			StorageService.PresignedDownload presigned = storageService.generatePresignedDownload(
+					module.sourceAudioStorageKey(), AUDIO_DOWNLOAD_TTL, null);
+			return presigned != null ? presigned.downloadUrl() : null;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
+
 	/**
-	 * Streams the listening-audio bytes of a module. Read access mirrors
-	 * {@link #getModule(long)}: the owning teacher and class-member students
-	 * only.
+	 * Generates a presigned GET URL for listening audio of a module.
+	 * Read access mirrors {@link #getModule(long)}: the owning teacher and class-member students only.
 	 */
 	@Transactional(readOnly = true)
-	public ModuleAudioResult getModuleAudio(long moduleId) {
+	public AudioDownloadUrlResult generateAudioDownloadUrl(long moduleId) {
 		User caller = currentUserProvider.requireActiveUser();
 		Module module = requireModule(moduleId);
 		Assignment assignment = requireAssignment(module.assignmentId());
 		requireReadAccess(assignment, caller);
 		String storageKey = module.sourceAudioStorageKey();
-		if (storageKey == null || storageKey.isBlank()) {
+		if (storageKey == null || storageKey.isBlank() || module.sourceAudioUploadStatus() != ModuleUploadStatus.READY
+				|| !storageService.objectExists(storageKey)) {
 			throw ApiException.notFound(AUDIO_NOT_AVAILABLE_MESSAGE);
 		}
-		byte[] bytes = storageService.getObjectBytes(storageKey);
-		if (bytes == null || bytes.length == 0) {
-			throw ApiException.notFound(AUDIO_NOT_AVAILABLE_MESSAGE);
+		StorageService.PresignedDownload presigned = storageService.generatePresignedDownload(
+				storageKey, AUDIO_DOWNLOAD_TTL, null);
+		if (presigned == null) {
+			throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể tạo liên kết tải audio.");
 		}
 		String mimeType = module.sourceAudioMimeType() == null
 				? DEFAULT_AUDIO_MIME_TYPE
 				: module.sourceAudioMimeType();
-		return new ModuleAudioResult(bytes, mimeType);
+		return new AudioDownloadUrlResult(
+				moduleId,
+				presigned.downloadUrl(),
+				storageKey,
+				mimeType,
+				module.sourceAudioDurationSeconds(),
+				presigned.expiresAt());
 	}
 
 	/**
@@ -400,6 +427,12 @@ public class ModuleService {
 	public record AudioUploadConfirmResult(String storageKey, String uploadStatus) {
 	}
 
-	public record ModuleAudioResult(byte[] bytes, String mimeType) {
+	public record AudioDownloadUrlResult(
+			Long moduleId,
+			String downloadUrl,
+			String storageKey,
+			String mimeType,
+			Integer durationSeconds,
+			OffsetDateTime expiresAt) {
 	}
 }

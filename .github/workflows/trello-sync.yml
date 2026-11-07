@@ -27,6 +27,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_ACTION: ${{ github.event.action }}
           PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_USER: ${{ github.event.pull_request.user.login }}
         run: |
           python3 - << 'EOF'
           import json
@@ -45,19 +46,27 @@ jobs:
           pr_number = os.environ.get("PR_NUMBER", "")
           pr_action = os.environ.get("PR_ACTION", "")
           pr_merged = os.environ.get("PR_MERGED", "false").lower() == "true"
+          pr_user = os.environ.get("PR_USER", "")
 
           if not api_key or not api_token:
-              print("Notice: TRELLO_API_KEY or TRELLO_API_TOKEN not configured. Skipping Trello sync.")
+              print("Notice: TRELLO_API_KEY or TRELLO_API_TOKEN not configured in GitHub Secrets. Skipping Trello sync.")
               sys.exit(0)
 
-          # Extract card tag like FE-84, BE-74, OPS-50, QA-38, etc.
-          tag_match = re.search(r"\b((?:FE|BE|OPS|QA|AI|PM)-\d+)\b", f"{pr_title} {pr_branch}", re.IGNORECASE)
-          if not tag_match:
-              print(f"No card tag matching (FE|BE|OPS|QA|AI|PM)-NUM found in PR title or branch: '{pr_title}' / '{pr_branch}'")
-              sys.exit(0)
+          # Clean diacritics / common typos in branch or title
+          clean_text = pr_title.replace('fĩ', 'fix').replace('fì', 'fix') + ' ' + pr_branch
 
-          card_tag = tag_match.group(1).upper()
-          print(f"Detected card identifier: {card_tag}")
+          # Extract canonical role tag (FE-46, BE-15, OPS-35, QA-20, etc.)
+          tag_match = re.search(r"\b((?:FE|BE|OPS|QA|AI|PM)-\d+)\b", clean_text, re.IGNORECASE)
+          card_tag = tag_match.group(1).upper() if tag_match else None
+
+          # Extract GitHub Issue numbers (#176, #192, ISSUE-176, etc.)
+          issue_numbers = re.findall(r"(?:ISSUE[\s\-_]*#?|#)(\d+)\b", clean_text, re.IGNORECASE)
+
+          print(f"Extracted info: CardTag='{card_tag}', IssueNumbers={issue_numbers}")
+
+          if not card_tag and not issue_numbers:
+              print(f"No card tag matching (FE|BE|OPS|QA|AI|PM)-NUM or Issue numbers found in: '{pr_title}' / '{pr_branch}'")
+              sys.exit(0)
 
           def trello_request(endpoint, method="GET", params=None, data=None):
               base = "https://api.trello.com/1"
@@ -102,13 +111,46 @@ jobs:
               print(f"Failed to fetch cards for board {board_id}")
               sys.exit(0)
 
-          target_card = next((c for c in cards if f"[{card_tag}]" in c["name"].upper() or f" {card_tag} " in f" {c['name'].upper()} "), None)
+          # Multi-tier matching engine
+          target_card = None
+          match_reason = None
+
+          # Tier 1: Canonical [ROLE-NUM] match in card title
+          if card_tag:
+              target_card = next((c for c in cards if f"[{card_tag}]" in c["name"].upper() or f" {card_tag} " in f" {c['name'].upper()} "), None)
+              if target_card:
+                  match_reason = f"Tier 1 (Exact Tag: [{card_tag}])"
+
+          # Tier 2: Match by GitHub Issue number in card title (e.g. [FE-47][ISSUE #192])
+          if not target_card and issue_numbers:
+              for inum in issue_numbers:
+                  pattern = re.compile(rf"#\b{inum}\b")
+                  target_card = next((c for c in cards if pattern.search(c["name"])), None)
+                  if target_card:
+                      match_reason = f"Tier 2 (Issue #{inum} in Card Title)"
+                      break
+
+          # Tier 3: Match legacy role tag in card description (e.g. renumbered cards referencing [FE-72])
+          if not target_card and card_tag:
+              target_card = next((c for c in cards if f"[{card_tag}]" in c.get("desc", "").upper() or f"`{card_tag}`" in c.get("desc", "").upper()), None)
+              if target_card:
+                  match_reason = f"Tier 3 (Legacy Tag [{card_tag}] in Description)"
+
+          # Tier 4: Match Issue number in card description
+          if not target_card and issue_numbers:
+              for inum in issue_numbers:
+                  pattern = re.compile(rf"#\b{inum}\b")
+                  target_card = next((c for c in cards if pattern.search(c.get("desc", ""))), None)
+                  if target_card:
+                      match_reason = f"Tier 4 (Issue #{inum} in Description)"
+                      break
+
           if not target_card:
-              print(f"Card with tag [{card_tag}] not found on board.")
+              print(f"Card matching tag [{card_tag}] or issues {issue_numbers} not found on board.")
               sys.exit(0)
 
           card_id = target_card["id"]
-          print(f"Found target card: '{target_card['name']}' (ID: {card_id})")
+          print(f"Successfully matched target card via {match_reason}: '{target_card['name']}' (ID: {card_id})")
 
           # Attach PR URL if not already attached
           attachments = trello_request(f"/cards/{card_id}/attachments") or []
@@ -124,12 +166,12 @@ jobs:
                   trello_request(f"/cards/{card_id}", method="PUT", data={"idList": review_list["id"]})
 
               # Post comment tagging Tester
-              comment = f"@zawntsu Developer opened PR #{pr_number} ({pr_url}). Ready for QA verification!"
+              comment = f"@zawntsu Developer @{pr_user} opened PR #{pr_number} ({pr_url}). Ready for QA verification!"
               print("Posting notification comment to card...")
               trello_request(f"/cards/{card_id}/actions/comments", method="POST", data={"text": comment})
 
           elif pr_action == "closed" and pr_merged:
-              comment = f"PR #{pr_number} has been merged into develop branch ({pr_url})."
+              comment = f"PR #{pr_number} has been merged into develop branch ({pr_url}) by @{pr_user}."
               print("Posting merge comment to card...")
               trello_request(f"/cards/{card_id}/actions/comments", method="POST", data={"text": comment})
 

@@ -30,7 +30,7 @@ jobs:
           branch = os.environ.get('PR_BRANCH', '').strip()
 
           title_pattern = r'^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\((FE|BE|OPS|QA|AI|PM)-[0-9]+\):\s.+'
-          branch_pattern = r'^(feature|fix|chore|docs|refactor)\/(FE|BE|OPS|QA|AI|PM)-[0-9]+-[a-z0-9-]+$'
+          branch_pattern = r'^(feat|feature|fix|chore|docs|refactor)\/(FE|BE|OPS|QA|AI|PM)-[0-9]+-[a-z0-9-]+$'
 
           print('==============================================')
           print('      PR CONVENTION & BRANCH LINTER           ')
@@ -53,7 +53,7 @@ jobs:
               print('[PASS] PR Title format is compliant.')
 
           if not branch_ok:
-              print('::error::Branch name does not match convention: feature/ROLE-NUM-slug (e.g. feature/FE-84-audio-player)')
+              print('::error::Branch name does not match convention: feat/ROLE-NUM-slug (e.g. feat/FE-84-audio-player)')
               failed = True
           else:
               print('[PASS] Branch name format is compliant.')

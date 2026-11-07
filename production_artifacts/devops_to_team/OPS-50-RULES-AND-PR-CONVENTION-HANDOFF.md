@@ -28,7 +28,7 @@
    - Kích hoạt khi có PR nhắm vào: `develop`, `staging`, `main`.
    - Kiểm tra định dạng:
      - Tiêu đề PR: `^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\((FE|BE|OPS|QA|AI|PM)-[0-9]+\):\s.+` (Ví dụ: `feat(FE-84): implement audio player`).
-     - Tên nhánh: `^(feature|fix|chore|docs|refactor)\/(FE|BE|OPS|QA|AI|PM)-[0-9]+-[a-z0-9-]+$` (Ví dụ: `feature/FE-84-audio-player`).
+     - Tên nhánh: `^(feat|feature|fix|chore|docs|refactor)\/(FE|BE|OPS|QA|AI|PM)-[0-9]+-[a-z0-9-]+$` (Ví dụ: `feat/FE-84-audio-player` hoặc `feature/FE-84-audio-player`).
 
 4. **Workflow Trello Auto-Sync Bot (Zero-MCP)**:
    - Tệp: `.github/workflows/trello-sync.yml`.
@@ -47,11 +47,11 @@
   `remote: fatal: Cannot delete protected branch 'develop' due to ruleset 'IMMUTABLE-CORE-BRANCHES'.`
 
 ### Kịch bản 2: Kiểm chứng PR Convention Linter với PR sai định dạng
-- **Thao tác**: Mở PR thử nghiệm với tiêu đề sai quy chuẩn (ví dụ: `update code`, `fix bug audio`) hoặc nhánh không có tiền tố `feature/ROLE-NUM-slug`.
+- **Thao tác**: Mở PR thử nghiệm với tiêu đề sai quy chuẩn (ví dụ: `update code`, `fix bug audio`) hoặc nhánh không có tiền tố `feat/ROLE-NUM-slug`.
 - **Kết quả mong đợi**: Workflow `PR Convention Linter` trên GitHub Actions lập tức đánh **FAIL** với thông báo lỗi chi tiết.
 
 ### Kịch bản 3: Kiểm chứng PR Convention Linter với PR đúng định dạng
-- **Thao tác**: Đặt tiêu đề PR đúng chuẩn `feat(OPS-50): configure pr convention linter` trên nhánh `feature/OPS-50-...`.
+- **Thao tác**: Đặt tiêu đề PR đúng chuẩn `feat(OPS-50): configure pr convention linter` trên nhánh `feat/OPS-50-...` (hoặc `feature/OPS-50-...`).
 - **Kết quả mong đợi**: Workflow `PR Convention Linter` chạy thành công đạt trạng thái **PASS**.
 
 ### Kịch bản 4: Kiểm chứng quyền Merge PR của Admin

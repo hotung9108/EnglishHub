@@ -73,10 +73,16 @@ export function useStudentDetails({
 
     const loadData = async () => {
       try {
-        // Call reports and evaluations in parallel
-        const [progressRes, evalRes] = await Promise.allSettled([
+        // Call reports, evaluations, and user lookup all in parallel
+        const initialLookupHint = {
+          fullName: hintFullName,
+          email: hintEmail,
+        };
+
+        const [progressRes, evalRes, initialUserRes] = await Promise.allSettled([
           reportService.getStudentProgress(studentId),
           studentEvaluationService.list(studentId),
+          userService.getUserById(studentId, initialLookupHint),
         ]);
 
         if (ignore) return;
@@ -95,13 +101,17 @@ export function useStudentDetails({
           setEvaluations([]);
         }
 
-        // Build identity hint for accurate lookup without full scan
-        const lookupHint = {
-          fullName: hintFullName || resolvedProgress?.studentName,
-          email: hintEmail,
-        };
+        let resolvedUser: UserListItem | null =
+          initialUserRes.status === 'fulfilled' ? initialUserRes.value : null;
 
-        const resolvedUser = await userService.getUserById(studentId, lookupHint);
+        // Fallback with progress studentName only if direct lookup was null and hint was missing
+        if (!resolvedUser && !hintFullName && resolvedProgress?.studentName) {
+          const secondaryHint = {
+            fullName: resolvedProgress.studentName,
+            email: hintEmail,
+          };
+          resolvedUser = await userService.getUserById(studentId, secondaryHint);
+        }
 
         if (ignore) return;
 
