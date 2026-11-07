@@ -695,27 +695,58 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return moduleDetail?.answers?.filter((a) => !!a.docStorageKey) || [];
   }, [moduleDetail?.answers]);
 
+  const [loadedDocText, setLoadedDocText] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const txtAnswer = moduleDetail?.answers?.find(
+      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
+    );
+    if (!txtAnswer || !activeModule?.id) {
+      return;
+    }
+
+    submissionService
+      .getDocumentFileBlob(activeModule.id)
+      .then((blob) => blob.text())
+      .then((text) => {
+        if (isMounted) setLoadedDocText(text);
+      })
+      .catch((err) => {
+        console.warn('Failed to load essay.txt content:', err);
+      });
+
+    return () => {
+      isMounted = false;
+      setLoadedDocText(null);
+    };
+  }, [moduleDetail, activeModule?.id]);
+
   // Extract student text answer
   const studentAnswerText = useMemo(() => {
     if (!moduleDetail?.answers || moduleDetail.answers.length === 0) {
-      return '';
+      return loadedDocText || '';
     }
 
     const firstAnswer = moduleDetail.answers[0];
     if (firstAnswer.content === null || firstAnswer.content === undefined) {
-      return '';
+      return loadedDocText || '';
     }
     if (typeof firstAnswer.content === 'string') {
-      return firstAnswer.content.trim();
+      const trimmed = firstAnswer.content.trim();
+      return trimmed || loadedDocText || '';
     }
     if (typeof firstAnswer.content === 'object') {
       const obj = firstAnswer.content as Record<string, unknown>;
       const textVal = obj.text ?? obj.essay ?? obj.answer ?? obj.content;
-      if (typeof textVal === 'string') return textVal.trim();
+      if (typeof textVal === 'string') {
+        const trimmed = textVal.trim();
+        return trimmed || loadedDocText || '';
+      }
       return JSON.stringify(obj);
     }
-    return String(firstAnswer.content ?? '').trim();
-  }, [moduleDetail]);
+    return String(firstAnswer.content ?? '').trim() || loadedDocText || '';
+  }, [moduleDetail, loadedDocText]);
 
   const wordCount = useMemo(() => {
     if (!studentAnswerText.trim()) return 0;
@@ -1536,7 +1567,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
                     {attachedDocAnswers.map((ans) => {
                       const docKey = ans.docStorageKey || '';
                       const isPdf = ans.docMimeType?.includes('pdf') || docKey.toLowerCase().endsWith('.pdf');
-                      const extension = isPdf ? 'pdf' : 'docx';
+                      const isTxt = ans.docMimeType?.includes('text/plain') || docKey.toLowerCase().endsWith('.txt');
+                      const extension = isPdf ? 'pdf' : isTxt ? 'txt' : 'docx';
                       const fileName = getFileNameFromKey(docKey);
 
                       return (

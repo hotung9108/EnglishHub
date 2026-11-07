@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
-import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmissionListItem } from '../api/services/submission.service';
+import { submissionService, isSubmissionGraded, type SubmissionDetail, type SubmissionListItem, type SubmitModulePayload } from '../api/services/submission.service';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
@@ -39,6 +39,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showEmptyConfirmModal, setShowEmptyConfirmModal] = useState(false);
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
@@ -288,10 +289,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
-    if (!audioBlob) {
-      setError('Vui lòng thực hiện ghi âm bài nói trước khi nộp bài.');
-      return;
-    }
 
     if (isRecording) {
       setError('Vui lòng bấm dừng ghi âm và nghe lại bản ghi trước khi nộp bài.');
@@ -303,13 +300,24 @@ const StudentAssignmentSpeaking: React.FC = () => {
       return;
     }
 
+    // Kịch bản học viên chưa ghi âm bài nói -> hiển thị Modal cảnh báo xác nhận nộp rỗng
+    if (!audioBlob) {
+      setShowEmptyConfirmModal(true);
+      return;
+    }
+
+    await doSubmitAssignment(audioBlob);
+  };
+
+  const doSubmitAssignment = async (blobToSubmit: Blob | null) => {
     setIsSubmitting(true);
     setError(null);
+    setShowEmptyConfirmModal(false);
 
     try {
-      const subId = submission.id;
-      const speakingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
-      const subModuleId = speakingSubMod?.id || submission.modules?.[0]?.id;
+      const subId = submission?.id;
+      const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
 
       if (!subModuleId) {
         throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
@@ -320,28 +328,28 @@ const StudentAssignmentSpeaking: React.FC = () => {
         return;
       }
 
-      // Step 1: Request presigned PUT URL from backend
-      // Backend validates MIME against: 'audio/webm', 'audio/wav', 'audio/mpeg'
-      const { uploadUrl, storageKey } = await submissionService.getAudioUploadUrl(
-        subModuleId,
-        backendMimeType
-      );
+      let uploadedAudioStorageKey: string | undefined = undefined;
 
-      // Step 2: Upload audio blob directly to S3 / MinIO storage
-      await submissionService.uploadDirectToStorage(uploadUrl, audioBlob, backendMimeType);
+      // Step 1: Upload audio using consolidated 2-in-1 helper if student recorded
+      if (blobToSubmit) {
+        const uploadRes = await submissionService.uploadAudio(subModuleId, blobToSubmit, backendMimeType);
+        uploadedAudioStorageKey = uploadRes.storageKey;
+      }
 
-      // Step 3: Submit module with audioStorageKey (backend probes storage and marks READY)
-      await submissionService.submitModule(subModuleId, {
-        audioStorageKey: storageKey,
-      });
+      // Step 2: Submit module (with audioStorageKey if recorded, or empty if skipped)
+      const submitPayload: SubmitModulePayload = {};
+      if (uploadedAudioStorageKey) {
+        submitPayload.audioStorageKey = uploadedAudioStorageKey;
+      }
+      await submissionService.submitModule(subModuleId, submitPayload);
 
-      const currentSubModules = (submission.modules || []).map((m) =>
+      const currentSubModules = (submission?.modules || []).map((m) =>
         m.id === subModuleId ? { ...m, status: 'SUBMITTED' as const } : m
       );
       setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
 
-      // Step 4: Check if other modules in submission are already completed
-      const otherModules = submission.modules?.filter((m) => m.id !== subModuleId) || [];
+      // Step 3: Check if other modules in submission are already completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (subId && allOthersDone) {
@@ -672,6 +680,41 @@ const StudentAssignmentSpeaking: React.FC = () => {
           </section>
         </div>
       </div>
+
+      {/* Modal xác nhận nộp Speaking rỗng khi không có bản ghi âm */}
+      {showEmptyConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-800">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Xác nhận nộp bài không ghi âm
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Bạn chưa thực hiện ghi âm bài nói. Bạn có chắc chắn muốn nộp bài trống (nhận 0 điểm phần này) để tiếp tục không?
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowEmptyConfirmModal(false)}
+                disabled={isSubmitting}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void doSubmitAssignment(null)}
+                loading={isSubmitting}
+              >
+                Tiếp tục nộp bài
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

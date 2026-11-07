@@ -197,13 +197,40 @@ export const StudentSubmissionResult: React.FC = () => {
     }
   }, []);
 
+  const [loadedDocText, setLoadedDocText] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const txtAnswer = moduleDetail?.answers?.find(
+      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
+    );
+    if (!txtAnswer || !selectedModuleId) {
+      return;
+    }
+
+    submissionService
+      .getDocumentFileBlob(selectedModuleId)
+      .then((blob) => blob.text())
+      .then((text) => {
+        if (isMounted) setLoadedDocText(text);
+      })
+      .catch((err) => {
+        console.warn('Failed to load essay.txt in StudentSubmissionResult:', err);
+      });
+
+    return () => {
+      isMounted = false;
+      setLoadedDocText(null);
+    };
+  }, [moduleDetail, selectedModuleId]);
+
   const targetAnswer = moduleDetail?.answers?.find(answer => !!answer.audioStorageKey) || moduleDetail?.answers?.[0];
   const annotationResult = useStudentAnswerAnnotations(targetAnswer?.id);
   const annotationStatus = isLoading || isLoadingAnnotationAnswer ? 'loading' : annotationResult.status;
   const annotations = useMemo<DisplayAnnotation[]>(() => {
     const rawText = moduleDetail?.skill === 'SPEAKING'
       ? ''
-      : extractAnswerContentText(moduleDetail?.answers, targetAnswer?.id);
+      : (extractAnswerContentText(moduleDetail?.answers, targetAnswer?.id) || loadedDocText || '');
     return annotationResult.annotations
       .filter(annotation => annotation.reviewStatus === 'ACCEPTED')
       .map((annotation, index) => {
@@ -221,7 +248,7 @@ export const StudentSubmissionResult: React.FC = () => {
           endOffset: annotation.endOffset,
         };
       });
-  }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, t]);
+  }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, loadedDocText, t]);
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => {
@@ -573,8 +600,8 @@ export const StudentSubmissionResult: React.FC = () => {
 
   // Extracted student contents
   const studentEssay = useMemo(() => {
-    return extractAnswerText(moduleDetail?.answers);
-  }, [moduleDetail?.answers]);
+    return extractAnswerText(moduleDetail?.answers) || loadedDocText || '';
+  }, [moduleDetail?.answers, loadedDocText]);
 
   const attachedDocKey = useMemo(() => {
     return moduleDetail?.answers?.find(a => a.docStorageKey)?.docStorageKey || null;

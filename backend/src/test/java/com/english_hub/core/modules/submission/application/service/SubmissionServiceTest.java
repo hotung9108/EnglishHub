@@ -2576,9 +2576,24 @@ class SubmissionServiceTest {
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
 				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
 
-		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "text/plain"))
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "image/png"))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Định dạng file không được hỗ trợ.");
+	}
+
+	@Test
+	void getDocumentUploadUrl_generatesPresignedUrlForTextPlain() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.txt", "text/plain"))
+				.thenReturn(presigned("https://storage.local/upload/essay.txt", "submissions/88/module-151/essay.txt"));
+
+		UploadUrlResult result = submissionService.getDocumentUploadUrl(151L, "text/plain");
+
+		assertThat(result.uploadUrl()).isEqualTo("https://storage.local/upload/essay.txt");
+		assertThat(result.storageKey()).isEqualTo("submissions/88/module-151/essay.txt");
+		assertThat(result.expiresAt()).isEqualTo(EXPIRES_AT);
 	}
 
 	@Test

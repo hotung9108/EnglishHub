@@ -45,7 +45,6 @@ const StudentAssignmentWriting: React.FC = () => {
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
-  const [resolvedQuestionId, setResolvedQuestionId] = useState<number | null>(null);
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -83,10 +82,7 @@ const StudentAssignmentWriting: React.FC = () => {
         const writingMod = sub.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING') || sub.modules?.[0];
         if (writingMod?.id) {
           try {
-            const detail = await submissionService.getSubmissionModuleDetail(writingMod.id);
-            if (isMounted && detail?.questions && detail.questions.length > 0) {
-              setResolvedQuestionId(detail.questions[0].id);
-            }
+            await submissionService.getSubmissionModuleDetail(writingMod.id);
           } catch {
             // Fallback if detail call fails
           }
@@ -422,36 +418,22 @@ const StudentAssignmentWriting: React.FC = () => {
     try {
       let uploadedStorageKey: string | undefined = undefined;
 
-      // 1. Upload document file if selected
-      if (uploadedFile) {
-        const mimeType = getBackendDocumentMimeType(uploadedFile);
+      // Determine file to upload: use user-attached file or package typed editor text into essay.txt
+      let fileToUpload: File | null = uploadedFile;
+      if (!fileToUpload && trimmedText !== '') {
+        const textBlob = new Blob([trimmedText], { type: 'text/plain;charset=utf-8' });
+        fileToUpload = new File([textBlob], 'essay.txt', { type: 'text/plain;charset=utf-8' });
+      }
+
+      // 1. Upload document file via consolidated helper (FE-73 / FE-74)
+      if (fileToUpload) {
+        const mimeType = getBackendDocumentMimeType(fileToUpload);
         try {
-          const { uploadUrl, storageKey } = await submissionService.getDocumentUploadUrl(
-            subModuleId,
-            mimeType
-          );
-
-          if (!uploadUrl || !storageKey) {
-            throw new Error('Không nhận được liên kết tải tệp lên từ máy chủ.');
+          const uploadRes = await submissionService.uploadDocument(subModuleId, fileToUpload, mimeType);
+          if (!uploadRes || !uploadRes.storageKey) {
+            throw new Error('Không nhận được mã lưu trữ tệp từ máy chủ.');
           }
-
-          let targetUrl = uploadUrl;
-          if (uploadUrl.includes('//minio:9000/')) {
-            targetUrl = uploadUrl.replace(/^https?:\/\/minio:9000/, '/s3-upload');
-          }
-
-          const uploadResp = await fetch(targetUrl, {
-            method: 'PUT',
-            body: uploadedFile,
-            headers: {
-              'Content-Type': uploadedFile.type || 'application/octet-stream',
-            },
-          });
-          if (!uploadResp.ok) {
-            throw new Error(`Tải tệp lên kho lưu trữ thất bại (HTTP ${uploadResp.status}).`);
-          }
-
-          uploadedStorageKey = storageKey;
+          uploadedStorageKey = uploadRes.storageKey;
         } catch (uploadErr) {
           console.error('Document storage upload failed:', uploadErr);
           const uploadMsg = uploadErr instanceof Error ? uploadErr.message : 'Tải tệp bài làm lên kho lưu trữ thất bại.';
@@ -461,26 +443,10 @@ const StudentAssignmentWriting: React.FC = () => {
         }
       }
 
-      // 2. Submit module with storageKey and text content answers
-      const questionId = resolvedQuestionId || 1;
-      const submitPayload: SubmitModulePayload = {};
-
-      if (trimmedText !== '') {
-        submitPayload.answers = [
-          {
-            questionId,
-            content: uploadedFile
-              ? {
-                  text: trimmedText,
-                  fileName: uploadedFile.name,
-                  hasAttachedFile: true,
-                }
-              : { text: trimmedText },
-          },
-        ];
-      } else {
-        submitPayload.answers = [];
-      }
+      // 2. Submit module with storageKey, eliminating raw text streaming to backend (FE-74)
+      const submitPayload: SubmitModulePayload = {
+        answers: [],
+      };
 
       if (uploadedStorageKey) {
         submitPayload.storageKey = uploadedStorageKey;
