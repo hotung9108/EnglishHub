@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-018",
+  "title": "Điểm thô khớp thang điểm API",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "stopSuite": false
+  },
+  "reason": "Raw score cell must match API score and maximum\n+ actual - expected\n\n+ '7.5/100'\n- '7.5/10'\n         ^\n",
+  "actualUrl": "http://localhost:5173/student/grades",
+  "startedAt": "2026-11-07T05:17:31.442Z",
+  "finishedAt": "2026-11-07T05:17:41.003Z"
+}

@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-022",
+  "title": "Lọc danh sách bài theo kỹ năng Writing",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:00.801Z",
+  "finishedAt": "2026-11-04T07:18:01.231Z"
+}

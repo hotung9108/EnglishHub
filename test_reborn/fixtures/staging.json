@@ -1,0 +1,17 @@
+{
+  "apiBaseUrl": "https://api-staging.hotung9108.me/api/v1",
+  "createdAt": "2026-10-14T14:07:29.420Z",
+  "className": "QA29-Teacher-2026-10-14T14-07-29-421Z",
+  "assignmentTitle": "QA29-Writing-Grading-2026-11-03T10-32-40-322Z",
+  "teacherId": 4,
+  "studentId": 12,
+  "studentName": "Ngô Thị Phương",
+  "classId": 120,
+  "memberId": 175,
+  "assignmentId": 2894,
+  "moduleId": 4069,
+  "submissionId": 2575,
+  "submissionModuleId": 4388,
+  "gradingId": 3520,
+  "verifiedAt": "2026-11-03T10:32:51.302Z"
+}

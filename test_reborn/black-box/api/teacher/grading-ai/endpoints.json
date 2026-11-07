@@ -1,0 +1,755 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 15 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "SUITE15 CHUẨN BỊ",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{seedClassId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-001] Giáo viên phụ trách xem điểm theo submission module",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-004] Module chưa nộp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-005] Không phân tích AI cho READING",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-006] Không phân tích AI cho LISTENING",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-007] Nhập điểm hợp lệ 0 với M=10",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-008] Nhập điểm hợp lệ 10 với M=10",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-009] Nhập điểm hợp lệ 7.5 với M=10",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-010] Thiếu finalScore",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-011] finalScore null",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-012] Điểm âm",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-013] Điểm vượt M",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-014] Điểm sai kiểu chuỗi chữ",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-015] Điểm sai kiểu object",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-016] Điểm sai kiểu boolean",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-017] Teacher đọc annotation",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-018] Answer chưa có annotation",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-019] Thêm annotation teacher",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-020] Offset bắt đầu bằng kết thúc",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-021] Thiếu startOffset",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-022] Thiếu endOffset",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-023] startOffset null",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-024] endOffset null",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-025] endOffset nhỏ hơn startOffset",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-026] Offset chuỗi chữ",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-027] Offset sai kiểu object",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-030] Không duyệt annotation do teacher tạo",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-038] Xóa annotation TEACHER",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-040] Xóa lần hai",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-041] Teacher xem lịch sử điểm",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-042] Admin xem lịch sử điểm lớp giáo viên khác",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-043] Grading chưa có lịch sử",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-044] Không token bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-045] Token sai chữ ký bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-047] Không token bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-048] Token sai chữ ký bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-050] Không token bị từ chối",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-051] Token sai chữ ký bị từ chối",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-053] Không token bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-054] Token sai chữ ký bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-056] Không token bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-057] Token sai chữ ký bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-062] Không token bị từ chối",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-063] Token sai chữ ký bị từ chối",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-065] Không token bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-066] Token sai chữ ký bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-068] Role S1 không có quyền endpoint",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-069] Role S1 không có quyền endpoint",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-070] Giáo viên lớp khác truy cập tài nguyên T1",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-071] Role S1 không có quyền endpoint",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-073] Role S1 không có quyền endpoint",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-074] Role S1 không có quyền endpoint",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-075] ID dương không tồn tại",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{missing}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-076] Path ID sai định dạng",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/abc/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-077] ID dương không tồn tại",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{missing}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-078] Path ID sai định dạng",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/abc/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-079] ID dương không tồn tại",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{missing}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-080] Path ID sai định dạng",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/abc",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-081] ID dương không tồn tại",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{missing}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-082] Path ID sai định dạng",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/abc/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-083] ID dương không tồn tại",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{missing}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-084] Path ID sai định dạng",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/abc/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-087] ID dương không tồn tại",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{missing}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-088] Path ID sai định dạng",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/abc",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-089] ID dương không tồn tại",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{missing}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-090] Path ID sai định dạng",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/abc/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-091] JSON hỏng cú pháp",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-092] Không có request body",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-093] JSON hỏng cú pháp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-094] Không có request body",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-097] Module mới tạo luôn có grading, không 404 chưa chấm",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-098] Điểm bằng giá trị số không tạo log mới",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-103] Đã nộp bài, giáo viên chấm ngay khi chưa hết hạn",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-001] Đọc grading qua #51",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-002] Quan sát quyền admin ở #51",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-003] Danh sách grading qua #52",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings?page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-004] Quan sát bộ lọc và quyền admin ở #52",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings?classId={{class1}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-005] Offset trên text so với JSON",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-006] Offset trên Unicode và emoji",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-007] Offset thập phân",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-011] Quan sát phân trang annotation",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations?page=2&limit=1",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-012] Quan sát phân trang change-log",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs?page=2&limit=1",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-OBS-014] Bài chưa nộp: quan sát response và dữ liệu",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-015] Offset vượt độ dài text hiển thị",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-016] Điểm dạng numeric string",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-002] Yêu cầu AI cho WRITING PENDING đã nộp [Có điều kiện phạm vi]",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-003] Yêu cầu AI cho SPEAKING PENDING đã nộp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-028] Duyệt annotation AI thành ACCEPTED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-029] Duyệt annotation AI thành REJECTED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-031] Thiếu reviewStatus",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-032] reviewStatus null",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-033] reviewStatus rỗng",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-034] reviewStatus chỉ khoảng trắng",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-035] Không cho đưa về PENDING",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-036] Enum không hợp lệ",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-037] reviewStatus sai kiểu object",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-039] Xóa annotation AI",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-046] Token đã hết hạn bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-049] Token đã hết hạn bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-052] Token đã hết hạn bị từ chối",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-055] Token đã hết hạn bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-058] Token đã hết hạn bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-059] Không token bị từ chối",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-060] Token sai chữ ký bị từ chối",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-061] Token đã hết hạn bị từ chối",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-064] Token đã hết hạn bị từ chối",
+      "method": "DELETE",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-067] Token đã hết hạn bị từ chối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}/change-logs",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-072] Role S1 không có quyền endpoint",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-085] ID dương không tồn tại",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{missing}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-086] Path ID sai định dạng",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/abc/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-095] JSON hỏng cú pháp",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-096] Không có request body",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-099] AI chưa được duyệt không được ghi điểm cuối",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-100] Học viên xem điểm của mình sau giáo viên duyệt",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-101] Đổi duyệt annotation AI ACCEPTED sang REJECTED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-102] Đổi duyệt annotation AI REJECTED sang ACCEPTED",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-008] Enum hoa thường và khoảng trắng",
+      "method": "PATCH",
+      "url": "{{apiBaseUrl}}/annotations/{{annotation}}/review",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-009] Gọi lại AI ở FAILED",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-010] Gửi yêu cầu AI lặp",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading/ai-analyze",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-OBS-013] AI và giáo viên chấm xen kẽ",
+      "method": "PUT",
+      "url": "{{apiBaseUrl}}/gradings/{{g}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE19-REQ-104] Học viên chưa được xem điểm/kết quả grading trước giáo viên duyệt",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{sm}}/grading",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE19-REQ-105] Học viên chưa được xem kết quả chữa bài/annotation trước giáo viên duyệt",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/answers/{{answer}}/annotations",
+      "mayMutate": false
+    },
+    {
+      "name": "SUITE15 DỌN DỮ LIỆU",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/classes/{{seedClassId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "QA19 CONTROL 15 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

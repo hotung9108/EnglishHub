@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-036",
+  "title": "Tìm học viên không tồn tại và khôi phục",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:09.491Z",
+  "finishedAt": "2026-11-04T07:18:10.349Z"
+}

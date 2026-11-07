@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-037",
+  "title": "Kết quả: chuyển về Bảng điểm",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "Waiting for element to be located By(css selector, aside a[href=\"grades\"])\nWait timed out after 30080ms",
+  "actualUrl": "http://localhost:5173/student/submissions/1242",
+  "startedAt": "2026-11-07T05:21:53.013Z",
+  "finishedAt": "2026-11-07T05:22:33.210Z"
+}

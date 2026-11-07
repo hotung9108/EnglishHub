@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-011",
+  "title": "Teachers tìm và mở hồ sơ QA",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Ambiguous button /^Xem chi tiết$|^View Details$/: 2",
+  "actualUrl": "http://localhost:5173/admin/teachers",
+  "startedAt": "2026-11-07T05:16:08.154Z",
+  "finishedAt": "2026-11-07T05:16:19.426Z"
+}

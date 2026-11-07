@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-048",
+  "title": "Ngân hàng đề / modal giao nhanh",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:17.049Z",
+  "finishedAt": "2026-11-04T07:18:17.561Z"
+}

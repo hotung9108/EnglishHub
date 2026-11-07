@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-024",
+  "title": "Chấm điểm biên thấp 0 và đọc lại",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:01.748Z",
+  "finishedAt": "2026-11-04T07:18:02.226Z"
+}

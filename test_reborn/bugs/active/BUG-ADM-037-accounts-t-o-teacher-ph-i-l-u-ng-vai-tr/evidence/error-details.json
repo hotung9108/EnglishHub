@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-037",
+  "title": "Accounts tạo Teacher phải lưu đúng vai trò TEACHER",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Missing button /Thêm tài khoản mới|Add new account/i\nWait timed out after 31106ms",
+  "actualUrl": "http://localhost:5173/admin/accounts",
+  "startedAt": "2026-11-07T05:22:49.113Z",
+  "finishedAt": "2026-11-07T05:23:28.244Z"
+}

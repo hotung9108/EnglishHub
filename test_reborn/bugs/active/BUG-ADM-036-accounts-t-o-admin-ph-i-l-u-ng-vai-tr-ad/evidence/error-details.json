@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-036",
+  "title": "Accounts tạo Admin phải lưu đúng vai trò ADMIN",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Missing button /Thêm tài khoản mới|Add new account/i\nWait timed out after 30045ms",
+  "actualUrl": "http://localhost:5173/admin/accounts",
+  "startedAt": "2026-11-07T05:22:11.378Z",
+  "finishedAt": "2026-11-07T05:22:49.001Z"
+}

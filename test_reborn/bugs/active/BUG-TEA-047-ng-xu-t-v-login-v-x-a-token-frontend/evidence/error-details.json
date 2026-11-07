@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-047",
+  "title": "Đăng xuất về login và xóa token frontend",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(css selector, a.sidebar-link-logout[href=\"/login\"])\nWait timed out after 30006ms",
+  "actualUrl": "https://staging.hotung9108.me/teacher/dashboard",
+  "startedAt": "2026-11-04T14:23:50.274Z",
+  "finishedAt": "2026-11-04T14:24:22.878Z"
+}

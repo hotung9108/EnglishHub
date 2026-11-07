@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-050",
+  "title": "Mở lộ trình/buổi học của lớp",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(xpath, //main//button[starts-with(normalize-space(.),'Lộ trình')])\nWait timed out after 30197ms",
+  "actualUrl": "http://localhost:5173/teacher/classes/85/progress",
+  "startedAt": "2026-11-07T05:24:42.035Z",
+  "finishedAt": "2026-11-07T05:25:19.989Z"
+}

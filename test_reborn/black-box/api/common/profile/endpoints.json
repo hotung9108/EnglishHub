@@ -1,0 +1,251 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 10 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1024 - [TC_UC03_01] Teacher lấy profile của chính mình",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1025 - [TC_UC03_02] Student lấy profile của chính mình",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1026 - [TC_UC03_03] Get profile không có token",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1027 - [TC_UC03_04] Get profile với token không hợp lệ",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1028 - [TC_UC03_05] Profile không lộ dữ liệu nhạy cảm",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1029 - [TC_UC03_06] Token teacher chỉ trả profile teacher",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1030 - [TC_UC03_07] User LOCKED không lấy được profile",
+      "method": "GET",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": false
+    },
+    {
+      "name": "QaseID=1039 - [TC_UC03_16] Reject body rỗng khi update profile",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1040 - [TC_UC03_17] Reject tất cả field null",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1041 - [TC_UC03_18] Reject fullName rỗng",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1042 - [TC_UC03_19] Reject fullName chỉ whitespace",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1043 - [TC_UC03_20] Update profile không có token",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1044 - [TC_UC03_21] Update profile với token sai",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1045 - [TC_UC03_22] Update profile với JSON malformed",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1031 - [TC_UC03_08] Cập nhật fullName hợp lệ",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1032 - [TC_UC03_09] Cập nhật phone hợp lệ",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1033 - [TC_UC03_10] Cập nhật avatarUrl hợp lệ",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1034 - [TC_UC03_11] Cập nhật nhiều field profile",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1035 - [TC_UC03_12] Trim giá trị profile",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1036 - [TC_UC03_13] Xóa phone bằng chuỗi rỗng",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1037 - [TC_UC03_14] Xóa avatarUrl bằng whitespace",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1038 - [TC_UC03_15] Không thay đổi field immutable",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1046 - [TC_UC03_23] AvatarUrl sai định dạng",
+      "method": "PUT",
+      "url": "{{base_url}}/api/v1/users/me",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1053 - [TC_UC03_30] Sai current password",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1054 - [TC_UC03_31] Đổi password với body rỗng",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1055 - [TC_UC03_32] Thiếu currentPassword",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1056 - [TC_UC03_33] Thiếu newPassword",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1057 - [TC_UC03_34] Current password rỗng",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1058 - [TC_UC03_35] New password rỗng",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1059 - [TC_UC03_36] New password dưới 8 ký tự",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1060 - [TC_UC03_37] New password thiếu chữ hoa",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1061 - [TC_UC03_38] New password thiếu chữ số",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1049 - [TC_UC03_26] Đổi mật khẩu với current password đúng",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1050 - [TC_UC03_27] Login bằng password mới",
+      "method": "POST",
+      "url": "{{base_url}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1051 - [TC_UC03_28] Password cũ bị từ chối",
+      "method": "POST",
+      "url": "{{base_url}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1052 - [TC_UC03_29] Password mới đúng giới hạn tối thiểu",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1062 - [TC_UC03_39] Đổi password không có token",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1063 - [TC_UC03_40] Đổi password với token sai",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QaseID=1064 - [TC_UC03_41] User LOCKED không đổi password",
+      "method": "PATCH",
+      "url": "{{base_url}}/api/v1/users/me/password",
+      "mayMutate": true
+    },
+    {
+      "name": "QA19 CONTROL 10 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

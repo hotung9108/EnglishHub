@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-030",
+  "title": "Lọc bài theo lớp và trạng thái đã chấm",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "Waiting for element to be located By(xpath, //main//button[contains(normalize-space(.),'Chưa bắt đầu')])\nWait timed out after 30108ms",
+  "actualUrl": "http://localhost:5173/student/assignments",
+  "startedAt": "2026-11-07T05:20:02.346Z",
+  "finishedAt": "2026-11-07T05:20:40.132Z"
+}
