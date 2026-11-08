@@ -69,3 +69,4 @@ class AnalyzeWritingResponse(CamelModel):
     annotations: List[WritingAnnotationItem] = Field(default_factory=list)
     model_used: str
     provider_used: str
+    extracted_text: Optional[str] = Field(None, description="Văn bản đã trích xuất từ tài liệu hoặc bài viết gốc")
