@@ -1625,7 +1625,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               )}
 
               <div className="tsd-speaking-audio-bar">
-                {isAudioLoading ? (
+                {isAudioLoading && !audioUrl ? (
                   <div className="tsd-audio-empty">
                     {isVi ? 'Đang tải audio bài nộp...' : 'Loading submission audio...'}
                   </div>
