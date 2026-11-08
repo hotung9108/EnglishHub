@@ -231,10 +231,12 @@ export const StudentSubmissionResult: React.FC = () => {
   }, [moduleDetail, selectedModuleId, selectedSkill]);
 
   useEffect(() => {
+    if (moduleDetail?.skill !== 'SPEAKING') {
+      return;
+    }
     const gradingId = moduleDetail?.grading?.id;
     if (!gradingResult?.aiTranscript && gradingId && typeof gradingService.getById === 'function') {
-      gradingService
-        .getById(gradingId)
+      Promise.resolve(gradingService.getById(gradingId))
         .then((res) => {
           if (res?.aiTranscript) {
             setFallbackAiTranscript(res.aiTranscript);
@@ -244,7 +246,7 @@ export const StudentSubmissionResult: React.FC = () => {
           // ignore if forbidden or network error
         });
     }
-  }, [gradingResult?.aiTranscript, moduleDetail?.grading?.id]);
+  }, [gradingResult?.aiTranscript, moduleDetail?.grading?.id, moduleDetail?.skill]);
 
   const speakingTranscriptText = useMemo(() => {
     const rawTranscript =

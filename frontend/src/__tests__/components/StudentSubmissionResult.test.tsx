@@ -11,7 +11,7 @@ import {
   type SubmissionModuleDetailResponse,
   type SubmissionSkill,
 } from '../../api/services/submission.service';
-import { gradingService, type StudentGradingResult } from '../../api/services/grading.service';
+import { gradingService, type GradingDetailResponse, type StudentGradingResult } from '../../api/services/grading.service';
 import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 import { questionService } from '../../api/services/question.service';
@@ -210,6 +210,7 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     vi.mocked(submissionService.getSubmission).mockResolvedValue(mockSubmission);
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue(mockModuleDetail);
     vi.mocked(gradingService.getStudentGradingResult).mockResolvedValue(publishedResult);
+    vi.mocked(gradingService.getById).mockResolvedValue({ id: 80, aiTranscript: null } as unknown as GradingDetailResponse);
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({
       data: mockAnnotations,
     });
