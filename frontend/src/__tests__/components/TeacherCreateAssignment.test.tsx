@@ -219,3 +219,43 @@ it('supports multi-module operations: adding, switching, reordering, and removin
   await user.click(deleteBtns[0]);
   expect(screen.getByText(/2\s*phần thi/i)).toBeVisible();
 });
+
+it('handles max submissions input blur and empty values', async () => {
+  const { container } = await setup('writing', 'vi');
+  const maxSubInput = container.querySelectorAll('input[type="number"]')[1];
+  fireEvent.change(maxSubInput, { target: { value: '' } });
+  fireEvent.blur(maxSubInput);
+  expect(maxSubInput).toHaveValue(1);
+  fireEvent.change(maxSubInput, { target: { value: '05' } });
+  expect(maxSubInput).toHaveValue(5);
+});
+
+it('navigates to assignments list when clicking cancel', async () => {
+  const { user } = await setup('writing', 'vi');
+  await user.click(screen.getByRole('button', { name: 'Hủy bỏ' }));
+  expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments');
+});
+
+it('updates class selection when selecting a different class', async () => {
+  const { user } = await setup('writing', 'vi');
+  const select = screen.getByRole('combobox');
+  await user.selectOptions(select, '13');
+  expect(select).toHaveValue('13');
+});
+
+it('updates module custom title and maxScore with input validation', async () => {
+  const { container } = await setup('writing', 'vi');
+  const titleInput = container.querySelector('.tae-meta-title-input') as HTMLInputElement;
+  if (titleInput) {
+    fireEvent.change(titleInput, { target: { value: 'Task 1: Line Graph' } });
+    expect(titleInput).toHaveValue('Task 1: Line Graph');
+  }
+  const scoreInput = container.querySelector('.tae-meta-score-input') as HTMLInputElement;
+  if (scoreInput) {
+    fireEvent.change(scoreInput, { target: { value: '' } });
+    fireEvent.blur(scoreInput);
+    expect(scoreInput).toHaveValue('10');
+    fireEvent.change(scoreInput, { target: { value: '020' } });
+    expect(scoreInput).toHaveValue('20');
+  }
+});

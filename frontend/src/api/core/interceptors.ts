@@ -74,6 +74,7 @@ export class TokenRefreshManager {
           if (newToken && originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
           }
+          originalRequest._retry = true;
           return client(originalRequest);
         })
         .catch(err => Promise.reject(parseApiError(err)));
@@ -108,13 +109,8 @@ export class TokenRefreshManager {
 
       return client(originalRequest);
     } catch (refreshErr) {
-      const isAuthError = axios.isAxiosError(refreshErr) && 
-        (refreshErr.response?.status === 401 || refreshErr.response?.status === 403);
-
-      if (isAuthError || !this.storage.getRefreshToken()) {
-        this.storage.clearTokens();
-        this.notifySessionExpired();
-      }
+      this.storage.clearTokens();
+      this.notifySessionExpired();
       const rejectionError = new UnauthorizedError(
         'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.',
         refreshErr

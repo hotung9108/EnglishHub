@@ -102,7 +102,7 @@ const StudentAssignmentListening: React.FC = () => {
       const progress = classifyStudentQuizProgress(sub, scope);
       if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
       if (!isStudentQuizPendingFinalization(sub, scope)) {
-        const redirectRoute = getExamPageRedirectRoute(sub, 'LISTENING', numericId, currentAssignment.modules);
+        const redirectRoute = getExamPageRedirectRoute(sub, 'LISTENING', numericId, currentAssignment.modules, moduleId);
         if (redirectRoute) {
           navigate(redirectRoute, { replace: true });
           return;

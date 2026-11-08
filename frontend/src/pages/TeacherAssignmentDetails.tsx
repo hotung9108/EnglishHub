@@ -577,18 +577,44 @@ export const TeacherAssignmentDetails: React.FC = () => {
         const activeMod = modulesList[selectedModuleIndex] || modulesList[0] || null;
         const activeInst = activeMod?.instructions ?? instructions;
         if (!activeInst) return null;
+
+        const minWordsMatch = activeInst.match(/<!--\s*minWords:\s*(\d+)\s*-->/i);
+        const minWords = minWordsMatch ? Number(minWordsMatch[1]) : null;
+        const imgMatch = activeInst.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+        const diagramUrl = imgMatch ? imgMatch[1] : null;
+        const cleanInst = activeInst
+          .replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '')
+          .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
+          .trim();
+
         return (
           <div className="eh-card p-6 mb-6">
-            <div className="flex justify-between items-start mb-3">
+            <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
               <h2 className="flex items-center gap-2.5 m-0 text-base font-bold text-main">
                 <div className="p-1.5 rounded-md bg-primary-container text-primary flex items-center justify-center">
                   <FileText size={18} />
                 </div>
                 <span>{t('assignmentDetails.promptTitle')}</span>
               </h2>
+              {minWords && (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                  {isVi ? `Yêu cầu tối thiểu: ${minWords} từ` : `Min words: ${minWords}`}
+                </span>
+              )}
             </div>
-            <div className="text-main/90 text-sm leading-relaxed whitespace-pre-line font-normal bg-surface-variant/40 p-4 rounded-xl border border-border/50">
-              {activeInst}
+
+            {diagramUrl && (
+              <div className="mb-4 p-3 bg-white rounded-xl border border-border/50 max-w-xl">
+                <img 
+                  src={diagramUrl} 
+                  alt="Task 1 Diagram Preview" 
+                  className="w-full max-h-80 object-contain rounded-lg"
+                />
+              </div>
+            )}
+
+            <div className="text-main/90 text-sm leading-relaxed whitespace-pre-line font-normal bg-surface-variant/40 p-4 rounded-xl border border-border/50 max-h-96 overflow-y-auto">
+              {cleanInst || activeInst}
             </div>
           </div>
         );

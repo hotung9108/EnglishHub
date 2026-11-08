@@ -225,7 +225,11 @@ export const TeacherCreateAssignment: React.FC = () => {
     switch (mod.skill) {
       case 'writing': {
         const c = mod.config as WritingConfig;
-        return c.promptText.trim();
+        const basePrompt = c.promptText.trim();
+        const defaultMin = c.taskType === 'task1' ? 150 : 250;
+        const minWordsHeader = (c.minWords && c.minWords !== defaultMin) ? `<!-- minWords: ${c.minWords} -->\n` : '';
+        const chartMarkdown = c.chartImageUrl?.trim() ? `\n\n![Diagram](${c.chartImageUrl.trim()})` : '';
+        return `${minWordsHeader}${basePrompt}${chartMarkdown}`.trim();
       }
       case 'speaking': {
         const c = mod.config as SpeakingConfig;
@@ -434,28 +438,30 @@ export const TeacherCreateAssignment: React.FC = () => {
           }
         }
 
-        // Create questions for reading / listening
+        // Create questions for reading / listening in parallel with Promise.all
         if (createdModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
           const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
-          for (let i = 0; i < qList.length; i++) {
-            const q = qList[i];
-            const payload = q.type === 'multiple_choice'
-              ? buildMcqPayload({
-                  content: q.prompt,
-                  options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
-                    ? ((q as { options?: string[] }).options || [])
-                    : [],
-                  correctOptionIndexOrText: q.correctAnswer,
-                  score: q.points || 1,
-                  orderIndex: i + 1,
-                })
-              : buildShortAnswerPayload({
-                  content: q.prompt,
-                  answerText: q.correctAnswer,
-                  score: q.points || 1,
-                  orderIndex: i + 1,
-                });
-            await questionService.createQuestion(createdModuleId, payload);
+          if (qList.length > 0) {
+            const questionPromises = qList.map((q, i) => {
+              const payload = q.type === 'multiple_choice'
+                ? buildMcqPayload({
+                    content: q.prompt,
+                    options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
+                      ? ((q as { options?: string[] }).options || [])
+                      : [],
+                    correctOptionIndexOrText: q.correctAnswer,
+                    score: q.points || 1,
+                    orderIndex: i + 1,
+                  })
+                : buildShortAnswerPayload({
+                    content: q.prompt,
+                    answerText: q.correctAnswer,
+                    score: q.points || 1,
+                    orderIndex: i + 1,
+                  });
+              return questionService.createQuestion(createdModuleId, payload);
+            });
+            await Promise.all(questionPromises);
           }
         }
       }
@@ -679,10 +685,17 @@ export const TeacherCreateAssignment: React.FC = () => {
                   inputMode="numeric"
                   pattern="[0-9]*"
                   className="tae-meta-score-input"
-                  value={activeModule.maxScore || 10}
+                  value={activeModule.maxScore === 0 ? '' : (activeModule.maxScore || 10)}
+                  placeholder="10"
                   onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    handleActiveModuleMetaChange('maxScore', Math.max(1, Number(val) || 10));
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const clean = raw.replace(/^0+/, '');
+                    handleActiveModuleMetaChange('maxScore', clean === '' ? (raw === '0' ? 0 : 10) : Number(clean));
+                  }}
+                  onBlur={() => {
+                    if (!activeModule.maxScore || activeModule.maxScore <= 0) {
+                      handleActiveModuleMetaChange('maxScore', 10);
+                    }
                   }}
                 />
               </div>
@@ -761,8 +774,22 @@ export const TeacherCreateAssignment: React.FC = () => {
                   min="1"
                   max="10"
                   className="text-input"
-                  value={assignmentData.maxSubmissions ?? 1}
-                  onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: Math.max(1, Number(e.target.value) || 1) })}
+                  value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
+                  placeholder="1"
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                      return;
+                    }
+                    const clean = raw.replace(/^0+/, '');
+                    setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                  }}
+                  onBlur={() => {
+                    if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
+                      setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                    }
+                  }}
                 />
               </div>
             </div>
