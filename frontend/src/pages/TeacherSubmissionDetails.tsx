@@ -1556,6 +1556,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
                         : (isVi ? 'Chấm bài bằng AI' : 'Grade with AI'))}
                 </Button>
               </div>
+
+              {/* Spoken Audio Transcript for Teacher */}
+              {transcriptText && (
+                <div className="tsd-speaking-transcript-wrap">
+                  <div className="tsd-speaking-transcript-label">
+                    <FileText size={15} />
+                    <span>{isVi ? 'Bản ghi lời nói của học viên (AI Transcript):' : 'Student Audio Transcript (AI Transcribed):'}</span>
+                  </div>
+                  <div className="tsd-speaking-transcript-text">
+                    {transcriptText}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -38,7 +38,7 @@ import {
   normalizeAnnotationCategory,
   type StudentAnnotationCategory,
 } from '../utils/annotationCategory.utils';
-import { extractAnnotationSnippet, extractAnswerContentText } from '../utils/annotationSnippet.utils';
+import { extractAnnotationSnippet, extractAnswerContentText, extractTranscriptText } from '../utils/annotationSnippet.utils';
 import '../styles/student-result.css';
 
 interface DisplayAnnotation {
@@ -111,6 +111,7 @@ export const StudentSubmissionResult: React.FC = () => {
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
   const [gradingResult, setGradingResult] = useState<StudentGradingResult | null>(null);
+  const [fallbackAiTranscript, setFallbackAiTranscript] = useState<unknown | null>(null);
   const [attempts, setAttempts] = useState<SubmissionListItem[]>([]);
   const [isLoadingAnnotationAnswer, setIsLoadingAnnotationAnswer] = useState(false);
   const annotationLoadId = useRef(0);
@@ -150,6 +151,7 @@ export const StudentSubmissionResult: React.FC = () => {
     const isCurrentLoad = () => moduleLoaderMounted.current && loadId === annotationLoadId.current;
     setSelectedModuleId(subModuleId);
     setGradingResult(null);
+    setFallbackAiTranscript(null);
     setError(null);
     setIsLoading(true);
     setModuleDetail(null);
@@ -187,6 +189,7 @@ export const StudentSubmissionResult: React.FC = () => {
     } catch {
       if (isCurrentLoad()) {
         setGradingResult(null);
+    setFallbackAiTranscript(null);
         setError('Không thể tải kết quả chấm bài. Vui lòng thử lại.');
       }
     } finally {
@@ -227,12 +230,39 @@ export const StudentSubmissionResult: React.FC = () => {
     };
   }, [moduleDetail, selectedModuleId, selectedSkill]);
 
+  useEffect(() => {
+    if (moduleDetail?.skill !== 'SPEAKING') {
+      return;
+    }
+    const gradingId = moduleDetail?.grading?.id;
+    if (!gradingResult?.aiTranscript && gradingId && typeof gradingService.getById === 'function') {
+      Promise.resolve(gradingService.getById(gradingId))
+        .then((res) => {
+          if (res?.aiTranscript) {
+            setFallbackAiTranscript(res.aiTranscript);
+          }
+        })
+        .catch(() => {
+          // ignore if forbidden or network error
+        });
+    }
+  }, [gradingResult?.aiTranscript, moduleDetail?.grading?.id, moduleDetail?.skill]);
+
+  const speakingTranscriptText = useMemo(() => {
+    const rawTranscript =
+      gradingResult?.aiTranscript ??
+      fallbackAiTranscript ??
+      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript;
+    const text = extractTranscriptText(rawTranscript);
+    return text.length > 0 ? text : null;
+  }, [gradingResult, fallbackAiTranscript, moduleDetail]);
+
   const targetAnswer = moduleDetail?.answers?.find(answer => !!answer.audioStorageKey) || moduleDetail?.answers?.[0];
   const annotationResult = useStudentAnswerAnnotations(targetAnswer?.id);
   const annotationStatus = isLoading || isLoadingAnnotationAnswer ? 'loading' : annotationResult.status;
   const annotations = useMemo<DisplayAnnotation[]>(() => {
     const rawText = moduleDetail?.skill === 'SPEAKING'
-      ? ''
+      ? (speakingTranscriptText || '')
       : (extractAnswerContentText(moduleDetail?.answers, targetAnswer?.id) || loadedDocText || '');
     return annotationResult.annotations
       .filter(annotation => annotation.reviewStatus === 'ACCEPTED')
@@ -251,7 +281,7 @@ export const StudentSubmissionResult: React.FC = () => {
           endOffset: annotation.endOffset,
         };
       });
-  }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, loadedDocText, t]);
+  }, [annotationResult.annotations, moduleDetail, targetAnswer?.id, loadedDocText, speakingTranscriptText, t]);
 
   const [reloadKey, setReloadKey] = useState(0);
   const handleRetry = () => {
@@ -269,6 +299,7 @@ export const StudentSubmissionResult: React.FC = () => {
 
     annotationLoadId.current++;
     setGradingResult(null);
+    setFallbackAiTranscript(null);
     setError(null);
     setIsLoading(true);
     setReloadKey((k) => k + 1);
@@ -281,6 +312,7 @@ export const StudentSubmissionResult: React.FC = () => {
     const loadData = async () => {
       let moduleLoadStarted = false;
       setGradingResult(null);
+    setFallbackAiTranscript(null);
       setIsLoading(true);
       setError(null);
       setNoSubmissionFound(false);
@@ -386,6 +418,7 @@ export const StudentSubmissionResult: React.FC = () => {
     let loadId = ++annotationLoadId.current;
     setSubmission(null);
     setGradingResult(null);
+    setFallbackAiTranscript(null);
     setModuleDetail(null);
     setSelectedModuleId(null);
     setError(null);
@@ -410,6 +443,7 @@ export const StudentSubmissionResult: React.FC = () => {
       setSubmission(null);
       setModuleDetail(null);
       setGradingResult(null);
+    setFallbackAiTranscript(null);
       setSelectedModuleId(null);
       setError('Không thể tải lần nộp đã chọn. Vui lòng thử lại.');
     } finally {
@@ -1117,6 +1151,19 @@ export const StudentSubmissionResult: React.FC = () => {
               ) : (
                 <div className="result-audio-empty">
                   {isVi ? 'Chưa tìm thấy bản ghi âm của bài nộp này.' : 'No audio recording found for this submission.'}
+                </div>
+              )}
+
+              {/* Spoken Transcript for Student */}
+              {speakingTranscriptText && (
+                <div className="result-speaking-transcript-wrap">
+                  <div className="result-speaking-transcript-label">
+                    <FileText size={16} />
+                    <span>{isVi ? 'Bản ghi lời nói (AI Transcript):' : 'Spoken Transcript (AI Transcribed):'}</span>
+                  </div>
+                  <div className="result-speaking-transcript-text">
+                    {speakingTranscriptText}
+                  </div>
                 </div>
               )}
             </div>

@@ -11,7 +11,7 @@ import {
   type SubmissionModuleDetailResponse,
   type SubmissionSkill,
 } from '../../api/services/submission.service';
-import { gradingService, type StudentGradingResult } from '../../api/services/grading.service';
+import { gradingService, type GradingDetailResponse, type StudentGradingResult } from '../../api/services/grading.service';
 import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 import { questionService } from '../../api/services/question.service';
@@ -35,6 +35,7 @@ vi.mock('../../api/services/submission.service', async (original) => ({
 vi.mock('../../api/services/grading.service', () => ({
   gradingService: {
     getStudentGradingResult: vi.fn(),
+    getById: vi.fn().mockResolvedValue({ id: 1, aiTranscript: null }),
   },
 }));
 
@@ -209,6 +210,7 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     vi.mocked(submissionService.getSubmission).mockResolvedValue(mockSubmission);
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue(mockModuleDetail);
     vi.mocked(gradingService.getStudentGradingResult).mockResolvedValue(publishedResult);
+    vi.mocked(gradingService.getById).mockResolvedValue({ id: 80, aiTranscript: null } as unknown as GradingDetailResponse);
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({
       data: mockAnnotations,
     });
@@ -500,9 +502,10 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
       expect(screen.getByText('Current B feedback')).toBeVisible();
       expect(view.container.querySelector('.result-hero-score-box')).toHaveTextContent('0/10');
       expect(screen.queryByText('Late A feedback')).not.toBeInTheDocument();
-      for (const privateValue of ['Private transcript', 'Private reviewer', 'Private review time', 'Private instruction']) {
+      for (const privateValue of ['Private reviewer', 'Private review time', 'Private instruction']) {
         expect(screen.queryByText(privateValue)).not.toBeInTheDocument();
       }
+      expect(screen.getByText('Private transcript')).toBeVisible();
       expect(screen.queryByText('Không thể tải kết quả chấm bài. Vui lòng thử lại.')).not.toBeInTheDocument();
       expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('current-speaking.webm'));
     },

@@ -124,6 +124,24 @@ export interface StudentGradingResult {
   maxScoreSnapshot: number | null;
   finalFeedback: string | null;
   gradedAt: string | null;
+  aiTranscript?: unknown | null;
+}
+
+export function parseAiTranscriptField(raw: unknown): unknown {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return raw;
+      }
+    }
+  }
+  return raw;
 }
 
 export class GradingService {
@@ -166,8 +184,12 @@ export class GradingService {
     return this.http.put<GradingMessageResponse>(`/gradings/${id}`, payload, options);
   }
 
-  getById(id: number, options?: ApiRequestOptions): Promise<GradingDetailResponse> {
-    return this.http.get<GradingDetailResponse>(`/gradings/${id}`, options);
+  async getById(id: number, options?: ApiRequestOptions): Promise<GradingDetailResponse> {
+    const detail = await this.http.get<GradingDetailResponse>(`/gradings/${id}`, options);
+    if (detail && detail.aiTranscript !== undefined && detail.aiTranscript !== null) {
+      detail.aiTranscript = parseAiTranscriptField(detail.aiTranscript);
+    }
+    return detail;
   }
 
   listGradings(
@@ -199,6 +221,7 @@ export class GradingService {
       maxScoreSnapshot: detail.maxScoreSnapshot,
       finalFeedback: detail.finalFeedback,
       gradedAt: detail.gradedAt,
+      aiTranscript: detail.aiTranscript,
     };
   }
 }
