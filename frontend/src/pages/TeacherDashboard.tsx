@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Users, BookOpen, Clock, Plus, 
+  Users, BookOpen, ClipboardList, Plus, 
   CheckCircle2, 
-  FileText, PenTool, Mic, Headphones, Library,
-  ChevronRight, AlertCircle,
-  RefreshCw
+  PenTool, Mic, Headphones,
+  ChevronRight, ChevronLeft, AlertCircle,
+  RefreshCw, CheckSquare, Clock,
+  Sparkles, GraduationCap, ArrowRight
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
@@ -15,12 +16,10 @@ import { submissionService, type SubmissionListItem, type SubmissionModuleSummar
 import type { 
   TeacherSkill, 
   TeacherPendingSubmission, 
-  TeacherClassSummary,
-  TeacherSkillPerformance,
-  TeacherUpcomingDeadline,
-  TeacherActivityItem
+  TeacherActiveAssignment,
+  TeacherClassSummary
 } from '../types/teacher-dashboard.types';
-import { Button, EmptyState } from '../components/common';
+import { Button, EmptyState, LoadingState } from '../components/common';
 import '../styles/teacher-dashboard.css';
 
 interface EnrichedClassData {
@@ -29,6 +28,8 @@ interface EnrichedClassData {
   assignments: AssignmentSummary[];
   submissions: SubmissionListItem[];
 }
+
+const QUEUE_PAGE_SIZE = 4;
 
 export const TeacherDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -46,8 +47,8 @@ export const TeacherDashboard: React.FC = () => {
   // Raw fetched data
   const [enrichedClasses, setEnrichedClasses] = useState<EnrichedClassData[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
+  const [queuePage, setQueuePage] = useState<number>(1);
 
-  // Timestamp captured once per mount/session to ensure pure rendering calculations
   const [currentTimestamp] = useState(() => Date.now());
 
   const handleRetry = () => {
@@ -73,7 +74,7 @@ export const TeacherDashboard: React.FC = () => {
           return c.status === 'ACTIVE';
         });
 
-        const effectiveClasses = targetClasses.length > 0 ? targetClasses : allClasses.slice(0, 8);
+        const effectiveClasses = targetClasses.length > 0 ? targetClasses : allClasses.slice(0, 10);
 
         // 2. Fetch members, assignments and submissions for each class in parallel
         const enriched = await Promise.all(
@@ -157,13 +158,22 @@ export const TeacherDashboard: React.FC = () => {
     return 'writing';
   };
 
-  // 1. Pending Submissions Queue
+  // Helper: Generate initials avatar
+  const getInitials = (name?: string) => {
+    if (!name) return 'HV';
+    const clean = name.replace(/\(.*?\)/g, '').trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'HV';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  // 1. Pending Submissions Queue (100% real API data)
   const pendingSubmissions: TeacherPendingSubmission[] = useMemo(() => {
     const list: TeacherPendingSubmission[] = [];
 
     for (const ec of enrichedClasses) {
       for (const sub of ec.submissions) {
-        // Consider submissions that are SUBMITTED or have pending module grading
         const isPendingGrading = sub.status === 'SUBMITTED' || 
           sub.modules.some((m: SubmissionModuleSummary) => m.grading?.status === 'PENDING' || m.grading?.status === 'AI_GRADED');
 
@@ -190,23 +200,21 @@ export const TeacherDashboard: React.FC = () => {
             ? `Band ${aiScoreVal}` 
             : hasAiGrading 
             ? (isVi ? 'Đã sơ chấm' : 'Pre-graded') 
-            : (isVi ? 'Chờ AI' : 'Pending AI');
+            : undefined;
 
           list.push({
             id: `sub-${sub.id}`,
-            assignmentId: String(sub.assignmentId),
+            submissionId: sub.id,
+            assignmentId: sub.assignmentId,
             assignmentTitle: assignInfo?.title || (isVi ? `Bài tập #${sub.assignmentId}` : `Assignment #${sub.assignmentId}`),
-            studentId: String(sub.studentId),
+            studentId: sub.studentId,
             studentName: studentInfo?.name || (isVi ? `Học viên #${sub.studentId}` : `Student #${sub.studentId}`),
             studentEmail: studentInfo?.email,
             studentCode: studentInfo?.code,
-            studentAvatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(studentInfo?.name || 'ST')}`,
             className: assignInfo?.className || ec.summary.name,
             skill,
             submittedAt: timeText,
-            aiPreScore,
-            aiConfidence: hasAiGrading ? 95 : 85,
-            urgency: hoursAgo > 48 ? 'high' : hoursAgo > 12 ? 'medium' : 'normal'
+            aiPreScore
           });
         }
       }
@@ -221,11 +229,17 @@ export const TeacherDashboard: React.FC = () => {
     return pendingSubmissions.filter((item) => item.skill === selectedSkill);
   }, [pendingSubmissions, selectedSkill]);
 
-  // Condensed queue items for concise dashboard overview
-  const MAX_OVERVIEW_QUEUE_ITEMS = 4;
-  const displayedQueue = useMemo(() => {
-    return filteredQueue.slice(0, MAX_OVERVIEW_QUEUE_ITEMS);
-  }, [filteredQueue]);
+  // Pagination for Queue
+  const totalQueuePages = Math.max(1, Math.ceil(filteredQueue.length / QUEUE_PAGE_SIZE));
+  const paginatedQueue = useMemo(() => {
+    const startIndex = (queuePage - 1) * QUEUE_PAGE_SIZE;
+    return filteredQueue.slice(startIndex, startIndex + QUEUE_PAGE_SIZE);
+  }, [filteredQueue, queuePage]);
+
+  const handleSkillTabChange = (skill: string) => {
+    setSelectedSkill(skill);
+    setQueuePage(1);
+  };
 
   // Skill counts for tabs
   const queueCounts = useMemo(() => {
@@ -238,7 +252,118 @@ export const TeacherDashboard: React.FC = () => {
     };
   }, [pendingSubmissions]);
 
-  // 2. Class Summaries
+  // 2. Active & Assigned Assignments with real submission progress
+  const activeAssignments: TeacherActiveAssignment[] = useMemo(() => {
+    const list: TeacherActiveAssignment[] = [];
+
+    for (const ec of enrichedClasses) {
+      for (const a of ec.assignments) {
+        const statusUpper = a.status ? a.status.toUpperCase() : '';
+        // Include all published or assigned exercises (exclude unassigned DRAFTs)
+        if (statusUpper !== 'DRAFT') {
+          const enrolled = ec.members.length;
+          const submittedCount = ec.submissions.filter((s) => s.assignmentId === a.id).length;
+          const pendingGradingCount = ec.submissions.filter(
+            (s) => s.assignmentId === a.id && !isSubmissionGraded(s)
+          ).length;
+
+          const submissionRate = enrolled > 0 
+            ? Math.min(100, Math.round((submittedCount / enrolled) * 100))
+            : 0;
+
+          let formattedCloseDate = '';
+          let isUrgent = false;
+          let isExpired = false;
+          if (a.closeAt) {
+            const d = new Date(a.closeAt);
+            if (!isNaN(d.getTime())) {
+              const now = new Date();
+              const diffMs = d.getTime() - now.getTime();
+              isExpired = diffMs < 0 || statusUpper === 'CLOSED';
+
+              const hours = String(d.getHours()).padStart(2, '0');
+              const minutes = String(d.getMinutes()).padStart(2, '0');
+              const timeStr = `${hours}:${minutes}`;
+
+              const day = String(d.getDate()).padStart(2, '0');
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const dateStr = `${day}/${month}`;
+
+              const isToday = d.toDateString() === now.toDateString();
+              const tomorrow = new Date(now);
+              tomorrow.setDate(tomorrow.getDate() + 1);
+              const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+              if (isExpired) {
+                formattedCloseDate = isVi ? `Đã đóng (${dateStr})` : `Closed (${dateStr})`;
+              } else if (isToday) {
+                formattedCloseDate = isVi ? `Hạn hôm nay • ${timeStr}` : `Due today • ${timeStr}`;
+                isUrgent = true;
+              } else if (isTomorrow) {
+                formattedCloseDate = isVi ? `Hạn ngày mai • ${timeStr}` : `Due tomorrow • ${timeStr}`;
+                isUrgent = true;
+              } else {
+                formattedCloseDate = isVi ? `Hạn nộp: ${timeStr}, ${dateStr}` : `Due: ${timeStr}, ${dateStr}`;
+              }
+            }
+          }
+
+          list.push({
+            id: a.id,
+            title: a.title,
+            className: ec.summary.name,
+            classId: ec.summary.id,
+            closeAt: formattedCloseDate,
+            isUrgent,
+            isExpired,
+            enrolledCount: enrolled,
+            submittedCount,
+            pendingGradingCount,
+            submissionRate
+          });
+        }
+      }
+    }
+
+    // Sort: open/urgent assignments first, then recently closed, newest ID first
+    list.sort((x, y) => {
+      if (x.isExpired !== y.isExpired) {
+        return x.isExpired ? 1 : -1;
+      }
+      return y.id - x.id;
+    });
+
+    return list.slice(0, 6);
+  }, [enrichedClasses, isVi]);
+
+  // 3. Overall Grading Stats
+  const gradingOverview = useMemo(() => {
+    let totalSubs = 0;
+    let gradedSubs = 0;
+
+    for (const ec of enrichedClasses) {
+      for (const s of ec.submissions) {
+        totalSubs++;
+        if (isSubmissionGraded(s)) {
+          gradedSubs++;
+        }
+      }
+    }
+
+    const pendingSubs = Math.max(0, totalSubs - gradedSubs);
+    const completionRate = totalSubs > 0 
+      ? Math.min(100, Math.round((gradedSubs / totalSubs) * 100))
+      : 100;
+
+    return {
+      totalSubs,
+      gradedSubs,
+      pendingSubs,
+      completionRate
+    };
+  }, [enrichedClasses]);
+
+  // 4. Class Summaries (100% real API data)
   const classesData: TeacherClassSummary[] = useMemo(() => {
     return enrichedClasses.map((ec) => {
       const cls = ec.summary;
@@ -248,7 +373,6 @@ export const TeacherDashboard: React.FC = () => {
         (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
       ).length;
 
-      // Calculate avg score across completed submissions
       const gradedScores: number[] = [];
       for (const s of ec.submissions) {
         for (const m of s.modules) {
@@ -262,218 +386,52 @@ export const TeacherDashboard: React.FC = () => {
         ? Math.round((gradedScores.reduce((a, b) => a + b, 0) / gradedScores.length) * 10) / 10 
         : 0;
 
-      const totalPossibleSubmissions = ec.assignments.length * Math.max(1, totalEnrolled);
-      const submittedCount = ec.submissions.length;
-      const progressPercent = totalPossibleSubmissions > 0 
-        ? Math.min(100, Math.round((submittedCount / totalPossibleSubmissions) * 100))
-        : 0;
-
       return {
-        id: String(cls.id),
+        id: cls.id,
         code: `CLASS-${cls.id}`,
         name: cls.name,
         enrolled: totalEnrolled,
+        assignmentsCount: ec.assignments.length,
         pendingGrading: pendingCount,
-        avgScore,
-        nextSession: isVi ? 'Lịch học trong tuần' : 'Scheduled this week',
-        schedule: isVi ? 'Theo thời khóa biểu' : 'Regular Schedule',
-        progressPercent
+        avgScore
       };
     });
-  }, [enrichedClasses, isVi]);
-
-  // 3. 4-Skill Performance
-  const skillPerformances: TeacherSkillPerformance[] = useMemo(() => {
-    const skillScores: Record<TeacherSkill, number[]> = {
-      writing: [],
-      speaking: [],
-      reading: [],
-      listening: []
-    };
-
-    for (const ec of enrichedClasses) {
-      for (const s of ec.submissions) {
-        for (const m of s.modules) {
-          const sk = mapSkill(m.skill);
-          if (m.grading?.finalScore !== null && m.grading?.finalScore !== undefined) {
-            skillScores[sk].push(m.grading.finalScore);
-          }
-        }
-      }
-    }
-
-    const calcAvg = (scores: number[]) => {
-      const valid = scores.filter((sc) => sc > 0);
-      if (valid.length === 0) return 0;
-      return Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 10) / 10;
-    };
-
-    const calcSkillSubmissionRate = (skill: TeacherSkill) => {
-      let possible = 0;
-      let actual = 0;
-      for (const ec of enrichedClasses) {
-        const matchingAssigns = ec.assignments.filter((a) => mapSkill(a.title) === skill);
-        possible += matchingAssigns.length * ec.members.length;
-        for (const s of ec.submissions) {
-          if (s.modules.some((m) => mapSkill(m.skill) === skill)) {
-            actual++;
-          }
-        }
-      }
-      return possible > 0 ? Math.min(100, Math.round((actual / possible) * 100)) : 0;
-    };
-
-    return [
-      {
-        skill: 'writing',
-        skillName: 'Writing',
-        avgScore: calcAvg(skillScores.writing),
-        submissionRate: calcSkillSubmissionRate('writing'),
-        needsReviewCount: queueCounts.writing
-      },
-      {
-        skill: 'speaking',
-        skillName: 'Speaking',
-        avgScore: calcAvg(skillScores.speaking),
-        submissionRate: calcSkillSubmissionRate('speaking'),
-        needsReviewCount: queueCounts.speaking
-      },
-      {
-        skill: 'reading',
-        skillName: 'Reading',
-        avgScore: calcAvg(skillScores.reading),
-        submissionRate: calcSkillSubmissionRate('reading'),
-        needsReviewCount: queueCounts.reading
-      },
-      {
-        skill: 'listening',
-        skillName: 'Listening',
-        avgScore: calcAvg(skillScores.listening),
-        submissionRate: calcSkillSubmissionRate('listening'),
-        needsReviewCount: queueCounts.listening
-      }
-    ];
-  }, [enrichedClasses, queueCounts]);
-
-  // 4. Upcoming Deadlines
-  const upcomingDeadlines: TeacherUpcomingDeadline[] = useMemo(() => {
-    const deadlines: TeacherUpcomingDeadline[] = [];
-
-    for (const ec of enrichedClasses) {
-      for (const a of ec.assignments) {
-        const closeDate = a.closeAt ? new Date(a.closeAt) : null;
-        if (!closeDate) continue;
-
-        const msRemaining = closeDate.getTime() - currentTimestamp;
-        const hoursRemaining = Math.round(msRemaining / (1000 * 60 * 60));
-
-        let timeRemaining = isVi ? 'Đã quá hạn' : 'Overdue';
-        let status: 'urgent' | 'upcoming' = 'upcoming';
-
-        if (hoursRemaining > 24) {
-          const days = Math.round(hoursRemaining / 24);
-          timeRemaining = isVi ? `còn ${days} ngày` : `${days} days left`;
-        } else if (hoursRemaining > 0) {
-          timeRemaining = isVi ? `còn ${hoursRemaining} giờ` : `${hoursRemaining}h left`;
-          status = 'urgent';
-        }
-
-        deadlines.push({
-          id: `dl-${a.id}`,
-          title: a.title,
-          type: 'assignment',
-          className: ec.summary.name,
-          date: closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit'
-          }),
-          timeRemaining,
-          status
-        });
-      }
-    }
-
-    return deadlines.slice(0, 4);
-  }, [enrichedClasses, isVi, currentTimestamp]);
-
-  // 5. Activity Feed
-  const recentActivities: TeacherActivityItem[] = useMemo(() => {
-    const activities: TeacherActivityItem[] = [];
-
-    for (const ec of enrichedClasses) {
-      for (const sub of ec.submissions) {
-        const studentInfo = studentMap.get(sub.studentId);
-        const assignInfo = assignmentMap.get(sub.assignmentId);
-        const studentName = studentInfo?.name || (isVi ? 'Học viên' : 'Student');
-
-        if (isSubmissionGraded(sub)) {
-          activities.push({
-            id: `act-grad-${sub.id}`,
-            type: 'ai_graded',
-            title: isVi 
-              ? `Hoàn tất chấm bài của ${studentName}` 
-              : `Grading finalized for ${studentName}`,
-            desc: assignInfo?.title || ec.summary.name,
-            timestamp: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : (isVi ? 'Gần đây' : 'Recently'),
-            className: ec.summary.name
-          });
-        } else if (sub.status === 'SUBMITTED') {
-          activities.push({
-            id: `act-sub-${sub.id}`,
-            type: 'submission',
-            title: isVi 
-              ? `${studentName} đã nộp bài tập` 
-              : `${studentName} submitted assignment`,
-            desc: assignInfo?.title || ec.summary.name,
-            timestamp: sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : (isVi ? 'Hôm nay' : 'Today'),
-            className: ec.summary.name
-          });
-        }
-      }
-    }
-
-    return activities.slice(0, 5);
-  }, [enrichedClasses, studentMap, assignmentMap, isVi]);
+  }, [enrichedClasses]);
 
   // Total KPIs
   const totalStudentsCount = useMemo(() => {
     return enrichedClasses.reduce((sum, ec) => sum + ec.members.length, 0);
   }, [enrichedClasses]);
 
-  const overallAvgBand = useMemo(() => {
-    const scores = skillPerformances.map((s) => s.avgScore).filter((s) => s > 0);
-    if (scores.length === 0) return 'Band 0.0';
-    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-    return `Band ${avg.toFixed(1)}`;
-  }, [skillPerformances]);
+  const totalAssignmentsCount = useMemo(() => {
+    return enrichedClasses.reduce((sum, ec) => sum + ec.assignments.length, 0);
+  }, [enrichedClasses]);
 
   // Skill badge helper
   const renderSkillBadge = (skill: TeacherSkill) => {
     switch (skill) {
       case 'writing':
         return (
-          <span className="exam-badge-skill writing">
-            <PenTool size={12} /> Writing
+          <span className="teacher-dash-skill-pill writing">
+            <PenTool size={11} /> Writing
           </span>
         );
       case 'speaking':
         return (
-          <span className="exam-badge-skill speaking">
-            <Mic size={12} /> Speaking
+          <span className="teacher-dash-skill-pill speaking">
+            <Mic size={11} /> Speaking
           </span>
         );
       case 'reading':
         return (
-          <span className="exam-badge-skill reading">
-            <BookOpen size={12} /> Reading
+          <span className="teacher-dash-skill-pill reading">
+            <BookOpen size={11} /> Reading
           </span>
         );
       default:
         return (
-          <span className="exam-badge-skill listening">
-            <Headphones size={12} /> Listening
+          <span className="teacher-dash-skill-pill listening">
+            <Headphones size={11} /> Listening
           </span>
         );
     }
@@ -487,44 +445,41 @@ export const TeacherDashboard: React.FC = () => {
           <h1 className="teacher-dash-greeting">
             {isVi ? `Chào mừng trở lại, ${teacherName}!` : `Welcome back, ${teacherName}!`}
           </h1>
+          <p className="teacher-dash-subgreeting">
+            {pendingSubmissions.length > 0 
+              ? (isVi 
+                  ? `${pendingSubmissions.length} bài nộp đang chờ chấm điểm.` 
+                  : `${pendingSubmissions.length} submissions awaiting review.`)
+              : (isVi
+                  ? 'Tất cả bài nộp đã được chấm hoàn tất.'
+                  : 'All submissions have been graded.')}
+          </p>
         </div>
 
         <div className="teacher-dash-hero-actions">
           <Button 
             variant="primary"
-            icon={<Plus size={16} />}
+            icon={<Plus size={15} />}
             onClick={() => navigate('/teacher/assignments/create')}
           >
             {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
           </Button>
-          <Button 
-            variant="secondary"
-            icon={<Library size={16} />}
-            onClick={() => navigate('/teacher/assignments')}
-          >
-            {isVi ? 'Quản lý bài tập' : 'Assignments'}
-          </Button>
         </div>
       </section>
 
-      {/* Loading Skeleton */}
+      {/* Loading State */}
       {isLoading && (
-        <div className="eh-card p-8 text-center text-muted">
-          <RefreshCw size={36} className="animate-spin mx-auto mb-3 text-primary block" />
-          <h3 className="m-0 text-base font-bold text-surface">
-            {isVi ? 'Đang tải dữ liệu thực tế từ hệ thống...' : 'Loading live dashboard metrics...'}
-          </h3>
-          <p className="mt-1 text-xs text-muted">
-            {isVi ? 'Đang đồng bộ lớp học, bài tập nộp và điểm số học viên.' : 'Syncing classes, submissions, and performance data.'}
-          </p>
-        </div>
+        <LoadingState 
+          title={isVi ? 'Đang đồng bộ dữ liệu lớp học & bài nộp...' : 'Syncing classes and submissions...'}
+          description={isVi ? 'Đang tải hàng đợi bài nộp cần chấm và tiến độ hoàn thành các lớp.' : 'Fetching submissions awaiting evaluation and active class turnouts.'}
+        />
       )}
 
       {/* Error Alert */}
       {!isLoading && error && (
-        <div className="adm-alert-error justify-between p-4 mb-6">
+        <div className="adm-alert-error justify-between p-4">
           <div className="flex items-center gap-3">
-            <AlertCircle size={22} className="text-error" />
+            <AlertCircle size={20} className="text-error" />
             <span className="text-sm text-error font-semibold">{error}</span>
           </div>
           <Button 
@@ -543,369 +498,426 @@ export const TeacherDashboard: React.FC = () => {
         <section className="teacher-dash-kpi-grid">
           {/* KPI 1: Active Classes */}
           <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/classes')}>
-            <div className="teacher-dash-kpi-body">
-              <div className="teacher-dash-kpi-value">{enrichedClasses.length}</div>
-              <div className="teacher-dash-kpi-label">{isVi ? 'Lớp đang giảng dạy' : 'Active Classes'}</div>
+            <div className="teacher-dash-kpi-header">
+              <div className="teacher-dash-kpi-icon-wrap classes">
+                <BookOpen size={20} />
+              </div>
+              <span className="teacher-dash-kpi-subtext">
+                {isVi ? 'Đang hoạt động' : 'Active'}
+              </span>
             </div>
+            <div className="teacher-dash-kpi-value">{enrichedClasses.length}</div>
+            <div className="teacher-dash-kpi-label">{isVi ? 'Lớp giảng dạy' : 'Teaching Classes'}</div>
           </div>
 
           {/* KPI 2: Total Students */}
-          <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-body">
-              <div className="teacher-dash-kpi-value">{totalStudentsCount}</div>
-              <div className="teacher-dash-kpi-label">{isVi ? 'Tổng số học viên' : 'Enrolled Students'}</div>
+          <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/classes')}>
+            <div className="teacher-dash-kpi-header">
+              <div className="teacher-dash-kpi-icon-wrap">
+                <Users size={20} />
+              </div>
+              <span className="teacher-dash-kpi-subtext">
+                {isVi ? 'Tổng ghi danh' : 'Enrolled'}
+              </span>
             </div>
+            <div className="teacher-dash-kpi-value">{totalStudentsCount}</div>
+            <div className="teacher-dash-kpi-label">{isVi ? 'Tổng số học viên' : 'Total Students'}</div>
           </div>
 
           {/* KPI 3: Pending Grading Queue */}
-          <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/assignments')}>
-            <div className="teacher-dash-kpi-body">
-              <div className="teacher-dash-kpi-value">{pendingSubmissions.length}</div>
-              <div className="teacher-dash-kpi-label">{isVi ? 'Bài nộp chờ chấm' : 'Pending Submissions'}</div>
+          <div className="teacher-dash-kpi-card" onClick={() => {
+            const el = document.getElementById('pending-queue-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}>
+            <div className="teacher-dash-kpi-header">
+              <div className="teacher-dash-kpi-icon-wrap gold">
+                <CheckSquare size={20} />
+              </div>
+              {pendingSubmissions.length > 0 ? (
+                <span className="teacher-dash-kpi-badge">
+                  {isVi ? 'Cần chấm' : 'To Grade'}
+                </span>
+              ) : (
+                <span className="teacher-dash-kpi-badge done">
+                  {isVi ? 'Đã hoàn tất' : 'Done'}
+                </span>
+              )}
             </div>
+            <div className="teacher-dash-kpi-value">{pendingSubmissions.length}</div>
+            <div className="teacher-dash-kpi-label">{isVi ? 'Bài nộp chờ chấm' : 'Pending Submissions'}</div>
           </div>
 
-          {/* KPI 4: Average Score */}
-          <div className="teacher-dash-kpi-card">
-            <div className="teacher-dash-kpi-body">
-              <div className="teacher-dash-kpi-value">{overallAvgBand}</div>
-              <div className="teacher-dash-kpi-label">{isVi ? 'Điểm trung bình các lớp' : 'Overall Average'}</div>
+          {/* KPI 4: Total Assignments Assigned */}
+          <div className="teacher-dash-kpi-card" onClick={() => navigate('/teacher/assignments')}>
+            <div className="teacher-dash-kpi-header">
+              <div className="teacher-dash-kpi-icon-wrap">
+                <ClipboardList size={20} />
+              </div>
+              <span className="teacher-dash-kpi-subtext">
+                {isVi ? 'Tất cả lớp' : 'All Classes'}
+              </span>
             </div>
+            <div className="teacher-dash-kpi-value">{totalAssignmentsCount}</div>
+            <div className="teacher-dash-kpi-label">{isVi ? 'Bài tập đã giao' : 'Total Assignments'}</div>
           </div>
         </section>
       )}
 
-      {/* 3. Main Dashboard Columns */}
+      {/* 3. Main Dashboard Workspace: Two-Column Layout */}
       {!isLoading && !error && (
-        <div className="teacher-dash-main-cols">
-          {/* Left Column: Pending Submissions Queue & 4-Skill Matrix */}
-          <div className="flex flex-col gap-6">
-            {/* Pending Submissions Queue (Condensed Overview) */}
-            <section className="teacher-dash-card-section">
-              <div className="teacher-dash-section-header">
-                <div className="teacher-dash-section-title-wrap">
-                  <h2 className="teacher-dash-section-title">
-                    {isVi ? 'Hàng đợi bài nộp cần chấm & duyệt' : 'Pending Grading & Review Queue'}
-                  </h2>
-                </div>
-                <button 
-                  type="button"
-                  className="teacher-dash-link-action"
-                  onClick={() => navigate('/teacher/assignments')}
-                >
-                  <span>{isVi ? 'Xem tất cả' : 'View all'}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
+        <div className="teacher-dash-two-cols">
+          {/* Left Column: Pending Submissions Queue with Pagination */}
+          <section id="pending-queue-section" className="teacher-dash-section">
+            <div className="teacher-dash-section-header">
+              <h2 className="teacher-dash-section-title">
+                {isVi ? 'Hàng đợi bài nộp cần chấm & đánh giá' : 'Pending Submissions Queue'}
+              </h2>
+              <button 
+                type="button"
+                className="teacher-dash-link-action"
+                onClick={() => navigate('/teacher/assignments')}
+              >
+                <span>{isVi ? 'Tất cả bài tập' : 'All assignments'}</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
 
-              {/* Skill Filter Tabs */}
-              <div className="teacher-dash-skill-tabs">
+            {/* Skill Filter Segmented Control */}
+            <div className="teacher-dash-skill-filter-wrapper">
+              <div className="teacher-dash-skill-segmented" role="tablist" aria-label="Lọc theo kỹ năng">
                 <button 
                   type="button"
-                  className={`teacher-dash-skill-tab-btn ${selectedSkill === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedSkill('all')}
+                  role="tab"
+                  aria-selected={selectedSkill === 'all'}
+                  className={`teacher-dash-skill-pill ${selectedSkill === 'all' ? 'active' : ''}`}
+                  onClick={() => handleSkillTabChange('all')}
                 >
-                  <span>{isVi ? 'Tất cả' : 'All'}</span>
-                  <span className="teacher-dash-tab-count">{queueCounts.all}</span>
+                  <span className="teacher-dash-skill-pill-name">{isVi ? 'Tất cả' : 'All'}</span>
+                  <span className="teacher-dash-skill-pill-count">{queueCounts.all}</span>
                 </button>
                 <button 
                   type="button"
-                  className={`teacher-dash-skill-tab-btn ${selectedSkill === 'writing' ? 'active' : ''}`}
-                  onClick={() => setSelectedSkill('writing')}
+                  role="tab"
+                  aria-selected={selectedSkill === 'writing'}
+                  className={`teacher-dash-skill-pill ${selectedSkill === 'writing' ? 'active' : ''}`}
+                  onClick={() => handleSkillTabChange('writing')}
                 >
                   <PenTool size={12} />
-                  <span>Writing</span>
-                  <span className="teacher-dash-tab-count">{queueCounts.writing}</span>
+                  <span className="teacher-dash-skill-pill-name">Writing</span>
+                  <span className="teacher-dash-skill-pill-count">{queueCounts.writing}</span>
                 </button>
                 <button 
                   type="button"
-                  className={`teacher-dash-skill-tab-btn ${selectedSkill === 'speaking' ? 'active' : ''}`}
-                  onClick={() => setSelectedSkill('speaking')}
+                  role="tab"
+                  aria-selected={selectedSkill === 'speaking'}
+                  className={`teacher-dash-skill-pill ${selectedSkill === 'speaking' ? 'active' : ''}`}
+                  onClick={() => handleSkillTabChange('speaking')}
                 >
                   <Mic size={12} />
-                  <span>Speaking</span>
-                  <span className="teacher-dash-tab-count">{queueCounts.speaking}</span>
+                  <span className="teacher-dash-skill-pill-name">Speaking</span>
+                  <span className="teacher-dash-skill-pill-count">{queueCounts.speaking}</span>
                 </button>
                 <button 
                   type="button"
-                  className={`teacher-dash-skill-tab-btn ${selectedSkill === 'reading' ? 'active' : ''}`}
-                  onClick={() => setSelectedSkill('reading')}
+                  role="tab"
+                  aria-selected={selectedSkill === 'reading'}
+                  className={`teacher-dash-skill-pill ${selectedSkill === 'reading' ? 'active' : ''}`}
+                  onClick={() => handleSkillTabChange('reading')}
                 >
                   <BookOpen size={12} />
-                  <span>Reading</span>
-                  <span className="teacher-dash-tab-count">{queueCounts.reading}</span>
+                  <span className="teacher-dash-skill-pill-name">Reading</span>
+                  <span className="teacher-dash-skill-pill-count">{queueCounts.reading}</span>
                 </button>
                 <button 
                   type="button"
-                  className={`teacher-dash-skill-tab-btn ${selectedSkill === 'listening' ? 'active' : ''}`}
-                  onClick={() => setSelectedSkill('listening')}
+                  role="tab"
+                  aria-selected={selectedSkill === 'listening'}
+                  className={`teacher-dash-skill-pill ${selectedSkill === 'listening' ? 'active' : ''}`}
+                  onClick={() => handleSkillTabChange('listening')}
                 >
                   <Headphones size={12} />
-                  <span>Listening</span>
-                  <span className="teacher-dash-tab-count">{queueCounts.listening}</span>
+                  <span className="teacher-dash-skill-pill-name">Listening</span>
+                  <span className="teacher-dash-skill-pill-count">{queueCounts.listening}</span>
                 </button>
               </div>
+            </div>
 
-              {/* Submission Queue Items (Overview Condensed) */}
-              <div className="teacher-dash-queue-list">
-                {displayedQueue.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`teacher-dash-queue-item ${item.urgency === 'high' ? 'high-urgency' : ''}`}
-                  >
-                    <div className="teacher-dash-student-info">
-                      <img 
-                        src={item.studentAvatar} 
-                        alt={item.studentName} 
-                        className="teacher-dash-avatar" 
-                      />
-                      <div className="teacher-dash-details">
-                        <div className="teacher-dash-student-name">
-                          <span>{item.studentName}</span>
+            {/* Submissions List (Paginated, Max 4 per page) */}
+            <div className="teacher-dash-queue-list">
+              {paginatedQueue.map((item) => (
+                <div key={item.id} className={`teacher-dash-queue-card skill-${item.skill}`}>
+                  {/* Top Row: Student Identity (Left) & Skill / AI Badges (Right) */}
+                  <div className="teacher-dash-queue-card-header">
+                    <div className="teacher-dash-queue-student-group">
+                      <div className="teacher-dash-avatar-initials">
+                        {getInitials(item.studentName)}
+                      </div>
+                      <div className="teacher-dash-student-meta">
+                        <div className="teacher-dash-student-line">
+                          <span className="teacher-dash-student-name">{item.studentName}</span>
+                          {item.studentCode && (
+                            <span className="teacher-dash-student-code">{item.studentCode}</span>
+                          )}
+                        </div>
+                        <div className="teacher-dash-class-line">
+                          <GraduationCap size={12} className="teacher-dash-class-icon" />
                           <span className="teacher-dash-class-tag">{item.className}</span>
-                          {renderSkillBadge(item.skill)}
-                        </div>
-                        <div className="teacher-dash-assignment-title" title={item.assignmentTitle}>
-                          {item.assignmentTitle}
-                        </div>
-                        <div className="teacher-dash-meta-pills">
-                          <span>{item.submittedAt}</span>
-                          <span>•</span>
-                          <span className="teacher-dash-ai-pill">
-                            AI: {item.aiPreScore}
-                          </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="teacher-dash-queue-actions">
-                      <button 
-                        type="button"
-                        className="teacher-dash-btn-grade"
-                        onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`, {
-                          state: {
-                            studentName: item.studentName,
-                            studentCode: item.studentCode
-                          }
-                        })}
-                      >
-                        <span>{isVi ? 'Chấm bài' : 'Grade'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {filteredQueue.length === 0 && (
-                  <div className="teacher-dash-queue-empty">
-                    <CheckCircle2 size={18} className="text-primary" />
-                    <span>
-                      {isVi 
-                        ? 'Không có bài nộp chờ chấm. Tất cả bài tập đã được chấm hoặc học sinh chưa nộp bài mới.' 
-                        : 'No pending submissions in queue.'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* 4-Skill Matrix Performance */}
-            <section className="teacher-dash-card-section">
-              <div className="teacher-dash-section-header">
-                <div className="teacher-dash-section-title-wrap">
-                  <h2 className="teacher-dash-section-title">
-                    {isVi ? 'Năng lực 4 Kỹ năng (Tổng hợp các lớp)' : '4-Skill Competence Matrix'}
-                  </h2>
-                </div>
-                <button 
-                  type="button"
-                  className="teacher-dash-link-action"
-                  onClick={() => navigate('/teacher/classes')}
-                >
-                  <span>{isVi ? 'Chi tiết tiến độ' : 'Detailed progress'}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="teacher-dash-skill-matrix">
-                {skillPerformances.map((item) => (
-                  <div key={item.skill} className="teacher-dash-skill-box">
-                    <div className="teacher-dash-skill-box-top">
-                      <span className="teacher-dash-skill-title">
-                        {item.skill === 'writing' && <PenTool size={14} className="text-primary" />}
-                        {item.skill === 'speaking' && <Mic size={14} color="#9333ea" />}
-                        {item.skill === 'reading' && <BookOpen size={14} className="text-secondary" />}
-                        {item.skill === 'listening' && <Headphones size={14} color="#0d9488" />}
-                        {item.skillName}
-                      </span>
-                      <span className="teacher-dash-skill-score">
-                        {item.avgScore > 0 ? item.avgScore : '—'}
-                      </span>
-                    </div>
-
-                    <div className="teacher-dash-progress-track">
-                      <div 
-                        className={`teacher-dash-progress-bar ${item.skill}`}
-                        style={{ width: `${Math.min(100, Math.round((item.avgScore / 10.0) * 100))}%` }}
-                      />
-                    </div>
-
-                    <div className="teacher-dash-skill-foot">
-                      <span>{isVi ? 'Nộp bài:' : 'Completion:'} {item.submissionRate}%</span>
-                      <span>{item.needsReviewCount} {isVi ? 'chờ duyệt' : 'pending'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Active Classes Grid */}
-            <section className="teacher-dash-card-section">
-              <div className="teacher-dash-section-header">
-                <div className="teacher-dash-section-title-wrap">
-                  <h2 className="teacher-dash-section-title">
-                    {isVi ? 'Tổng quan các Lớp đang phụ trách' : 'My Active Classes Overview'}
-                  </h2>
-                </div>
-                <button 
-                  className="teacher-dash-link-action"
-                  onClick={() => navigate('/teacher/classes')}
-                >
-                  <span>{isVi ? 'Quản lý lớp học' : 'Manage classes'}</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="teacher-dash-classes-grid">
-                {classesData.map((cls) => (
-                  <div 
-                    key={cls.id} 
-                    className="teacher-dash-class-card"
-                    onClick={() => navigate(`/teacher/classes/${cls.id}/progress`)}
-                  >
-                    <div className="teacher-dash-class-header">
-                      <div>
-                        <span className="teacher-dash-class-code">{cls.code}</span>
-                        <div className="teacher-dash-class-name">{cls.name}</div>
-                      </div>
-                    </div>
-
-                    <div className="teacher-dash-class-meta-row">
-                      <span className="teacher-dash-class-meta-item">
-                        <Users size={14} /> {cls.enrolled} {isVi ? 'học viên' : 'students'}
-                      </span>
-                      <span className="teacher-dash-class-meta-item">
-                        <Clock size={14} /> {cls.nextSession}
-                      </span>
-                    </div>
-
-                    <div className="teacher-dash-progress-track">
-                      <div 
-                        className="teacher-dash-progress-bar writing"
-                        style={{ width: `${cls.progressPercent}%` }}
-                      />
-                    </div>
-
-                    <div className="teacher-dash-class-footer">
-                      <span className="teacher-dash-class-score-pill">
-                        Band TB: {cls.avgScore}
-                      </span>
-                      {cls.pendingGrading > 0 ? (
-                        <span className="teacher-dash-class-pending-badge">
-                          {cls.pendingGrading} {isVi ? 'bài cần chấm' : 'to grade'}
+                    <div className="teacher-dash-queue-badges">
+                      {renderSkillBadge(item.skill)}
+                      {item.aiPreScore && (
+                        <span className="teacher-dash-ai-pill">
+                          <Sparkles size={11} />
+                          <span>AI: {item.aiPreScore}</span>
                         </span>
-                      ) : (
-                        <span className="teacher-dash-class-done-badge">
-                          {isVi ? 'Đã hoàn tất' : 'All Graded'}
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="teacher-dash-queue-divider" />
+
+                  {/* Bottom Row: Assignment Title, Submission Time & Grade Action */}
+                  <div className="teacher-dash-queue-card-body">
+                    <div className="teacher-dash-assignment-info">
+                      <div className="teacher-dash-assignment-title" title={item.assignmentTitle}>
+                        {item.assignmentTitle}
+                      </div>
+                      <div className="teacher-dash-time">
+                        <Clock size={12} />
+                        <span>{isVi ? `Nộp ${item.submittedAt}` : `Submitted ${item.submittedAt}`}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button"
+                      className="teacher-dash-btn-grade"
+                      onClick={() => navigate(`/teacher/assignments/${item.assignmentId}/submissions/${item.studentId}`, {
+                        state: {
+                          studentName: item.studentName,
+                          studentCode: item.studentCode
+                        }
+                      })}
+                    >
+                      <span>{isVi ? 'Chấm bài' : 'Grade'}</span>
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {filteredQueue.length === 0 && (
+                <div className="teacher-dash-queue-empty">
+                  <CheckCircle2 size={20} className="text-primary" />
+                  <span>
+                    {isVi 
+                      ? 'Hiện không có bài nộp nào cần chấm trong danh mục này.' 
+                      : 'No pending submissions in this category.'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Pagination Controls */}
+            {filteredQueue.length > QUEUE_PAGE_SIZE && (
+              <div className="teacher-dash-pagination">
+                <span className="teacher-dash-page-info">
+                  {isVi 
+                    ? `Hiển thị ${(queuePage - 1) * QUEUE_PAGE_SIZE + 1} - ${Math.min(queuePage * QUEUE_PAGE_SIZE, filteredQueue.length)} trên tổng số ${filteredQueue.length} bài`
+                    : `Showing ${(queuePage - 1) * QUEUE_PAGE_SIZE + 1} - ${Math.min(queuePage * QUEUE_PAGE_SIZE, filteredQueue.length)} of ${filteredQueue.length}`}
+                </span>
+
+                <div className="teacher-dash-page-actions">
+                  <button 
+                    type="button" 
+                    className="teacher-dash-btn-page"
+                    disabled={queuePage <= 1}
+                    onClick={() => setQueuePage((prev) => Math.max(1, prev - 1))}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  <span className="teacher-dash-page-label">
+                    {queuePage} / {totalQueuePages}
+                  </span>
+
+                  <button 
+                    type="button" 
+                    className="teacher-dash-btn-page"
+                    disabled={queuePage >= totalQueuePages}
+                    onClick={() => setQueuePage((prev) => Math.min(totalQueuePages, prev + 1))}
+                    aria-label="Next page"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Right Column: Balanced Real-Data Widgets */}
+          <div className="teacher-dash-right-col">
+            {/* Widget 1: Active Assignments Submission Tracker */}
+            <section className="teacher-dash-section">
+              <div className="teacher-dash-section-header">
+                <h3 className="teacher-dash-section-title">
+                  {isVi ? 'Bài tập đang mở & Tiến độ nộp' : 'Active Assignments'}
+                </h3>
+              </div>
+
+              <div className="teacher-dash-active-assign-list">
+                {activeAssignments.map((a) => (
+                  <div 
+                    key={a.id} 
+                    className="teacher-dash-active-assign-item"
+                    onClick={() => navigate(`/teacher/assignments`)}
+                  >
+                    <div className="teacher-dash-active-assign-top">
+                      <h4 className="teacher-dash-active-assign-title">{a.title}</h4>
+                      <span className="teacher-dash-active-assign-class">{a.className}</span>
+                    </div>
+
+                    <div className="teacher-dash-progress-track">
+                      <div 
+                        className="teacher-dash-progress-bar"
+                        style={{ width: `${a.submissionRate}%` }}
+                      />
+                    </div>
+
+                    <div className="teacher-dash-active-assign-meta">
+                      <span className="teacher-dash-active-assign-stat">
+                        {isVi ? 'Đã nộp:' : 'Submitted:'} <strong>{a.submittedCount} / {a.enrolledCount}</strong> ({a.submissionRate}%)
+                      </span>
+                      {a.closeAt && (
+                        <span className={`teacher-dash-deadline-tag ${a.isUrgent ? 'urgent' : ''} ${a.isExpired ? 'expired' : ''}`}>
+                          <Clock size={11} />
+                          <span>{a.closeAt}</span>
                         </span>
                       )}
                     </div>
                   </div>
                 ))}
 
-                {classesData.length === 0 && (
-                  <div className="col-span-full">
-                    <EmptyState
-                      icon={BookOpen}
-                      title={isVi ? 'Chưa có lớp học nào được phân công' : 'No classes assigned'}
-                      description={isVi ? 'Liên hệ Quản trị viên để được xếp lớp giảng dạy.' : 'Contact administrator to be assigned classes.'}
-                    />
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          {/* Right Column: Widgets (Schedule & Timeline) */}
-          <div className="teacher-dash-side-widgets">
-            {/* Upcoming Schedule & Deadlines */}
-            <section className="teacher-dash-card-section">
-              <div className="teacher-dash-section-header">
-                <div className="teacher-dash-section-title-wrap">
-                  <h3 className="teacher-dash-section-title">
-                    {isVi ? 'Hạn nộp & Lịch sắp tới' : 'Upcoming Deadlines'}
-                  </h3>
-                </div>
-              </div>
-
-              <div className="teacher-dash-deadline-list">
-                {upcomingDeadlines.map((item) => (
-                  <div key={item.id} className="teacher-dash-deadline-item">
-                    <div 
-                      className={`teacher-dash-deadline-icon ${item.status === 'urgent' ? 'urgent' : 'normal'}`}
-                    >
-                      <FileText size={16} />
-                    </div>
-                    <div className="teacher-dash-deadline-info">
-                      <div className="teacher-dash-deadline-title">{item.title}</div>
-                      <div className="teacher-dash-deadline-class">{item.className}</div>
-                      <div className="teacher-dash-deadline-time">
-                        <Clock size={11} /> {item.date} ({item.timeRemaining})
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {upcomingDeadlines.length === 0 && (
-                  <div className="teacher-dash-widget-empty">
-                    {isVi ? 'Không có hạn nộp nào trong thời gian tới.' : 'No upcoming deadlines.'}
+                {activeAssignments.length === 0 && (
+                  <div className="teacher-dash-queue-empty">
+                    <CheckCircle2 size={16} className="text-muted" />
+                    <span>{isVi ? 'Không có bài tập nào đang mở.' : 'No active assignments.'}</span>
                   </div>
                 )}
               </div>
             </section>
 
-            {/* Recent Teaching Activities */}
-            <section className="teacher-dash-card-section">
+            {/* Widget 2: Overall Grading Efficiency Summary */}
+            <section className="teacher-dash-section">
               <div className="teacher-dash-section-header">
-                <div className="teacher-dash-section-title-wrap">
-                  <h3 className="teacher-dash-section-title">
-                    {isVi ? 'Hoạt động gần đây' : 'Recent Activity Stream'}
-                  </h3>
+                <h3 className="teacher-dash-section-title">
+                  {isVi ? 'Hiệu suất chấm điểm' : 'Grading Overview'}
+                </h3>
+              </div>
+
+              <div className="teacher-dash-grading-summary">
+                <div className="teacher-dash-stat-box">
+                  <span className="teacher-dash-stat-box-num">{gradingOverview.totalSubs}</span>
+                  <span className="teacher-dash-stat-box-label">{isVi ? 'Tổng bài đã nộp' : 'Total Submissions'}</span>
+                </div>
+                <div className="teacher-dash-stat-box">
+                  <span className="teacher-dash-stat-box-num">{gradingOverview.gradedSubs}</span>
+                  <span className="teacher-dash-stat-box-label">{isVi ? 'Đã hoàn tất chấm' : 'Graded'}</span>
                 </div>
               </div>
 
-              <div className="teacher-dash-activity-timeline">
-                {recentActivities.map((act) => (
-                  <div key={act.id} className="teacher-dash-activity-item">
-                    <div 
-                      className={`teacher-dash-activity-dot ${act.type === 'submission' ? 'submission' : act.type === 'ai_graded' ? 'ai_graded' : 'normal'}`}
-                    />
-                    <div className="teacher-dash-activity-content">
-                      <div className="teacher-dash-activity-title">{act.title}</div>
-                      <div className="teacher-dash-activity-desc">{act.desc}</div>
-                      <div className="teacher-dash-activity-time">{act.timestamp} • {act.className}</div>
-                    </div>
-                  </div>
-                ))}
-
-                {recentActivities.length === 0 && (
-                  <div className="teacher-dash-widget-empty">
-                    {isVi ? 'Chưa có hoạt động mới ghi nhận.' : 'No recent activities recorded.'}
-                  </div>
-                )}
+              <div className="teacher-dash-completion-bar-wrap">
+                <div className="teacher-dash-completion-label-row">
+                  <span>{isVi ? 'Tiến độ hoàn tất chấm điểm' : 'Completion Rate'}</span>
+                  <span className="teacher-dash-completion-pct">{gradingOverview.completionRate}%</span>
+                </div>
+                <div className="teacher-dash-progress-track">
+                  <div 
+                    className="teacher-dash-progress-bar"
+                    style={{ width: `${gradingOverview.completionRate}%` }}
+                  />
+                </div>
               </div>
             </section>
           </div>
         </div>
+      )}
+
+      {/* 4. Active Classes Overview (Full Width Bottom Section) */}
+      {!isLoading && !error && (
+        <section className="teacher-dash-section">
+          <div className="teacher-dash-section-header">
+            <h2 className="teacher-dash-section-title">
+              {isVi ? 'Lớp học đang phụ trách' : 'My Classes Overview'}
+            </h2>
+            <button 
+              type="button"
+              className="teacher-dash-link-action"
+              onClick={() => navigate('/teacher/classes')}
+            >
+              <span>{isVi ? 'Quản lý danh sách lớp' : 'Manage all classes'}</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          <div className="teacher-dash-classes-grid">
+            {classesData.map((cls) => (
+              <div 
+                key={cls.id} 
+                className="teacher-dash-class-card"
+                onClick={() => navigate(`/teacher/classes/${cls.id}/progress`)}
+              >
+                <div className="teacher-dash-class-card-top">
+                  <div>
+                    <span className="teacher-dash-class-code">{cls.code}</span>
+                    <div className="teacher-dash-class-name">{cls.name}</div>
+                  </div>
+                </div>
+
+                <div className="teacher-dash-class-stats">
+                  <span className="teacher-dash-class-stat-item">
+                    <Users size={14} />
+                    <span>{cls.enrolled} {isVi ? 'học viên' : 'students'}</span>
+                  </span>
+                  <span>•</span>
+                  <span className="teacher-dash-class-stat-item">
+                    <ClipboardList size={14} />
+                    <span>{cls.assignmentsCount} {isVi ? 'bài tập' : 'assignments'}</span>
+                  </span>
+                </div>
+
+                <div className="teacher-dash-class-footer">
+                  {cls.pendingGrading > 0 ? (
+                    <span className="teacher-dash-class-badge-pending">
+                      {cls.pendingGrading} {isVi ? 'bài chờ chấm' : 'pending review'}
+                    </span>
+                  ) : (
+                    <span className="teacher-dash-class-badge-done">
+                      {isVi ? 'Đã chấm hết' : 'All Graded'}
+                    </span>
+                  )}
+                  <span className="teacher-dash-class-view-link">
+                    <span>{isVi ? 'Tiến độ' : 'Progress'}</span>
+                    <ChevronRight size={13} />
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {classesData.length === 0 && (
+              <div className="col-span-full">
+                <EmptyState
+                  icon={BookOpen}
+                  title={isVi ? 'Chưa có lớp học nào được phân công' : 'No classes assigned'}
+                  description={isVi ? 'Liên hệ Quản trị viên để được xếp lớp giảng dạy.' : 'Contact administrator to be assigned classes.'}
+                />
+              </div>
+            )}
+          </div>
+        </section>
       )}
     </div>
   );

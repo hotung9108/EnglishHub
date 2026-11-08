@@ -8,7 +8,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import { assignmentService } from '../api/services/assignment.service';
-import { Button, EmptyState, Pagination, StatusBadge, Skeleton } from '../components/common';
+import { Button, EmptyState, Pagination, StatusBadge, Skeleton, ConfirmModal, useToast } from '../components/common';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
 import { parseApiError } from '../api/core/errors';
 import type { ApiClientError } from '../api/core/errors';
@@ -20,6 +20,7 @@ export const ClassDetails: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'settings'>('roster');
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,8 @@ export const ClassDetails: React.FC = () => {
   const [assignmentsLoading, setAssignmentsLoading] = useState<boolean>(true);
   const [assignmentsError, setAssignmentsError] = useState<ApiClientError | null>(null);
   const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: number; name: string } | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   // Pagination for students roster
   const [rosterPage, setRosterPage] = useState<number>(1);
@@ -147,15 +150,23 @@ export const ClassDetails: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (memberId: number, memberName: string) => {
+  const handleRemoveMember = (memberId: number, memberName: string) => {
     if (classNumericId === null) return;
-    if (confirm(isVi ? `Xác nhận xóa học viên ${memberName} khỏi lớp?` : `Remove student ${memberName} from class?`)) {
-      try {
-        await classService.removeMember(classNumericId, memberId);
-        setStudentsRoster(prev => prev.filter(m => m.memberId !== memberId));
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : isVi ? 'Không thể xóa học viên khỏi lớp.' : 'Failed to remove member.');
-      }
+    setMemberToRemove({ id: memberId, name: memberName });
+  };
+
+  const executeRemoveMember = async () => {
+    if (!memberToRemove || classNumericId === null) return;
+    setIsRemoving(true);
+    try {
+      await classService.removeMember(classNumericId, memberToRemove.id);
+      setStudentsRoster(prev => prev.filter(m => m.memberId !== memberToRemove.id));
+      toastSuccess(isVi ? `Đã xóa học viên ${memberToRemove.name} khỏi lớp.` : `Removed student ${memberToRemove.name} from class.`);
+      setMemberToRemove(null);
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể xóa học viên khỏi lớp.' : 'Failed to remove member.');
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -630,6 +641,24 @@ export const ClassDetails: React.FC = () => {
           }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={Boolean(memberToRemove)}
+        title={isVi ? 'Xóa học viên khỏi lớp' : 'Remove Student'}
+        message={
+          memberToRemove
+            ? isVi
+              ? `Xác nhận xóa học viên ${memberToRemove.name} khỏi lớp này?`
+              : `Confirm removing student ${memberToRemove.name} from this class?`
+            : ''
+        }
+        confirmText={isVi ? 'Xóa khỏi lớp' : 'Remove'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant="danger"
+        isLoading={isRemoving}
+        onConfirm={executeRemoveMember}
+        onCancel={() => setMemberToRemove(null)}
+      />
     </div>
   );
 };

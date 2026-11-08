@@ -1,4 +1,4 @@
-/* ================================================================
+﻿/* ================================================================
    EnglishHub Admin Module Styles
    ================================================================ */
 
@@ -237,7 +237,7 @@
 
 .badge-code {
   background-color: #EEF2FF;
-  color: #4F46E5;
+  color: var(--eh-primary, #1B4D3E);
   font-size: 12px;
   padding: 4px 8px;
 }
@@ -491,7 +491,7 @@
 }
 
 .stepper-circle-current {
-  background-color: #2563EB;
+  background-color: var(--eh-primary, #1B4D3E);
   color: white;
 }
 
@@ -507,7 +507,7 @@
 }
 
 .stepper-status-completed { color: #059669; }
-.stepper-status-current { color: #1D4ED8; }
+.stepper-status-current { color: var(--eh-primary, #1B4D3E); }
 .stepper-status-pending { color: #9CA3AF; }
 
 .stepper-label-active {
@@ -597,7 +597,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  color: #3B82F6;
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .info-card-avatar {
@@ -656,7 +656,7 @@
 }
 
 .tab-badge-active {
-  background-color: #2563EB;
+  background-color: var(--eh-primary, #1B4D3E);
   color: white;
 }
 
@@ -924,7 +924,7 @@
 
 .login-forgot-link {
   font-size: 12.5px;
-  color: #2563eb;
+  color: var(--eh-primary, #1B4D3E);
   text-decoration: none;
   font-weight: 600;
 }
@@ -952,7 +952,7 @@
 .login-remember-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: #2563eb;
+  accent-color: var(--eh-primary, #1B4D3E);
   cursor: pointer;
 }
 
@@ -990,7 +990,7 @@
 }
 
 .step-header-icon {
-  background-color: #2563EB;
+  background-color: var(--eh-primary, #1B4D3E);
   color: white;
   padding: 12px;
   border-radius: 12px;
@@ -1006,7 +1006,7 @@
 }
 
 .step-header-desc {
-  color: #3B82F6;
+  color: var(--eh-primary, #1B4D3E);
   font-weight: 400;
 }
 

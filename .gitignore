@@ -27,6 +27,8 @@ __pycache__/
 
 /tester_plan_real
 
+/overleaf_reports
+
 # Local MCP configs containing secrets
 .agents/plugins/**/mcp_config.json
 !.agents/plugins/**/mcp_config.example.json

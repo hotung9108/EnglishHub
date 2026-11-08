@@ -10,11 +10,13 @@ import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 
 export const Students: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
@@ -219,8 +221,13 @@ export const Students: React.FC = () => {
                             try {
                               await userService.updateStatus(st.id, nextStatus);
                               await refetch();
+                              toastSuccess(
+                                isVi
+                                  ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${st.name} thành công.`
+                                  : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} student ${st.name}.`
+                              );
                             } catch {
-                              alert(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
+                              toastError(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
                             }
                           }}
                         >

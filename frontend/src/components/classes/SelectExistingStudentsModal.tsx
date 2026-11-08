@@ -204,11 +204,11 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
               width: '40px',
               height: '40px',
               borderRadius: '10px',
-              backgroundColor: '#eff6ff',
+              backgroundColor: 'var(--eh-primary-light, #EAF0E8)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--primary, #2563eb)'
+              color: 'var(--eh-primary, #1B4D3E)'
             }}>
               <UserPlus size={20} />
             </div>
@@ -317,7 +317,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--primary, #2563eb)',
+                  color: 'var(--eh-primary, #1B4D3E)',
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '12.5px'
@@ -341,7 +341,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
           }}>
             {loading ? (
               <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', color: 'var(--on-surface-variant)' }}>
-                <Loader2 size={28} className="animate-spin" color="var(--primary, #2563eb)" />
+                <Loader2 size={28} className="animate-spin" color="var(--eh-primary, #1B4D3E)" />
                 <span style={{ fontSize: '13.5px' }}>{isVi ? 'Đang tải danh bạ học viên...' : 'Loading student directory...'}</span>
               </div>
             ) : availableStudents.length === 0 ? (
@@ -380,7 +380,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                         justifyContent: 'space-between',
                         padding: '12px 16px',
                         borderBottom: '1px solid var(--outline-variant, #e2e8f0)',
-                        backgroundColor: isSelected ? '#eff6ff' : 'var(--surface, #ffffff)',
+                        backgroundColor: isSelected ? 'var(--eh-primary-subtle, #f2f6f1)' : 'var(--surface, #ffffff)',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked ? 0.6 : 1,
                         transition: 'background-color 0.15s ease'
@@ -395,7 +395,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                           style={{
                             width: '17px',
                             height: '17px',
-                            accentColor: 'var(--primary, #2563eb)',
+                            accentColor: 'var(--eh-primary, #1B4D3E)',
                             cursor: isLocked ? 'not-allowed' : 'pointer'
                           }}
                         />
@@ -405,8 +405,8 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                           width: '34px',
                           height: '34px',
                           borderRadius: '50%',
-                          backgroundColor: isSelected ? '#2563eb' : '#dbeafe',
-                          color: isSelected ? '#ffffff' : '#1e40af',
+                          backgroundColor: isSelected ? 'var(--eh-primary, #1B4D3E)' : 'var(--eh-primary-light, #EAF0E8)',
+                          color: isSelected ? '#ffffff' : 'var(--eh-primary, #1B4D3E)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -469,7 +469,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
         }}>
           <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
             {isVi ? 'Đã chọn: ' : 'Selected: '}
-            <strong style={{ color: 'var(--primary, #2563eb)' }}>
+            <strong style={{ color: 'var(--eh-primary, #1B4D3E)' }}>
               {selectedIds.length} {isVi ? 'học viên' : 'students'}
             </strong>
           </div>

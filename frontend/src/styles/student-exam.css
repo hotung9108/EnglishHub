@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    EnglishHub - Student Exam Workspace (Reading & Listening)
    Follows docs/minimal_saas_elearning_design_brief.md
    Prefix: .exam-*
@@ -40,7 +40,7 @@
 }
 
 .exam-breadcrumbs-current {
-  color: var(--color-primary, #4F46E5);
+  color: var(--eh-primary, #1B4D3E);
   font-weight: 500;
 }
 
@@ -184,7 +184,7 @@
 .exam-paragraph-tag {
   padding: 2px 8px;
   background-color: var(--color-primary-light, #EEF2FF);
-  color: var(--color-primary, #4F46E5);
+  color: var(--eh-primary, #1B4D3E);
   font-size: 11px;
   font-weight: 700;
   border-radius: 4px;
@@ -219,7 +219,7 @@
   height: 40px;
   border-radius: 10px;
   background-color: var(--color-primary-light, #EEF2FF);
-  color: var(--color-primary, #4F46E5);
+  color: var(--eh-primary, #1B4D3E);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -280,7 +280,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   color: #FFFFFF;
   border: none;
   display: flex;
@@ -321,7 +321,7 @@
 
 .exam-audio-progress-fill {
   height: 100%;
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   border-radius: 3px;
   transition: width 0.1s linear;
 }
@@ -430,9 +430,9 @@
 }
 
 .exam-nav-btn.is-active {
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   color: #FFFFFF;
-  border-color: var(--color-primary, #4F46E5);
+  border-color: var(--eh-primary, #1B4D3E);
 }
 
 .exam-nav-btn.is-bookmarked {
@@ -443,11 +443,11 @@
 
 .exam-nav-btn.is-answered {
   background-color: #DBEAFE;
-  color: #1D4ED8;
+  color: var(--eh-primary-hover, #133D30);
 }
 
 .exam-nav-btn.is-active.is-bookmarked {
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   color: #FFFFFF;
   box-shadow: 0 0 0 2px #EAB308;
 }
@@ -491,7 +491,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   color: #FFFFFF;
   display: flex;
   align-items: center;
@@ -562,7 +562,7 @@
 }
 
 .exam-option-item.is-selected {
-  border-color: var(--color-primary, #4F46E5);
+  border-color: var(--eh-primary, #1B4D3E);
   background-color: var(--color-primary-light, #EEF2FF);
 }
 
@@ -581,14 +581,14 @@
 }
 
 .exam-option-item.is-selected .exam-radio-indicator {
-  border-color: var(--color-primary, #4F46E5);
+  border-color: var(--eh-primary, #1B4D3E);
 }
 
 .exam-radio-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--color-primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
 }
 
 .exam-option-content {

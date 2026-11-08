@@ -6,7 +6,7 @@ import {
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
   XCircle, Plus, Trash2
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAnnotationErrorKind, type AnnotationErrorKind } from '../hooks/useStudentAnswerAnnotations';
 import { parseApiError } from '../api';
@@ -1275,14 +1275,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="tsd-loading-container">
-        <RefreshCw size={36} color="var(--primary)" className="animate-spin tsd-loading-spinner" />
-        <h3 className="tsd-loading-title">
-          {isVi ? 'Đang tải bài làm học viên và phân tích AI...' : 'Loading student submission & AI insights...'}
-        </h3>
-        <p className="tsd-loading-desc">
-          {isVi ? 'Đang kết nối hệ thống chấm chữa và bài nộp thực tế.' : 'Connecting to grading engine and live answers.'}
-        </p>
+      <div className="tsd-page-container py-6">
+        <LoadingState 
+          title={isVi ? 'Đang tải bài làm học viên và phân tích AI...' : 'Loading student submission & AI insights...'}
+          description={isVi ? 'Đang kết nối hệ thống chấm chữa và bài nộp thực tế.' : 'Connecting to grading engine and live answers.'}
+        />
       </div>
     );
   }

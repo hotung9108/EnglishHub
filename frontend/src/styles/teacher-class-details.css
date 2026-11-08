@@ -646,6 +646,7 @@
 .tcd-skill-badge.speaking { background-color: #f3eefa; color: #5b21b6; }
 .tcd-skill-badge.reading { background-color: #e9f3ed; color: #16533d; }
 .tcd-skill-badge.listening { background-color: #edf3fb; color: #1e3a8a; }
+.tcd-skill-badge.all-skills { background-color: #f6f2eb; color: #8c5e14; border: 1px solid #ecd8b0; }
 
 .tcd-assignment-title {
   font-size: 15px;
@@ -808,18 +809,220 @@
   background-color: #f8fafc;
 }
 
-/* Responsive */
-@media (max-width: 900px) {
+/* ==========================================================================
+   Mobile & Responsive Enhancements - EnglishHub
+   ========================================================================== */
+@media (max-width: 768px) {
   .tcd-container {
-    padding: 16px;
-    gap: 18px;
+    padding: 14px 12px 64px;
+    gap: 16px;
   }
+
+  .tcd-breadcrumbs {
+    font-size: 12px;
+    gap: 6px;
+  }
+
   .tcd-hero-card {
-    padding: 20px;
+    padding: 16px 14px;
+    border-radius: 14px;
+    gap: 14px;
   }
+
+  .tcd-hero-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .tcd-class-title {
+    font-size: 19px;
+    line-height: 1.3;
+  }
+
+  .tcd-meta-row {
+    gap: 10px;
+    font-size: 12px;
+  }
+
   .tcd-hero-actions {
     width: 100%;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .tcd-class-select {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .tcd-btn-primary,
+  .tcd-btn-secondary {
+    width: 100%;
+    justify-content: center;
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+
+  /* KPI Grid */
+  .tcd-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .tcd-kpi-card {
+    padding: 12px 14px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+
+  .tcd-kpi-num {
+    font-size: 19px;
+  }
+
+  .tcd-kpi-label {
+    font-size: 11.5px;
+  }
+
+  .tcd-kpi-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  /* Tabs Bar */
+  .tcd-tabs-bar {
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .tcd-tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tcd-tab-item {
+    padding: 10px 14px;
+    font-size: 13px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Toolbar */
+  .tcd-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .tcd-search-wrap {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .tcd-filter-pills {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .tcd-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tcd-filter-pill {
+    flex-shrink: 0;
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+
+  .tcd-toolbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .tcd-toolbar-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Table Horizontal Scrolling */
+  .tcd-table-wrap {
+    border-radius: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tcd-table th,
+  .tcd-table td {
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+
+  /* Assignments Grid */
+  .tcd-assignments-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .tcd-assignment-card {
+    padding: 16px 14px;
+    border-radius: 12px;
+    gap: 12px;
+  }
+
+  /* 4-Skill Analytics Grid */
+  .tcd-analytics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .tcd-analytics-skill-card {
+    padding: 16px 14px;
+    border-radius: 12px;
+    gap: 10px;
+  }
+
+  .tcd-skill-avg-score {
+    font-size: 20px;
+  }
+
+  /* Student Detail Drawer */
+  .tcd-drawer-box {
+    max-width: 100%;
+    height: 100%;
+  }
+
+  .tcd-drawer-header {
+    padding: 16px;
+  }
+
+  .tcd-drawer-body {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .tcd-drawer-footer {
+    padding: 12px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tcd-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tcd-hero-card {
+    padding: 14px 12px;
+  }
+
+  .tcd-card-section {
+    padding: 14px 12px;
   }
 }
 

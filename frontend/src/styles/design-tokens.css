@@ -1,0 +1,111 @@
+/* ==========================================================================
+   EnglishHub Design Tokens — Royal Academic & Minimalism Luxury System
+   Single Source of Truth for Colors, Typography, Spacing, Shadows & Radius
+   ========================================================================== */
+
+:root {
+  /* --- Canvas & Surfaces --- */
+  --eh-canvas: #faf8f5;
+  --eh-canvas-subtle: #f4efe6;
+  --eh-surface: #ffffff;
+  --eh-surface-dim: #f4efe6;
+  --eh-surface-container: #eae3d7;
+  --eh-surface-container-high: #ded5c6;
+  --eh-surface-container-highest: #c8bdab;
+  --eh-surface-elevated: #ffffff;
+  --eh-surface-hover: #f7f4ee;
+
+  /* --- Typography --- */
+  --eh-font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  --eh-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --eh-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* --- Brand Core: Royal Sovereign Green & Deep Forest --- */
+  --eh-primary: #1b4d3e;
+  --eh-primary-hover: #133d30;
+  --eh-primary-active: #0e2c22;
+  --eh-primary-light: #eaf0e8;
+  --eh-primary-subtle: #f2f6f1;
+  --eh-primary-border: #c2d9c5;
+  --eh-on-primary: #ffffff;
+
+  /* --- Metallic Elegance: Antique Gold & Brushed Brass --- */
+  --eh-gold: #c5a880;
+  --eh-gold-hover: #b3956c;
+  --eh-gold-light: #f5eedf;
+  --eh-gold-subtle: #faf6ee;
+  --eh-gold-dark: #8c5e14;
+  --eh-gold-border: #e2d2be;
+
+  /* --- Text & Warm Neutrals (Imperial Charcoal & Warm Umber) --- */
+  --eh-text-primary: #262320;
+  --eh-text-secondary: #736b63;
+  --eh-text-muted: #968e85;
+  --eh-text-inverse: #ffffff;
+  --eh-text-disabled: #b5ada3;
+
+  /* --- Borders & Dividers --- */
+  --eh-border: #e6dfd5;
+  --eh-border-subtle: #f0ebe2;
+  --eh-border-strong: #d1c4b2;
+  --eh-border-hover: #c2a882;
+  --eh-border-focus: #1b4d3e;
+
+  /* --- Status & Semantics (Refined Academic Tones) --- */
+  --eh-success: #17523f;
+  --eh-success-bg: #e7f3ec;
+  --eh-success-border: #b7dec8;
+  --eh-on-success: #17523f;
+
+  --eh-warning: #8c5e14;
+  --eh-warning-bg: #fbf4e6;
+  --eh-warning-border: #ecd8b0;
+  --eh-on-warning: #66430b;
+
+  --eh-danger: #8f2222;
+  --eh-danger-bg: #fbebeb;
+  --eh-danger-border: #f3c5c5;
+  --eh-on-danger: #661515;
+
+  --eh-info: #1b4d3e;
+  --eh-info-bg: #eaf0e8;
+  --eh-info-border: #c2d9c5;
+
+  /* --- 4 English Skills Tokens --- */
+  --eh-skill-listening: #1e3a8a;
+  --eh-skill-listening-bg: #edf3fb;
+  --eh-skill-listening-border: #c8dcf5;
+
+  --eh-skill-speaking: #5b21b6;
+  --eh-skill-speaking-bg: #f3eefa;
+  --eh-skill-speaking-border: #d8c7f0;
+
+  --eh-skill-reading: #16533d;
+  --eh-skill-reading-bg: #e9f3ed;
+  --eh-skill-reading-border: #b9dbc5;
+
+  --eh-skill-writing: #8c5e14;
+  --eh-skill-writing-bg: #faf3e5;
+  --eh-skill-writing-border: #ecd8b0;
+
+  /* --- Elevation Shadows --- */
+  --eh-shadow-xs: 0 1px 2px rgba(38, 35, 32, 0.04);
+  --eh-shadow-sm: 0 1px 3px rgba(38, 35, 32, 0.06), 0 0 0 1px var(--eh-border);
+  --eh-shadow-md: 0 4px 12px -2px rgba(38, 35, 32, 0.08), 0 0 0 1px var(--eh-border);
+  --eh-shadow-lg: 0 12px 32px -4px rgba(38, 35, 32, 0.12), 0 0 0 1px var(--eh-border);
+  --eh-shadow-focus: 0 0 0 3px rgba(27, 77, 62, 0.16);
+
+  /* --- Radii --- */
+  --eh-radius-xs: 2px;
+  --eh-radius-sm: 4px;
+  --eh-radius-md: 8px;
+  --eh-radius-lg: 12px;
+  --eh-radius-xl: 16px;
+  --eh-radius-2xl: 20px;
+  --eh-radius-full: 9999px;
+
+  /* --- Transitions --- */
+  --eh-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --eh-transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --eh-transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}

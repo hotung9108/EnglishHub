@@ -7,9 +7,10 @@ import { submissionService, type SubmissionListItem } from '../api/services/subm
 import { 
   Plus, Mic, BookOpen, Headphones, PenTool, 
   Search, AlertCircle, FileText, 
-  X, Edit2, RefreshCw
+  X, Edit2, RefreshCw, Clock, Sparkles,
+  GraduationCap, ArrowRight
 } from 'lucide-react';
-import { Button, EmptyState, MetricCard, Pagination } from '../components/common';
+import { Button, EmptyState, MetricCard, Pagination, LoadingState } from '../components/common';
 import { matchesSkillFilter, toSkillBadgeTypes, type AssignmentBadgeType, type AssignmentSkillFilter } from '../utils/assignmentSkills';
 
 interface AssignmentDisplayItem {
@@ -20,6 +21,7 @@ interface AssignmentDisplayItem {
   className: string;
   dueDate: string;
   daysLeft?: number;
+  closeDate?: Date | null;
   totalStudents: number;
   submittedCount: number;
   pendingGradingCount: number;
@@ -168,6 +170,7 @@ export const TeacherAssignments: React.FC = () => {
                   className: cls.name,
                   dueDate: dueDateStr,
                   daysLeft,
+                  closeDate,
                   totalStudents: membersCount,
                   submittedCount,
                   pendingGradingCount,
@@ -240,34 +243,116 @@ export const TeacherAssignments: React.FC = () => {
     switch (type) {
       case 'writing':
         return (
-          <span key={type} className="skill-badge writing">
-            <PenTool size={12} />
-            Writing
+          <span key={type} className="teacher-skill-mini-badge writing">
+            <PenTool size={11} />
+            <span>Writing</span>
           </span>
         );
       case 'speaking':
         return (
-          <span key={type} className="skill-badge speaking">
-            <Mic size={12} />
-            Speaking
+          <span key={type} className="teacher-skill-mini-badge speaking">
+            <Mic size={11} />
+            <span>Speaking</span>
           </span>
         );
       case 'reading':
         return (
-          <span key={type} className="skill-badge reading">
-            <BookOpen size={12} />
-            Reading
+          <span key={type} className="teacher-skill-mini-badge reading">
+            <BookOpen size={11} />
+            <span>Reading</span>
           </span>
         );
       case 'listening':
         return (
-          <span key={type} className="skill-badge listening">
-            <Headphones size={12} />
-            Listening
+          <span key={type} className="teacher-skill-mini-badge listening">
+            <Headphones size={11} />
+            <span>Listening</span>
           </span>
         );
     }
     return null;
+  };
+
+  const renderSkillBadges = (skills: AssignmentSkill[]) => {
+    const badgeTypes = toSkillBadgeTypes(skills);
+    if (badgeTypes.length === 4) {
+      return (
+        <span className="teacher-skill-combined-badge" title="Reading, Listening, Writing, Speaking">
+          <Sparkles size={11} />
+          <span>{isVi ? '4 Kỹ năng' : '4 Skills'}</span>
+        </span>
+      );
+    }
+    return (
+      <div className="teacher-assignment-skills-wrap">
+        {badgeTypes.map(getSkillBadge)}
+      </div>
+    );
+  };
+
+  const renderDeadlineTag = (item: AssignmentDisplayItem) => {
+    if (!item.closeDate || isNaN(item.closeDate.getTime())) {
+      return (
+        <span className="teacher-assignment-deadline-tag">
+          <Clock size={11} />
+          <span>{isVi ? 'Không thời hạn' : 'No deadline'}</span>
+        </span>
+      );
+    }
+
+    const d = item.closeDate;
+    const now = new Date(currentTimestamp);
+    const isToday = d.toDateString() === now.toDateString();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${minutes}`;
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const dateStr = `${day}/${month}`;
+
+    if (item.status === 'closed') {
+      return (
+        <span className="teacher-assignment-deadline-tag expired">
+          <Clock size={11} />
+          <span>{isVi ? `Đã đóng (${dateStr})` : `Closed (${dateStr})`}</span>
+        </span>
+      );
+    }
+
+    if (isToday) {
+      return (
+        <span className="teacher-assignment-deadline-tag urgent">
+          <Clock size={11} />
+          <span>{isVi ? `Hết hạn hôm nay • ${timeStr}` : `Due today • ${timeStr}`}</span>
+        </span>
+      );
+    }
+
+    if (isTomorrow) {
+      return (
+        <span className="teacher-assignment-deadline-tag urgent">
+          <Clock size={11} />
+          <span>{isVi ? `Hạn ngày mai • ${timeStr}` : `Due tomorrow • ${timeStr}`}</span>
+        </span>
+      );
+    }
+
+    return (
+      <span className="teacher-assignment-deadline-tag">
+        <Clock size={11} />
+        <span>{isVi ? `Hạn nộp: ${timeStr}, ${dateStr}` : `Due: ${timeStr}, ${dateStr}`}</span>
+        {item.daysLeft !== undefined && item.daysLeft > 0 && (
+          <span className="teacher-assignment-deadline-sub">
+            {isVi ? `(Còn ${item.daysLeft} ngày)` : `(${item.daysLeft}d left)`}
+          </span>
+        )}
+      </span>
+    );
   };
 
   const handleSelectSkillToCreate = (skillType: string) => {
@@ -278,51 +363,46 @@ export const TeacherAssignments: React.FC = () => {
 
   return (
     <div className="teacher-container">
-      {/* Header */}
-      <div className="teacher-header">
-        <div>
-          <h1 className="teacher-title">
+      {/* Unified Hero Header Card */}
+      <section className="teacher-page-hero">
+        <div className="teacher-hero-content">
+          <h1 className="teacher-hero-title">
             {isVi ? 'Quản lý bài tập' : 'Assignments'}
           </h1>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Class Select Dropdown */}
-          <select
-            value={selectedClassId}
-            onChange={(e) => handleClassFilterChange(e.target.value)}
-            className="select-input font-semibold text-sm"
-          >
-            <option value="all">{isVi ? 'Tất cả các lớp' : 'All Classes'}</option>
-            {classes.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <div className="teacher-hero-actions">
+            {/* Class Select Dropdown */}
+            <select
+              value={selectedClassId}
+              onChange={(e) => handleClassFilterChange(e.target.value)}
+              className="select-input font-semibold text-sm"
+            >
+              <option value="all">{isVi ? 'Tất cả các lớp' : 'All Classes'}</option>
+              {classes.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
 
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Plus}
-            onClick={() => setShowSkillModal(true)}
-          >
-            {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
-          </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              onClick={() => setShowSkillModal(true)}
+            >
+              {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Loading Indicator */}
       {isLoading && (
-        <div className="eh-card p-6 mb-6 text-center">
-          <RefreshCw size={28} className="text-primary animate-spin m-auto mb-3" />
-          <h3 className="m-0 text-sm font-bold text-main">
-            {isVi ? 'Đang tải danh sách bài tập thực tế...' : 'Loading live assignments...'}
-          </h3>
-          <p className="mt-1 text-xs text-muted">
-            {isVi ? 'Đang cập nhật tiến độ nộp bài và hàng đợi cần chấm.' : 'Syncing submissions turnout and pending grading queue.'}
-          </p>
-        </div>
+        <LoadingState 
+          title={isVi ? 'Đang tải danh sách bài tập...' : 'Loading assignments...'}
+          description={isVi ? 'Đang đồng bộ dữ liệu bài tập và tiến độ nộp bài của các lớp.' : 'Syncing assignments and student submission turnouts.'}
+        />
       )}
 
       {/* Error Alert */}
@@ -439,87 +519,90 @@ export const TeacherAssignments: React.FC = () => {
 
             return (
               <div key={item.id} className="teacher-assignment-card">
-                {/* Left Column: Skill, Title, Due date */}
-                <div className="teacher-assignment-meta-left">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="teacher-assignment-code-badge">
-                      {item.code}
-                    </span>
-                    {toSkillBadgeTypes(item.skills).map(getSkillBadge)}
-                    <span className="text-xs text-muted">
-                      {item.className}
-                    </span>
+                {/* 1. Header Line: Identity (Code, Class, Skills) & Grading Status */}
+                <div className="teacher-assignment-card-header">
+                  <div className="teacher-assignment-card-identity">
+                    <span className="teacher-assignment-code-badge">{item.code}</span>
+                    <div className="teacher-assignment-class-tag">
+                      <GraduationCap size={13} />
+                      <span>{item.className}</span>
+                    </div>
+                    {renderSkillBadges(item.skills)}
                   </div>
 
-                  <h3 
-                    onClick={() => navigate(`/teacher/assignments/${item.id}`)}
-                    className="teacher-assignment-title"
-                  >
-                    {item.title}
-                  </h3>
-
-                  <div className="teacher-assignment-deadline-row">
-                    <span>
-                      {isVi ? 'Hạn nộp:' : 'Deadline:'} <strong>{item.dueDate}</strong>
-                    </span>
-                    {item.daysLeft !== undefined && (
-                      <span className={`teacher-assignment-days-badge ${item.daysLeft <= 1 ? 'urgent' : 'normal'}`}>
-                        {item.daysLeft === 0 
-                          ? (isVi ? 'Hết hạn hôm nay' : 'Due today') 
-                          : (isVi ? `Còn ${item.daysLeft} ngày` : `${item.daysLeft} days left`)}
+                  <div className="teacher-assignment-card-status">
+                    {item.pendingGradingCount > 0 ? (
+                      <span className="teacher-assignment-pending-pill">
+                        <span className="teacher-assignment-status-dot pending" />
+                        <span>{item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}</span>
+                      </span>
+                    ) : (
+                      <span className="teacher-assignment-done-pill">
+                        <span className="teacher-assignment-status-dot done" />
+                        <span>{isVi ? 'Đã chấm hoàn tất' : 'All graded'}</span>
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Middle Column: Submission Progress */}
-                <div className="teacher-assignment-progress-wrap">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted">{isVi ? 'Tiến độ nộp bài:' : 'Turnout:'}</span>
-                    <span className="font-bold text-main">
-                      {item.submittedCount}/{item.totalStudents} ({submissionPercent}%)
-                    </span>
+                {/* 2. Main Title */}
+                <h3 
+                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
+                  className="teacher-assignment-title"
+                >
+                  {item.title}
+                </h3>
+
+                {/* 3. Divider */}
+                <div className="teacher-assignment-card-divider" />
+
+                {/* 4. Footer Line: Deadline & Turnout Progress (Left) + Actions (Right) */}
+                <div className="teacher-assignment-card-footer">
+                  <div className="teacher-assignment-footer-meta">
+                    {renderDeadlineTag(item)}
+
+                    <span className="teacher-assignment-meta-separator">•</span>
+
+                    <div className="teacher-assignment-turnout-group">
+                      <span className="teacher-assignment-turnout-label">
+                        {isVi ? 'Đã nộp:' : 'Turnout:'} <strong>{item.submittedCount}/{item.totalStudents}</strong> ({submissionPercent}%)
+                      </span>
+                      <div className="teacher-assignment-mini-progress">
+                        <div 
+                          className="teacher-assignment-mini-fill"
+                          style={{ width: `${submissionPercent}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="teacher-progress-bar">
-                    <div 
-                      className="teacher-progress-fill" 
-                      style={{ width: `${submissionPercent}%` }}
-                    />
+
+                  <div className="teacher-assignment-card-actions">
+                    <button
+                      type="button"
+                      className="teacher-assignment-btn-edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/teacher/assignments/${item.id}/edit`);
+                      }}
+                      title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
+                    >
+                      <Edit2 size={13} />
+                      <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="teacher-assignment-btn-primary"
+                      onClick={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
+                    >
+                      <span>
+                        {item.pendingGradingCount > 0 
+                          ? (isVi ? 'Chấm bài ngay' : 'Grade Now') 
+                          : (isVi ? 'Quản lý bài nộp' : 'View Submissions')}
+                      </span>
+                      <ArrowRight size={13} />
+                    </button>
                   </div>
-                </div>
-
-                {/* Right Column: Pending grading badge & Action Button */}
-                <div className="teacher-assignment-actions">
-                  {item.pendingGradingCount > 0 ? (
-                    <span className="teacher-assignment-pending-badge">
-                      {item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}
-                    </span>
-                  ) : (
-                    <span className="teacher-assignment-done-badge">
-                      {isVi ? 'Đã chấm hết' : 'All Graded'}
-                    </span>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={Edit2}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/teacher/assignments/${item.id}/edit`);
-                    }}
-                    title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
-                  >
-                    {isVi ? 'Chỉnh sửa' : 'Edit'}
-                  </Button>
-
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => navigate(`/teacher/assignments/${item.id}`)}
-                  >
-                    {item.pendingGradingCount > 0 ? (isVi ? 'Chấm bài ngay' : 'Grade Now') : (isVi ? 'Xem kết quả' : 'View Submissions')}
-                  </Button>
                 </div>
               </div>
             );

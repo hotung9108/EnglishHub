@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, PenTool, Mic, BookOpen, Headphones, Play, Pause, 
-  Clock, Send, Copy, Volume2, Star
+  Clock, Send, Copy, Volume2
 } from 'lucide-react';
 import type { ExamTemplateItem } from '../../types/exam-bank.types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -26,13 +26,13 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
   const getSkillIcon = (skill: string) => {
     switch (skill) {
       case 'writing':
-        return <PenTool size={18} color="#2563eb" />;
+        return <PenTool size={16} color="var(--eh-skill-writing, #8C5E14)" />;
       case 'speaking':
-        return <Mic size={18} color="#9333ea" />;
+        return <Mic size={16} color="var(--eh-skill-speaking, #5B21B6)" />;
       case 'reading':
-        return <BookOpen size={18} color="#16a34a" />;
+        return <BookOpen size={16} color="var(--eh-skill-reading, #16533D)" />;
       default:
-        return <Headphones size={18} color="#0d9488" />;
+        return <Headphones size={16} color="var(--eh-skill-listening, #1E3A8A)" />;
     }
   };
 
@@ -41,38 +41,31 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
       <div className="exam-modal-box" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="exam-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="exam-card-code">{exam.code}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span className="teacher-exam-code-badge">{exam.code}</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
               {getSkillIcon(exam.skill)}
               <span style={{ 
-                fontSize: '13px', 
+                fontSize: '12.5px', 
                 fontWeight: 700, 
                 textTransform: 'uppercase',
-                color: exam.skill === 'writing' ? '#2563eb' : exam.skill === 'speaking' ? '#9333ea' : exam.skill === 'reading' ? '#16a34a' : '#0d9488'
+                color: exam.skill === 'writing' ? 'var(--eh-skill-writing, #8C5E14)' : exam.skill === 'speaking' ? 'var(--eh-skill-speaking, #5B21B6)' : exam.skill === 'reading' ? 'var(--eh-skill-reading, #16533D)' : 'var(--eh-skill-listening, #1E3A8A)'
               }}>
                 {exam.skill}
               </span>
             </div>
-            <span style={{ 
-              fontSize: '12px', 
-              padding: '2px 8px', 
-              borderRadius: '4px', 
-              backgroundColor: '#eff6ff', 
-              color: '#1d4ed8', 
-              fontWeight: 600 
-            }}>
+            <span className="teacher-exam-source-tag">
               {exam.format}
             </span>
-            <span style={{ fontSize: '12px', color: '#64748b' }}>
-              • {exam.targetBand}
+            <span className="teacher-exam-band-pill">
+              {exam.targetBand}
             </span>
           </div>
 
           <button 
             type="button" 
             onClick={onClose}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 4 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--eh-text-muted, #9E9589)', display: 'flex', padding: 4 }}
           >
             <X size={20} />
           </button>
@@ -80,18 +73,19 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
 
         {/* Body */}
         <div className="exam-modal-body">
-          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0' }}>
+          <h2 style={{ fontFamily: "var(--eh-font-serif, 'Lora', Georgia, serif)", fontSize: '20px', fontWeight: 700, color: '#262320', margin: '0 0 10px 0', lineHeight: 1.35 }}>
             {exam.title}
           </h2>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: '#64748b', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px', color: '#6B635B', marginBottom: '20px', flexWrap: 'wrap' }}>
             <span>{isVi ? 'Nguồn gốc: ' : 'Source: '}<strong>{exam.source}</strong></span>
             <span>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#d97706', fontWeight: 700 }}>
-              <Star size={14} fill="#d97706" /> {exam.rating} ({exam.usageCount} {isVi ? 'lớp học đã sử dụng' : 'classes used'})
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={14} style={{ display: 'inline', marginRight: 4 }} />
+              {exam.durationMinutes} {isVi ? 'phút' : 'mins'}
             </span>
             <span>•</span>
-            <span><Clock size={14} style={{ display: 'inline', marginRight: 4 }} />{exam.durationMinutes} {isVi ? 'phút' : 'mins'}</span>
+            <span style={{ fontWeight: 600, color: '#262320' }}>{exam.questionCount}</span>
           </div>
 
           {/* Content Preview based on Skill */}
@@ -110,11 +104,11 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
               </div>
 
               {exam.details.rubricsSummary && (
-                <div style={{ padding: '14px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1d4ed8', display: 'block', marginBottom: '4px' }}>
+                <div style={{ padding: '14px', backgroundColor: 'var(--eh-primary-subtle, #f2f6f1)', borderRadius: '8px', border: '1px solid var(--eh-primary-border, #c2d9c5)' }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--eh-primary, #1B4D3E)', display: 'block', marginBottom: '4px' }}>
                     {isVi ? 'Cấu hình tiêu chí chấm điểm chuẩn:' : 'Official Rubrics:'}
                   </span>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#1e3a8a' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--eh-text-primary, #262320)' }}>
                     {exam.details.rubricsSummary}
                   </p>
                 </div>
@@ -274,7 +268,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
           <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{isVi ? 'Thẻ chủ đề:' : 'Tags:'}</span>
             {exam.tags.map((t, idx) => (
-              <span key={idx} className="exam-tag-pill">#{t}</span>
+              <span key={idx} className="teacher-exam-source-tag">#{t}</span>
             ))}
           </div>
         </div>
@@ -283,7 +277,7 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
         <div className="exam-modal-footer">
           <button 
             type="button" 
-            className="btn btn-secondary bg-white btn-sm"
+            className="teacher-exam-btn-preview"
             onClick={onClose}
           >
             {isVi ? 'Đóng' : 'Close'}
@@ -291,27 +285,25 @@ export const ExamDetailModal: React.FC<ExamDetailModalProps> = ({
 
           <button 
             type="button" 
-            className="btn btn-secondary bg-white btn-sm"
+            className="teacher-exam-btn-preview"
             onClick={() => {
               onClose();
               onCloneTemplate(exam);
             }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Copy size={14} />
+            <Copy size={13} />
             <span>{isVi ? 'Nhân bản & Chỉnh sửa' : 'Customize & Clone'}</span>
           </button>
 
           <button 
             type="button" 
-            className="btn btn-primary btn-sm"
+            className="teacher-exam-btn-primary"
             onClick={() => {
               onClose();
               onAssignToClass(exam);
             }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
           >
-            <Send size={14} />
+            <Send size={13} />
             <span>{isVi ? 'Giao ngay cho lớp' : 'Assign to Class'}</span>
           </button>
         </div>

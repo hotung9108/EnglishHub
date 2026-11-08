@@ -45,8 +45,8 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
               fontWeight: 700, 
               padding: '2px 10px', 
               borderRadius: '12px', 
-              backgroundColor: '#eff6ff', 
-              color: '#2563eb' 
+              backgroundColor: 'var(--eh-primary-light, #EAF0E8)', 
+              color: 'var(--eh-primary, #1B4D3E)' 
             }}>
               {isVi ? 'GIAO DIỆN HỌC VIÊN LÀM BÀI (STUDENT VIEW PREVIEW)' : 'STUDENT EXAM RUNNER PREVIEW'}
             </span>
@@ -183,7 +183,7 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                   {data.reading.questions.map((q) => (
                     <div key={q.id} style={{ padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#2563eb' }}>Q{q.order}.</span>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--eh-primary, #1B4D3E)' }}>Q{q.order}.</span>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{q.prompt}</span>
                       </div>
 

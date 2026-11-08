@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    EnglishHub Student Portal: Submission Result & Feedback Modern Styles
    ========================================================================== */
 
@@ -134,7 +134,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--primary, #4F46E5);
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .result-attempt-select {
@@ -152,7 +152,7 @@
 
 .result-attempt-select:hover,
 .result-attempt-select:focus {
-  border-color: var(--primary, #4F46E5);
+  border-color: var(--eh-primary, #1B4D3E);
   background-color: var(--surface, #FFFFFF);
 }
 
@@ -205,9 +205,9 @@
 }
 
 .result-btn-white {
-  background-color: var(--primary, #4F46E5);
+  background-color: var(--eh-primary, #1B4D3E);
   color: #FFFFFF;
-  border: 1px solid var(--primary, #4F46E5);
+  border: 1px solid var(--eh-primary, #1B4D3E);
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -783,13 +783,13 @@
 
 .waveform-bar {
   flex: 1;
-  background-color: #3b82f6;
+  background-color: var(--eh-primary, #1B4D3E);
   border-radius: 2px;
   transition: height 0.2s ease, background-color 0.2s ease;
 }
 
 .waveform-bar.passed {
-  background-color: #60a5fa;
+  background-color: var(--eh-primary-light, #EAF0E8);
 }
 
 .waveform-bar.active {
@@ -807,7 +807,7 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background-color: #2563eb;
+  background-color: var(--eh-primary, #1B4D3E);
   color: #ffffff;
   border: none;
   display: flex;
@@ -819,7 +819,7 @@
 }
 
 .audio-play-btn:hover {
-  background-color: #1d4ed8;
+  background-color: var(--eh-primary-hover, #133D30);
   transform: scale(1.06);
 }
 
@@ -847,7 +847,7 @@
 }
 
 .audio-speed-btn.active {
-  background-color: #2563eb;
+  background-color: var(--eh-primary, #1B4D3E);
   color: #ffffff;
 }
 
@@ -1284,7 +1284,7 @@
 
 .result-doc-icon {
   margin: 0 auto 12px;
-  color: #3b82f6;
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .result-doc-title {
