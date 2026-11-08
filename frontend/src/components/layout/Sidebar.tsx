@@ -193,7 +193,6 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
         items: [
           { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
           { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
-          { path: '/student/analytics', label: language === 'vi' ? 'Phân tích học tập' : 'Analytics', icon: BarChart3 },
         ]
       }
     ]
