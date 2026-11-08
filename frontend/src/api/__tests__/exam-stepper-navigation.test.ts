@@ -78,7 +78,7 @@ test('isModuleSubmittedOrGraded recognizes SUBMITTED and GRADED as completed', (
   assert.strictEqual(isModuleSubmittedOrGraded(undefined), false);
 });
 
-test('Sequential access control: isModuleAccessible locks future modules until prior modules are done', () => {
+test('Non-sequential access control: isModuleAccessible allows free module choice without artificial locking', () => {
   const assignmentModules: ExamModuleItem[] = [
     { id: 101, skill: 'LISTENING', orderIndex: 1 },
     { id: 102, skill: 'READING', orderIndex: 2 },
@@ -86,35 +86,21 @@ test('Sequential access control: isModuleAccessible locks future modules until p
     { id: 104, skill: 'SPEAKING', orderIndex: 4 }
   ];
 
-  // At the start: only Module 0 (Listening) is accessible
+  // All valid module indices are accessible so students can choose freely
   assert.strictEqual(isModuleAccessible(0, assignmentModules, []), true);
-  assert.strictEqual(isModuleAccessible(1, assignmentModules, []), false);
-  assert.strictEqual(isModuleAccessible(2, assignmentModules, []), false);
-  assert.strictEqual(isModuleAccessible(3, assignmentModules, []), false);
+  assert.strictEqual(isModuleAccessible(1, assignmentModules, []), true);
+  assert.strictEqual(isModuleAccessible(2, assignmentModules, []), true);
+  assert.strictEqual(isModuleAccessible(3, assignmentModules, []), true);
+  assert.strictEqual(isModuleAccessible(-1, assignmentModules, []), false);
+  assert.strictEqual(isModuleAccessible(4, assignmentModules, []), false);
 
-  // When Module 0 is submitted: Module 1 becomes accessible, but 2 and 3 remain locked
   const subModulesStep1: SubmissionModuleItem[] = [
     { id: 1, moduleId: 101, skill: 'LISTENING', status: 'SUBMITTED' }
   ];
   assert.strictEqual(isModuleAccessible(0, assignmentModules, subModulesStep1), true);
   assert.strictEqual(isModuleAccessible(1, assignmentModules, subModulesStep1), true);
-  assert.strictEqual(isModuleAccessible(2, assignmentModules, subModulesStep1), false);
-  assert.strictEqual(isModuleAccessible(3, assignmentModules, subModulesStep1), false);
-
-  // When Module 1 is also submitted: Module 2 becomes accessible, 3 remains locked
-  const subModulesStep2: SubmissionModuleItem[] = [
-    { id: 1, moduleId: 101, skill: 'LISTENING', status: 'SUBMITTED' },
-    { id: 2, moduleId: 102, skill: 'READING', status: 'SUBMITTED' }
-  ];
-  assert.strictEqual(isModuleAccessible(2, assignmentModules, subModulesStep2), true);
-  assert.strictEqual(isModuleAccessible(3, assignmentModules, subModulesStep2), false);
-
-  // When Module 2 is also submitted: Module 3 becomes accessible
-  const subModulesStep3: SubmissionModuleItem[] = [
-    ...subModulesStep2,
-    { id: 3, moduleId: 103, skill: 'WRITING', status: 'SUBMITTED' }
-  ];
-  assert.strictEqual(isModuleAccessible(3, assignmentModules, subModulesStep3), true);
+  assert.strictEqual(isModuleAccessible(2, assignmentModules, subModulesStep1), true);
+  assert.strictEqual(isModuleAccessible(3, assignmentModules, subModulesStep1), true);
 });
 
 test('getNextIncompleteModule advances through 4 modules in order', () => {
@@ -202,13 +188,13 @@ test('calculateExamSteps accurately computes statuses for all 4 steps', () => {
   assert.strictEqual(steps[1].isCompleted, false);
   assert.strictEqual(steps[1].isAccessible, true);
 
-  assert.strictEqual(steps[2].status, 'LOCKED');
+  assert.strictEqual(steps[2].status, 'AVAILABLE');
   assert.strictEqual(steps[2].isCompleted, false);
-  assert.strictEqual(steps[2].isAccessible, false);
+  assert.strictEqual(steps[2].isAccessible, true);
 
-  assert.strictEqual(steps[3].status, 'LOCKED');
+  assert.strictEqual(steps[3].status, 'AVAILABLE');
   assert.strictEqual(steps[3].isCompleted, false);
-  assert.strictEqual(steps[3].isAccessible, false);
+  assert.strictEqual(steps[3].isAccessible, true);
 });
 
 test('calculateExamSteps: when all 4 modules are submitted and no active attempt, all show COMPLETED and none show ACTIVE', () => {
@@ -251,9 +237,9 @@ test('calculateExamSteps: when no attempt has been started yet (hasActiveAttempt
   assert.strictEqual(steps[0].isCompleted, false);
   assert.strictEqual(steps[0].isAccessible, true);
 
-  assert.strictEqual(steps[1].status, 'LOCKED');
-  assert.strictEqual(steps[2].status, 'LOCKED');
-  assert.strictEqual(steps[3].status, 'LOCKED');
+  assert.strictEqual(steps[1].status, 'AVAILABLE');
+  assert.strictEqual(steps[2].status, 'AVAILABLE');
+  assert.strictEqual(steps[3].status, 'AVAILABLE');
   assert.strictEqual(steps.some((s) => s.status === 'ACTIVE'), false);
 });
 
@@ -377,10 +363,10 @@ test('getExamPageRedirectRoute redirects completed submissions, completed module
       42,
       multiModules
     ),
-    '/student/assignments/reading/42?submissionId=779'
+    '/student/assignments/reading/42?submissionId=779&moduleId=20'
   );
 
-  // 4. Parent is IN_PROGRESS, Listening is IN_PROGRESS -> jumping ahead to Writing (LOCKED) redirects back to Listening
+  // 4. Parent is IN_PROGRESS, student can choose Writing directly without being forced to Listening
   assert.strictEqual(
     getExamPageRedirectRoute(
       {
@@ -397,7 +383,7 @@ test('getExamPageRedirectRoute redirects completed submissions, completed module
       42,
       multiModules
     ),
-    '/student/assignments/listening/42?submissionId=779'
+    null
   );
 
   // 5. Parent is IN_PROGRESS, current module is SUBMITTED in a single-module exam -> redirect to result page
