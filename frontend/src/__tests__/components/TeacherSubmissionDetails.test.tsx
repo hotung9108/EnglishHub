@@ -28,6 +28,7 @@ vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { g
 vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn() } }));
 vi.mock('../../api/services/grading.service', () => ({ gradingService: { getBySubmissionModuleId: vi.fn(), getAiSuggestion: vi.fn(), submitGrade: vi.fn(), requestAiAnalysis: vi.fn(), getById: vi.fn() } }));
 vi.mock('../../api/services/class.service', () => ({ classService: { list: vi.fn(), listMembers: vi.fn() } }));
+vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn().mockResolvedValue({ id: 30, instructions: 'Sample module instructions' }) } }));
 vi.mock('../../api/services/answer-annotation.service', () => ({ answerAnnotationService: { listAnnotations: vi.fn(), createAnnotation: vi.fn(), reviewAnnotation: vi.fn(), deleteAnnotation: vi.fn() } }));
 
 const submission: SubmissionDetail = {
