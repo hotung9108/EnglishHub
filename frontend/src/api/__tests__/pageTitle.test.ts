@@ -55,6 +55,8 @@ test('pageTitle - getPageTitle resolves teacher routes', () => {
   assert.strictEqual(getPageTitle('/teacher/assignments/10/edit', 'vi'), 'Chỉnh sửa bài tập');
   assert.strictEqual(getPageTitle('/teacher/assignments/edit/10', 'vi'), 'Chỉnh sửa bài tập');
   assert.strictEqual(getPageTitle('/teacher/assignments/10/submissions/5', 'vi'), 'Chi tiết bài nộp');
+  assert.strictEqual(getPageTitle('/teacher/assignments/10/submissions', 'vi'), 'Quản lý bài nộp & Chấm điểm');
+  assert.strictEqual(getPageTitle('/teacher/assignments/10/grading', 'en'), 'Submissions & Grading');
   assert.strictEqual(getPageTitle('/teacher/assignments/10', 'vi'), 'Chi tiết bài tập');
   assert.strictEqual(getPageTitle('/teacher/settings', 'vi'), 'Cài đặt');
   assert.strictEqual(getPageTitle('/teacher/profile', 'vi'), 'Hồ sơ cá nhân');

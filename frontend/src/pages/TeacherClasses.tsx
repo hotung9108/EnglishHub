@@ -10,7 +10,7 @@ import {
   Calendar, MapPin, 
   RefreshCw, AlertCircle
 } from 'lucide-react';
-import { Button, EmptyState, Pagination } from '../components/common';
+import { Button, EmptyState, Pagination, LoadingState } from '../components/common';
 
 interface TeacherClassCardData {
   id: string;
@@ -193,37 +193,32 @@ export const TeacherClasses: React.FC = () => {
 
   return (
     <div className="teacher-container">
-      {/* Header */}
-      <div className="teacher-header">
-        <div>
-          <h1 className="teacher-title">
+      {/* Unified Hero Header Card */}
+      <section className="teacher-page-hero">
+        <div className="teacher-hero-content">
+          <h1 className="teacher-hero-title">
             {isVi ? 'Quản lý lớp học' : 'Classes'}
           </h1>
-        </div>
 
-        <div className="flex gap-2 items-center">
-          <Button 
-            variant="primary" 
-            size="sm"
-            icon={Plus}
-            onClick={() => navigate('/teacher/assignments/create')}
-          >
-            {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
-          </Button>
+          <div className="teacher-hero-actions">
+            <Button 
+              variant="primary" 
+              size="sm"
+              icon={Plus}
+              onClick={() => navigate('/teacher/assignments/create')}
+            >
+              {isVi ? 'Giao bài tập mới' : 'Create Assignment'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Loading state */}
       {isLoading && (
-        <div className="eh-card p-6 mb-6 text-center">
-          <RefreshCw size={28} className="text-primary animate-spin m-auto mb-3" />
-          <h3 className="m-0 text-sm font-bold text-main">
-            {isVi ? 'Đang tải danh sách lớp học thực tế...' : 'Loading live classes...'}
-          </h3>
-          <p className="mt-1 text-xs text-muted">
-            {isVi ? 'Đang đồng bộ sĩ số, bài tập và điểm trung bình từng lớp.' : 'Syncing enrollment turnout and average class performance.'}
-          </p>
-        </div>
+        <LoadingState 
+          title={isVi ? 'Đang tải danh sách lớp học...' : 'Loading classes...'}
+          description={isVi ? 'Đang đồng bộ dữ liệu lớp học và học viên phụ trách.' : 'Syncing classroom roster and enrolled students.'}
+        />
       )}
 
       {/* Error state */}

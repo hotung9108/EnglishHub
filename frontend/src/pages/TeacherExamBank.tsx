@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Library, Search, PenTool, Mic, BookOpen, Headphones, 
-  CheckCircle2, Clock, Star, 
-  Layers, X
+  Search, PenTool, Mic, BookOpen, Headphones, 
+  Clock, Plus, X, Eye, Send, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import type { 
@@ -13,7 +12,8 @@ import { ExamDetailModal } from '../components/exam-bank/ExamDetailModal';
 import { QuickAssignModal } from '../components/exam-bank/QuickAssignModal';
 import { assignmentService, type AssignmentSkill } from '../api/services/assignment.service';
 import { moduleService, type ModuleTaskType } from '../api/services/module.service';
-import { Pagination } from '../components/common';
+import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import '../styles/teacher.css';
 import '../styles/teacher-exam-bank.css';
 
 export const TeacherExamBank: React.FC = () => {
@@ -24,9 +24,7 @@ export const TeacherExamBank: React.FC = () => {
   // State
   const [selectedSkill, setSelectedSkill] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFormat, setSelectedFormat] = useState<string>('all');
   const [selectedBand, setSelectedBand] = useState<string>('all');
-  const [selectedTag, setSelectedTag] = useState<string>('all');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -42,18 +40,8 @@ export const TeacherExamBank: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleFormatChange = (format: string) => {
-    setSelectedFormat(format);
-    setCurrentPage(1);
-  };
-
   const handleBandChange = (band: string) => {
     setSelectedBand(band);
-    setCurrentPage(1);
-  };
-
-  const handleTagChange = (tag: string) => {
-    setSelectedTag(tag);
     setCurrentPage(1);
   };
 
@@ -418,12 +406,8 @@ export const TeacherExamBank: React.FC = () => {
     return examTemplates.filter(item => {
       // Skill filter
       if (selectedSkill !== 'all' && item.skill !== selectedSkill) return false;
-      // Format filter
-      if (selectedFormat !== 'all' && item.format !== selectedFormat) return false;
       // Band filter
       if (selectedBand !== 'all' && item.targetBand !== selectedBand) return false;
-      // Tag filter
-      if (selectedTag !== 'all' && !item.tags.includes(selectedTag)) return false;
       // Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -431,12 +415,13 @@ export const TeacherExamBank: React.FC = () => {
           item.title.toLowerCase().includes(q) ||
           item.code.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q) ||
+          item.format.toLowerCase().includes(q) ||
           item.tags.some(t => t.toLowerCase().includes(q))
         );
       }
       return true;
     });
-  }, [examTemplates, selectedSkill, selectedFormat, selectedBand, selectedTag, searchQuery]);
+  }, [examTemplates, selectedSkill, selectedBand, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredExams.length / pageSize));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -457,13 +442,12 @@ export const TeacherExamBank: React.FC = () => {
     };
   }, [examTemplates]);
 
-  const totalDeploys = useMemo(() => {
-    return examTemplates.reduce((sum, e) => sum + e.usageCount, 0);
+  const cambridgeCount = useMemo(() => {
+    return examTemplates.filter(e => e.format.includes('Cambridge')).length;
   }, [examTemplates]);
 
-  const avgRating = useMemo(() => {
-    if (examTemplates.length === 0) return '5.0';
-    return (examTemplates.reduce((sum, e) => sum + e.rating, 0) / examTemplates.length).toFixed(1);
+  const academicCount = useMemo(() => {
+    return examTemplates.filter(e => e.format.includes('Academic')).length;
   }, [examTemplates]);
 
   const handleConfirmAssign = async (form: QuickAssignForm) => {
@@ -541,166 +525,151 @@ export const TeacherExamBank: React.FC = () => {
     switch (skill) {
       case 'writing':
         return (
-          <span className="exam-badge-skill writing">
-            <PenTool size={12} /> Writing
+          <span className="teacher-exam-skill-badge writing">
+            <PenTool size={11} /> Writing
           </span>
         );
       case 'speaking':
         return (
-          <span className="exam-badge-skill speaking">
-            <Mic size={12} /> Speaking
+          <span className="teacher-exam-skill-badge speaking">
+            <Mic size={11} /> Speaking
           </span>
         );
       case 'reading':
         return (
-          <span className="exam-badge-skill reading">
-            <BookOpen size={12} /> Reading
+          <span className="teacher-exam-skill-badge reading">
+            <BookOpen size={11} /> Reading
           </span>
         );
       default:
         return (
-          <span className="exam-badge-skill listening">
-            <Headphones size={12} /> Listening
+          <span className="teacher-exam-skill-badge listening">
+            <Headphones size={11} /> Listening
           </span>
         );
     }
   };
 
   return (
-    <div className="exam-bank-container">
-      {/* Hero Header Banner */}
-      <section className="exam-bank-hero">
-        <div className="exam-hero-content">
-          <div>
-            <h1 className="exam-hero-title">
-              {isVi ? 'Ngân Hàng Đề Thi & Bài Tập Mẫu' : 'Exam & Assessment Template Bank'}
-            </h1>
-          </div>
+    <div className="teacher-container">
+      {/* Unified Hero Header Card */}
+      <section className="teacher-page-hero">
+        <div className="teacher-hero-content">
+          <h1 className="teacher-hero-title">
+            {isVi ? 'Ngân hàng đề thi' : 'Exam Bank'}
+          </h1>
 
-          <div className="exam-hero-actions">
-            <button 
-              type="button" 
-              className="btn btn-secondary bg-white btn-sm font-bold text-main"
+          <div className="teacher-hero-actions">
+            <Button 
+              variant="primary" 
+              size="sm"
+              icon={Plus}
               onClick={() => navigate('/teacher/assignments/create')}
             >
-              <span>{isVi ? 'Soạn đề mới' : 'Create Custom'}</span>
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-primary btn-sm font-bold"
-              onClick={() => showToast(isVi ? 'Đang cập nhật thêm đề thi mẫu mới...' : 'Syncing Exam Bank...')}
-            >
-              <span>{isVi ? 'Đồng bộ đề thi' : 'Sync Bank'}</span>
-            </button>
+              {isVi ? 'Soạn đề mới' : 'Create Custom'}
+            </Button>
           </div>
         </div>
       </section>
 
       {/* KPI Stats Grid */}
-      <div className="exam-stats-grid">
-        <div className="exam-stat-card">
-          <div className="exam-stat-icon exam-stat-icon-primary">
-            <Library size={22} />
-          </div>
-          <div>
-            <div className="exam-stat-num">{examTemplates.length} {isVi ? 'Đề thi chuẩn' : 'Templates'}</div>
-            <div className="exam-stat-label">{isVi ? 'Đề thi 4 kỹ năng' : 'Curated Exams'}</div>
-          </div>
-        </div>
-
-        <div className="exam-stat-card">
-          <div className="exam-stat-icon exam-stat-icon-success">
-            <CheckCircle2 size={22} />
-          </div>
-          <div>
-            <div className="exam-stat-num">100% {isVi ? 'Rubric Chuẩn' : 'Calibrated'}</div>
-            <div className="exam-stat-label">{isVi ? 'Rubric thang điểm 10' : 'Standard Rubrics'}</div>
-          </div>
-        </div>
-
-        <div className="exam-stat-card">
-          <div className="exam-stat-icon exam-stat-icon-purple">
-            <Layers size={22} />
-          </div>
-          <div>
-            <div className="exam-stat-num">{totalDeploys}+ {isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
-            <div className="exam-stat-label">{isVi ? 'Lượt giao bài' : 'Class Deploys'}</div>
-          </div>
-        </div>
-
-        <div className="exam-stat-card">
-          <div className="exam-stat-icon exam-stat-icon-amber">
-            <Star size={22} />
-          </div>
-          <div>
-            <div className="exam-stat-num">{avgRating} / 5.0</div>
-            <div className="exam-stat-label">{isVi ? 'Đánh giá chất lượng' : 'Fidelity Rating'}</div>
-          </div>
-        </div>
+      <div className="teacher-stats-grid mb-6">
+        <MetricCard
+          title={isVi ? 'Tổng số đề thi' : 'Curated Templates'}
+          value={examTemplates.length}
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'Chuẩn Cambridge' : 'Cambridge IELTS'}
+          value={cambridgeCount}
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'IELTS Academic' : 'Academic Formats'}
+          value={academicCount}
+          className="h-full"
+        />
+        <MetricCard
+          title={isVi ? 'Kỹ năng chuẩn hóa' : 'Standard Skills'}
+          value="4/4"
+          className="h-full"
+        />
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="exam-filter-bar">
+      <div className="teacher-filter-bar">
         {/* 4 Skills Navigation Pills */}
-        <div className="exam-skill-pills">
+        <div className="teacher-pills">
           <button
             type="button"
-            className={`exam-skill-pill ${selectedSkill === 'all' ? 'active' : ''}`}
+            className={`teacher-pill ${selectedSkill === 'all' ? 'active' : ''}`}
             onClick={() => handleSkillChange('all')}
           >
             {isVi ? 'Tất cả kỹ năng' : 'All Skills'}
-            <span className="exam-pill-count">({skillCounts.all})</span>
+            <span className="teacher-pill-badge">{skillCounts.all}</span>
           </button>
 
           <button
             type="button"
-            className={`exam-skill-pill ${selectedSkill === 'writing' ? 'active-writing' : ''}`}
+            className={`teacher-pill ${selectedSkill === 'writing' ? 'active' : ''}`}
             onClick={() => handleSkillChange('writing')}
           >
             <PenTool size={13} />
-            <span>Writing (Kỹ năng Viết)</span>
-            <span className="exam-pill-count">({skillCounts.writing})</span>
+            Writing
+            <span className="teacher-pill-badge">{skillCounts.writing}</span>
           </button>
 
           <button
             type="button"
-            className={`exam-skill-pill ${selectedSkill === 'speaking' ? 'active-speaking' : ''}`}
+            className={`teacher-pill ${selectedSkill === 'speaking' ? 'active' : ''}`}
             onClick={() => handleSkillChange('speaking')}
           >
             <Mic size={13} />
-            <span>Speaking (Kỹ năng Nói)</span>
-            <span className="exam-pill-count">({skillCounts.speaking})</span>
+            Speaking
+            <span className="teacher-pill-badge">{skillCounts.speaking}</span>
           </button>
 
           <button
             type="button"
-            className={`exam-skill-pill ${selectedSkill === 'reading' ? 'active-reading' : ''}`}
+            className={`teacher-pill ${selectedSkill === 'reading' ? 'active' : ''}`}
             onClick={() => handleSkillChange('reading')}
           >
             <BookOpen size={13} />
-            <span>Reading (Kỹ năng Đọc)</span>
-            <span className="exam-pill-count">({skillCounts.reading})</span>
+            Reading
+            <span className="teacher-pill-badge">{skillCounts.reading}</span>
           </button>
 
           <button
             type="button"
-            className={`exam-skill-pill ${selectedSkill === 'listening' ? 'active-listening' : ''}`}
+            className={`teacher-pill ${selectedSkill === 'listening' ? 'active' : ''}`}
             onClick={() => handleSkillChange('listening')}
           >
             <Headphones size={13} />
-            <span>Listening (Kỹ năng Nghe)</span>
-            <span className="exam-pill-count">({skillCounts.listening})</span>
+            Listening
+            <span className="teacher-pill-badge">{skillCounts.listening}</span>
           </button>
         </div>
 
-        {/* Search & Dropdown Filters Row */}
-        <div className="exam-controls-row">
-          <div className="exam-search-box">
-            <Search size={15} className="exam-search-icon" />
+        {/* Target Band and Search Box */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select 
+            className="select-input font-medium text-xs py-2 px-3"
+            style={{ height: '36px', minWidth: '150px' }}
+            value={selectedBand}
+            onChange={(e) => handleBandChange(e.target.value)}
+          >
+            <option value="all">{isVi ? 'Tất cả Target Band' : 'All Target Bands'}</option>
+            <option value="Band 6.0 - 7.0">Band 6.0 - 7.0</option>
+            <option value="Band 6.5 - 7.5">Band 6.5 - 7.5</option>
+            <option value="Band 7.5 - 8.5+">Band 7.5 - 8.5+</option>
+          </select>
+
+          <div className="teacher-search-wrap">
+            <Search size={15} className="teacher-search-icon" />
             <input 
               type="text"
-              className="exam-search-input"
-              placeholder={isVi ? 'Tìm đề theo tên, mã đề EB, chủ đề (AI, Environment...)' : 'Search exam code, topic, or title...'}
+              className="teacher-search-input"
+              placeholder={isVi ? 'Tìm đề theo tên, mã đề EB, chủ đề...' : 'Search exam code, topic, or title...'}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
             />
@@ -709,126 +678,78 @@ export const TeacherExamBank: React.FC = () => {
                 type="button" 
                 onClick={() => handleSearchChange('')}
                 className="exam-search-clear"
+                title={isVi ? 'Xóa tìm kiếm' : 'Clear search'}
               >
                 <X size={14} />
               </button>
             )}
           </div>
-
-          <div className="exam-dropdown-group">
-            {/* Format Filter */}
-            <select 
-              className="exam-filter-select"
-              value={selectedFormat}
-              onChange={(e) => handleFormatChange(e.target.value)}
-            >
-              <option value="all">{isVi ? 'Tất cả nguồn đề' : 'All Exam Sources'}</option>
-              <option value="Cambridge 15-19">Cambridge IELTS 15-19</option>
-              <option value="IELTS Academic">IELTS Academic Test</option>
-              <option value="IELTS General">IELTS General</option>
-              <option value="TOEIC 750+">TOEIC 750+ Test Bank</option>
-              <option value="VSTEP B2-C1">VSTEP B2-C1</option>
-            </select>
-
-            {/* Target Band Filter */}
-            <select 
-              className="exam-filter-select"
-              value={selectedBand}
-              onChange={(e) => handleBandChange(e.target.value)}
-            >
-              <option value="all">{isVi ? 'Tất cả Target Band' : 'All Target Bands'}</option>
-              <option value="Band 5.5 - 6.5">Band 5.5 - 6.5</option>
-              <option value="Band 6.5 - 7.5">Band 6.5 - 7.5</option>
-              <option value="Band 7.5 - 8.5+">Band 7.5 - 8.5+</option>
-            </select>
-
-            {/* Topic Tag Filter */}
-            <select 
-              className="exam-filter-select"
-              value={selectedTag}
-              onChange={(e) => handleTagChange(e.target.value)}
-            >
-              <option value="all">{isVi ? 'Tất cả chủ đề' : 'All Topic Tags'}</option>
-              <option value="Environment">Environment & Ecology</option>
-              <option value="AI & Tech">AI & Technology</option>
-              <option value="Urbanization">Urbanization & Cities</option>
-              <option value="Science">Science & Biology</option>
-              <option value="Campus Life">Campus Life & Education</option>
-            </select>
-          </div>
         </div>
       </div>
 
       {/* Exam Grid */}
-      <div className="exam-grid">
+      <div className="teacher-exam-grid">
         {paginatedExams.map((exam) => (
-          <div key={exam.id} className="exam-card">
-            <div>
-              {/* Card Top: Code, Skill, Source */}
-              <div className="exam-card-top">
-                <div className="flex items-center gap-2">
-                  <span className="exam-card-code">{exam.code}</span>
-                  {getSkillBadge(exam.skill)}
-                </div>
-                <span className="exam-card-source">{exam.source}</span>
+          <div key={exam.id} className="teacher-exam-card">
+            {/* 1. Header Line: Identity (Code, Skill, Format) & Target Band */}
+            <div className="teacher-exam-card-header">
+              <div className="teacher-exam-card-identity">
+                <span className="teacher-exam-code-badge">{exam.code}</span>
+                {getSkillBadge(exam.skill)}
+                <span className="teacher-exam-source-tag">{exam.format}</span>
               </div>
 
-              {/* Title */}
+              <div className="teacher-exam-card-band">
+                <span className="teacher-exam-band-pill">{exam.targetBand}</span>
+              </div>
+            </div>
+
+            {/* 2. Main Title & Concise Description */}
+            <div className="teacher-exam-card-body">
               <h3 
-                className="exam-card-title"
+                className="teacher-exam-title"
                 onClick={() => setPreviewExam(exam)}
                 title={exam.title}
               >
                 {exam.title}
               </h3>
-
-              {/* Description */}
-              <p className="exam-card-desc">
+              <p className="teacher-exam-desc">
                 {exam.description}
               </p>
-
-              {/* Meta tags strip */}
-              <div className="exam-card-meta-strip">
-                <span className="inline-flex items-center gap-1"><Clock size={12} />{exam.durationMinutes}p</span>
-                <span>•</span>
-                <span className="font-semibold text-main">{exam.questionCount}</span>
-                <span>•</span>
-                <span className="exam-target-band-badge">
-                  {exam.targetBand}
-                </span>
-              </div>
-
-              {/* Tags */}
-              <div className="exam-card-tags mt-2">
-                {exam.tags.slice(0, 3).map((tag, idx) => (
-                  <span key={idx} className="exam-tag-pill">#{tag}</span>
-                ))}
-              </div>
             </div>
 
-            {/* Footer with actions */}
-            <div className="exam-card-footer">
-              <div className="flex items-center gap-1 text-xs text-muted">
-                <Star size={13} fill="#d97706" color="#d97706" />
-                <span className="font-bold text-main">{exam.rating}</span>
-                <span>({exam.usageCount})</span>
+            {/* 3. Divider */}
+            <div className="teacher-exam-card-divider" />
+
+            {/* 4. Footer Line: Duration/Specs (Left) + Actions (Right) */}
+            <div className="teacher-exam-card-footer">
+              <div className="teacher-exam-footer-meta">
+                <span className="teacher-exam-meta-item">
+                  <Clock size={12} />
+                  <span>{exam.durationMinutes} {isVi ? 'phút' : 'mins'}</span>
+                </span>
+                <span className="teacher-exam-meta-separator">•</span>
+                <span className="teacher-exam-meta-spec">{exam.questionCount}</span>
               </div>
 
-              <div className="exam-card-actions">
+              <div className="teacher-exam-card-actions">
                 <button
                   type="button"
-                  className="btn btn-secondary bg-white btn-sm"
+                  className="teacher-exam-btn-preview"
                   onClick={() => setPreviewExam(exam)}
                   title={isVi ? 'Xem trước nội dung đề' : 'Preview Exam'}
                 >
+                  <Eye size={13} />
                   <span>{isVi ? 'Xem trước' : 'Preview'}</span>
                 </button>
 
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
+                  className="teacher-exam-btn-primary"
                   onClick={() => setAssigningExam(exam)}
+                  title={isVi ? 'Giao đề này cho lớp' : 'Assign to class'}
                 >
+                  <Send size={13} />
                   <span>{isVi ? 'Giao cho lớp' : 'Assign'}</span>
                 </button>
               </div>
@@ -858,15 +779,10 @@ export const TeacherExamBank: React.FC = () => {
 
       {/* Empty State */}
       {filteredExams.length === 0 && (
-        <div className="exam-empty-card">
-          <Library size={44} className="exam-empty-icon" />
-          <h3 className="exam-empty-title">
-            {isVi ? 'Không tìm thấy đề thi phù hợp' : 'No matching exam templates found'}
-          </h3>
-          <p className="exam-empty-desc">
-            {isVi ? 'Hãy thử điều chỉnh từ khóa tìm kiếm hoặc bỏ bớt các bộ lọc kỹ năng/thang điểm.' : 'Try adjusting your search query or reset the skill filters.'}
-          </p>
-        </div>
+        <EmptyState
+          title={isVi ? 'Không tìm thấy đề thi phù hợp' : 'No matching exam templates found'}
+          description={isVi ? 'Hãy thử điều chỉnh từ khóa tìm kiếm hoặc bỏ bớt các bộ lọc kỹ năng/thang điểm.' : 'Try adjusting your search query or reset the skill filters.'}
+        />
       )}
 
       {/* Exam Detail Preview Modal */}

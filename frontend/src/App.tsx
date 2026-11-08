@@ -28,7 +28,6 @@ const Students = React.lazy(() => import('./pages/Students'));
 const AddStudent = React.lazy(() => import('./pages/AddStudent'));
 const StudentDetails = React.lazy(() => import('./pages/StudentDetails'));
 const Profile = React.lazy(() => import('./pages/Profile'));
-const Settings = React.lazy(() => import('./pages/Settings'));
 const AdminSettings = React.lazy(() => import('./pages/AdminSettings'));
 const AdminReports = React.lazy(() => import('./pages/AdminReports'));
 const AdminGradingAuditLogs = React.lazy(() => import('./pages/AdminGradingAuditLogs'));
@@ -39,6 +38,7 @@ const Roles = React.lazy(() => import('./pages/Roles'));
 const TeacherClasses = React.lazy(() => import('./pages/TeacherClasses'));
 const TeacherAssignments = React.lazy(() => import('./pages/TeacherAssignments'));
 const TeacherAssignmentDetails = React.lazy(() => import('./pages/TeacherAssignmentDetails'));
+const TeacherAssignmentGrading = React.lazy(() => import('./pages/TeacherAssignmentGrading'));
 const TeacherCreateAssignment = React.lazy(() => import('./pages/TeacherCreateAssignment'));
 const TeacherEditAssignment = React.lazy(() => import('./pages/TeacherEditAssignment'));
 const TeacherSubmissionDetails = React.lazy(() => import('./pages/TeacherSubmissionDetails'));
@@ -124,7 +124,7 @@ function App() {
 
               {/* Global Redirects */}
               <Route path="/reports" element={<ReportsRedirect />} />
-              <Route path="/progress" element={<Navigate to="/teacher/classes" replace />} />
+              <Route path="/progress" element={<Navigate to="/teacher/progress" replace />} />
 
               {/* Teacher Routes */}
               <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>
@@ -134,15 +134,18 @@ function App() {
                   <Route path="classes" element={<TeacherClasses />} />
                   <Route path="classes/:id" element={<TeacherClassProgress />} />
                   <Route path="classes/:id/progress" element={<TeacherClassProgress />} />
+                  <Route path="progress" element={<TeacherClassProgress />} />
                   <Route path="assignments" element={<TeacherAssignments />} />
                   <Route path="assignments/create" element={<TeacherCreateAssignment />} />
                   <Route path="assignments/:id" element={<TeacherAssignmentDetails />} />
+                  <Route path="assignments/:id/submissions" element={<TeacherAssignmentGrading />} />
+                  <Route path="assignments/:id/grading" element={<TeacherAssignmentGrading />} />
                   <Route path="assignments/:id/edit" element={<TeacherEditAssignment />} />
                   <Route path="assignments/edit/:id" element={<TeacherEditAssignment />} />
                   <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
                   <Route path="exam-bank" element={<TeacherExamBank />} />
                   <Route path="assignments/templates" element={<Navigate to="/teacher/assignments" replace />} />
-                  <Route path="settings" element={<Settings />} />
+                  <Route path="settings" element={<Navigate to="/teacher/profile" replace />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Route>
@@ -168,7 +171,7 @@ function App() {
                   <Route path="grades" element={<StudentGrades />} />
                   <Route path="analytics" element={<StudentAnalytics />} />
                   <Route path="status" element={<StudentAssignments />} />
-                  <Route path="settings" element={<Settings />} />
+                  <Route path="settings" element={<Navigate to="/student/profile" replace />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Route>

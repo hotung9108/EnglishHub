@@ -46,6 +46,7 @@ export const ROUTE_TITLE_RULES: RouteTitleRule[] = [
   { pattern: /^\/teacher\/assignments\/create\/?$/, titleVi: 'Tạo bài tập mới', titleEn: 'Create Assignment' },
   { pattern: /^\/teacher\/assignments\/(edit\/[^/]+|[^/]+\/edit)\/?$/, titleVi: 'Chỉnh sửa bài tập', titleEn: 'Edit Assignment' },
   { pattern: /^\/teacher\/assignments\/[^/]+\/submissions\/[^/]+\/?$/, titleVi: 'Chi tiết bài nộp', titleEn: 'Submission Details' },
+  { pattern: /^\/teacher\/assignments\/[^/]+\/(submissions|grading)\/?$/, titleVi: 'Quản lý bài nộp & Chấm điểm', titleEn: 'Submissions & Grading' },
   { pattern: /^\/teacher\/assignments\/[^/]+\/?$/, titleVi: 'Chi tiết bài tập', titleEn: 'Assignment Details' },
 
   // --- Teacher Static Routes ---

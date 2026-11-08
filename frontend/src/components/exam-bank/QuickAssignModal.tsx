@@ -271,7 +271,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
           <div className="exam-modal-footer">
             <button 
               type="button" 
-              className="btn btn-secondary bg-white btn-sm"
+              className="teacher-exam-btn-preview"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -280,9 +280,9 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
 
             <button 
               type="submit" 
-              className="btn btn-primary btn-sm"
+              className="teacher-exam-btn-primary"
               disabled={isSubmitting || isLoadingClasses || !form.classId}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 24px' }}
+              style={{ padding: '8px 24px' }}
             >
               {isSubmitting ? (
                 <>

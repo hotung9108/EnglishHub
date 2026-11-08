@@ -6,14 +6,14 @@ import {
   CheckCircle2, AlertCircle, Users, Calendar, 
   Plus, Download, X, 
   ArrowUpRight, Award, FileText, Send, Eye,
-  RefreshCw, BarChart3
+  Sparkles, RefreshCw, BarChart3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary, type ClassDetail, type ClassMember } from '../api/services/class.service';
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
-import { Pagination } from '../components/common';
+import { Pagination, LoadingState } from '../components/common';
 import type { 
   ClassSkill, 
   StudentGradeRow, 
@@ -21,6 +21,37 @@ import type {
   SkillAnalyticsItem
 } from '../types/teacher-class.types';
 import '../styles/teacher-class-details.css';
+
+const normalizeSkillName = (s: string): ClassSkill => {
+  const lower = s.toLowerCase();
+  if (lower.includes('speak') || lower.includes('nói') || lower.includes('recording') || lower.includes('part 1') || lower.includes('part 2')) return 'speaking';
+  if (lower.includes('read') || lower.includes('đọc') || lower.includes('passage') || lower.includes('quiz')) return 'reading';
+  if (lower.includes('listen') || lower.includes('nghe') || lower.includes('audio')) return 'listening';
+  return 'writing';
+};
+
+const detectAllSkills = (a: AssignmentSummary, subs: SubmissionListItem[]): ClassSkill[] => {
+  const skillsSet = new Set<ClassSkill>();
+  // 1. From a.skills (API backend array)
+  if (Array.isArray(a.skills) && a.skills.length > 0) {
+    for (const sk of a.skills) {
+      skillsSet.add(normalizeSkillName(sk));
+    }
+  }
+  // 2. From student submission modules of this assignment
+  for (const sub of subs) {
+    for (const mod of sub.modules || []) {
+      if (mod.skill) {
+        skillsSet.add(normalizeSkillName(mod.skill));
+      }
+    }
+  }
+  // 3. Fallback to title keywords if none detected
+  if (skillsSet.size === 0) {
+    skillsSet.add(normalizeSkillName(a.title));
+  }
+  return Array.from(skillsSet);
+};
 
 export const TeacherClassProgress: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -82,14 +113,6 @@ export const TeacherClassProgress: React.FC = () => {
     if (score >= 6.5) return 'medium';
     if (score > 0) return 'low';
     return 'none';
-  };
-
-  const detectSkill = (title: string): ClassSkill => {
-    const t = title.toLowerCase();
-    if (t.includes('speak') || t.includes('nói') || t.includes('part 1') || t.includes('part 2')) return 'speaking';
-    if (t.includes('read') || t.includes('đọc') || t.includes('passage')) return 'reading';
-    if (t.includes('listen') || t.includes('nghe') || t.includes('audio')) return 'listening';
-    return 'writing';
   };
 
   // Load live class data
@@ -181,12 +204,14 @@ export const TeacherClassProgress: React.FC = () => {
             else status = 'open';
           }
 
-          const skill = detectSkill(a.title);
+          const detectedSkills = detectAllSkills(a, subs);
+          const primarySkill = detectedSkills[0] || 'writing';
 
           return {
             id: String(a.id),
             title: a.title,
-            skill,
+            skill: primarySkill,
+            skills: detectedSkills,
             dueDate: closeDate ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '—',
             daysLeft,
             submittedCount,
@@ -213,7 +238,7 @@ export const TeacherClassProgress: React.FC = () => {
             for (const mod of sub.modules) {
               const score = mod.grading?.finalScore;
               if (score !== null && score !== undefined) {
-                const skill = detectSkill(mod.skill || 'writing');
+                const skill = normalizeSkillName(mod.skill || 'writing');
                 if (skill === 'writing') writingScores.push(score);
                 else if (skill === 'speaking') speakingScores.push(score);
                 else if (skill === 'reading') readingScores.push(score);
@@ -348,22 +373,8 @@ export const TeacherClassProgress: React.FC = () => {
     return filteredStudents.slice(start, start + pageSize);
   }, [filteredStudents, safeCurrentPage, pageSize]);
 
-  // 4-Skill Analytics Data calculated from submissions
+  // 4-Skill Analytics Data calculated from submissions & assignments
   const skillAnalytics: SkillAnalyticsItem[] = useMemo(() => {
-    const getAvg = (skill: ClassSkill) => {
-      const vals = studentsRoster.map((s) => s.scores[skill]).filter((v) => v > 0);
-      if (vals.length === 0) return 0;
-      return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-    };
-
-    const getSkillCompletion = (skill: ClassSkill) => {
-      const skillAssignments = classAssignments.filter((a) => a.skill === skill);
-      if (skillAssignments.length === 0 || enrolledMembers.length === 0) return 0;
-      const possible = skillAssignments.length * enrolledMembers.length;
-      const actual = skillAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
-      return Math.min(100, Math.round((actual / possible) * 100));
-    };
-
     const skills: { skill: ClassSkill; name: string }[] = [
       { skill: 'writing', name: 'Writing' },
       { skill: 'speaking', name: 'Speaking' },
@@ -372,15 +383,38 @@ export const TeacherClassProgress: React.FC = () => {
     ];
 
     return skills.map(({ skill, name }) => {
-      const skillAssignments = classAssignments.filter((a) => a.skill === skill);
-      const gradedCount = skillAssignments.reduce((sum, a) => sum + Math.max(0, a.submittedCount - a.pendingGrading), 0);
+      // 1. Find all assignments in this class that contain this skill
+      const skillAssignments = classAssignments.filter((a) => (a.skills || [a.skill]).includes(skill));
+
+      // 2. Scores from student roster for this skill
+      const scoredStudents = studentsRoster.map((s) => s.scores[skill]).filter((v) => v > 0);
+      const gradedCount = scoredStudents.length;
+
+      // 3. Accurate average score
+      // Only show score if there are assignments or graded submissions for this skill
+      const avgScore = (skillAssignments.length > 0 || scoredStudents.length > 0) && scoredStudents.length > 0
+        ? Math.round((scoredStudents.reduce((a, b) => a + b, 0) / scoredStudents.length) * 10) / 10
+        : 0;
+
+      // 4. Accurate completion rate
+      let completionRate = 0;
+      if (skillAssignments.length > 0 && enrolledMembers.length > 0) {
+        const possible = skillAssignments.length * enrolledMembers.length;
+        const actual = skillAssignments.reduce((sum, a) => sum + a.submittedCount, 0);
+        completionRate = Math.min(100, Math.round((actual / possible) * 100));
+      } else if (gradedCount > 0 && enrolledMembers.length > 0) {
+        completionRate = Math.min(100, Math.round((gradedCount / enrolledMembers.length) * 100));
+      }
+
+      // If there are graded submissions for this skill, assignment count must be at least 1
+      const assignmentCount = Math.max(skillAssignments.length, gradedCount > 0 ? 1 : 0);
 
       return {
         skill,
         name,
-        avgScore: getAvg(skill),
-        completionRate: getSkillCompletion(skill),
-        assignmentCount: skillAssignments.length,
+        avgScore,
+        completionRate,
+        assignmentCount,
         gradedCount
       };
     });
@@ -451,14 +485,11 @@ export const TeacherClassProgress: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 20px', maxWidth: '800px', margin: '40px auto' }}>
-        <RefreshCw size={36} color="var(--primary, #1b4d3e)" className="animate-spin" style={{ margin: '0 auto 16px auto', display: 'block' }} />
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
-          {isVi ? 'Đang tải dữ liệu tiến độ lớp học...' : 'Loading class progress...'}
-        </h3>
-        <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-          {isVi ? 'Đang đồng bộ kết quả bài tập và học viên.' : 'Syncing assignments and student results.'}
-        </p>
+      <div className="tcd-container py-6">
+        <LoadingState 
+          title={isVi ? 'Đang tải dữ liệu tiến độ lớp học...' : 'Loading class progress...'}
+          description={isVi ? 'Đang đồng bộ sổ điểm, kết quả 4 kỹ năng và danh sách học viên.' : 'Syncing gradebook, 4-skill evaluation, and student roster.'}
+        />
       </div>
     );
   }
@@ -900,9 +931,24 @@ export const TeacherClassProgress: React.FC = () => {
             {classAssignments.map((hw) => (
               <div key={hw.id} className="tcd-assignment-card">
                 <div className="tcd-assignment-card-header">
-                  <span className={`tcd-skill-badge ${hw.skill}`}>
-                    {hw.skill}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(hw.skills && hw.skills.length === 4) ? (
+                      <span className="tcd-skill-badge all-skills">
+                        <Sparkles size={11} />
+                        <span>{isVi ? '4 Kỹ năng' : '4 Skills'}</span>
+                      </span>
+                    ) : (hw.skills && hw.skills.length > 1) ? (
+                      hw.skills.map((sk) => (
+                        <span key={sk} className={`tcd-skill-badge ${sk}`}>
+                          {sk}
+                        </span>
+                      ))
+                    ) : (
+                      <span className={`tcd-skill-badge ${hw.skill}`}>
+                        {hw.skill}
+                      </span>
+                    )}
+                  </div>
                   <span className={`tcd-status-chip ${hw.status === 'open' ? 'ontime' : 'support'}`}>
                     {hw.status === 'open' ? (isVi ? 'Đang mở' : 'Open') : (isVi ? 'Đã đóng' : 'Closed')}
                   </span>

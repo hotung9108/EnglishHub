@@ -39,6 +39,7 @@ export interface ClassAssignmentItem {
   id: string;
   title: string;
   skill: ClassSkill;
+  skills?: ClassSkill[];
   dueDate: string;
   daysLeft: number;
   submittedCount: number;

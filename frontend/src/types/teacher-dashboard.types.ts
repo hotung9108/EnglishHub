@@ -2,56 +2,39 @@ export type TeacherSkill = 'writing' | 'speaking' | 'reading' | 'listening';
 
 export interface TeacherPendingSubmission {
   id: string;
-  assignmentId: string;
+  submissionId: number;
+  assignmentId: number;
   assignmentTitle: string;
-  studentId: string;
+  studentId: number;
   studentName: string;
   studentEmail?: string;
   studentCode?: string;
-  studentAvatar: string;
   className: string;
   skill: TeacherSkill;
   submittedAt: string;
-  aiPreScore: string;
-  aiConfidence: number;
-  urgency: 'high' | 'medium' | 'normal';
+  aiPreScore?: string;
+}
+
+export interface TeacherActiveAssignment {
+  id: number;
+  title: string;
+  className: string;
+  classId: number;
+  closeAt: string;
+  isUrgent?: boolean;
+  isExpired?: boolean;
+  enrolledCount: number;
+  submittedCount: number;
+  pendingGradingCount: number;
+  submissionRate: number;
 }
 
 export interface TeacherClassSummary {
-  id: string;
+  id: number;
   code: string;
   name: string;
   enrolled: number;
+  assignmentsCount: number;
   pendingGrading: number;
   avgScore: number;
-  nextSession: string;
-  schedule: string;
-  progressPercent: number;
-}
-
-export interface TeacherSkillPerformance {
-  skill: TeacherSkill;
-  skillName: string;
-  avgScore: number;
-  submissionRate: number;
-  needsReviewCount: number;
-}
-
-export interface TeacherUpcomingDeadline {
-  id: string;
-  title: string;
-  type: 'assignment' | 'workshop' | 'grading_deadline';
-  className: string;
-  date: string;
-  timeRemaining: string;
-  status: 'urgent' | 'upcoming';
-}
-
-export interface TeacherActivityItem {
-  id: string;
-  type: 'submission' | 'ai_graded' | 'feedback_viewed' | 'system';
-  title: string;
-  desc: string;
-  timestamp: string;
-  className: string;
 }
