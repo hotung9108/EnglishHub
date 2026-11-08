@@ -1283,6 +1283,7 @@ for (const operation of ['create', 'delete'] as const) {
     }
     const apiCalls = vi.mocked(answerAnnotationService.createAnnotation).mock.calls.length + vi.mocked(answerAnnotationService.deleteAnnotation).mock.calls.length;
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    pending.promise.catch(() => {});
     await act(async () => {
       if (outcome === 'error') pending.reject(new Error('Old mutation error'));
       else pending.resolve({ id: 999, message: 'Updated' });

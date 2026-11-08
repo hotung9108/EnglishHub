@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown
+  Layers, CheckCircle2, ChevronDown, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -277,16 +277,18 @@ export const TeacherCreateAssignment: React.FC = () => {
     }
 
     // Comprehensive validation for all modules
+    const isMulti = assignmentData.modules.length > 1;
     for (let i = 0; i < assignmentData.modules.length; i++) {
       const mod = assignmentData.modules[i];
       const modNum = i + 1;
       const modLabel = mod.title ? `"${mod.title}" (Phần ${modNum})` : `Phần ${modNum}: ${getSkillName(mod.skill)}`;
+      const prefix = isMulti ? `${modLabel}: ` : '';
 
       if (mod.skill === 'writing') {
         const c = mod.config as WritingConfig;
         if (!c.promptText.trim()) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Nội dung đề bài Writing không được để trống!` : `${modLabel}: Writing prompt cannot be empty!`);
+          showToast(isVi ? `${prefix}Nội dung đề bài Writing không được để trống!` : `${prefix}Writing prompt cannot be empty!`);
           return;
         }
       } else if (mod.skill === 'speaking') {
@@ -294,37 +296,37 @@ export const TeacherCreateAssignment: React.FC = () => {
         const spPrompt = (c.promptText || c.cueCardTopic || '').trim();
         if (!spPrompt) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Nội dung đề bài Speaking không được để trống!` : `${modLabel}: Speaking prompt cannot be empty!`);
+          showToast(isVi ? `${prefix}Nội dung đề bài Speaking không được để trống!` : `${prefix}Speaking prompt cannot be empty!`);
           return;
         }
       } else if (mod.skill === 'reading') {
         const c = mod.config as ReadingConfig;
         if (!c.passageTitle.trim()) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Tiêu đề bài đọc không được để trống!` : `${modLabel}: Reading passage title cannot be empty!`);
+          showToast(isVi ? `${prefix}Tiêu đề bài đọc không được để trống!` : `${prefix}Passage title cannot be empty!`);
           return;
         }
         const pContent = (c.passageContent || c.paragraphs?.map(p => p.content).join('\n\n') || '').trim();
         if (!pContent) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Nội dung văn bản bài đọc không được để trống!` : `${modLabel}: Reading passage content cannot be empty!`);
+          showToast(isVi ? `${prefix}Nội dung văn bản bài đọc không được để trống!` : `${prefix}Passage content cannot be empty!`);
           return;
         }
         if (!c.questions || c.questions.length === 0) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!` : `${modLabel}: Please add at least 1 question!`);
+          showToast(isVi ? `${prefix}Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!` : `${prefix}Please add at least 1 question for the reading assignment!`);
           return;
         }
         for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
           const q = c.questions[qIdx];
           if (!q.prompt.trim()) {
             setActiveModuleIndex(i);
-            showToast(isVi ? `${modLabel}: Nội dung câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
+            showToast(isVi ? `${prefix}Nội dung câu hỏi Reading #${qIdx + 1} không được để trống!` : `${prefix}Reading question #${qIdx + 1} statement cannot be empty!`);
             return;
           }
           if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
             setActiveModuleIndex(i);
-            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
+            showToast(isVi ? `${prefix}Đáp án chính xác cho câu hỏi Reading #${qIdx + 1} không được để trống!` : `${prefix}Correct answer for reading question #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
@@ -332,24 +334,24 @@ export const TeacherCreateAssignment: React.FC = () => {
         const c = mod.config as ListeningConfig;
         if (!c.audioFile && !c.audioUrl?.trim()) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Vui lòng chọn tệp âm thanh cho bài nghe!` : `${modLabel}: Please select an audio file!`);
+          showToast(isVi ? `${prefix}Vui lòng chọn tệp âm thanh cho bài nghe!` : `${prefix}Please select an audio file for the listening assignment!`);
           return;
         }
         if (!c.questions || c.questions.length === 0) {
           setActiveModuleIndex(i);
-          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!` : `${modLabel}: Please add at least 1 question!`);
+          showToast(isVi ? `${prefix}Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!` : `${prefix}Please add at least 1 question for the listening assignment!`);
           return;
         }
         for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
           const q = c.questions[qIdx];
           if (!q.prompt.trim()) {
             setActiveModuleIndex(i);
-            showToast(isVi ? `${modLabel}: Nội dung câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
+            showToast(isVi ? `${prefix}Nội dung câu hỏi Listening #${qIdx + 1} không được để trống!` : `${prefix}Listening question #${qIdx + 1} statement cannot be empty!`);
             return;
           }
           if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
             setActiveModuleIndex(i);
-            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
+            showToast(isVi ? `${prefix}Đáp án chính xác cho câu hỏi Listening #${qIdx + 1} không được để trống!` : `${prefix}Correct answer for listening question #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
@@ -365,9 +367,11 @@ export const TeacherCreateAssignment: React.FC = () => {
         ? new Date(assignmentData.dueDate).toISOString() 
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const mainDescription = assignmentData.modules
-        .map((m, idx) => `[Phần ${idx + 1} - ${m.skill.toUpperCase()}${m.title ? `: ${m.title}` : ''}]: ${getInstructionsForModule(m)}`)
-        .join('\n\n');
+      const mainDescription = isMulti
+        ? assignmentData.modules
+            .map((m, idx) => `[Phần ${idx + 1} - ${m.skill.toUpperCase()}${m.title ? `: ${m.title}` : ''}]: ${getInstructionsForModule(m)}`)
+            .join('\n\n')
+        : getInstructionsForModule(assignmentData.modules[0]);
 
       // 1. Create assignment on backend
       const res = await assignmentService.createAssignment(selectedClassId, {
@@ -671,12 +675,15 @@ export const TeacherCreateAssignment: React.FC = () => {
                   {isVi ? 'Thang điểm:' : 'Max score:'}
                 </span>
                 <input
-                  type="number"
-                  min="1"
-                  max="100"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="tae-meta-score-input"
                   value={activeModule.maxScore || 10}
-                  onChange={(e) => handleActiveModuleMetaChange('maxScore', Math.max(1, Number(e.target.value) || 10))}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    handleActiveModuleMetaChange('maxScore', Math.max(1, Number(val) || 10));
+                  }}
                 />
               </div>
             </div>
@@ -798,10 +805,9 @@ export const TeacherCreateAssignment: React.FC = () => {
           <button
             type="button"
             className="btn btn-secondary bg-white btn-sm"
-            onClick={() => setShowPreviewModal(true)}
+            onClick={() => navigate('/teacher/assignments')}
           >
-            <Eye size={16} />
-            <span>{isVi ? 'Xem trước đề thi' : 'Preview Exam'}</span>
+            {isVi ? 'Hủy bỏ' : 'Cancel'}
           </button>
         }
         rightActions={
@@ -809,11 +815,19 @@ export const TeacherCreateAssignment: React.FC = () => {
             <button
               type="button"
               className="btn btn-secondary bg-white btn-sm"
+              onClick={() => setShowPreviewModal(true)}
+            >
+              <Eye size={16} />
+              <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary bg-white btn-sm"
               onClick={() => executeCreateAssignment('DRAFT')}
               disabled={isSubmitting}
             >
               <Save size={16} />
-              <span>{isVi ? 'Lưu bản nháp' : 'Save as Draft'}</span>
+              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
             </button>
             <button
               type="button"
@@ -821,8 +835,12 @@ export const TeacherCreateAssignment: React.FC = () => {
               onClick={() => executeCreateAssignment('PUBLISHED')}
               disabled={isSubmitting}
             >
-              <Send size={16} />
-              <span>{isVi ? 'Giao bài tập ngay' : 'Publish Assignment'}</span>
+              {isSubmitting ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <Send size={16} />
+              )}
+              <span>{isSubmitting ? (isVi ? 'Đang giao bài...' : 'Publishing...') : (isVi ? 'Giao bài tập' : 'Create & Publish')}</span>
             </button>
           </div>
         }
