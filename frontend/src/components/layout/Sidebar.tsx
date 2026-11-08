@@ -14,7 +14,6 @@ import {
   TrendingUp,
   History,
   Shield,
-  Library,
   Globe,
   ShieldCheck,
   ChevronsUpDown,
@@ -164,7 +163,6 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
-          { path: '/teacher/exam-bank', label: language === 'vi' ? 'Ngân hàng đề thi' : 'Exam Bank', icon: Library },
         ]
       },
       {

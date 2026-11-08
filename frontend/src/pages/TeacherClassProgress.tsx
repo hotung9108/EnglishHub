@@ -13,6 +13,7 @@ import { classService, type ClassSummary, type ClassDetail, type ClassMember } f
 import { assignmentService, type AssignmentSummary } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
+import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
 import { Pagination, LoadingState } from '../components/common';
 import type { 
   ClassSkill, 
@@ -94,7 +95,39 @@ export const TeacherClassProgress: React.FC = () => {
 
   const [selectedStudent, setSelectedStudent] = useState<StudentGradeRow | null>(null);
   const [directMessageText, setDirectMessageText] = useState('');
+  const [evaluationHistory, setEvaluationHistory] = useState<StudentEvaluationListItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSendingEvaluation, setIsSendingEvaluation] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleCloseStudentModal = () => {
+    setSelectedStudent(null);
+    setEvaluationHistory([]);
+    setDirectMessageText('');
+  };
+
+  const handleOpenStudentDetail = (std: StudentGradeRow) => {
+    setSelectedStudent(std);
+    setIsLoadingHistory(true);
+    setEvaluationHistory([]);
+    setDirectMessageText('');
+    const studentIdNum = Number(std.id.replace('std-', ''));
+    if (studentIdNum && currentClass?.id) {
+      studentEvaluationService.list(studentIdNum, { classId: currentClass.id, page: 1, limit: 20 })
+        .then((res) => {
+          setEvaluationHistory(res.data || []);
+        })
+        .catch((err) => {
+          console.error('Failed to load student evaluation history:', err);
+          setEvaluationHistory([]);
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
+        });
+    } else {
+      setIsLoadingHistory(false);
+    }
+  };
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -178,10 +211,14 @@ export const TeacherClassProgress: React.FC = () => {
         // Map class assignments items (clean, real fields)
         const mappedAssignments: ClassAssignmentItem[] = rawAssignments.map((a) => {
           const subs = allSubmissionsByAssignId[a.id] || [];
-          const submittedCount = subs.length;
-          const pendingGrading = subs.filter(
-            (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
-          ).length;
+          const distinctStudentIds = new Set(subs.map((s) => s.studentId));
+          const submittedCount = distinctStudentIds.size;
+          const pendingStudentIds = new Set(
+            subs
+              .filter((s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
+              .map((s) => s.studentId)
+          );
+          const pendingGrading = pendingStudentIds.size;
 
           const gradedScores = subs
             .flatMap((s) => s.modules)
@@ -227,7 +264,8 @@ export const TeacherClassProgress: React.FC = () => {
         // 7. Build Student Grade Roster
         const rosterRows: StudentGradeRow[] = members.map((member) => {
           const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
-          const completedCount = studentSubs.length;
+          const distinctCompletedAssignIds = new Set(studentSubs.map((s) => s.assignmentId));
+          const completedCount = distinctCompletedAssignIds.size;
 
           const writingScores: number[] = [];
           const speakingScores: number[] = [];
@@ -426,22 +464,33 @@ export const TeacherClassProgress: React.FC = () => {
 
   const handleSendDirectEvaluation = async () => {
     if (!selectedStudent || !currentClass) return;
+    const trimmed = directMessageText.trim();
+    if (!trimmed) {
+      showToast(isVi ? 'Vui lòng nhập nội dung nhận xét.' : 'Please enter evaluation content.');
+      return;
+    }
+    setIsSendingEvaluation(true);
     try {
       const studentIdNum = Number(selectedStudent.id.replace('std-', ''));
-      if (directMessageText.trim()) {
-        await studentEvaluationService.create(studentIdNum, {
-          classId: currentClass.id,
-          content: directMessageText
-        });
-      }
-      showToast(isVi ? `Đã lưu nhận xét cho ${selectedStudent.name}!` : `Evaluation saved for ${selectedStudent.name}!`);
-      setSelectedStudent(null);
+      const res = await studentEvaluationService.create(studentIdNum, {
+        classId: currentClass.id,
+        content: trimmed
+      });
+      const newItem: StudentEvaluationListItem = {
+        id: res.id || Date.now(),
+        classId: currentClass.id,
+        teacherName: currentClass.teacher?.fullName || (isVi ? 'Giáo viên' : 'Teacher'),
+        content: trimmed,
+        createdAt: new Date().toISOString()
+      };
+      setEvaluationHistory((prev) => [newItem, ...prev]);
       setDirectMessageText('');
+      showToast(isVi ? `Đã lưu nhận xét cho ${selectedStudent.name}!` : `Evaluation saved for ${selectedStudent.name}!`);
     } catch (err) {
       console.error('Failed to send evaluation:', err);
       showToast(isVi ? 'Không thể lưu nhận xét lúc này. Vui lòng thử lại.' : 'Failed to save evaluation. Please retry.');
-      setSelectedStudent(null);
-      setDirectMessageText('');
+    } finally {
+      setIsSendingEvaluation(false);
     }
   };
 
@@ -870,7 +919,7 @@ export const TeacherClassProgress: React.FC = () => {
                       <button 
                         className="tcd-btn-action-icon"
                         title={isVi ? 'Xem chi tiết học viên' : 'View Student'}
-                        onClick={() => setSelectedStudent(std)}
+                        onClick={() => handleOpenStudentDetail(std)}
                       >
                         <Eye size={15} />
                       </button>
@@ -1090,7 +1139,7 @@ export const TeacherClassProgress: React.FC = () => {
 
       {/* 8. Student Detail Drawer (Modal) */}
       {selectedStudent && (
-        <div className="tcd-drawer-overlay" onClick={() => setSelectedStudent(null)}>
+        <div className="tcd-drawer-overlay" onClick={handleCloseStudentModal}>
           <div className="tcd-drawer-box" onClick={(e) => e.stopPropagation()}>
             <div className="tcd-drawer-header">
               <div className="flex items-center gap-3">
@@ -1102,7 +1151,7 @@ export const TeacherClassProgress: React.FC = () => {
               </div>
               <button 
                 className="tcd-btn-action-icon"
-                onClick={() => setSelectedStudent(null)}
+                onClick={handleCloseStudentModal}
               >
                 <X size={18} />
               </button>
@@ -1172,10 +1221,40 @@ export const TeacherClassProgress: React.FC = () => {
                 </div>
               </div>
 
-              {/* Direct Feedback / Evaluation input */}
+              {/* Direct Feedback & History */}
               <div>
                 <h4 className="text-sm font-bold text-main mb-2 mt-0">
-                  {isVi ? 'Nhận xét đánh giá học viên' : 'Direct Evaluation'}
+                  {isVi ? 'Lịch sử đánh giá & nhận xét' : 'Evaluation History'}
+                </h4>
+                {isLoadingHistory ? (
+                  <div className="flex items-center gap-2 text-xs text-muted py-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isVi ? 'Đang tải lịch sử nhận xét...' : 'Loading evaluation history...'}</span>
+                  </div>
+                ) : evaluationHistory.length === 0 ? (
+                  <div className="tcd-eval-history-empty">
+                    {isVi ? 'Chưa có nhận xét nào trước đây.' : 'No evaluations recorded yet.'}
+                  </div>
+                ) : (
+                  <div className="tcd-eval-history-list">
+                    {evaluationHistory.map((item) => (
+                      <div key={item.id} className="tcd-eval-history-item">
+                        <div className="tcd-eval-history-meta">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {item.teacherName || (isVi ? 'Giáo viên' : 'Teacher')}
+                          </span>
+                          <span>
+                            {item.createdAt ? new Date(item.createdAt).toLocaleString(isVi ? 'vi-VN' : 'en-US') : ''}
+                          </span>
+                        </div>
+                        <div className="tcd-eval-history-content">{item.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <h4 className="text-sm font-bold text-main mb-2 mt-3">
+                  {isVi ? 'Nhận xét mới cho học viên' : 'New Evaluation'}
                 </h4>
                 <textarea
                   className="tcd-drawer-eval-input"
@@ -1183,6 +1262,7 @@ export const TeacherClassProgress: React.FC = () => {
                   placeholder={isVi ? 'Nhập nhận xét hoặc hướng dẫn ôn tập cho học viên này...' : 'Enter evaluation for this student...'}
                   value={directMessageText}
                   onChange={(e) => setDirectMessageText(e.target.value)}
+                  disabled={isSendingEvaluation}
                 />
               </div>
             </div>
@@ -1190,16 +1270,17 @@ export const TeacherClassProgress: React.FC = () => {
             <div className="tcd-drawer-footer">
               <button 
                 className="tcd-btn-secondary"
-                onClick={() => setSelectedStudent(null)}
+                onClick={handleCloseStudentModal}
               >
                 {isVi ? 'Đóng' : 'Close'}
               </button>
               <button 
                 className="tcd-btn-primary"
                 onClick={handleSendDirectEvaluation}
+                disabled={isSendingEvaluation || !directMessageText.trim()}
               >
-                <Send size={13} />
-                <span>{isVi ? 'Lưu đánh giá' : 'Save Evaluation'}</span>
+                {isSendingEvaluation ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+                <span>{isSendingEvaluation ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu đánh giá' : 'Save Evaluation')}</span>
               </button>
             </div>
           </div>

@@ -109,11 +109,11 @@ it.each(['reading', 'listening'])('persists actual MCQ and short-answer question
   await user.click(screen.getByRole('button', { name: 'Giao bài tập' }));
   await waitFor(() => expect(questionService.createQuestion).toHaveBeenCalledTimes(2));
   expect(questionService.createQuestion).toHaveBeenNthCalledWith(1, 70, {
-    content: 'Choose renewable energy.', questionType: 'MULTIPLE_CHOICE', score: 1, orderIndex: 1,
+    content: 'Choose renewable energy.', questionType: 'MULTIPLE_CHOICE', score: 5, orderIndex: 1,
     correctAnswer: { options: ['A', 'B', 'C', 'D'].map((letter, index) => ({ id: index + 1, content: 'Lựa chọn ' + letter, isCorrect: index === 2 })) },
   });
   expect(questionService.createQuestion).toHaveBeenNthCalledWith(2, 70, {
-    content: 'Name the energy.', questionType: 'SHORT_ANSWER', score: 1, orderIndex: 2, correctAnswer: { correctAnswer: 'solar' },
+    content: 'Name the energy.', questionType: 'SHORT_ANSWER', score: 5, orderIndex: 2, correctAnswer: { correctAnswer: 'solar' },
   });
   expect(moduleService.createModule).toHaveBeenCalledExactlyOnceWith(42, {
     skill: skill.toUpperCase(), taskType: 'QUIZ', orderIndex: 1, maxScore: 10, aiInstruction: undefined,

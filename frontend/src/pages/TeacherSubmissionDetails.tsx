@@ -272,60 +272,55 @@ export const TeacherSubmissionDetails: React.FC = () => {
       setModuleDetail(null);
     }
 
+    let resolvedGradingId: number | null = null;
+    let gradingStatus: string | null = null;
     try {
       const gradingRes = await gradingService.getBySubmissionModuleId(targetModuleId);
       if (!isCurrentModuleLoad()) return;
       setGradingSummary(gradingRes);
+      gradingStatus = gradingRes.status || null;
       if (gradingRes.finalScore != null) {
         setFinalScoreInput(String(gradingRes.finalScore));
       }
       if (gradingRes.id) {
-        try {
-          const detail = await gradingService.getById(gradingRes.id);
-          if (!isCurrentModuleLoad()) return;
-          setGradingDetail(detail);
-          if (detail.finalScore != null) {
-            setFinalScoreInput(String(detail.finalScore));
-          }
-          if (detail.finalFeedback) {
-            setFeedbackText(detail.finalFeedback);
-          } else if (detail.aiFeedback) {
-            setFeedbackText(detail.aiFeedback);
-          }
-        } catch {
-          if (!isCurrentModuleLoad()) return;
-          // ignore
-        }
-      }
-
-      if (gradingRes.status === 'COMPLETED') {
-        try {
-          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
-        } catch {
-          // ignore
-        }
-      } else {
-        try {
-          const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
-          if (localDraft) {
-            const parsed = JSON.parse(localDraft);
-            if (parsed && typeof parsed === 'object') {
-              if (parsed.score != null && parsed.score !== '') {
-                setFinalScoreInput(String(parsed.score));
-              }
-              if (parsed.feedback != null && parsed.feedback !== '') {
-                setFeedbackText(String(parsed.feedback));
-              }
-            }
-          }
-        } catch {
-          // ignore
-        }
+        resolvedGradingId = gradingRes.id;
       }
     } catch {
       if (!isCurrentModuleLoad()) return;
       setGradingSummary(null);
-      setGradingDetail(null);
+    }
+
+    if (!resolvedGradingId && currentModDetail?.grading?.id) {
+      resolvedGradingId = currentModDetail.grading.id;
+      gradingStatus = currentModDetail.grading.status || gradingStatus;
+    }
+
+    if (resolvedGradingId) {
+      try {
+        const detail = await gradingService.getById(resolvedGradingId);
+        if (!isCurrentModuleLoad()) return;
+        setGradingDetail(detail);
+        if (detail.finalScore != null) {
+          setFinalScoreInput(String(detail.finalScore));
+        }
+        if (detail.finalFeedback) {
+          setFeedbackText(detail.finalFeedback);
+        } else if (detail.aiFeedback) {
+          setFeedbackText(detail.aiFeedback);
+        }
+      } catch {
+        if (!isCurrentModuleLoad()) return;
+        // ignore
+      }
+    }
+
+    if (gradingStatus === 'COMPLETED') {
+      try {
+        localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+      } catch {
+        // ignore
+      }
+    } else {
       try {
         const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
         if (localDraft) {
@@ -988,10 +983,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [currentAnnotations]);
 
   const transcriptText = useMemo(() => {
-    const rawTranscript = aiSuggestion?.transcript ?? gradingDetail?.aiTranscript;
+    const rawTranscript =
+      aiSuggestion?.transcript ??
+      gradingDetail?.aiTranscript ??
+      (gradingSummary as { aiTranscript?: unknown })?.aiTranscript ??
+      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript ??
+      (activeModule?.grading as { aiTranscript?: unknown })?.aiTranscript;
     const text = extractTranscriptText(rawTranscript);
     return text.length > 0 ? text : null;
-  }, [aiSuggestion, gradingDetail]);
+  }, [aiSuggestion, gradingDetail, gradingSummary, moduleDetail, activeModule]);
 
   const extractSnippet = (start?: number, end?: number): string | null => {
     const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
@@ -1558,17 +1558,23 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
 
               {/* Spoken Audio Transcript for Teacher */}
-              {transcriptText && (
-                <div className="tsd-speaking-transcript-wrap">
-                  <div className="tsd-speaking-transcript-label">
-                    <FileText size={15} />
-                    <span>{isVi ? 'Bản ghi lời nói của học viên (AI Transcript):' : 'Student Audio Transcript (AI Transcribed):'}</span>
-                  </div>
+              <div className="tsd-speaking-transcript-wrap">
+                <div className="tsd-speaking-transcript-label">
+                  <FileText size={15} />
+                  <span>{isVi ? 'Bản ghi lời nói của học viên (AI Transcript):' : 'Student Audio Transcript (AI Transcribed):'}</span>
+                </div>
+                {transcriptText ? (
                   <div className="tsd-speaking-transcript-text">
                     {transcriptText}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-xs text-muted italic py-1">
+                    {isVi 
+                      ? 'Chưa có bản ghi âm tự động (Bấm "Chấm bài bằng AI" để trích xuất transcript lời nói của học viên).' 
+                      : 'No automated transcript available (Click "Grade with AI" to transcribe student audio).'}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

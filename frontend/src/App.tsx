@@ -45,7 +45,6 @@ const TeacherEditAssignment = React.lazy(() => import('./pages/TeacherEditAssign
 const TeacherSubmissionDetails = React.lazy(() => import('./pages/TeacherSubmissionDetails'));
 const TeacherClassProgress = React.lazy(() => import('./pages/TeacherClassProgress'));
 const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
-const TeacherExamBank = React.lazy(() => import('./pages/TeacherExamBank'));
 
 // Student Pages (Code-split via React.lazy)
 const StudentAssignments = React.lazy(() => import('./pages/StudentAssignments'));
@@ -145,7 +144,7 @@ function App() {
                   <Route path="assignments/:id/edit" element={<TeacherEditAssignment />} />
                   <Route path="assignments/edit/:id" element={<TeacherEditAssignment />} />
                   <Route path="assignments/:id/submissions/:studentId" element={<TeacherSubmissionDetails />} />
-                  <Route path="exam-bank" element={<TeacherExamBank />} />
+                  <Route path="exam-bank" element={<Navigate to="/teacher/assignments" replace />} />
                   <Route path="assignments/templates" element={<Navigate to="/teacher/assignments" replace />} />
                   <Route path="settings" element={<Navigate to="/teacher/profile" replace />} />
                   <Route path="profile" element={<Profile />} />

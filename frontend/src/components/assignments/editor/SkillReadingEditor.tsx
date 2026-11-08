@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import type {
   ReadingConfig, ReadingQuestionItem, ReadingQuestionType
 } from '../../../types/assignment-editor.types';
@@ -8,11 +8,16 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 interface SkillReadingEditorProps {
   config: ReadingConfig;
   onChange: (updated: ReadingConfig) => void;
+  moduleMaxScore?: number;
 }
 
-export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, onChange }) => {
+export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, onChange, moduleMaxScore }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
+
+  const currentTotalScore = moduleMaxScore !== undefined && moduleMaxScore > 0 ? moduleMaxScore : 10;
+  const calculatedScorePerQ = config.questions.length > 0 ? (currentTotalScore / config.questions.length) : 1;
+  const pointsDisplay = Number.isInteger(calculatedScorePerQ) ? calculatedScorePerQ : calculatedScorePerQ.toFixed(2);
 
   const updateField = <K extends keyof ReadingConfig>(key: K, value: ReadingConfig[K]) => {
     onChange({ ...config, [key]: value });
@@ -39,14 +44,9 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
   const handleAddQuestion = (type: ReadingQuestionType) => {
     const newOrder = config.questions.length + 1;
     const initialOptions = type === 'multiple_choice'
-      ? [
-          isVi ? 'Lựa chọn A' : 'Option A',
-          isVi ? 'Lựa chọn B' : 'Option B',
-          isVi ? 'Lựa chọn C' : 'Option C',
-          isVi ? 'Lựa chọn D' : 'Option D'
-        ]
+      ? ['', '', '', '']
       : undefined;
-    const defaultAns = initialOptions ? initialOptions[0] : '';
+    const defaultAns = type === 'multiple_choice' ? 'A' : '';
 
     const newQuestion: ReadingQuestionItem = {
       id: `rq-${Date.now()}`,
@@ -59,6 +59,36 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
     };
 
     updateField('questions', [...config.questions, newQuestion]);
+  };
+
+  const handleInsertQuestionAfter = (targetIndex: number, type: ReadingQuestionType) => {
+    const newQuestion: ReadingQuestionItem = {
+      id: `rq-${Date.now()}`,
+      order: targetIndex + 2,
+      type,
+      prompt: isVi
+        ? (type === 'multiple_choice' ? 'Câu hỏi trắc nghiệm mới: Nhập nội dung...' : 'Câu hỏi điền từ mới: Nhập nội dung...')
+        : (type === 'multiple_choice' ? 'New MCQ: Enter question statement...' : 'New blank: Enter statement...'),
+      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
+      correctAnswer: type === 'multiple_choice' ? 'A' : '',
+      points: 1
+    };
+
+    const nextQuestions = [...config.questions];
+    nextQuestions.splice(targetIndex + 1, 0, newQuestion);
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
+  };
+
+  const handleMoveQuestion = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= config.questions.length) return;
+    const nextQuestions = [...config.questions];
+    const temp = nextQuestions[index];
+    nextQuestions[index] = nextQuestions[targetIndex];
+    nextQuestions[targetIndex] = temp;
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
   };
 
   const handleUpdateQuestion = <K extends keyof ReadingQuestionItem>(
@@ -180,6 +210,21 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
           </div>
         </div>
 
+        {/* Score Summary Badge */}
+        <div className="flex flex-wrap items-center justify-between bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg p-3 text-xs mb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={15} className="text-blue-600 dark:text-blue-400" />
+            <span className="text-slate-700 dark:text-slate-200 font-medium">
+              {isVi 
+                ? `Tổng điểm module: ${currentTotalScore} điểm • Gồm ${config.questions.length} câu hỏi • Mỗi câu: ${pointsDisplay} điểm` 
+                : `Module Total: ${currentTotalScore} pts • ${config.questions.length} questions • ${pointsDisplay} pts/question`}
+            </span>
+          </div>
+          <span className="text-muted">
+            {isVi ? '(Điểm chia đều tự động theo thang điểm tổng module)' : '(Points distributed evenly by module score)'}
+          </span>
+        </div>
+
         {/* Questions List */}
         {config.questions.length === 0 ? (
           <div className="question-empty-state">
@@ -201,17 +246,33 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 text-xs text-muted">
-                        <span>{isVi ? 'Điểm:' : 'Score:'}</span>
-                        <input
-                          type="number"
-                          min={0.25}
-                          step={0.25}
-                          value={q.points}
-                          onChange={(e) => handleUpdateQuestion(qIdx, 'points', parseFloat(e.target.value) || 1)}
-                          className="question-points-input"
-                        />
+                      {/* Move Up / Move Down buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === 0}
+                          onClick={() => handleMoveQuestion(qIdx, 'up')}
+                          title={isVi ? 'Di chuyển câu hỏi lên trên' : 'Move up'}
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === config.questions.length - 1}
+                          onClick={() => handleMoveQuestion(qIdx, 'down')}
+                          title={isVi ? 'Di chuyển câu hỏi xuống dưới' : 'Move down'}
+                        >
+                          <ChevronDown size={14} />
+                        </button>
                       </div>
+
+                      {/* Readonly Score Pill */}
+                      <div className="flex items-center gap-1.5 text-xs text-muted bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+                        <span className="font-semibold text-primary">{pointsDisplay} {isVi ? 'điểm' : 'pts'}</span>
+                      </div>
+
                       <button
                         type="button"
                         className="btn btn-secondary bg-white btn-sm text-danger"
@@ -244,27 +305,30 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                         {isVi ? 'Các lựa chọn (Tích chọn radio vào đáp án đúng):' : 'Options (Select correct radio):'}
                       </label>
                       <div className="question-options-list">
-                        {(q.options || ['A', 'B', 'C', 'D']).map((opt, oIdx) => {
+                        {(q.options || ['', '', '', '']).map((opt, oIdx) => {
                           const letter = String.fromCharCode(65 + oIdx);
-                          const isCorrect = q.correctAnswer === opt;
+                          const isCorrect = q.correctAnswer === letter || (opt.trim() !== '' && q.correctAnswer === opt);
                           return (
                             <div key={oIdx} className={`question-option-row ${isCorrect ? 'correct' : ''}`}>
                               <input
                                 type="radio"
                                 name={`correct-${q.id}`}
                                 checked={isCorrect}
-                                onChange={() => handleUpdateQuestion(qIdx, 'correctAnswer', opt)}
+                                onChange={() => handleUpdateQuestion(qIdx, 'correctAnswer', opt.trim() || letter)}
                               />
                               <span className="question-option-letter">{letter}.</span>
                               <input
                                 type="text"
                                 className="edit-form-input bg-white py-1 px-3"
                                 value={opt}
+                                placeholder={isVi ? `Lựa chọn ${letter} (nhập đáp án...)` : `Option ${letter} (enter text...)`}
                                 onChange={(e) => {
-                                  const newOpts = [...(q.options || [])];
+                                  const newOpts = [...(q.options || ['', '', '', ''])];
                                   newOpts[oIdx] = e.target.value;
                                   handleUpdateQuestion(qIdx, 'options', newOpts);
-                                  if (isCorrect) handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value);
+                                  if (isCorrect) {
+                                    handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value.trim() || letter);
+                                  }
                                 }}
                               />
                             </div>
@@ -287,6 +351,29 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                       />
                     </div>
                   )}
+
+                  {/* Quick Insert Below Action Bar */}
+                  <div className="flex items-center justify-between pt-2.5 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <span className="text-muted font-medium">
+                      {isVi ? 'Chèn câu hỏi ngay bên dưới câu này:' : 'Insert question below this one:'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
+                      >
+                        <Plus size={11} /> {isVi ? '+ Trắc nghiệm' : '+ MCQ'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
+                      >
+                        <Plus size={11} /> {isVi ? '+ Điền từ' : '+ Blank'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })}
