@@ -252,6 +252,7 @@ def test_writing_route_extracts_document(
     documents: dict[str, bytes],
     writing_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    sample_text: str,
 ) -> None:
     monkeypatch.setattr(settings, "MOCK_MODE", True)
     download = AsyncMock(return_value=documents[document_type])
@@ -265,6 +266,7 @@ def test_writing_route_extracts_document(
 
     assert response.status_code == 200
     assert response.json()["textMetrics"]["wordCount"] == SAMPLE_WORD_COUNT
+    assert " ".join(response.json()["extractedText"].split()) == " ".join(sample_text.split())
     download.assert_awaited_once_with(url)
 
 

@@ -659,6 +659,58 @@ class GradingAiAnalysisServiceImplTest {
 	}
 
 	@Test
+	void analyzeSubmittedModule_writingDocumentWithExtractedText_persistsContentInAnswer() {
+		long submissionModuleId = 203L;
+		Grading grading = new Grading(
+				16L, submissionModuleId, GradingMethod.AUTO, GradingStatus.PENDING, null, null, null,
+				BigDecimal.valueOf(9.0), null, null, null, null, null);
+		GradingContext context = new GradingContext(
+				submissionModuleId, null, 203L, 10L, 5L, 2L, 16L, ModuleSkill.WRITING, true, null);
+		Answer answer = new Answer(
+				submissionModuleId,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"submissions/203/essay.docx",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+				2048L,
+				UploadStatus.READY
+		);
+		ReflectionTestUtils.setField(answer, "id", 1203L);
+
+		when(gradingRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(grading));
+		when(gradingContextRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(Optional.of(context));
+		when(answerRepository.findBySubmissionModuleId(submissionModuleId)).thenReturn(List.of(answer));
+		when(storageService.generatePresignedGetUrl("submissions/203/essay.docx")).thenReturn("https://storage.example.com/essay.docx?presigned=true");
+
+		String extractedText = "This is the extracted text content from docx file that has sufficient length.";
+		AiWritingAnalysisResponse aiResponse = new AiWritingAnalysisResponse(
+				submissionModuleId,
+				8.0,
+				"Well articulated essay extracted from DOCX.",
+				new WritingCriteriaScoresDto(8.0, 8.0, 7.5, 8.0, 8.0),
+				new TextMetricsDto(100, 5, 20.0, 0.75, 10.0),
+				List.of(new AiAnnotationDto(5, 10, "is the", "GRAMMAR", "Sample annotation", null)),
+				"google/gemini-2.5-flash",
+				"openrouter",
+				extractedText
+		);
+
+		when(aiServiceClient.analyzeWriting(any(AiWritingAnalysisRequest.class))).thenReturn(aiResponse);
+		when(gradingAiResultPersistenceService.persistAiResult(any(), any())).thenReturn(true);
+
+		service.analyzeSubmittedModule(submissionModuleId);
+
+		ArgumentCaptor<Answer> answerCaptor = ArgumentCaptor.forClass(Answer.class);
+		verify(answerRepository).save(answerCaptor.capture());
+		assertThat(answerCaptor.getValue().getContent()).isEqualTo(extractedText);
+	}
+
+	@Test
 	void analyzeSubmittedModule_missingCriteriaOverallScore_marksPendingGradingFailed() {
 		long submissionModuleId = 205L;
 		Grading grading = new Grading(

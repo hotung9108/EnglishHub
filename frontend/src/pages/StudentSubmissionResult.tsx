@@ -208,6 +208,12 @@ export const StudentSubmissionResult: React.FC = () => {
     if (existing && existing.trim()) {
       return;
     }
+    const isTxt = moduleDetail?.answers?.some(
+      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
+    );
+    if (!isTxt) {
+      return;
+    }
     if (!selectedModuleId || selectedSkill !== 'WRITING' || typeof submissionService?.getDocumentFileBlob !== 'function') {
       return;
     }
