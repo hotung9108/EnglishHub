@@ -157,7 +157,7 @@ const FALLBACK_AUDIO_URL = 'https://storage.example.test/submissions/40/audio-fa
 
 function configureAudio(audio: HTMLAudioElement, duration: number, initialTime = 0) {
   let currentTime = initialTime;
-  let currentDuration = duration;
+  const currentDuration = duration;
   Object.defineProperty(audio, 'duration', {
     configurable: true,
     get: () => currentDuration,

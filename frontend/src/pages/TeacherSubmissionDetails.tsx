@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
@@ -67,7 +67,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
   const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
   const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [audioLoadingContext, setAudioLoadingContext] = useState<{ moduleId: number; answerId: number } | null>(null);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
@@ -760,7 +760,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const currentAudioContext = targetModuleId && audioAnswer
     ? { moduleId: targetModuleId, answerId: audioAnswer.id }
     : null;
-  audioContextRef.current = currentAudioContext;
+  const currentAudioModuleId = currentAudioContext?.moduleId ?? null;
+  const currentAudioAnswerId = currentAudioContext?.answerId ?? null;
+  useLayoutEffect(() => {
+    audioContextRef.current = currentAudioModuleId !== null && currentAudioAnswerId !== null
+      ? { moduleId: currentAudioModuleId, answerId: currentAudioAnswerId }
+      : null;
+  }, [currentAudioModuleId, currentAudioAnswerId]);
 
   const isSpeaking = activeModule?.skill === 'SPEAKING' ||
     currentModuleDetail?.answers?.some((answer) => Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim()));
@@ -770,6 +776,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
     : directAudioUrl;
   const audioError = Boolean(currentAudioContext && audioErrorContext?.moduleId === currentAudioContext.moduleId &&
     audioErrorContext.answerId === currentAudioContext.answerId);
+  const isAudioLoading = Boolean(currentAudioContext && audioLoadingContext?.moduleId === currentAudioContext.moduleId &&
+    audioLoadingContext.answerId === currentAudioContext.answerId);
 
   const loadAudioFallback = useCallback(async (
     moduleId: number,
@@ -780,7 +788,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     if (preserveTime && audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
       pendingAudioTimeRef.current = audioRef.current.currentTime;
     }
-    setIsAudioLoading(true);
+    setAudioLoadingContext({ moduleId, answerId });
     setAudioErrorContext(null);
     try {
       const response = await submissionService.getAudioDownloadUrl(moduleId);
@@ -796,7 +804,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     } finally {
       if (requestId === audioRequestRef.current &&
         audioContextRef.current?.moduleId === moduleId && audioContextRef.current.answerId === answerId) {
-        setIsAudioLoading(false);
+        setAudioLoadingContext(null);
       }
     }
   }, []);
@@ -805,23 +813,21 @@ export const TeacherSubmissionDetails: React.FC = () => {
     const requestId = ++audioRequestRef.current;
     audioFallbackUsedRef.current = false;
     pendingAudioTimeRef.current = null;
-    audioRef.current?.pause();
-    setAudioUrlOverride(null);
-    setAudioErrorContext(null);
-    setIsAudioLoading(false);
+    const audio = audioRef.current;
+    audio?.pause();
 
-    if (currentAudioContext && isSpeaking && !directAudioUrl) {
+    if (currentAudioModuleId !== null && currentAudioAnswerId !== null && isSpeaking && !directAudioUrl) {
       audioFallbackUsedRef.current = true;
-      void loadAudioFallback(currentAudioContext.moduleId, currentAudioContext.answerId, requestId, false);
+      void loadAudioFallback(currentAudioModuleId, currentAudioAnswerId, requestId, false);
     }
 
     return () => {
       audioRequestRef.current += 1;
-      audioRef.current?.pause();
+      audio?.pause();
     };
   }, [
-    currentAudioContext?.moduleId,
-    currentAudioContext?.answerId,
+    currentAudioModuleId,
+    currentAudioAnswerId,
     directAudioUrl,
     isSpeaking,
     loadAudioFallback,

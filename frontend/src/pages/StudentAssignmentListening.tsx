@@ -38,6 +38,33 @@ const AUDIO_NOT_FOUND_MESSAGE = 'Bài nghe chưa có tệp audio.';
 const AUDIO_LOAD_ERROR_MESSAGE = 'Không tải được audio đề bài. Vui lòng thử lại.';
 const AUDIO_PLAY_ERROR_MESSAGE = 'Phát audio thất bại. Vui lòng bấm phát lại.';
 const AUDIO_MEDIA_ERROR_MESSAGE = 'Không thể phát audio đề bài. Vui lòng thử lại.';
+
+interface ListeningAudioState {
+  moduleId: number | null;
+  url: string | null;
+  isAudioLoading: boolean;
+  audioError: string | null;
+  audioErrorCanRetry: boolean;
+  playError: string | null;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+}
+
+function createListeningAudioState(moduleId: number | null, isAudioLoading = false): ListeningAudioState {
+  return {
+    moduleId,
+    url: null,
+    isAudioLoading,
+    audioError: null,
+    audioErrorCanRetry: false,
+    playError: null,
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+  };
+}
+
 // An unavailable scope disables submission; these values are never sent to the API.
 const UNAVAILABLE_SCOPE: StudentQuizSubmitScope = {
   assignmentId: 0, submissionId: 0, moduleId: 0, submissionModuleId: 0, expectedModuleIds: [],
@@ -89,7 +116,6 @@ const StudentAssignmentListening: React.FC = () => {
   const [questions, setQuestions] = useState<unknown>([]);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   useLayoutEffect(() => () => {
     audioRef.current?.pause();
@@ -97,13 +123,20 @@ const StudentAssignmentListening: React.FC = () => {
   const audioRequestId = useRef(0);
   const audioRefetchUsed = useRef(false);
   const pendingAudioTime = useRef<number | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const [audioErrorCanRetry, setAudioErrorCanRetry] = useState(false);
-  const [playError, setPlayError] = useState<string | null>(null);
-  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioState, setAudioState] = useState(() => createListeningAudioState(null));
+  const activeAudioState = audioState.moduleId === audioModuleId
+    ? audioState
+    : createListeningAudioState(audioModuleId, audioModuleId !== null);
+  const {
+    url: audioUrl,
+    isAudioLoading,
+    audioError,
+    audioErrorCanRetry,
+    playError,
+    isPlaying,
+    currentTime: audioCurrentTime,
+    duration: audioDuration,
+  } = activeAudioState;
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [selectedAnswers, setSelectedAnswers] = useState<StudentQuizAnswers>({});
   const answerScope = useRef<{ assignmentId: number | null; submissionId: number | null; moduleId: number | null }>({
@@ -118,53 +151,60 @@ const StudentAssignmentListening: React.FC = () => {
 
   const handleRetry = () => setReloadKey((k) => k + 1);
 
+  const updateAudioState = useCallback((currentModuleId: number | null, updates: Partial<ListeningAudioState>) => {
+    setAudioState((current) => {
+      const base = current.moduleId === currentModuleId
+        ? current
+        : createListeningAudioState(currentModuleId, true);
+      return { ...base, ...updates, moduleId: currentModuleId };
+    });
+  }, []);
+
   const loadAudioUrl = useCallback(async (currentModuleId: number, requestId: number) => {
-    setIsAudioLoading(true);
-    setAudioError(null);
-    setAudioErrorCanRetry(false);
     try {
       const response = await moduleService.getAudioDownloadUrl(currentModuleId);
       if (requestId !== audioRequestId.current) return;
       if (!response.downloadUrl) {
-        setAudioUrl(null);
-        setAudioError(AUDIO_LOAD_ERROR_MESSAGE);
-        setAudioErrorCanRetry(true);
-        setIsAudioLoading(false);
+        updateAudioState(currentModuleId, {
+          url: null,
+          audioError: AUDIO_LOAD_ERROR_MESSAGE,
+          audioErrorCanRetry: true,
+          isAudioLoading: false,
+        });
         return;
       }
-      setAudioUrl(response.downloadUrl);
+      updateAudioState(currentModuleId, {
+        url: response.downloadUrl,
+        audioError: null,
+        audioErrorCanRetry: false,
+        playError: null,
+      });
     } catch (err: unknown) {
       if (requestId !== audioRequestId.current) return;
       const apiError = parseApiError(err);
-      setAudioUrl(null);
-      setAudioError(apiError.statusCode === 404 ? AUDIO_NOT_FOUND_MESSAGE : AUDIO_LOAD_ERROR_MESSAGE);
-      setAudioErrorCanRetry(apiError.statusCode !== 404);
-      setIsAudioLoading(false);
+      updateAudioState(currentModuleId, {
+        url: null,
+        audioError: apiError.statusCode === 404 ? AUDIO_NOT_FOUND_MESSAGE : AUDIO_LOAD_ERROR_MESSAGE,
+        audioErrorCanRetry: apiError.statusCode !== 404,
+        isAudioLoading: false,
+      });
     }
-  }, []);
+  }, [updateAudioState]);
 
   useEffect(() => {
     const requestId = ++audioRequestId.current;
     audioRefetchUsed.current = false;
     pendingAudioTime.current = null;
-    audioRef.current?.pause();
-    setAudioUrl(null);
-    setAudioError(null);
-    setAudioErrorCanRetry(false);
-    setPlayError(null);
-    setIsPlaying(false);
-    setAudioCurrentTime(0);
-    setAudioDuration(0);
+    const audio = audioRef.current;
+    audio?.pause();
 
     if (audioModuleId) {
       void loadAudioUrl(audioModuleId, requestId);
-    } else {
-      setIsAudioLoading(false);
     }
 
     return () => {
       if (audioRequestId.current === requestId) audioRequestId.current += 1;
-      audioRef.current?.pause();
+      audio?.pause();
     };
   }, [audioModuleId, loadAudioUrl]);
 
@@ -177,26 +217,19 @@ const StudentAssignmentListening: React.FC = () => {
     audioRefetchUsed.current = false;
     pendingAudioTime.current = null;
     audioRef.current?.pause();
-    setAudioUrl(null);
-    setAudioError(null);
-    setAudioErrorCanRetry(false);
-    setPlayError(null);
-    setIsPlaying(false);
-    setAudioCurrentTime(0);
-    setAudioDuration(0);
+    setAudioState(createListeningAudioState(audioModuleId, true));
     void loadAudioUrl(audioModuleId, ++audioRequestId.current);
   };
 
   const handleAudioPlay = async () => {
     const audio = audioRef.current;
     if (!audio || !audioUrl || isAudioLoading) return;
-    setPlayError(null);
+    updateAudioState(audioModuleId, { playError: null });
     try {
       await audio.play();
-      setIsPlaying(true);
+      updateAudioState(audioModuleId, { isPlaying: true });
     } catch {
-      setIsPlaying(false);
-      setPlayError(AUDIO_PLAY_ERROR_MESSAGE);
+      updateAudioState(audioModuleId, { isPlaying: false, playError: AUDIO_PLAY_ERROR_MESSAGE });
     }
   };
 
@@ -207,14 +240,20 @@ const StudentAssignmentListening: React.FC = () => {
       pendingAudioTime.current = audio.currentTime;
     }
     audio?.pause();
-    setIsPlaying(false);
-    setAudioUrl(null);
+    updateAudioState(audioModuleId, {
+      url: null,
+      isPlaying: false,
+      isAudioLoading: true,
+      playError: null,
+    });
 
     if (audioRefetchUsed.current) {
       pendingAudioTime.current = null;
-      setAudioError(AUDIO_MEDIA_ERROR_MESSAGE);
-      setAudioErrorCanRetry(true);
-      setIsAudioLoading(false);
+      updateAudioState(audioModuleId, {
+        audioError: AUDIO_MEDIA_ERROR_MESSAGE,
+        audioErrorCanRetry: true,
+        isAudioLoading: false,
+      });
       return;
     }
 
@@ -227,28 +266,28 @@ const StudentAssignmentListening: React.FC = () => {
     if (!audio) return;
     const duration = audio.duration;
     if (!Number.isFinite(duration) || duration <= 0) {
-      setAudioDuration(0);
-      setAudioCurrentTime(0);
+      updateAudioState(audioModuleId, { duration: 0, currentTime: 0, isAudioLoading: false });
       pendingAudioTime.current = null;
-      setIsAudioLoading(false);
       return;
     }
 
-    setAudioDuration(duration);
     if (pendingAudioTime.current !== null) {
       const restoredTime = Math.min(Math.max(pendingAudioTime.current, 0), duration);
       audio.currentTime = restoredTime;
-      setAudioCurrentTime(restoredTime);
+      updateAudioState(audioModuleId, { duration, currentTime: restoredTime, isAudioLoading: false });
       pendingAudioTime.current = null;
     } else {
-      setAudioCurrentTime(Number.isFinite(audio.currentTime) ? audio.currentTime : 0);
+      updateAudioState(audioModuleId, {
+        duration,
+        currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        isAudioLoading: false,
+      });
     }
-    setIsAudioLoading(false);
   };
 
   const handleAudioTimeUpdate = () => {
     const currentTime = audioRef.current?.currentTime ?? 0;
-    setAudioCurrentTime(Number.isFinite(currentTime) ? currentTime : 0);
+    updateAudioState(audioModuleId, { currentTime: Number.isFinite(currentTime) ? currentTime : 0 });
   };
 
   const handleAudioSeek = (value: number) => {
@@ -256,7 +295,7 @@ const StudentAssignmentListening: React.FC = () => {
     if (!audio || !Number.isFinite(audioDuration) || audioDuration <= 0) return;
     const nextTime = Math.min(Math.max(value, 0), audioDuration);
     audio.currentTime = nextTime;
-    setAudioCurrentTime(nextTime);
+    updateAudioState(audioModuleId, { currentTime: nextTime });
   };
 
   const canSeekAudio = Boolean(audioUrl) && !isAudioLoading && Number.isFinite(audioDuration) && audioDuration > 0;
@@ -290,6 +329,7 @@ const StudentAssignmentListening: React.FC = () => {
       setIsLoading(true);
       setError(null);
       setAudioModuleId(null);
+      setAudioState(createListeningAudioState(null));
       setLoadedScope({ key: viewKey, scope: UNAVAILABLE_SCOPE });
       setSubmission(null);
       const requestedId = searchParams.get('submissionId');
@@ -320,6 +360,7 @@ const StudentAssignmentListening: React.FC = () => {
 
         if (!isMounted) return;
         setAudioModuleId(moduleId);
+        setAudioState(createListeningAudioState(moduleId, true));
         if (answerScope.current.moduleId !== (moduleId ?? null)) {
           answerScope.current.moduleId = moduleId ?? null;
           setSelectedAnswers({});
@@ -610,15 +651,13 @@ const StudentAssignmentListening: React.FC = () => {
                 preload="metadata"
                 aria-label="Audio đề bài Listening"
                 onPlay={() => {
-                  setIsPlaying(true);
-                  setPlayError(null);
+                  updateAudioState(audioModuleId, { isPlaying: true, playError: null });
                 }}
-                onPause={() => setIsPlaying(false)}
+                onPause={() => updateAudioState(audioModuleId, { isPlaying: false })}
                 onTimeUpdate={handleAudioTimeUpdate}
                 onLoadedMetadata={handleAudioMetadata}
                 onEnded={() => {
-                  setIsPlaying(false);
-                  setAudioCurrentTime(audioDuration);
+                  updateAudioState(audioModuleId, { isPlaying: false, currentTime: audioDuration });
                 }}
                 onError={handleAudioError}
               />
@@ -638,7 +677,7 @@ const StudentAssignmentListening: React.FC = () => {
                     onClick={() => {
                       if (isPlaying) {
                         audioRef.current?.pause();
-                        setIsPlaying(false);
+                        updateAudioState(audioModuleId, { isPlaying: false });
                       } else {
                         void handleAudioPlay();
                       }
