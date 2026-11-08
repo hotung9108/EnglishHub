@@ -1,4 +1,4 @@
-/* EnglishHub Student Portal: Writing Interactive Workspace Styles */
+﻿/* EnglishHub Student Portal: Writing Interactive Workspace Styles */
 
 .writing-container {
   max-width: 1400px;
@@ -281,7 +281,7 @@
 
 .writing-file-icon.docx {
   background-color: #dbeafe;
-  color: #1d4ed8;
+  color: var(--eh-primary-hover, #133D30);
 }
 
 .writing-file-info {

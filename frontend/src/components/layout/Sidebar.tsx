@@ -1,10 +1,10 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
   GraduationCap, 
-  User, 
+  User as UserIcon, 
   BarChart3, 
   Settings, 
   LogOut,
@@ -12,7 +12,13 @@ import {
   ClipboardList,
   CheckCircle,
   TrendingUp,
-  History
+  History,
+  Shield,
+  Library,
+  Globe,
+  ShieldCheck,
+  ChevronsUpDown,
+  X
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -36,10 +42,31 @@ export interface MenuSection {
   items: MenuItem[];
 }
 
-const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
+interface SidebarProps {
+  isOpen: boolean;
+  onCloseMobile?: () => void;
+}
+
+const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
   const navigate = useNavigate();
-  const { t, language } = useLanguage();
+  const { t, language, toggleLanguage } = useLanguage();
   const { user, logout } = useAuth();
+
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close flyout popover when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   const handleLogout = async () => {
     try {
@@ -48,9 +75,17 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
       navigate('/login', { replace: true });
     }
   };
+
+  const handleLinkClick = () => {
+    if (onCloseMobile && window.innerWidth <= 768) {
+      onCloseMobile();
+    }
+  };
   
-  // Default to admin if no user is found for some reason
+  // Default to admin if no user is found
   const role = user?.role || 'admin';
+  const normalizedRole = role.toLowerCase();
+
   const { badge: studentAssignmentBadge } = useStudentAssignmentBadge(
     role === 'student' ? user?.id : undefined,
     role
@@ -63,8 +98,29 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
   };
 
   const currentRoleLabel = language === 'vi'
-    ? (roleLabels[role]?.vi || 'Học viên')
-    : (roleLabels[role]?.en || 'Student');
+    ? (roleLabels[normalizedRole]?.vi || 'Học viên')
+    : (roleLabels[normalizedRole]?.en || 'Student');
+
+  const profileBasePath = normalizedRole === 'admin' 
+    ? '/admin/profile' 
+    : normalizedRole === 'teacher' 
+      ? '/teacher/profile' 
+      : '/student/profile';
+
+  const settingsBasePath = normalizedRole === 'admin'
+    ? '/admin/settings'
+    : normalizedRole === 'teacher'
+      ? '/teacher/settings'
+      : '/student/settings';
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const cleanName = name.replace(/\(.*?\)/g, '').trim();
+    const parts = cleanName.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'U';
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   const menuSections: Record<string, MenuSection[]> = {
     admin: [
@@ -78,8 +134,9 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         title: t('sectionManagement'),
         items: [
           { path: '/admin/accounts', label: t('menuAccounts'), icon: Users },
+          { path: '/admin/roles', label: language === 'vi' ? 'Phân quyền' : 'Roles', icon: Shield },
           { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
-          { path: '/admin/teachers', label: t('menuTeachers'), icon: User },
+          { path: '/admin/teachers', label: t('menuTeachers'), icon: UserIcon },
           { path: '/admin/students', label: t('menuStudents'), icon: Users },
         ]
       },
@@ -103,12 +160,13 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/teacher/classes', label: t('menuMyClasses'), icon: BookOpen },
           { path: '/teacher/assignments', label: t('menuAssignments'), icon: ClipboardList },
+          { path: '/teacher/exam-bank', label: language === 'vi' ? 'Ngân hàng đề thi' : 'Exam Bank', icon: Library },
         ]
       },
       {
         title: t('sectionResults'),
         items: [
-          { path: '/progress', label: t('menuProgress'), icon: TrendingUp },
+          { path: '/teacher/progress', label: t('menuProgress'), icon: TrendingUp },
         ]
       }
     ],
@@ -131,12 +189,13 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         items: [
           { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
           { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
+          { path: '/student/analytics', label: language === 'vi' ? 'Phân tích học tập' : 'Analytics', icon: BarChart3 },
         ]
       }
     ]
   };
 
-  const currentSections = menuSections[role] || menuSections.admin;
+  const currentSections = menuSections[normalizedRole] || menuSections.admin;
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
@@ -149,6 +208,18 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
           <div className="sidebar-brand-name">{t('systemName')}</div>
           <div className="sidebar-brand-sub">{currentRoleLabel}</div>
         </div>
+
+        {/* Mobile close button */}
+        {onCloseMobile && (
+          <button 
+            type="button" 
+            className="sidebar-mobile-close-btn" 
+            onClick={onCloseMobile}
+            aria-label="Close sidebar"
+          >
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       {/* Navigation Sections */}
@@ -166,6 +237,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                  onClick={handleLinkClick}
                 >
                   {item.icon && <item.icon size={18} strokeWidth={2} />}
                   <span>{item.label}</span>
@@ -180,6 +252,7 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
                         key={`child-${cIndex}`}
                         to={child.path}
                         className={({ isActive }) => `sidebar-link sidebar-submenu-link ${isActive ? 'active' : ''}`}
+                        onClick={handleLinkClick}
                       >
                         <span>{child.label}</span>
                       </NavLink>
@@ -192,31 +265,146 @@ const Sidebar = ({ isOpen }: { isOpen: boolean }) => {
         ))}
       </nav>
 
-      {/* Footer Utility Links */}
-      <div className="sidebar-footer">
-        <div className="sidebar-divider"></div>
-        <NavLink 
-          to={role === 'admin' ? '/admin/profile' : role === 'teacher' ? '/teacher/profile' : '/student/profile'} 
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <User size={18} strokeWidth={2} />
-          <span>{t('profile.title') || 'Hồ sơ cá nhân'}</span>
-        </NavLink>
-        <NavLink 
-          to={role === 'admin' ? '/admin/settings' : role === 'teacher' ? '/teacher/settings' : '/student/settings'} 
-          className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-        >
-          <Settings size={18} strokeWidth={2} />
-          <span>{t('menuSettings')}</span>
-        </NavLink>
+      {/* Consolidated Footer: Language, Admin System Settings & Floating User Profile */}
+      <div className="sidebar-footer" ref={userMenuRef}>
+        <div className="sidebar-divider" />
+
+        {/* 1. Admin System Settings Link (Only visible for Admin; Teachers & Students access Profile/Security via User Card) */}
+        {normalizedRole === 'admin' && (
+          <NavLink
+            to={settingsBasePath}
+            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+            onClick={handleLinkClick}
+          >
+            <Settings size={18} strokeWidth={2} />
+            <span>{language === 'vi' ? 'Cài đặt hệ thống' : 'System Settings'}</span>
+          </NavLink>
+        )}
+
+        {/* 2. Language Switcher Row */}
+        <div className="sidebar-lang-row">
+          <span className="sidebar-lang-label">
+            <Globe size={14} />
+            <span>{language === 'vi' ? 'Ngôn ngữ' : 'Language'}</span>
+          </span>
+          <div className="sidebar-lang-segmented">
+            <button
+              type="button"
+              className={`sidebar-lang-seg-btn ${language === 'vi' ? 'active' : ''}`}
+              onClick={() => { if (language !== 'vi') toggleLanguage(); }}
+              title="Tiếng Việt"
+            >
+              VI
+            </button>
+            <button
+              type="button"
+              className={`sidebar-lang-seg-btn ${language === 'en' ? 'active' : ''}`}
+              onClick={() => { if (language !== 'en') toggleLanguage(); }}
+              title="English"
+            >
+              EN
+            </button>
+          </div>
+        </div>
+
+        <div className="sidebar-divider-subtle" />
+
+        {/* 3. User Profile Card (Click to open floating menu on the right) */}
         <button 
-          type="button" 
-          onClick={handleLogout} 
-          className="sidebar-link sidebar-link-logout text-error"
+          type="button"
+          className={`sidebar-user-card ${isUserMenuOpen ? 'active' : ''}`}
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+          aria-expanded={isUserMenuOpen}
+          aria-haspopup="true"
         >
-          <LogOut size={18} strokeWidth={2} />
-          <span>{t('logout')}</span>
+          <div className="sidebar-user-avatar">
+            {user?.avatar ? (
+              <img src={user.avatar} alt={user.fullName} />
+            ) : (
+              getInitials(user?.fullName)
+            )}
+          </div>
+          <div className="sidebar-user-details">
+            <span className="sidebar-user-name" title={user?.fullName}>{user?.fullName || 'User'}</span>
+            <span className="sidebar-user-role">{currentRoleLabel}</span>
+          </div>
+          <ChevronsUpDown size={14} className="sidebar-user-chevron" />
         </button>
+
+        {/* 4. Floating User Flyout Popover (Floats to the right outside sidebar on Desktop) */}
+        {isUserMenuOpen && (
+          <div className="sidebar-user-popover-floating">
+            <div className="sidebar-popover-header">
+              <div className="sidebar-popover-user-row">
+                <div className="sidebar-popover-avatar">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user.fullName} />
+                  ) : (
+                    getInitials(user?.fullName)
+                  )}
+                </div>
+                <div className="sidebar-popover-info">
+                  <div className="sidebar-popover-name">{user?.fullName || 'User'}</div>
+                  <div className="sidebar-popover-email">{user?.email || 'user@eh.com'}</div>
+                </div>
+              </div>
+              <span className="sidebar-popover-role-badge">{currentRoleLabel}</span>
+            </div>
+
+            <div className="sidebar-popover-body">
+              <Link 
+                to={`${profileBasePath}?tab=general`}
+                className="sidebar-popover-item"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  handleLinkClick();
+                }}
+              >
+                <UserIcon size={15} />
+                <span>{t('settings.tabProfile')}</span>
+              </Link>
+
+              <Link 
+                to={`${profileBasePath}?tab=security`}
+                className="sidebar-popover-item"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  handleLinkClick();
+                }}
+              >
+                <ShieldCheck size={15} />
+                <span>{t('settings.tabSecurity')}</span>
+              </Link>
+
+              {normalizedRole === 'admin' && (
+                <Link 
+                  to={settingsBasePath}
+                  className="sidebar-popover-item"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    handleLinkClick();
+                  }}
+                >
+                  <Settings size={15} />
+                  <span>{language === 'vi' ? 'Cài đặt hệ thống' : 'System Settings'}</span>
+                </Link>
+              )}
+            </div>
+
+            <div className="sidebar-popover-divider" />
+
+            <div className="sidebar-popover-footer">
+              <button 
+                type="button"
+                className="sidebar-popover-item danger"
+                onClick={handleLogout}
+              >
+                <LogOut size={15} />
+                <span>{t('logout')}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

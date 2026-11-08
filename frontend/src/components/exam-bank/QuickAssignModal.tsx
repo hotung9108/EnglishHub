@@ -111,8 +111,8 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
               width: 36, 
               height: 36, 
               borderRadius: '8px', 
-              backgroundColor: '#eff6ff', 
-              color: '#2563eb', 
+              backgroundColor: 'var(--eh-primary-light, #EAF0E8)', 
+              color: 'var(--eh-primary, #1B4D3E)', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center' 
@@ -151,7 +151,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
                   <button 
                     type="button" 
                     onClick={handleRetry} 
-                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    style={{ background: 'none', border: 'none', color: 'var(--eh-primary, #1B4D3E)', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   >
                     <RefreshCw size={11} /> {isVi ? 'Thử lại' : 'Retry'}
                   </button>
@@ -245,7 +245,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
                   type="checkbox" 
                   checked={form.allowLate}
                   onChange={(e) => setForm({ ...form, allowLate: e.target.checked })}
-                  style={{ accentColor: '#2563eb' }}
+                  style={{ accentColor: 'var(--eh-primary, #1B4D3E)' }}
                 />
                 <span style={{ fontSize: '13px', color: '#334155' }}>
                   {isVi ? 'Cho phép nộp bài muộn tối đa 24 giờ' : 'Allow late submissions within 24h'}
@@ -257,7 +257,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
                   type="checkbox" 
                   checked={form.notifyStudents}
                   onChange={(e) => setForm({ ...form, notifyStudents: e.target.checked })}
-                  style={{ accentColor: '#2563eb' }}
+                  style={{ accentColor: 'var(--eh-primary, #1B4D3E)' }}
                 />
                 <span style={{ fontSize: '13px', color: '#334155' }}>
                   <Bell size={13} style={{ display: 'inline', marginRight: 4 }} />
@@ -271,7 +271,7 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
           <div className="exam-modal-footer">
             <button 
               type="button" 
-              className="btn btn-secondary bg-white btn-sm"
+              className="teacher-exam-btn-preview"
               onClick={onClose}
               disabled={isSubmitting}
             >
@@ -280,9 +280,9 @@ export const QuickAssignModal: React.FC<QuickAssignModalProps> = ({ exam, onClos
 
             <button 
               type="submit" 
-              className="btn btn-primary btn-sm"
+              className="teacher-exam-btn-primary"
               disabled={isSubmitting || isLoadingClasses || !form.classId}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 24px' }}
+              style={{ padding: '8px 24px' }}
             >
               {isSubmitting ? (
                 <>

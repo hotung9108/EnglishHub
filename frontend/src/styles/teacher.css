@@ -6,7 +6,41 @@
   padding: 0 24px 40px 24px;
 }
 
-/* Header */
+/* Unified Page Hero Header Card */
+.teacher-page-hero {
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 22px 28px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+  margin-bottom: 24px;
+}
+
+.teacher-hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.teacher-hero-title {
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--eh-text-primary, #262320);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.teacher-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Legacy Header Fallback */
 .teacher-header {
   display: flex;
   flex-direction: column;
@@ -347,45 +381,336 @@
 }
 
 .teacher-assignment-card {
-  background-color: var(--surface);
-  border: 1px solid var(--outline-variant);
-  border-radius: var(--radius-lg, 12px);
-  padding: 20px 22px;
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  transition: all 0.25s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-}
-
-@media (min-width: 900px) {
-  .teacher-assignment-card {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
+  gap: 12px;
+  transition: all var(--eh-transition-fast, 150ms ease);
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+  position: relative;
 }
 
 .teacher-assignment-card:hover {
-  border-color: var(--border-hover, #c2a882);
-  box-shadow: 0 8px 20px -4px rgba(27, 77, 62, 0.08);
+  border-color: var(--eh-border-hover, #c2a882);
+  box-shadow: 0 8px 24px -4px rgba(27, 77, 62, 0.08);
   transform: translateY(-1px);
 }
 
-.teacher-progress-bar {
-  height: 7px;
-  border-radius: 4px;
-  background-color: var(--surface-container-high, #e2e8f0);
-  overflow: hidden;
-  position: relative;
-  min-width: 140px;
+.teacher-assignment-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.teacher-progress-fill {
+.teacher-assignment-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.teacher-assignment-code-badge {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  background-color: #262320;
+  color: #FAF8F5;
+  letter-spacing: 0.02em;
+}
+
+.teacher-assignment-class-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--eh-text-secondary, #6B635B);
+  background-color: var(--eh-surface-subtle, #FAF8F5);
+  border: 1px solid var(--eh-border-subtle, #EDE8E1);
+  padding: 2.5px 9px;
+  border-radius: 6px;
+}
+
+.teacher-assignment-class-tag svg {
+  color: var(--eh-text-muted, #9E9589);
+  flex-shrink: 0;
+}
+
+.teacher-skill-combined-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2.5px 9px;
+  border-radius: 6px;
+  background-color: #F6F2EB;
+  color: #8C5E14;
+  border: 1px solid #ECD8B0;
+}
+
+.teacher-skill-combined-badge svg {
+  color: #C2A882;
+  flex-shrink: 0;
+}
+
+.teacher-assignment-skills-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.teacher-skill-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7.5px;
+  border-radius: 5px;
+  background-color: var(--eh-surface-subtle, #FAF8F5);
+  color: var(--eh-text-secondary, #6B635B);
+  border: 1px solid var(--eh-border-subtle, #EDE8E1);
+}
+
+.teacher-assignment-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.teacher-assignment-pending-pill,
+.teacher-assignment-done-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.teacher-assignment-pending-pill {
+  background-color: #FDF6EC;
+  color: #9A6014;
+  border: 1px solid #F6DFBA;
+}
+
+.teacher-assignment-done-pill {
+  background-color: #E7F3EC;
+  color: #17523F;
+  border: 1px solid #B7DEC8;
+}
+
+.teacher-assignment-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.teacher-assignment-status-dot.pending {
+  background-color: #D97706;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
+}
+
+.teacher-assignment-status-dot.done {
+  background-color: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.teacher-assignment-title {
+  font-family: var(--font-serif, 'Lora', Georgia, serif);
+  font-size: 16.5px;
+  font-weight: 600;
+  color: var(--eh-text-primary, #262320);
+  margin: 2px 0 0 0;
+  cursor: pointer;
+  line-height: 1.45;
+  transition: color var(--eh-transition-fast, 150ms ease);
+}
+
+.teacher-assignment-title:hover {
+  color: var(--eh-primary, #1B4D3E);
+}
+
+.teacher-assignment-card-divider {
+  height: 1px;
+  background-color: var(--eh-border-subtle, #F0ECE6);
+  margin: 2px 0;
+}
+
+.teacher-assignment-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.teacher-assignment-footer-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.teacher-assignment-deadline-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5.5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3.5px 9px;
+  border-radius: 6px;
+  background-color: var(--eh-surface-subtle, #FAF8F5);
+  color: var(--eh-text-secondary, #6B635B);
+  border: 1px solid var(--eh-border-subtle, #EDE8E1);
+  white-space: nowrap;
+}
+
+.teacher-assignment-deadline-tag svg {
+  color: var(--eh-text-muted, #9E9589);
+  flex-shrink: 0;
+}
+
+.teacher-assignment-deadline-tag.urgent {
+  background-color: #FBEBEB;
+  color: #8F2222;
+  border-color: #F3C5C5;
+  font-weight: 700;
+}
+
+.teacher-assignment-deadline-tag.urgent svg {
+  color: #8F2222;
+}
+
+.teacher-assignment-meta-separator {
+  color: var(--eh-border, #E6DFD5);
+  font-size: 13px;
+  user-select: none;
+}
+
+.teacher-assignment-turnout-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-assignment-turnout-label {
+  font-size: 12px;
+  color: var(--eh-text-secondary, #6B635B);
+  white-space: nowrap;
+}
+
+.teacher-assignment-turnout-label strong {
+  color: var(--eh-text-primary, #262320);
+  font-weight: 700;
+}
+
+.teacher-assignment-mini-progress {
+  width: 72px;
+  height: 5px;
+  border-radius: 3px;
+  background-color: var(--eh-border-subtle, #EDE8E1);
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.teacher-assignment-mini-fill {
   height: 100%;
-  border-radius: 4px;
-  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  border-radius: 3px;
+  background: linear-gradient(90deg, #1B4D3E 0%, #2A725D 100%);
   transition: width 0.3s ease;
+}
+
+.teacher-assignment-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.teacher-assignment-btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--eh-text-secondary, #6B635B);
+  border: 1px solid var(--eh-border, #E6DFD5);
+  cursor: pointer;
+  transition: all var(--eh-transition-fast, 150ms ease);
+}
+
+.teacher-assignment-btn-edit:hover {
+  background-color: var(--eh-surface-subtle, #FAF8F5);
+  border-color: var(--eh-border-hover, #C2A882);
+  color: var(--eh-text-primary, #262320);
+}
+
+.teacher-assignment-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background-color: var(--eh-primary, #1B4D3E);
+  color: #FFFFFF;
+  border: 1px solid var(--eh-primary, #1B4D3E);
+  cursor: pointer;
+  transition: all var(--eh-transition-fast, 150ms ease);
+  box-shadow: 0 1px 3px rgba(27, 77, 62, 0.15);
+}
+
+.teacher-assignment-btn-primary:hover {
+  background-color: var(--eh-primary-hover, #143A2F);
+  border-color: var(--eh-primary-hover, #143A2F);
+  box-shadow: 0 4px 10px rgba(27, 77, 62, 0.25);
+  transform: translateY(-0.5px);
+}
+
+@media (max-width: 640px) {
+  .teacher-assignment-card {
+    padding: 14px 16px;
+  }
+
+  .teacher-assignment-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .teacher-assignment-card-status {
+    margin-left: 0;
+  }
+
+  .teacher-assignment-card-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .teacher-assignment-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* Skill Picker Modal */
@@ -440,105 +765,6 @@
   box-shadow: 0 6px 16px -2px rgba(27, 77, 62, 0.12);
 }
 
-.teacher-assignment-meta-left {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.teacher-assignment-code-badge {
-  font-size: 11px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background-color: #262320;
-  color: #FAF8F5;
-  border: 1px solid #3F3A35;
-}
-
-.teacher-assignment-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--on-surface);
-  margin: 0;
-  cursor: pointer;
-  line-height: 1.4;
-  transition: color 0.15s ease;
-}
-
-.teacher-assignment-title:hover {
-  color: var(--primary);
-}
-
-.teacher-assignment-deadline-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 12.5px;
-  color: var(--on-surface-variant);
-  flex-wrap: wrap;
-}
-
-.teacher-assignment-days-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-.teacher-assignment-days-badge.urgent {
-  background-color: var(--error-container, #FBEBEB);
-  color: var(--error, #8F2222);
-  border: 1px solid var(--color-danger-border, #F3C5C5);
-}
-.teacher-assignment-days-badge.normal {
-  background-color: var(--secondary-container, #E7F3EC);
-  color: var(--on-secondary-container, #17523F);
-  border: 1px solid var(--secondary-fixed, #B7DEC8);
-}
-
-.teacher-assignment-progress-wrap {
-  flex: 1;
-  min-width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.teacher-assignment-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.teacher-assignment-pending-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 12px;
-  background-color: var(--tertiary-container, #FBF4E6);
-  color: var(--tertiary, #8C5E14);
-  border: 1px solid var(--tertiary-fixed, #ECD8B0);
-}
-
-.teacher-assignment-done-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--on-secondary-container, #17523F);
-  background-color: var(--secondary-container, #E7F3EC);
-  border: 1px solid var(--secondary-fixed, #B7DEC8);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-}
-
 .skill-modal-header {
   display: flex;
   justify-content: space-between;
@@ -590,20 +816,22 @@
 .skill-card-icon.listening { background-color: var(--skill-listening-bg, #EDF3FB); color: var(--skill-listening, #1E3A8A); }
 
 /* ==========================================================================
-   Teacher Assignment Details (.tad-*)
+   Teacher Assignment Details (.tad-*) - Royal Academic / Minimalism Luxury
    ========================================================================== */
 .tad-container {
-  padding-bottom: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px 40px 24px;
 }
 
 .tad-toast {
   position: fixed;
   top: 24px;
   right: 24px;
-  background-color: #0f172a;
+  background-color: var(--on-surface, #262320);
   color: #ffffff;
   padding: 12px 20px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -628,28 +856,29 @@
 }
 
 .tad-modal-box {
-  background-color: var(--surface);
-  border: 1px solid var(--border-color);
+  background-color: var(--surface, #ffffff);
+  border: 1px solid var(--outline-variant, #e6dfd5);
   border-radius: var(--radius-lg, 16px);
-  padding: 24px;
-  max-width: 440px;
+  padding: 28px;
+  max-width: 460px;
   width: 100%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 24px 38px 3px rgba(38, 35, 32, 0.12), 0 9px 46px 8px rgba(38, 35, 32, 0.08);
 }
 
 .tad-modal-title {
   margin: 0 0 10px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.4;
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--on-surface, #262320);
+  line-height: 1.3;
 }
 
 .tad-modal-description {
   margin: 0 0 24px 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text-secondary);
+  color: var(--on-surface-variant, #64748b);
 }
 
 .tad-modal-actions {
@@ -662,18 +891,20 @@
 .tad-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--primary);
+  gap: 6px;
+  color: var(--on-surface-variant, #64748b);
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
   padding: 0;
+  transition: color 0.18s ease;
 }
 .tad-back-btn:hover {
-  text-decoration: underline;
+  color: var(--primary, #1b4d3e);
+  text-decoration: none;
 }
 
 .tad-header {
@@ -686,41 +917,52 @@
 }
 
 .tad-title {
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
   font-size: 24px;
   font-weight: 700;
-  color: var(--on-surface);
+  color: var(--eh-text-primary, #262320);
+  line-height: 1.25;
 }
 
 .tad-meta-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .tad-status-pill {
   padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 13px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .tad-status-pill.open {
-  background-color: #dcfce7;
-  color: #16a34a;
+  background-color: var(--secondary-container, #e7f3ec);
+  color: var(--on-secondary-container, #17523f);
+  border: 1px solid var(--secondary-fixed, #b7dec8);
 }
 .tad-status-pill.closed {
   background-color: #f1f5f9;
   color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
 .tad-skill-tag {
-  background-color: #f3e8ff;
-  color: #9333ea;
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  border: 1px solid rgba(27, 77, 62, 0.15);
+  padding: 3px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 /* Stats Cards Grid */
@@ -746,7 +988,7 @@
 .tad-stat-card {
   background-color: var(--surface);
   border: 1px solid var(--outline-variant);
-  border-radius: var(--radius-md, 12px);
+  border-radius: var(--radius-lg, 14px);
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
@@ -762,10 +1004,10 @@
 }
 
 .tad-stat-label {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--on-surface-variant);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   letter-spacing: 0.01em;
 }
 
@@ -773,7 +1015,7 @@
   display: flex;
   align-items: baseline;
   gap: 3px;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--on-surface);
   line-height: 1.2;
@@ -781,7 +1023,7 @@
 }
 
 .tad-stat-value.date-value {
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -794,13 +1036,13 @@
 }
 
 .tad-stat-number {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .tad-stat-total {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--on-surface-variant);
   margin-left: 2px;
@@ -810,17 +1052,22 @@
 .tad-card {
   background-color: var(--surface);
   border: 1px solid var(--outline-variant);
-  border-radius: 12px;
+  border-radius: var(--radius-xl, 16px);
   padding: 24px;
   margin-bottom: 24px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
 }
 
 .tad-question-item {
   border: 1px solid var(--outline-variant);
-  border-radius: 10px;
-  padding: 16px 20px;
+  border-radius: var(--radius-md, 12px);
+  padding: 18px 20px;
   background-color: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+.tad-question-item:hover {
+  border-color: var(--border-hover, #c2a882);
 }
 
 .tad-q-badge-num {
@@ -830,7 +1077,7 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background-color: var(--primary);
+  background-color: var(--primary, #1b4d3e);
   color: #ffffff;
   font-size: 12px;
   font-weight: 700;
@@ -858,24 +1105,25 @@
 .tad-opt-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
   border: 1px solid var(--outline-variant);
-  background-color: #f8fafc;
-  color: #334155;
+  background-color: var(--surface-dim, #fcfbf9);
+  color: var(--on-surface);
+  transition: all 0.18s ease;
 }
 .tad-opt-item.correct {
-  border: 1.5px solid #10b981;
-  background-color: #ecfdf5;
-  color: #065f46;
+  border: 1.5px solid var(--secondary, #16a34a);
+  background-color: var(--secondary-container, #ecfdf5);
+  color: var(--on-secondary-container, #065f46);
   font-weight: 600;
 }
 
 .tad-opt-letter {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -887,7 +1135,7 @@
   flex-shrink: 0;
 }
 .tad-opt-letter.correct {
-  background-color: #10b981;
+  background-color: var(--secondary, #16a34a);
   color: #ffffff;
 }
 
@@ -979,29 +1227,37 @@
   text-align: left;
 }
 .tad-table th {
-  padding: 16px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--outline-variant);
   color: var(--on-surface-variant);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: var(--surface-container-low, #faf8f5);
 }
 .tad-table td {
-  padding: 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--outline-variant);
+  font-size: 13.5px;
+}
+.tad-table tr:hover td {
+  background-color: rgba(0, 0, 0, 0.015);
 }
 .tad-table tr:last-child td {
   border-bottom: none;
 }
 
 .tad-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 13.5px;
+  flex-shrink: 0;
 }
 
 .tad-badge-submitted {
@@ -1013,8 +1269,8 @@
   border: 1px solid var(--secondary-fixed, #B7DEC8);
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .tad-badge-in-progress {
@@ -1026,8 +1282,8 @@
   border: 1px solid var(--tertiary-fixed, #ECD8B0);
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .tad-badge-missing {
@@ -1039,8 +1295,8 @@
   border: 1px solid var(--color-danger-border, #F3C5C5);
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .tad-badge-dot {
@@ -1053,22 +1309,26 @@
 .tad-badge-dot.missing { background-color: var(--error, #8F2222); }
 
 .tad-grading-graded {
+  display: inline-flex;
+  align-items: center;
   background-color: var(--secondary-container, #E7F3EC);
   color: var(--on-secondary-container, #17523F);
   border: 1px solid var(--secondary-fixed, #B7DEC8);
   padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 .tad-grading-pending {
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--tertiary-fixed, #ECD8B0);
   background-color: var(--tertiary-container, #FBF4E6);
   color: var(--tertiary, #8C5E14);
   padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 /* ==========================================================================

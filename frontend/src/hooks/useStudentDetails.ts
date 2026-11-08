@@ -178,13 +178,13 @@ export function useStudentDetails({
       }
       return true;
     } catch (err: unknown) {
-      alert(
+      const msg =
         err instanceof Error
           ? err.message
           : isVi
           ? 'Không thể đổi trạng thái tài khoản.'
-          : 'Failed to toggle status.'
-      );
+          : 'Failed to toggle status.';
+      if (mountedRef.current) setStatusMessage(msg);
       return false;
     } finally {
       if (mountedRef.current) {
@@ -200,13 +200,13 @@ export function useStudentDetails({
       await userService.updateUser(studentUser.id, {});
       return true;
     } catch (err: unknown) {
-      alert(
+      const msg =
         err instanceof Error
           ? err.message
           : isVi
           ? 'Không thể đổi mật khẩu.'
-          : 'Failed to reset password.'
-      );
+          : 'Failed to reset password.';
+      if (mountedRef.current) setStatusMessage(msg);
       return false;
     } finally {
       if (mountedRef.current) {

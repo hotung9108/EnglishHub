@@ -1,4 +1,4 @@
-/* EnglishHub Teacher Assignment Editor Styles */
+﻿/* EnglishHub Teacher Assignment Editor Styles */
 
 .assignment-edit-container {
   max-width: 1400px;
@@ -575,7 +575,7 @@
   padding: 2px 8px;
   border-radius: 4px;
   background-color: #eff6ff;
-  color: #1d4ed8;
+  color: var(--eh-primary-hover, #133D30);
   border: 1px solid #bfdbfe;
 }
 

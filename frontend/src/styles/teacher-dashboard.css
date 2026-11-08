@@ -1,22 +1,22 @@
 /* ==========================================================================
-   Teacher Dashboard Styles - EnglishHub
-   Conforms to convention-fe.md (CSS Variables, No inline styles)
+   Teacher Dashboard — Royal Academic / Minimalism Luxury System
+   Single Source of Truth: design-tokens.css
    ========================================================================== */
 
 .teacher-dashboard-container {
-  padding: 24px 32px 64px;
-  max-width: 1440px;
+  padding: 32px 40px 80px;
+  max-width: 1360px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  animation: fadeIn 0.3s ease-out;
+  gap: 32px;
+  animation: teacherDashFadeIn 0.25s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes teacherDashFadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -28,135 +28,88 @@
    1. Hero Banner
    -------------------------------------------------------------------------- */
 .teacher-dash-hero {
-  background-color: var(--surface, #ffffff);
-  border: 1px solid var(--border-color, #e7e5e4);
-  border-radius: 20px;
-  padding: 32px 36px;
-  color: var(--text-primary, #292524);
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 28px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: var(--shadow-card);
-  position: relative;
-  overflow: hidden;
+  gap: 24px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+  flex-wrap: wrap;
 }
 
 .teacher-dash-hero-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-width: 680px;
-  z-index: 1;
-}
-
-.teacher-dash-badge-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background-color: var(--primary-light, #eaf0e8);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary, #1b4d3e);
-  width: fit-content;
-  border: 1px solid var(--border-color, #e6dfd5);
+  gap: 6px;
 }
 
 .teacher-dash-greeting {
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
   font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--eh-text-primary, #262320);
   margin: 0;
-  line-height: 1.25;
-  color: var(--text-primary, #262320);
+  line-height: 1.3;
 }
 
 .teacher-dash-subgreeting {
+  font-family: var(--eh-font-sans, 'Plus Jakarta Sans', sans-serif);
   font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-secondary, #736b63);
+  color: var(--eh-text-secondary, #736b63);
   margin: 0;
+  line-height: 1.5;
 }
 
 .teacher-dash-hero-actions {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
-  z-index: 1;
-}
-
-.teacher-dash-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background-color: var(--primary, #1b4d3e);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 14px;
-  padding: 10px 20px;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.teacher-dash-btn-primary:hover {
-  background-color: var(--primary-hover, #133d30);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(27, 77, 62, 0.25);
-}
-
-.teacher-dash-btn-glass {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background-color: var(--surface, #ffffff);
-  color: var(--text-primary, #292524);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 10px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color, #e7e5e4);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-sm);
-}
-
-.teacher-dash-btn-glass:hover {
-  background-color: var(--surface-hover, #f7f4ee);
-  border-color: var(--border-hover, #c2a882);
-  color: var(--accent, #1b4d3e);
-  transform: translateY(-2px);
+  flex-wrap: wrap;
 }
 
 /* --------------------------------------------------------------------------
-   2. KPI Metrics Grid
+   2. KPI Grid
    -------------------------------------------------------------------------- */
 .teacher-dash-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
+@media (max-width: 1024px) {
+  .teacher-dash-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .teacher-dash-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .teacher-dash-kpi-card {
-  background-color: var(--surface, #ffffff);
-  border: 1px solid var(--border-color, #e7e5e4);
-  border-radius: 16px;
-  padding: 20px 22px;
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  cursor: default;
+  gap: 12px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+  transition: transform var(--eh-transition-fast, 150ms ease),
+              box-shadow var(--eh-transition-fast, 150ms ease),
+              border-color var(--eh-transition-fast, 150ms ease);
+  cursor: pointer;
 }
 
 .teacher-dash-kpi-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-card);
-  border-color: var(--border-hover, #c2a882);
+  transform: translateY(-2px);
+  border-color: var(--eh-border-hover, #c2a882);
+  box-shadow: var(--eh-shadow-sm, 0 1px 3px rgba(38, 35, 32, 0.06));
 }
 
 .teacher-dash-kpi-header {
@@ -165,122 +118,96 @@
   justify-content: space-between;
 }
 
-.teacher-dash-kpi-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.teacher-dash-kpi-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--eh-radius-lg, 12px);
+  background-color: var(--eh-primary-light, #eaf0e8);
+  color: var(--eh-primary, #1b4d3e);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.teacher-dash-kpi-icon.blue { background-color: var(--primary-container); color: var(--primary); }
-.teacher-dash-kpi-icon.purple { background-color: #ede9fe; color: #7c3aed; }
-.teacher-dash-kpi-icon.red { background-color: #fee2e2; color: #dc2626; }
-.teacher-dash-kpi-icon.green { background-color: var(--secondary-container); color: var(--secondary); }
 
-.teacher-dash-deadline-icon.urgent { background-color: var(--error-container, #fef2f2); color: var(--error, #dc2626); }
-.teacher-dash-deadline-icon.normal { background-color: var(--primary-light, #eaf0e8); color: var(--primary, #1b4d3e); }
+.teacher-dash-kpi-icon-wrap.gold {
+  background-color: var(--eh-gold-light, #f5eedf);
+  color: var(--eh-gold-dark, #8c5e14);
+}
 
-.teacher-dash-activity-dot.submission { background-color: var(--primary, #1b4d3e); }
-.teacher-dash-activity-dot.ai_graded { background-color: var(--skill-speaking, #7e22ce); }
-.teacher-dash-activity-dot.normal { background-color: var(--secondary, #17523F); }
+.teacher-dash-kpi-icon-wrap.classes {
+  background-color: var(--eh-surface-dim, #f4efe6);
+  color: var(--eh-text-primary, #262320);
+}
 
-.teacher-dash-class-done-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.teacher-dash-kpi-badge {
   font-size: 11px;
   font-weight: 600;
-  color: var(--on-secondary-container, #17523F);
-  background-color: var(--secondary-container, #E7F3EC);
-  border: 1px solid var(--secondary-fixed, #B7DEC8);
-  padding: 2px 7px;
-  border-radius: 9999px;
+  padding: 2px 8px;
+  border-radius: var(--eh-radius-full, 9999px);
+  background-color: var(--eh-gold-light, #f5eedf);
+  color: var(--eh-gold-dark, #8c5e14);
+  border: 1px solid var(--eh-gold-border, #e2d2be);
 }
 
-.teacher-dash-widget-empty {
-  text-align: center;
-  padding: 24px 12px;
-  color: #64748b;
-  font-size: 12.5px;
-}
-
-.teacher-dash-kpi-trend {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 20px;
-}
-
-.teacher-dash-kpi-trend.positive {
-  background-color: #f0fdf4;
-  color: #16a34a;
-}
-
-.teacher-dash-kpi-trend.neutral {
-  background-color: #f1f5f9;
-  color: #475569;
-}
-
-.teacher-dash-kpi-trend.urgent {
-  background-color: #fef2f2;
-  color: #dc2626;
-  animation: pulseBadge 2s infinite ease-in-out;
-}
-
-@keyframes pulseBadge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.teacher-dash-kpi-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.teacher-dash-kpi-badge.done {
+  background-color: var(--eh-success-bg, #e7f3ec);
+  color: var(--eh-success, #17523f);
+  border: 1px solid var(--eh-success-border, #b7dec8);
 }
 
 .teacher-dash-kpi-value {
-  font-size: 28px;
+  font-family: var(--eh-font-sans, 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
   font-weight: 800;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  color: var(--eh-text-primary, #262320);
+  line-height: 1;
 }
 
 .teacher-dash-kpi-label {
   font-size: 13px;
   font-weight: 600;
-  color: #64748b;
+  color: var(--eh-text-secondary, #736b63);
 }
 
 .teacher-dash-kpi-subtext {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--eh-text-muted, #968e85);
 }
 
 /* --------------------------------------------------------------------------
-   3. Main Dashboard Layout (Columns)
+   3. Two-Column Layout (Queue + Side Widgets)
    -------------------------------------------------------------------------- */
-.teacher-dash-main-cols {
+.teacher-dash-two-cols {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .teacher-dash-two-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.teacher-dash-right-col {
+  display: flex;
+  flex-direction: column;
   gap: 28px;
 }
 
-/* Section Common Container */
-.teacher-dash-card-section {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  padding: 24px;
+/* --------------------------------------------------------------------------
+   4. Card Section Containers
+   -------------------------------------------------------------------------- */
+.teacher-dash-section {
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 28px 32px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
   display: flex;
   flex-direction: column;
   gap: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
 .teacher-dash-section-header {
@@ -288,566 +215,735 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
 }
 
 .teacher-dash-section-title-wrap {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .teacher-dash-section-title {
-  font-size: 17px;
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--eh-text-primary, #262320);
   margin: 0;
 }
 
-.teacher-dash-section-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background-color: var(--surface-dim, #F4EFE6);
-  color: var(--text-secondary, #736B63);
-  border: 1px solid var(--border-color, #E6DFD5);
-}
-
-.teacher-dash-section-badge.urgent {
-  background-color: var(--error-container, #FBEBEB);
-  color: var(--error, #8F2222);
-  border: 1px solid var(--color-danger-border, #F3C5C5);
+.teacher-dash-section-subtitle {
+  font-size: 13px;
+  color: var(--eh-text-secondary, #736b63);
+  margin: 0;
 }
 
 .teacher-dash-link-action {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary, #1b4d3e);
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  cursor: pointer;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--eh-primary, #1b4d3e);
   background: none;
   border: none;
-  padding: 0;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--eh-radius-md, 8px);
+  transition: all var(--eh-transition-fast, 150ms ease);
 }
 
 .teacher-dash-link-action:hover {
-  color: var(--primary-hover, #133d30);
-  text-decoration: underline;
+  background-color: var(--eh-primary-light, #eaf0e8);
+  color: var(--eh-primary-hover, #133d30);
 }
 
 /* --------------------------------------------------------------------------
-   4. Pending Submissions Queue
+   5. Skill Filter Segmented Control (Luxury Segmented Track)
    -------------------------------------------------------------------------- */
-.teacher-dash-skill-tabs {
-  display: flex;
-  gap: 6px;
+.teacher-dash-skill-filter-wrapper {
+  margin-bottom: 16px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
-.teacher-dash-skill-tab-btn {
+.teacher-dash-skill-filter-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.teacher-dash-skill-segmented {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: var(--radius-full);
-  font-size: 12px;
+  gap: 3px;
+  background-color: var(--eh-surface-dim, #f4efe6);
+  padding: 3.5px;
+  border-radius: var(--eh-radius-lg, 12px);
+  border: 1px solid var(--eh-border, #e6dfd5);
+}
+
+.teacher-dash-skill-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
   font-weight: 500;
-  border: none;
-  background-color: transparent;
-  color: var(--on-surface-variant);
+  color: var(--eh-text-secondary, #736b63);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.18s ease;
-  user-select: none;
+  transition: all var(--eh-transition-fast, 150ms ease);
 }
 
-.teacher-dash-skill-tab-btn:hover {
-  background-color: var(--surface-dim);
-  color: var(--on-surface);
+.teacher-dash-skill-pill svg {
+  color: var(--eh-text-muted, #8c827a);
+  transition: color var(--eh-transition-fast, 150ms ease);
 }
 
-.teacher-dash-skill-tab-btn.active {
-  background-color: var(--primary);
-  color: #ffffff;
+.teacher-dash-skill-pill:hover {
+  color: var(--eh-text-primary, #262320);
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.teacher-dash-skill-pill.active {
+  background-color: #ffffff;
+  color: var(--eh-primary, #1b4d3e);
   font-weight: 600;
-  border: none;
-  box-shadow: 0 2px 6px -1px rgba(27, 77, 62, 0.28);
+  border-color: rgba(27, 77, 62, 0.12);
+  box-shadow: 0 1px 3px rgba(38, 35, 32, 0.08), 0 1px 2px rgba(38, 35, 32, 0.04);
 }
 
-.teacher-dash-tab-count {
+.teacher-dash-skill-pill.active svg {
+  color: var(--eh-primary, #1b4d3e);
+}
+
+.teacher-dash-skill-pill-name {
+  line-height: 1.2;
+}
+
+.teacher-dash-skill-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 10.5px;
-  padding: 1px 5px;
-  border-radius: 8px;
+  font-weight: 600;
+  padding: 1px 6px;
+  min-width: 18px;
+  border-radius: var(--eh-radius-full, 9999px);
   background-color: rgba(38, 35, 32, 0.06);
-  color: var(--on-surface-variant);
-  transition: all 0.18s ease;
+  color: var(--eh-text-secondary, #736b63);
+  transition: all var(--eh-transition-fast, 150ms ease);
 }
 
-.teacher-dash-skill-tab-btn:hover .teacher-dash-tab-count {
-  background-color: rgba(38, 35, 32, 0.1);
-  color: var(--on-surface);
+.teacher-dash-skill-pill.active .teacher-dash-skill-pill-count {
+  background-color: var(--eh-primary-light, #eaf0e8);
+  color: var(--eh-primary, #1b4d3e);
+  font-weight: 700;
 }
 
-.teacher-dash-skill-tab-btn.active .teacher-dash-tab-count {
-  background-color: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-}
-
+/* --------------------------------------------------------------------------
+   6. Pending Submissions Queue
+   -------------------------------------------------------------------------- */
 .teacher-dash-queue-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
 }
 
-.teacher-dash-queue-item {
+.teacher-dash-queue-card {
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-left: 3.5px solid var(--eh-primary, #1b4d3e);
+  border-radius: var(--eh-radius-xl, 16px);
+  padding: 16px 20px;
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all var(--eh-transition-fast, 150ms ease);
+}
+
+.teacher-dash-queue-card.skill-reading {
+  border-left-color: var(--eh-skill-reading, #16533d);
+}
+
+.teacher-dash-queue-card.skill-writing {
+  border-left-color: var(--eh-skill-writing, #8c5e14);
+}
+
+.teacher-dash-queue-card.skill-speaking {
+  border-left-color: var(--eh-skill-speaking, #5b21b6);
+}
+
+.teacher-dash-queue-card.skill-listening {
+  border-left-color: var(--eh-skill-listening, #1e3a8a);
+}
+
+.teacher-dash-queue-card:hover {
+  border-color: var(--eh-border-hover, #c2a882);
+  box-shadow: var(--eh-shadow-md, 0 4px 16px -2px rgba(38, 35, 32, 0.08));
+  transform: translateY(-1px);
+}
+
+.teacher-dash-queue-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color, #f1f5f9);
-  background-color: var(--surface-dim, #f8fafc);
-  transition: all 0.2s ease;
   gap: 12px;
-}
-
-.teacher-dash-queue-item:hover {
-  background-color: var(--surface, #ffffff);
-  border-color: #cbd5e1;
-  box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.05);
-  transform: translateX(2px);
-}
-
-.teacher-dash-queue-item.high-urgency {
-  border-left: 3px solid #ef4444;
-}
-
-.teacher-dash-student-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-}
-
-.teacher-dash-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid #e2e8f0;
-  flex-shrink: 0;
-}
-
-.teacher-dash-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.teacher-dash-student-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
-  display: flex;
-  align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
 }
 
-.teacher-dash-class-tag {
-  font-size: 10.5px;
+.teacher-dash-queue-student-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.teacher-dash-avatar-initials {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--eh-radius-full, 9999px);
+  background-color: var(--eh-surface-dim, #f4efe6);
+  color: var(--eh-text-primary, #262320);
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-weight: 700;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--eh-border, #e6dfd5);
+}
+
+.teacher-dash-student-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.teacher-dash-student-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-dash-student-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--eh-text-primary, #262320);
+  line-height: 1.2;
+}
+
+.teacher-dash-student-code {
+  font-family: var(--eh-font-mono, monospace);
+  font-size: 11px;
   font-weight: 600;
-  color: var(--primary, #1b4d3e);
-  background-color: var(--primary-light, #eaf0e8);
+  color: var(--eh-text-muted, #78716c);
+  background-color: var(--eh-surface-dim, #f5f2eb);
+  border: 1px solid var(--eh-border, #e8e3d8);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--eh-radius-sm, 4px);
+  letter-spacing: 0.02em;
 }
 
-.teacher-dash-assignment-title {
+.teacher-dash-class-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
-  color: #475569;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 340px;
+  color: var(--eh-text-secondary, #736b63);
 }
 
-.teacher-dash-meta-pills {
+.teacher-dash-class-icon {
+  color: var(--eh-text-muted, #968e85);
+  flex-shrink: 0;
+}
+
+.teacher-dash-class-tag {
+  font-weight: 500;
+}
+
+.teacher-dash-queue-badges {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #64748b;
+  flex-shrink: 0;
 }
 
 .teacher-dash-ai-pill {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  background-color: #faf5ff;
-  color: #7e22ce;
-  border: 1px solid #f3e8ff;
-  padding: 1px 6px;
-  border-radius: 4px;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 600;
-  font-size: 10.5px;
+  padding: 3px 9px;
+  border-radius: var(--eh-radius-full, 9999px);
+  background-color: var(--eh-gold-subtle, #faf6ee);
+  color: var(--eh-gold-dark, #8c5e14);
+  border: 1px solid var(--eh-gold-border, #e2d2be);
 }
 
-.teacher-dash-queue-actions {
+.teacher-dash-queue-divider {
+  height: 1px;
+  background-color: var(--eh-border-subtle, #f0ebe2);
+  margin: 1px 0;
+}
+
+.teacher-dash-queue-card-body {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.teacher-dash-assignment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-dash-assignment-title {
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--eh-text-primary, #1f1d1a);
+  line-height: 1.35;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teacher-dash-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--eh-text-muted, #8c827a);
 }
 
 .teacher-dash-btn-grade {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  background-color: var(--primary, #1b4d3e);
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  background-color: var(--eh-primary, #1b4d3e);
   color: #ffffff;
   border: none;
+  border-radius: var(--eh-radius-md, 8px);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--eh-transition-fast, 150ms ease);
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(27, 77, 62, 0.15);
 }
 
 .teacher-dash-btn-grade:hover {
-  background-color: var(--primary-hover, #133d30);
-  box-shadow: 0 2px 6px rgba(27, 77, 62, 0.2);
+  background-color: var(--eh-primary-hover, #133d30);
+  box-shadow: var(--eh-shadow-sm, 0 2px 4px rgba(27, 77, 62, 0.2));
+  transform: translateX(1px);
 }
 
-.teacher-dash-queue-more {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background-color: #f8fafc;
-  border-radius: 8px;
-  border: 1px dashed #e2e8f0;
-  font-size: 12px;
-  color: #64748b;
-  margin-top: 2px;
+@media (max-width: 640px) {
+  .teacher-dash-queue-card-body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .teacher-dash-btn-grade {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .teacher-dash-queue-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 18px 16px;
-  background-color: #f8fafc;
-  border-radius: 8px;
-  border: 1px dashed #e2e8f0;
-  font-size: 13px;
-  color: #64748b;
+  gap: 10px;
+  padding: 40px 24px;
+  background-color: var(--eh-canvas, #faf8f5);
+  border: 1px dashed var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-lg, 12px);
+  color: var(--eh-text-secondary, #736b63);
+  font-size: 13.5px;
+  font-weight: 500;
 }
 
 /* --------------------------------------------------------------------------
-   5. 4-Skill Matrix Analytics
+   7. Queue Pagination Controls
    -------------------------------------------------------------------------- */
-.teacher-dash-skill-matrix {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 14px;
+.teacher-dash-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--eh-border-subtle, #f0ebe2);
+  margin-top: 4px;
 }
 
-.teacher-dash-skill-box {
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+.teacher-dash-page-info {
+  font-size: 12.5px;
+  color: var(--eh-text-muted, #968e85);
+}
+
+.teacher-dash-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-dash-btn-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--eh-radius-md, 8px);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  background-color: var(--eh-surface, #ffffff);
+  color: var(--eh-text-primary, #262320);
+  cursor: pointer;
+  transition: all var(--eh-transition-fast, 150ms ease);
+}
+
+.teacher-dash-btn-page:hover:not(:disabled) {
+  border-color: var(--eh-border-hover, #c2a882);
+  background-color: var(--eh-surface-dim, #f4efe6);
+}
+
+.teacher-dash-btn-page:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.teacher-dash-page-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--eh-text-primary, #262320);
+  padding: 0 4px;
+}
+
+/* --------------------------------------------------------------------------
+   8. Side Widget: Active Assignments Tracker
+   -------------------------------------------------------------------------- */
+.teacher-dash-active-assign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacher-dash-active-assign-item {
+  background-color: var(--eh-canvas, #faf8f5);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-lg, 12px);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  cursor: pointer;
+  transition: all var(--eh-transition-fast, 150ms ease);
 }
 
-.teacher-dash-skill-box-top {
+.teacher-dash-active-assign-item:hover {
+  border-color: var(--eh-border-hover, #c2a882);
+  background-color: var(--eh-surface, #ffffff);
+  box-shadow: var(--eh-shadow-xs, 0 1px 2px rgba(38, 35, 32, 0.04));
+}
+
+.teacher-dash-active-assign-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 8px;
 }
 
-.teacher-dash-skill-title {
-  font-size: 13px;
+.teacher-dash-active-assign-title {
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.teacher-dash-skill-score {
-  font-size: 22px;
-  font-weight: 800;
-  color: #0f172a;
+  color: var(--eh-text-primary, #262320);
+  margin: 0;
+  line-height: 1.35;
 }
 
 .teacher-dash-progress-track {
   width: 100%;
   height: 6px;
-  background-color: #e2e8f0;
-  border-radius: 3px;
+  background-color: var(--eh-border-subtle, #f0ebe2);
+  border-radius: var(--eh-radius-full, 9999px);
   overflow: hidden;
 }
 
 .teacher-dash-progress-bar {
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease-out;
+  background: linear-gradient(90deg, var(--eh-primary, #1b4d3e), var(--eh-gold, #c5a880));
+  border-radius: var(--eh-radius-full, 9999px);
+  transition: width 300ms ease;
 }
 
-.teacher-dash-progress-bar.writing { background-color: var(--skill-writing, #8C5E14); }
-.teacher-dash-progress-bar.speaking { background-color: var(--skill-speaking, #5B21B6); }
-.teacher-dash-progress-bar.reading { background-color: var(--skill-reading, #16533D); }
-.teacher-dash-progress-bar.listening { background-color: var(--skill-listening, #1E3A8A); }
-
-.teacher-dash-skill-foot {
+.teacher-dash-active-assign-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
-  color: #64748b;
-  margin-top: 2px;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--eh-text-muted, #968e85);
+}
+
+.teacher-dash-active-assign-stat {
+  white-space: nowrap;
+}
+
+.teacher-dash-active-assign-meta strong {
+  color: var(--eh-text-primary, #262320);
+}
+
+.teacher-dash-deadline-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2.5px 8px;
+  background-color: var(--eh-surface-dim, #f4efe6);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-sm, 6px);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--eh-text-secondary, #736b63);
+  white-space: nowrap;
+}
+
+.teacher-dash-deadline-tag svg {
+  color: var(--eh-primary, #1b4d3e);
+  flex-shrink: 0;
+}
+
+.teacher-dash-deadline-tag.urgent {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.teacher-dash-deadline-tag.urgent svg {
+  color: #b45309;
+}
+
+.teacher-dash-deadline-tag.expired {
+  background-color: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.teacher-dash-deadline-tag.expired svg {
+  color: #dc2626;
 }
 
 /* --------------------------------------------------------------------------
-   6. Active Classes Grid
+   9. Side Widget: Grading Summary Box
+   -------------------------------------------------------------------------- */
+.teacher-dash-grading-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.teacher-dash-stat-box {
+  background-color: var(--eh-canvas, #faf8f5);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-md, 8px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.teacher-dash-stat-box-num {
+  font-family: var(--eh-font-sans, 'Plus Jakarta Sans', sans-serif);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--eh-text-primary, #262320);
+  line-height: 1.1;
+}
+
+.teacher-dash-stat-box-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--eh-text-secondary, #736b63);
+}
+
+.teacher-dash-completion-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--eh-border-subtle, #f0ebe2);
+}
+
+.teacher-dash-completion-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--eh-text-secondary, #736b63);
+}
+
+.teacher-dash-completion-pct {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--eh-primary, #1b4d3e);
+}
+
+/* --------------------------------------------------------------------------
+   10. Active Classes Grid
    -------------------------------------------------------------------------- */
 .teacher-dash-classes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .teacher-dash-class-card {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 18px 20px;
+  background-color: var(--eh-surface, #ffffff);
+  border: 1px solid var(--eh-border, #e6dfd5);
+  border-radius: var(--eh-radius-lg, 12px);
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  transition: all 0.2s ease;
   cursor: pointer;
+  transition: transform var(--eh-transition-fast, 150ms ease),
+              border-color var(--eh-transition-fast, 150ms ease),
+              box-shadow var(--eh-transition-fast, 150ms ease);
 }
 
 .teacher-dash-class-card:hover {
-  border-color: var(--border-hover, #c2a882);
-  box-shadow: 0 6px 16px -3px rgba(27, 77, 62, 0.12);
   transform: translateY(-2px);
+  border-color: var(--eh-border-hover, #c2a882);
+  box-shadow: var(--eh-shadow-sm, 0 1px 3px rgba(38, 35, 32, 0.06));
 }
 
-.teacher-dash-class-header {
+.teacher-dash-class-card-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .teacher-dash-class-code {
+  font-family: var(--eh-font-mono, monospace);
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 6px;
-  background-color: var(--primary-light, #eaf0e8);
-  color: var(--primary, #1b4d3e);
-  letter-spacing: 0.04em;
+  border-radius: var(--eh-radius-sm, 4px);
+  background-color: var(--eh-gold-light, #f5eedf);
+  color: var(--eh-gold-dark, #8c5e14);
+  border: 1px solid var(--eh-gold-border, #e2d2be);
+  width: fit-content;
 }
 
 .teacher-dash-class-name {
-  font-size: 15px;
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 17px;
   font-weight: 700;
-  color: #0f172a;
-  line-height: 1.35;
-  margin-top: 4px;
+  color: var(--eh-text-primary, #262320);
+  margin-top: 6px;
+  line-height: 1.3;
 }
 
-.teacher-dash-class-meta-row {
+.teacher-dash-class-stats {
   display: flex;
   align-items: center;
-  gap: 14px;
-  font-size: 12px;
-  color: #64748b;
+  gap: 16px;
+  font-size: 12.5px;
+  color: var(--eh-text-secondary, #736b63);
+  padding: 10px 0;
+  border-top: 1px solid var(--eh-border-subtle, #f0ebe2);
+  border-bottom: 1px solid var(--eh-border-subtle, #f0ebe2);
 }
 
-.teacher-dash-class-meta-item {
+.teacher-dash-class-stat-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .teacher-dash-class-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 12px;
-  border-top: 1px solid #f1f5f9;
+}
+
+.teacher-dash-class-badge-pending {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--eh-warning, #8c5e14);
+  background-color: var(--eh-warning-bg, #fbf4e6);
+  border: 1px solid var(--eh-warning-border, #ecd8b0);
+  padding: 2px 8px;
+  border-radius: var(--eh-radius-full, 9999px);
+}
+
+.teacher-dash-class-badge-done {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--eh-success, #17523f);
+  background-color: var(--eh-success-bg, #e7f3ec);
+  border: 1px solid var(--eh-success-border, #b7dec8);
+  padding: 2px 8px;
+  border-radius: var(--eh-radius-full, 9999px);
+}
+
+.teacher-dash-class-view-link {
   font-size: 12px;
-}
-
-.teacher-dash-class-score-pill {
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.teacher-dash-class-pending-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background-color: var(--tertiary-container, #FBF4E6);
-  color: var(--tertiary, #8C5E14);
-  border: 1px solid var(--tertiary-fixed, #ECD8B0);
+  font-weight: 600;
+  color: var(--eh-primary, #1b4d3e);
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 /* --------------------------------------------------------------------------
-   7. Sidebar Widgets: Schedule & Recent Activity
+   11. Skill Pill Badges
    -------------------------------------------------------------------------- */
-.teacher-dash-side-widgets {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.teacher-dash-deadline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.teacher-dash-deadline-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background-color: #f8fafc;
-  border: 1px solid #f1f5f9;
-}
-
-.teacher-dash-deadline-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.teacher-dash-deadline-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex: 1;
-}
-
-.teacher-dash-deadline-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0f172a;
-  line-height: 1.3;
-}
-
-.teacher-dash-deadline-class {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--primary, #1b4d3e);
-}
-
-.teacher-dash-deadline-time {
-  font-size: 11px;
-  font-weight: 600;
-  color: #e11d48;
+.teacher-dash-skill-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--eh-radius-full, 9999px);
+  text-transform: capitalize;
 }
 
-.teacher-dash-activity-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  position: relative;
+.teacher-dash-skill-pill.writing {
+  color: var(--eh-skill-writing, #8c5e14);
+  background-color: var(--eh-skill-writing-bg, #faf3e5);
+  border: 1px solid var(--eh-skill-writing-border, #ecd8b0);
 }
 
-.teacher-dash-activity-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+.teacher-dash-skill-pill.speaking {
+  color: var(--eh-skill-speaking, #5b21b6);
+  background-color: var(--eh-skill-speaking-bg, #f3eefa);
+  border: 1px solid var(--eh-skill-speaking-border, #d8c7f0);
 }
 
-.teacher-dash-activity-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-top: 5px;
-  flex-shrink: 0;
+.teacher-dash-skill-pill.reading {
+  color: var(--eh-skill-reading, #16533d);
+  background-color: var(--eh-skill-reading-bg, #e9f3ed);
+  border: 1px solid var(--eh-skill-reading-border, #b9dbc5);
 }
 
-.teacher-dash-activity-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.teacher-dash-activity-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.teacher-dash-activity-desc {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.teacher-dash-activity-time {
-  font-size: 10px;
-  color: #94a3b8;
-  margin-top: 2px;
-}
-
-/* --------------------------------------------------------------------------
-   8. Responsive Adjustments
-   -------------------------------------------------------------------------- */
-@media (max-width: 1100px) {
-  .teacher-dash-main-cols {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .teacher-dashboard-container {
-    padding: 16px;
-    gap: 20px;
-  }
-
-  .teacher-dash-hero {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
-    padding: 24px;
-  }
-
-  .teacher-dash-queue-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .teacher-dash-queue-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
+.teacher-dash-skill-pill.listening {
+  color: var(--eh-skill-listening, #1e3a8a);
+  background-color: var(--eh-skill-listening-bg, #edf3fb);
+  border: 1px solid var(--eh-skill-listening-border, #c8dcf5);
 }

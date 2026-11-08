@@ -327,6 +327,51 @@
   border-radius: var(--radius-sm, 6px);
 }
 
+/* === Unified Loading State Component (.eh-loading-card) === */
+.eh-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 24px;
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-card, 0 1px 3px rgba(38, 35, 32, 0.04));
+  margin-bottom: 24px;
+}
+
+.eh-loading-icon-wrap {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: var(--primary-light, #eaf0e8);
+  color: var(--primary, #1b4d3e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(27, 77, 62, 0.12);
+}
+
+.eh-loading-title {
+  font-family: var(--eh-font-serif, 'Lora', Georgia, serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-surface, #262320);
+  margin: 0 0 6px 0;
+}
+
+.eh-loading-desc {
+  font-size: 13px;
+  color: var(--on-surface-variant, #64748b);
+  max-width: 440px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
 /* === Reusable Pagination Component (.eh-pagination) === */
 .eh-pagination {
   display: flex;

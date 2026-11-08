@@ -7,6 +7,7 @@ import {
   Award, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { gradingService } from '../api/services/grading.service';
 import { gradingChangeLogService } from '../api/services/grading-change-log.service';
 import type { 
@@ -20,6 +21,7 @@ import { Pagination } from '../components/common';
 export const AdminGradingAuditLogs: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success, warning } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -193,7 +195,36 @@ export const AdminGradingAuditLogs: React.FC = () => {
   }, [filteredGradings, safeCurrentPage, pageSize]);
 
   const handleExportCsv = () => {
-    alert(isVi ? 'Đang trích xuất nhật ký kiểm toán chấm điểm ra tập tin CSV...' : 'Exporting grading audit records to CSV...');
+    if (filteredGradings.length === 0) {
+      warning(isVi ? 'Không có dữ liệu kiểm toán để xuất tập tin.' : 'No audit records to export.');
+      return;
+    }
+
+    const headers = ['ID', 'Grading Code', 'Status', 'Final Score'];
+    const rows = filteredGradings.map((item) => [
+      item.id,
+      `GR-${item.id}`,
+      item.status,
+      item.finalScore !== null && item.finalScore !== undefined ? item.finalScore : 'N/A',
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,\uFEFF' +
+      [headers.join(','), ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `grading-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    success(
+      isVi
+        ? `Đã trích xuất thành công ${filteredGradings.length} bản ghi ra tệp CSV.`
+        : `Successfully exported ${filteredGradings.length} records to CSV.`
+    );
   };
 
   const formatStatusBadge = (status: GradingStatus) => {

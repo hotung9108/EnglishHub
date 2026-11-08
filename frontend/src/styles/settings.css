@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    Settings & Profile Styles - EnglishHub
    Conforms to convention-fe.md:
    - Uses CSS Variables & Design Tokens from index.css
@@ -324,7 +324,7 @@
 }
 
 .settings-hero-stat-value.text-primary {
-  color: #2563EB;
+  color: var(--eh-primary, #1B4D3E);
 }
 
 .settings-hero-stat-divider {

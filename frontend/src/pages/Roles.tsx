@@ -5,6 +5,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 
 interface RoleCapability {
   id: string;
@@ -19,6 +20,7 @@ interface RoleCapability {
 export const Roles: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess } = useToast();
 
   const [activeRole, setActiveRole] = useState<'admin' | 'teacher' | 'ta' | 'student'>('admin');
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -69,15 +71,14 @@ export const Roles: React.FC = () => {
 
   const handleSave = () => {
     setSaveSuccess(true);
+    toastSuccess(isVi ? 'Đã lưu cấu hình phân quyền vai trò.' : 'Role permissions saved successfully.');
     setTimeout(() => {
       setSaveSuccess(false);
     }, 2000);
   };
 
   const handleApplyPreset = (preset: string) => {
-    if (confirm(isVi ? `Áp dụng mẫu phân quyền "${preset}" cho vai trò này?` : `Apply preset "${preset}"?`)) {
-      alert(isVi ? 'Đã áp dụng mẫu phân quyền thành công.' : 'Preset applied.');
-    }
+    toastSuccess(isVi ? `Đã áp dụng mẫu phân quyền "${preset}" thành công.` : `Preset "${preset}" applied successfully.`);
   };
 
   return (
@@ -93,7 +94,7 @@ export const Roles: React.FC = () => {
         <div className="flex gap-2.5">
           <button 
             className="btn btn-secondary inline-flex items-center gap-1.5"
-            onClick={() => alert(isVi ? 'Đã khôi phục các thiết lập phân quyền mặc định của hệ thống.' : 'Default permissions restored.')}
+            onClick={() => toastSuccess(isVi ? 'Đã khôi phục các thiết lập phân quyền mặc định của hệ thống.' : 'Default permissions restored.')}
           >
             <RotateCcw size={15} />
             <span>{t('roles.restoreDefault')}</span>
