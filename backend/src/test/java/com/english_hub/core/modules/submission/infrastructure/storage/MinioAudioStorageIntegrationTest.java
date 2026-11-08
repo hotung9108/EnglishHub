@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.HexFormat;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +37,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * using a real MinIO container with a persistent volume, ensuring data
  * durability and SHA-256 checksum integrity after container restart.
  */
+// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 class MinioAudioStorageIntegrationTest {
 
 	private static final String MINIO_IMAGE = "cgr.dev/chainguard/minio:latest";

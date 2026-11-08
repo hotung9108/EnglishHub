@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-039",
+  "title": "Accounts tìm tài khoản có sẵn độc lập bước tạo",
+  "role": "admin",
+  "phase": "login",
+  "classification": "AUTH_REVIEW",
+  "reason": "Expected admin dashboard after login\nWait timed out after 30185ms",
+  "actualUrl": "https://staging.hotung9108.me/login",
+  "startedAt": "2026-11-04T03:17:41.471Z",
+  "finishedAt": "2026-11-04T03:18:13.346Z"
+}

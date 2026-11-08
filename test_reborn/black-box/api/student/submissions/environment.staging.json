@@ -1,0 +1,211 @@
+{
+  "id": "21e945ad5e3b81adf2ac82114f7e701c",
+  "name": "EnglishHub Staging - submissions",
+  "values": [
+    {
+      "key": "adminEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "aiPollCount",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "apiBaseUrl",
+      "value": "https://api-staging.hotung9108.me/api/v1",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "be18",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "be18Assignments",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "checkerToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "classId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "expiredAccessToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredTokenCandidate",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "invalidToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "lockedStudentToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "noEvaluationStudentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "nonMemberId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "stagingOrigin",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentBEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentBId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentBPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentBToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "teacherPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

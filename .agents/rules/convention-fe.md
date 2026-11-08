@@ -16,7 +16,8 @@ Tài liệu quy chuẩn phát triển Frontend cho dự án **EnglishHub**. Tấ
 - **Bundler**: Vite.
 - **Routing**: React Router DOM (v7).
 - **Icons**: Lucide React (`lucide-react`).
-- **Styling**: Vanilla CSS sử dụng CSS Variables & Design Tokens tại `src/styles/`.
+- **Styling**: Vanilla CSS sử dụng CSS Variables & Design Tokens tại `src/styles/design-tokens.css`.
+- **Design Philosophy**: Tuân thủ triệt để [docs/guidelines/UI_UX_DESIGN_PHILOSOPHY.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/docs/guidelines/UI_UX_DESIGN_PHILOSOPHY.md) (*Royal Academic & Quiet Minimalism*, *Truth in UI - Zero Fake/Mock*, *Ergonomic Dual-Theme*).
 - **Linter & Formatter**: ESLint (`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`).
 
 ---

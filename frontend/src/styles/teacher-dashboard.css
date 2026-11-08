@@ -309,7 +309,7 @@
 }
 
 .teacher-dash-skill-pill.active {
-  background-color: #ffffff;
+  background-color: var(--eh-surface);
   color: var(--eh-primary, #1b4d3e);
   font-weight: 600;
   border-color: rgba(27, 77, 62, 0.12);

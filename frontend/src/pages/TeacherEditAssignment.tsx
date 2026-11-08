@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Eye, Save, Send, CheckCircle2,
-  RefreshCw, AlertCircle
+  Eye, Save, Send, Plus, Trash2, ArrowUp, ArrowDown,
+  Layers, CheckCircle2, ChevronDown, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentDetail, type AssignmentStatus, type AssignmentSkill as ApiSkill } from '../api/services/assignment.service';
+import { 
+  assignmentService, 
+  type AssignmentDetail, 
+  type AssignmentStatus, 
+  type AssignmentSkill as ApiSkill 
+} from '../api/services/assignment.service';
 import { moduleService, type ModuleSummary } from '../api/services/module.service';
 import { submissionService } from '../api/services/submission.service';
 import { 
@@ -18,8 +23,21 @@ import {
   extractShortAnswerText,
   type QuestionResponse 
 } from '../api/services/question.service';
-import type { 
-  AssignmentEditorData, AssignmentSkill, ReadingQuestionItem, ListeningQuestionItem 
+import { 
+  type AssignmentEditorData, 
+  type AssignmentSkill, 
+  type EditorModuleItem,
+  type WritingConfig,
+  type SpeakingConfig,
+  type ReadingConfig,
+  type ListeningConfig,
+  type ReadingQuestionItem, 
+  type ListeningQuestionItem,
+  createDefaultModuleItem,
+  createDefaultWritingConfig,
+  createDefaultSpeakingConfig,
+  createDefaultReadingConfig,
+  createDefaultListeningConfig
 } from '../types/assignment-editor.types';
 import { 
   SkillWritingEditor, 
@@ -53,7 +71,13 @@ export const TeacherEditAssignment: React.FC = () => {
   const [classes, setClasses] = useState<ClassSummary[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [turnoutStats, setTurnoutStats] = useState<{ total: number; submitted: number }>({ total: 0, submitted: 0 });
-  const [moduleIdsBySkill, setModuleIdsBySkill] = useState<Partial<Record<AssignmentSkill, number>>>({});
+  const [currentDbStatus, setCurrentDbStatus] = useState<AssignmentStatus>('DRAFT');
+
+  // Multi-module management state
+  const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
+  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
+  const [deletedModuleDbIds, setDeletedModuleDbIds] = useState<number[]>([]);
+  const addMenuRef = useRef<HTMLDivElement>(null);
 
   // Assignment Editor state
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
@@ -70,58 +94,25 @@ export const TeacherEditAssignment: React.FC = () => {
     targetAudience: 'all',
     notifyStudents: true,
     maxSubmissions: 3,
-    writing: {
-      taskType: 'task2',
-      promptText: '',
-      minWords: 250,
-      scale: '10',
-      rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-      enableAi: true,
-      aiInstruction: '',
-      enablePlagiarismCheck: true,
-      modelAnswer: '',
-      attachments: []
-    },
-    speaking: {
-      promptText: '',
-      aiInstruction: '',
-      partType: 'part2',
-      cueCardTopic: '',
-      cueCardBullets: [],
-      prepTimeSeconds: 60,
-      speakingTimeSeconds: 120,
-      maxRetries: 3,
-      examinerSampleAudioUrl: '',
-      examinerTranscript: '',
-      followUpQuestions: [],
-      rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-      enableAi: true,
-      aiModel: 'Whisper V3 Speech Diagnostic'
-    },
-    reading: {
-      passageTitle: '',
-      passageSubtitle: '',
-      passageSource: '',
-      timeLimitMinutes: 20,
-      enableAiExplanation: true,
-      aiInstruction: '',
-      paragraphs: [],
-      questions: []
-    },
-    listening: {
-      audioUrl: '',
-      transcript: '',
-      questions: []
-    }
+    modules: [createDefaultModuleItem('writing', 1)]
   }));
+
+  // Close add menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleRetry = () => {
     setIsLoading(true);
     setError(null);
     setReloadKey((k) => k + 1);
   };
-
-  const [currentDbStatus, setCurrentDbStatus] = useState<AssignmentStatus>('DRAFT');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -136,143 +127,143 @@ export const TeacherEditAssignment: React.FC = () => {
       try {
         const assignmentIdNum = Number(id);
 
-      // 1-3. Fetch assignment details, classes, and modules in parallel
-      const [detailRes, classRes, modRes] = await Promise.allSettled([
-        assignmentService.getAssignment(assignmentIdNum),
-        classService.list({ limit: 100 }),
-        moduleService.listModules(assignmentIdNum)
-      ]);
+        // 1. Fetch assignment details, classes, and modules in parallel
+        const [detailRes, classRes, modRes] = await Promise.allSettled([
+          assignmentService.getAssignment(assignmentIdNum),
+          classService.list({ limit: 100 }),
+          moduleService.listModules(assignmentIdNum)
+        ]);
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      const detail: AssignmentDetail = detailRes.status === 'fulfilled' ? detailRes.value : {
-        id: assignmentIdNum,
-        title: '',
-        status: 'DRAFT',
-        modules: []
-      };
-      setCurrentDbStatus(detail.status);
+        const detail: AssignmentDetail = detailRes.status === 'fulfilled' ? detailRes.value : {
+          id: assignmentIdNum,
+          title: '',
+          status: 'DRAFT',
+          modules: []
+        };
+        setCurrentDbStatus(detail.status);
 
-      const classList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
-      setClasses(classList);
+        const classList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
+        setClasses(classList);
 
-      // Find which class contains this assignment in parallel
-      const classCheckResults = await Promise.all(
-        classList.map(async (cls) => {
-          try {
-            const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
-            const hasMatch = assignList.data?.some((a) => a.id === assignmentIdNum);
-            return { cls, hasMatch };
-          } catch {
-            return { cls, hasMatch: false };
-          }
-        })
-      );
-      const matchedClass = classCheckResults.find((r) => r.hasMatch)?.cls;
-
-      if (matchedClass) {
-        setSelectedClassId(matchedClass.id);
-        try {
-          const [membersRes, subsRes] = await Promise.allSettled([
-            classService.listMembers(matchedClass.id),
-            submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
-          ]);
-          const members = membersRes.status === 'fulfilled' ? membersRes.value : [];
-          const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data || []) : [];
-          setTurnoutStats({
-            total: members.length,
-            submitted: subs.filter((s) => s.status !== 'IN_PROGRESS').length
-          });
-        } catch {
-          // Fallback
-        }
-      }
-
-      let modules: ModuleSummary[] = [];
-      if (modRes.status === 'fulfilled') {
-        modules = modRes.value.modules || modRes.value.data || [];
-      }
-
-      if (modules.length === 0 && detail.modules && detail.modules.length > 0) {
-        modules = detail.modules.map(m => ({
-          id: m.id,
-          skill: m.skill,
-          taskType: 'QUIZ',
-          orderIndex: 1,
-          maxScore: 10,
-          hasAudio: false,
-        }));
-      }
-
-      let detectedSkill: AssignmentSkill = 'writing';
-      const skillMap: Partial<Record<AssignmentSkill, number>> = {};
-      let writingPrompt = '';
-      let writingAiInstruction = '';
-      let speakingPrompt = '';
-      let speakingAiInstruction = '';
-      let readingTitle = '';
-      let readingContent = '';
-      let readingQuestionsList: ReadingQuestionItem[] = [];
-      let listeningAudioUrl = '';
-      let listeningTranscript = '';
-      let listeningQuestionsList: ListeningQuestionItem[] = [];
-
-      // Fetch all module details and their questions in parallel
-      const moduleDetailsResults = await Promise.all(
-        modules.map(async (mod, mIdx) => {
-          const modSkill = mod.skill?.toLowerCase() || '';
-          let sKey: AssignmentSkill;
-          if (modSkill.includes('speak')) sKey = 'speaking';
-          else if (modSkill.includes('read')) sKey = 'reading';
-          else if (modSkill.includes('listen')) sKey = 'listening';
-          else sKey = 'writing';
-
-          const needQuestions = sKey === 'reading' || sKey === 'listening';
-          const [mDetailRes, qRes] = await Promise.allSettled([
-            moduleService.getModule(mod.id),
-            needQuestions ? questionService.listQuestions(mod.id) : Promise.reject('No questions')
-          ]);
-
-          return {
-            mod,
-            mIdx,
-            sKey,
-            modDetail: mDetailRes.status === 'fulfilled' ? mDetailRes.value : null,
-            questions: qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : []
-          };
-        })
-      );
-
-      for (const item of moduleDetailsResults) {
-        const { mod, mIdx, sKey, modDetail, questions: fetchedQuestions } = item;
-        skillMap[sKey] = mod.id;
-        if (mIdx === 0) {
-          detectedSkill = sKey;
-        }
-
-        if (modDetail) {
-          const inst = modDetail.instructions || '';
-          if (sKey === 'writing') {
-            writingPrompt = inst;
-            writingAiInstruction = modDetail.aiInstruction || '';
-          } else if (sKey === 'speaking') {
-            speakingPrompt = inst;
-            speakingAiInstruction = modDetail.aiInstruction || '';
-          } else if (sKey === 'reading') {
-            if (inst.includes('\n\n')) {
-              readingTitle = inst.split('\n\n')[0].slice(0, 100);
-              readingContent = inst.slice(inst.indexOf('\n\n') + 2);
-            } else {
-              readingTitle = inst.slice(0, 100);
-              readingContent = inst;
+        // Find which class contains this assignment in parallel
+        const classCheckResults = await Promise.all(
+          classList.map(async (cls) => {
+            try {
+              const assignList = await assignmentService.listAssignments(cls.id, { limit: 100 });
+              const hasMatch = assignList.data?.some((a) => a.id === assignmentIdNum);
+              return { cls, hasMatch };
+            } catch {
+              return { cls, hasMatch: false };
             }
-            readingQuestionsList = fetchedQuestions.map((q, idx) => {
+          })
+        );
+        const matchedClass = classCheckResults.find((r) => r.hasMatch)?.cls;
+
+        if (matchedClass) {
+          setSelectedClassId(matchedClass.id);
+          try {
+            const [membersRes, subsRes] = await Promise.allSettled([
+              classService.listMembers(matchedClass.id),
+              submissionService.listSubmissions({ assignmentId: assignmentIdNum, limit: 100 })
+            ]);
+            const members = membersRes.status === 'fulfilled' ? membersRes.value : [];
+            const subs = subsRes.status === 'fulfilled' ? (subsRes.value.data || []) : [];
+            setTurnoutStats({
+              total: members.length,
+              submitted: subs.filter((s) => s.status !== 'IN_PROGRESS').length
+            });
+          } catch {
+            // Fallback
+          }
+        }
+
+        let rawModules: ModuleSummary[] = [];
+        if (modRes.status === 'fulfilled') {
+          rawModules = modRes.value.modules || modRes.value.data || [];
+        }
+
+        if (rawModules.length === 0 && detail.modules && detail.modules.length > 0) {
+          rawModules = detail.modules.map((m, idx) => ({
+            id: m.id,
+            skill: m.skill,
+            taskType: 'QUIZ',
+            orderIndex: idx + 1,
+            maxScore: 10,
+            hasAudio: false,
+          }));
+        }
+
+        // Fetch details & questions for each module in parallel
+        const moduleDetailsResults = await Promise.all(
+          rawModules.map(async (mod, mIdx) => {
+            const modSkill = mod.skill?.toLowerCase() || '';
+            let sKey: AssignmentSkill;
+            if (modSkill.includes('speak')) sKey = 'speaking';
+            else if (modSkill.includes('read')) sKey = 'reading';
+            else if (modSkill.includes('listen')) sKey = 'listening';
+            else sKey = 'writing';
+
+            const needQuestions = sKey === 'reading' || sKey === 'listening';
+            const [mDetailRes, qRes] = await Promise.allSettled([
+              moduleService.getModule(mod.id),
+              needQuestions ? questionService.listQuestions(mod.id) : Promise.reject('No questions')
+            ]);
+
+            return {
+              mod,
+              mIdx,
+              sKey,
+              modDetail: mDetailRes.status === 'fulfilled' ? mDetailRes.value : null,
+              questions: qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : []
+            };
+          })
+        );
+
+        // Convert into rich EditorModuleItem array
+        const loadedModules: EditorModuleItem[] = moduleDetailsResults.map((item, idx) => {
+          const { mod, sKey, modDetail, questions: fetchedQuestions } = item;
+          const inst = modDetail?.instructions || '';
+          const aiInst = modDetail?.aiInstruction || '';
+          const maxSc = modDetail?.maxScore ? Number(modDetail.maxScore) : 10;
+
+          let modConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+
+          if (sKey === 'writing') {
+            modConfig = {
+              ...createDefaultWritingConfig(),
+              promptText: inst,
+              aiInstruction: aiInst,
+            };
+          } else if (sKey === 'speaking') {
+            modConfig = {
+              ...createDefaultSpeakingConfig(),
+              promptText: inst,
+              cueCardTopic: inst,
+              aiInstruction: aiInst,
+            };
+          } else if (sKey === 'reading') {
+            const hasDoubleNewline = inst.includes('\n\n');
+            const candidateTitle = hasDoubleNewline ? inst.split('\n\n')[0].trim() : '';
+            const isInstructionLike =
+              candidateTitle.toLowerCase().startsWith('đọc bài') ||
+              candidateTitle.toLowerCase().startsWith('read the') ||
+              candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+              candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+            const readingTitle = (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 80)
+              ? candidateTitle
+              : '';
+            const readingContent = hasDoubleNewline && !isInstructionLike
+              ? inst.slice(inst.indexOf('\n\n') + 2).trim()
+              : inst.trim();
+            const qList: ReadingQuestionItem[] = fetchedQuestions.map((q: QuestionResponse, qIdx: number) => {
               const isMcq = q.questionType === 'MULTIPLE_CHOICE';
               const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
               const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
               return {
                 id: String(q.id),
-                order: q.orderIndex || idx + 1,
+                order: q.orderIndex || qIdx + 1,
                 type: isMcq ? 'multiple_choice' : 'gap_fill',
                 prompt: q.content,
                 options: mcq ? mcq.options : undefined,
@@ -281,16 +272,22 @@ export const TeacherEditAssignment: React.FC = () => {
                 points: Number(q.score) || 1,
               };
             });
-          } else if (sKey === 'listening') {
-            listeningTranscript = inst;
-            listeningAudioUrl = modDetail.sourceAudioStorageKey || '';
-            listeningQuestionsList = fetchedQuestions.map((q, idx) => {
+            modConfig = {
+              ...createDefaultReadingConfig(),
+              passageTitle: readingTitle,
+              passageContent: readingContent,
+              questions: qList,
+              aiInstruction: aiInst,
+            };
+          } else {
+            // listening
+            const qList: ListeningQuestionItem[] = fetchedQuestions.map((q: QuestionResponse, qIdx: number) => {
               const isMcq = q.questionType === 'MULTIPLE_CHOICE';
               const mcq = isMcq ? extractMcqOptions(q.correctAnswer) : null;
               const shortAns = !isMcq ? extractShortAnswerText(q.correctAnswer) : '';
               return {
                 id: String(q.id),
-                order: q.orderIndex || idx + 1,
+                order: q.orderIndex || qIdx + 1,
                 section: 'section1',
                 type: isMcq ? 'multiple_choice' : 'short_answer',
                 prompt: q.content,
@@ -299,194 +296,267 @@ export const TeacherEditAssignment: React.FC = () => {
                 points: Number(q.score) || 1,
               };
             });
+            modConfig = {
+              ...createDefaultListeningConfig(),
+              transcript: inst,
+              audioUrl: modDetail?.audioDownloadUrl || modDetail?.sourceAudioStorageKey || '',
+              questions: qList,
+              aiInstruction: aiInst,
+            };
           }
+
+          return {
+            id: `mod-existing-${mod.id}`,
+            dbId: mod.id,
+            skill: sKey,
+            title: sKey === 'reading' ? (modConfig as ReadingConfig).passageTitle : '',
+            orderIndex: mod.orderIndex || idx + 1,
+            maxScore: maxSc,
+            config: modConfig,
+          };
+        });
+
+        if (loadedModules.length === 0) {
+          loadedModules.push(createDefaultModuleItem('writing', 1));
+        }
+
+        setAssignmentData({
+          id: String(detail.id),
+          code: `HW-${String(detail.id).padStart(2, '0')}`,
+          title: detail.title || '',
+          skill: loadedModules[0]?.skill || 'writing',
+          className: matchedClass?.name || '',
+          startDate: detail.openAt ? formatToLocalDateTimeInput(detail.openAt) : formatToLocalDateTimeInput(),
+          dueDate: detail.closeAt ? formatToLocalDateTimeInput(detail.closeAt) : formatToLocalDateTimeInput(addDays(new Date(), 7)),
+          durationMinutes: 60,
+          allowLate: true,
+          status: detail.status === 'PUBLISHED' ? 'active' : detail.status === 'CLOSED' ? 'closed' : 'draft',
+          targetAudience: 'all',
+          notifyStudents: true,
+          maxSubmissions: detail.maxSubmissions ?? 1,
+          modules: loadedModules
+        });
+      } catch (err) {
+        console.error('Failed to load assignment detail for edit:', err);
+        if (isMounted) {
+          setError(isVi ? 'Không thể tải thông tin bài tập. Vui lòng thử lại.' : 'Failed to load assignment details. Please retry.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
         }
       }
+    };
 
-      if (isMounted) {
-        setModuleIdsBySkill(skillMap);
-      }
+    loadAssignmentData();
 
-      const statusMap: Record<AssignmentStatus, 'active' | 'draft' | 'closed'> = {
-        PUBLISHED: 'active',
-        DRAFT: 'draft',
-        CLOSED: 'closed'
-      };
+    return () => {
+      isMounted = false;
+    };
+  }, [id, isVi, reloadKey]);
 
-      setAssignmentData((prev) => ({
-        ...prev,
-        id: String(detail.id),
-        code: `HW-${detail.id.toString().padStart(2, '0')}`,
-        title: detail.title,
-        skill: detectedSkill,
-        className: matchedClass ? matchedClass.name : (classList[0]?.name || 'Lớp tiếng Anh'),
-        status: statusMap[detail.status] || 'active',
-        maxSubmissions: detail.maxSubmissions ?? prev.maxSubmissions,
-        dueDate: detail.closeAt ? formatToLocalDateTimeInput(detail.closeAt) : prev.dueDate,
-        startDate: detail.openAt ? formatToLocalDateTimeInput(detail.openAt) : prev.startDate,
-        writing: {
-          ...prev.writing,
-          promptText: writingPrompt || prev.writing.promptText,
-          aiInstruction: writingAiInstruction || prev.writing.aiInstruction
-        },
-        speaking: {
-          ...prev.speaking,
-          promptText: speakingPrompt || prev.speaking.promptText || prev.speaking.cueCardTopic || '',
-          cueCardTopic: speakingPrompt || prev.speaking.cueCardTopic || '',
-          aiInstruction: speakingAiInstruction || prev.speaking.aiInstruction
-        },
-        reading: {
-          ...prev.reading,
-          passageTitle: readingTitle || prev.reading.passageTitle,
-          passageContent: readingContent || prev.reading.passageContent,
-          questions: readingQuestionsList.length > 0 ? readingQuestionsList : prev.reading.questions
-        },
-        listening: {
-          ...prev.listening,
-          audioUrl: listeningAudioUrl || prev.listening.audioUrl,
-          transcript: listeningTranscript || prev.listening.transcript,
-          questions: listeningQuestionsList.length > 0 ? listeningQuestionsList : prev.listening.questions
-        }
-      }));
-    } catch (err) {
-      console.error('Failed to load assignment detail for edit:', err);
-      if (isMounted) {
-        setError(isVi ? 'Không thể tải thông tin bài tập. Vui lòng thử lại.' : 'Failed to load assignment details. Please retry.');
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
+  // Add a new module
+  const handleAddModule = (skill: AssignmentSkill) => {
+    const nextOrder = assignmentData.modules.length + 1;
+    const newMod = createDefaultModuleItem(skill, nextOrder);
+    setAssignmentData((prev) => ({
+      ...prev,
+      modules: [...prev.modules, newMod]
+    }));
+    setActiveModuleIndex(assignmentData.modules.length);
+    setShowAddMenu(false);
+    showToast(isVi ? `Đã thêm phần thi ${getSkillName(skill)} mới.` : `Added new ${skill} module.`);
+  };
+
+  // Remove module
+  const handleRemoveModule = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (assignmentData.modules.length <= 1) {
+      showToast(isVi ? 'Bài tập phải có ít nhất 1 phần thi / module!' : 'Assignment must contain at least 1 module!');
+      return;
+    }
+
+    const targetMod = assignmentData.modules[index];
+    if (targetMod.dbId) {
+      setDeletedModuleDbIds((prev) => [...prev, targetMod.dbId!]);
+    }
+
+    const updated = assignmentData.modules.filter((_, idx) => idx !== index);
+    const reordered = updated.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+
+    if (activeModuleIndex >= reordered.length) {
+      setActiveModuleIndex(Math.max(0, reordered.length - 1));
+    } else if (activeModuleIndex === index) {
+      setActiveModuleIndex(Math.max(0, index - 1));
     }
   };
 
-  loadAssignmentData();
+  // Move module up or down
+  const handleMoveModule = (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= assignmentData.modules.length) return;
 
-  return () => {
-    isMounted = false;
+    const list = [...assignmentData.modules];
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    const reordered = list.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+    setActiveModuleIndex(targetIndex);
   };
-}, [id, isVi, reloadKey]);
 
-  const getInstructionsFor = (skill: AssignmentSkill): string => {
+  // Update active module config
+  const handleActiveModuleConfigChange = (updatedConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, config: updatedConfig };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  // Update active module meta
+  const handleActiveModuleMetaChange = (field: 'title' | 'maxScore', val: string | number) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, [field]: val };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  const getSkillName = (skill: AssignmentSkill): string => {
     switch (skill) {
-      case 'writing':
-        return assignmentData.writing.promptText.trim();
-      case 'speaking':
-        return (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
+      case 'writing': return isVi ? 'Viết (Writing)' : 'Writing';
+      case 'speaking': return isVi ? 'Nói (Speaking)' : 'Speaking';
+      case 'reading': return isVi ? 'Đọc (Reading)' : 'Reading';
+      case 'listening': return isVi ? 'Nghe (Listening)' : 'Listening';
+      default: return skill;
+    }
+  };
+
+  const getSkillIcon = (skill: AssignmentSkill, size = 16) => {
+    switch (skill) {
+      case 'writing': return <PenTool size={size} />;
+      case 'speaking': return <Mic size={size} />;
+      case 'reading': return <BookOpen size={size} />;
+      case 'listening': return <Headphones size={size} />;
+    }
+  };
+
+  const getInstructionsForModule = (mod: EditorModuleItem): string => {
+    switch (mod.skill) {
+      case 'writing': {
+        const c = mod.config as WritingConfig;
+        return c.promptText.trim();
+      }
+      case 'speaking': {
+        const c = mod.config as SpeakingConfig;
+        return (c.promptText || c.cueCardTopic || '').trim();
+      }
       case 'reading': {
-        const pTitle = assignmentData.reading.passageTitle.trim();
-        const pContent = (assignmentData.reading.passageContent 
-          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
+        const c = mod.config as ReadingConfig;
+        const pTitle = c.passageTitle.trim();
+        const pContent = (c.passageContent 
+          || c.paragraphs?.map(p => p.content).join('\n\n') 
           || '').trim();
         return pTitle ? `${pTitle}\n\n${pContent}` : pContent;
       }
-      case 'listening':
-        return (assignmentData.listening.transcript || assignmentData.listening.audioTitle || '').trim();
+      case 'listening': {
+        const c = mod.config as ListeningConfig;
+        return (c.transcript || c.audioTitle || '').trim();
+      }
       default:
         return '';
-    }
-  };
-
-  const isSkillConfigured = (skill: AssignmentSkill): boolean => {
-    switch (skill) {
-      case 'writing':
-        return Boolean(assignmentData.writing.promptText.trim());
-      case 'speaking':
-        return Boolean((assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim());
-      case 'reading':
-        return Boolean(
-          assignmentData.reading.passageTitle.trim() ||
-          assignmentData.reading.passageContent?.trim() ||
-          assignmentData.reading.paragraphs?.some(p => p.content.trim()) ||
-          assignmentData.reading.questions.length > 0
-        );
-      case 'listening':
-        return Boolean(
-          assignmentData.listening.audioFile ||
-          assignmentData.listening.audioUrl?.trim() ||
-          assignmentData.listening.transcript?.trim() ||
-          assignmentData.listening.questions.length > 0
-        );
-      default:
-        return false;
     }
   };
 
   const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
     if (!id) return;
 
-    const allSkills: AssignmentSkill[] = ['listening', 'reading', 'writing', 'speaking'];
-    const skillsToSave = allSkills.filter(s => Boolean(moduleIdsBySkill[s]) || isSkillConfigured(s));
-    const targetSkills = skillsToSave.length > 0 ? skillsToSave : [assignmentData.skill];
+    // Validation for all modules
+    for (let i = 0; i < assignmentData.modules.length; i++) {
+      const mod = assignmentData.modules[i];
+      const modNum = i + 1;
+      const modLabel = mod.title ? `"${mod.title}" (Phần ${modNum})` : `Phần ${modNum}: ${getSkillName(mod.skill)}`;
 
-    // Validation for each target skill
-    for (const skill of targetSkills) {
-      if (skill === 'writing') {
-        if (!assignmentData.writing.promptText.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'writing' }));
-          showToast(isVi ? 'Nội dung đề bài Writing không được để trống!' : 'Writing prompt cannot be empty!');
+      if (mod.skill === 'writing') {
+        const c = mod.config as WritingConfig;
+        if (!c.promptText.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Writing không được để trống!` : `${modLabel}: Writing prompt cannot be empty!`);
           return;
         }
-      } else if (skill === 'speaking') {
-        const spPrompt = (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
-        if (!spPrompt) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'speaking' }));
-          showToast(isVi ? 'Nội dung đề bài Speaking không được để trống!' : 'Speaking prompt cannot be empty!');
+      } else if (mod.skill === 'speaking') {
+        const c = mod.config as SpeakingConfig;
+        const prompt = (c.promptText || c.cueCardTopic || '').trim();
+        if (!prompt) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Speaking không được để trống!` : `${modLabel}: Speaking prompt cannot be empty!`);
           return;
         }
-      } else if (skill === 'reading') {
-        if (!assignmentData.reading.passageTitle.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Tiêu đề bài đọc không được để trống!' : 'Passage title cannot be empty!');
+      } else if (mod.skill === 'reading') {
+        const c = mod.config as ReadingConfig;
+        if (!c.passageTitle.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Tiêu đề bài đọc không được để trống!` : `${modLabel}: Passage title cannot be empty!`);
           return;
         }
-        const pContent = (assignmentData.reading.passageContent 
-          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
-          || '').trim();
+        const pContent = (c.passageContent || c.paragraphs?.map(p => p.content).join('\n\n') || '').trim();
         if (!pContent) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Nội dung văn bản bài đọc không được để trống!' : 'Passage content cannot be empty!');
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung văn bản bài đọc không được để trống!` : `${modLabel}: Passage content cannot be empty!`);
           return;
         }
-        const qList = assignmentData.reading.questions;
-        if (qList.length === 0) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!` : `${modLabel}: Please add at least 1 question!`);
           return;
         }
-        for (let i = 0; i < qList.length; i++) {
-          if (!qList[i].prompt.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-            showToast(isVi ? `Nội dung câu hỏi Reading #${i + 1} không được để trống!` : `Reading question #${i + 1} statement cannot be empty!`);
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
             return;
           }
-          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-            showToast(isVi ? `Đáp án chính xác cho câu hỏi Reading #${i + 1} không được để trống!` : `Correct answer for reading question #${i + 1} cannot be empty!`);
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
-      } else if (skill === 'listening') {
-        if (!assignmentData.listening.audioFile && !assignmentData.listening.audioUrl?.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-          showToast(isVi ? 'Vui lòng chọn tệp âm thanh cho bài nghe!' : 'Please select an audio file for the listening assignment!');
+      } else if (mod.skill === 'listening') {
+        const c = mod.config as ListeningConfig;
+        if (!c.audioFile && !c.audioUrl?.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng chọn tệp âm thanh cho bài nghe!` : `${modLabel}: Please select an audio file!`);
           return;
         }
-        const qList = assignmentData.listening.questions;
-        if (qList.length === 0) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!` : `${modLabel}: Please add at least 1 question!`);
           return;
         }
-        for (let i = 0; i < qList.length; i++) {
-          if (!qList[i].prompt.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-            showToast(isVi ? `Nội dung câu hỏi Listening #${i + 1} không được để trống!` : `Listening question #${i + 1} statement cannot be empty!`);
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
             return;
           }
-          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-            showToast(isVi ? `Đáp án chính xác cho câu hỏi Listening #${i + 1} không được để trống!` : `Correct answer for listening question #${i + 1} cannot be empty!`);
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
@@ -504,11 +574,11 @@ export const TeacherEditAssignment: React.FC = () => {
         ? new Date(assignmentData.dueDate).toISOString() 
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const mainDescription = targetSkills.length === 1
-        ? getInstructionsFor(targetSkills[0])
-        : targetSkills.map((s) => `[${s.toUpperCase()}]: ${getInstructionsFor(s)}`).join('\n\n');
+      const mainDescription = assignmentData.modules
+        .map((m, idx) => `[Phần ${idx + 1} - ${m.skill.toUpperCase()}${m.title ? `: ${m.title}` : ''}]: ${getInstructionsForModule(m)}`)
+        .join('\n\n');
 
-      // 1. Update assignment
+      // 1. Update assignment basics
       await assignmentService.updateAssignment(assignmentIdNum, {
         title: assignmentData.title,
         description: mainDescription,
@@ -517,7 +587,7 @@ export const TeacherEditAssignment: React.FC = () => {
         maxSubmissions: assignmentData.maxSubmissions ?? 1
       });
 
-      // 2. Update status only if changed and the transition is permitted by backend
+      // 2. Update status if changed
       if (publishStatus && publishStatus !== currentDbStatus) {
         const isValidTransition =
           (currentDbStatus === 'DRAFT' && publishStatus === 'PUBLISHED') ||
@@ -535,6 +605,17 @@ export const TeacherEditAssignment: React.FC = () => {
         }
       }
 
+      // 3. Delete removed modules
+      for (const delId of deletedModuleDbIds) {
+        try {
+          await moduleService.deleteModule(delId);
+        } catch (delErr) {
+          console.warn(`Failed to delete removed module #${delId}:`, delErr);
+        }
+      }
+      setDeletedModuleDbIds([]);
+
+      // 4. Update existing or create newly added modules
       const apiSkillMap: Record<AssignmentSkill, ApiSkill> = {
         writing: 'WRITING', speaking: 'SPEAKING', reading: 'READING', listening: 'LISTENING'
       };
@@ -542,190 +623,115 @@ export const TeacherEditAssignment: React.FC = () => {
         writing: 'ESSAY', speaking: 'RECORDING', reading: 'QUIZ', listening: 'QUIZ'
       };
 
-      const updatedSkillMap = { ...moduleIdsBySkill };
+      const updatedModulesList = [...assignmentData.modules];
 
-      for (let sIdx = 0; sIdx < targetSkills.length; sIdx++) {
-        const skill = targetSkills[sIdx];
-        const instructions = getInstructionsFor(skill);
-        const selectedAiInstruction = skill === 'writing'
-          ? (assignmentData.writing.aiInstruction || undefined)
-          : skill === 'speaking'
-          ? (assignmentData.speaking.aiInstruction || undefined)
-          : undefined;
+      for (let sIdx = 0; sIdx < updatedModulesList.length; sIdx++) {
+        const mod = updatedModulesList[sIdx];
+        const orderIndex = sIdx + 1;
+        const instructions = getInstructionsForModule(mod);
+        let aiInstruction: string | undefined = undefined;
+        if (mod.skill === 'writing') {
+          aiInstruction = (mod.config as WritingConfig).aiInstruction || undefined;
+        } else if (mod.skill === 'speaking') {
+          aiInstruction = (mod.config as SpeakingConfig).aiInstruction || undefined;
+        }
 
-        let targetModuleId = updatedSkillMap[skill];
+        let targetModuleId = mod.dbId;
+
         if (targetModuleId) {
+          // Existing module -> update
           try {
             await moduleService.updateModule(targetModuleId, {
               instructions,
-              aiInstruction: selectedAiInstruction
+              aiInstruction,
+              maxScore: mod.maxScore || 10,
+              orderIndex
             });
           } catch (modErr) {
-            console.warn(`Failed to update module for ${skill}:`, modErr);
+            console.warn(`Failed to update module #${targetModuleId}:`, modErr);
           }
         } else {
+          // New module added in edit view -> create
           try {
             const newMod = await moduleService.createModule(assignmentIdNum, {
-              skill: apiSkillMap[skill],
-              taskType: taskTypeMap[skill],
-              orderIndex: sIdx + 1,
+              skill: apiSkillMap[mod.skill],
+              taskType: taskTypeMap[mod.skill],
+              orderIndex,
               instructions,
-              aiInstruction: selectedAiInstruction,
-              maxScore: 10
+              aiInstruction,
+              maxScore: mod.maxScore || 10
             });
             targetModuleId = newMod.id;
-            updatedSkillMap[skill] = newMod.id;
+            updatedModulesList[sIdx] = { ...mod, dbId: newMod.id };
           } catch (createErr) {
-            console.warn(`Failed to create module for ${skill}:`, createErr);
+            console.warn(`Failed to create new module for ${mod.skill}:`, createErr);
           }
         }
 
-        // Upload new audio file if provided
-        if (targetModuleId && skill === 'listening' && assignmentData.listening.audioFile) {
-          try {
-            await moduleService.uploadAudio(targetModuleId, assignmentData.listening.audioFile);
-          } catch (audioErr) {
-            console.error('Failed to upload audio file in edit mode:', audioErr);
-            showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe. Vui lòng thử lại!' : 'Failed to upload audio file!');
-            throw audioErr;
+        // Upload audio if listening and has new file
+        if (targetModuleId && mod.skill === 'listening') {
+          const lConfig = mod.config as ListeningConfig;
+          if (lConfig.audioFile) {
+            try {
+              await moduleService.uploadAudio(targetModuleId, lConfig.audioFile);
+            } catch (audioErr) {
+              console.warn('Failed to upload audio file:', audioErr);
+            }
           }
         }
 
-        // Synchronize questions sequentially for Reading / Listening to prevent 409 Lock Contention
-        if (targetModuleId && (skill === 'reading' || skill === 'listening')) {
-          let existingDbQuestions: QuestionResponse[] = [];
-          try {
-            const dbRes = await questionService.listQuestions(targetModuleId);
-            existingDbQuestions = dbRes.questions || [];
-          } catch (dbErr) {
-            console.warn(`Could not fetch existing DB questions for ${skill}:`, dbErr);
-          }
-
-          const uiQuestions = skill === 'reading'
-            ? assignmentData.reading.questions
-            : assignmentData.listening.questions;
-
-          // A. Delete questions removed in UI
-          const uiNumericIds = new Set(
-            uiQuestions
-              .map((q) => Number(q.id))
-              .filter((num) => Number.isInteger(num) && num > 0)
-          );
-
-          for (const dbQ of existingDbQuestions) {
-            if (!uiNumericIds.has(dbQ.id)) {
+        // Create / sync questions for reading / listening
+        if (targetModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
+          const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
+          for (let i = 0; i < qList.length; i++) {
+            const q = qList[i];
+            const isExistingQuestion = q.id && !q.id.startsWith('new-') && !q.id.startsWith('mod-') && Number.isFinite(Number(q.id));
+            if (!isExistingQuestion) {
+              const payload = q.type === 'multiple_choice'
+                ? buildMcqPayload({
+                    content: q.prompt,
+                    options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
+                      ? ((q as { options?: string[] }).options || [])
+                      : [],
+                    correctOptionIndexOrText: q.correctAnswer,
+                    score: q.points || 1,
+                    orderIndex: i + 1,
+                  })
+                : buildShortAnswerPayload({
+                    content: q.prompt,
+                    answerText: q.correctAnswer,
+                    score: q.points || 1,
+                    orderIndex: i + 1,
+                  });
               try {
-                await questionService.deleteQuestion(dbQ.id);
-              } catch (delErr: unknown) {
-                console.warn(`Could not delete question ${dbQ.id}:`, delErr);
+                await questionService.createQuestion(targetModuleId, payload);
+              } catch (qErr) {
+                console.warn('Failed to create question:', qErr);
               }
             }
-          }
-
-          // B. Sequentially update existing or create new questions
-          const updatedQuestionIds: Record<number, string> = {};
-          for (let i = 0; i < uiQuestions.length; i++) {
-            const q = uiQuestions[i];
-            const isExisting = Number.isInteger(Number(q.id)) && Number(q.id) > 0 && existingDbQuestions.some((dbQ) => dbQ.id === Number(q.id));
-            const payload = q.type === 'multiple_choice'
-              ? buildMcqPayload({
-                  content: q.prompt,
-                  options: q.options,
-                  correctOptionIndexOrText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                })
-              : buildShortAnswerPayload({
-                  content: q.prompt,
-                  answerText: q.correctAnswer,
-                  score: q.points,
-                  orderIndex: i + 1,
-                });
-
-            if (isExisting) {
-              await questionService.updateQuestion(Number(q.id), {
-                content: payload.content,
-                correctAnswer: payload.correctAnswer,
-                score: payload.score,
-                orderIndex: payload.orderIndex,
-              });
-            } else {
-              const created = await questionService.createQuestion(targetModuleId, payload);
-              updatedQuestionIds[i] = String(created.id);
-            }
-          }
-
-          if (Object.keys(updatedQuestionIds).length > 0) {
-            setAssignmentData((prev) => {
-              if (skill === 'reading') {
-                return {
-                  ...prev,
-                  reading: {
-                    ...prev.reading,
-                    questions: prev.reading.questions.map((item, idx) =>
-                      updatedQuestionIds[idx] ? { ...item, id: updatedQuestionIds[idx] } : item
-                    ),
-                  },
-                };
-              }
-              if (skill === 'listening') {
-                return {
-                  ...prev,
-                  listening: {
-                    ...prev.listening,
-                    questions: prev.listening.questions.map((item, idx) =>
-                      updatedQuestionIds[idx] ? { ...item, id: updatedQuestionIds[idx] } : item
-                    ),
-                  },
-                };
-              }
-              return prev;
-            });
           }
         }
       }
 
-      setModuleIdsBySkill(updatedSkillMap);
-
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      setLastSavedTime(timeStr);
-
-      showToast(isVi ? 'Cập nhật bài tập thành công!' : 'Assignment updated successfully!');
-      if (publishStatus !== 'DRAFT') {
-        setTimeout(() => navigate('/teacher/assignments'), 1000);
-      }
-    } catch (err: unknown) {
-      console.error('Failed to update assignment:', err);
-      const msg = err instanceof Error ? err.message : '';
-      showToast(msg ? `Lỗi: ${msg}` : (isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please retry!'));
+      setAssignmentData((prev) => ({ ...prev, modules: updatedModulesList }));
+      setLastSavedTime(new Date().toLocaleTimeString('vi-VN'));
+      showToast(isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!');
+    } catch (err) {
+      console.error('Failed to save assignment changes:', err);
+      showToast(isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSaveDraft = () => {
-    if (currentDbStatus === 'PUBLISHED') {
-      showToast(isVi ? 'Bài tập này đã xuất bản, không thể chuyển về bản nháp.' : 'This assignment is already published.');
-      return;
-    }
-    saveAssignmentChanges('DRAFT');
-  };
-
-  const handleSaveAndPublish = () => {
-    saveAssignmentChanges(currentDbStatus === 'PUBLISHED' ? undefined : 'PUBLISHED');
-  };
-
-  const handleSkillChange = (newSkill: AssignmentSkill) => {
-    setAssignmentData((prev) => ({ ...prev, skill: newSkill }));
-  };
+  const activeModule = assignmentData.modules[activeModuleIndex] || assignmentData.modules[0];
 
   if (isLoading) {
     return (
-      <div className="teacher-container py-6">
+      <div className="teacher-container">
         <LoadingState 
-          title={isVi ? 'Đang tải thông tin bài tập từ hệ thống...' : 'Loading assignment details...'}
-          description={isVi ? 'Đang đồng bộ nội dung đề bài, hạn nộp và lớp học.' : 'Syncing instructions, deadlines, and classroom.'}
+          title={isVi ? 'Đang nạp chi tiết bài tập' : 'Loading Assignment Details'}
+          description={isVi ? 'Vui lòng chờ trong giây lát...' : 'Please wait a moment...'}
         />
       </div>
     );
@@ -733,19 +739,17 @@ export const TeacherEditAssignment: React.FC = () => {
 
   if (error) {
     return (
-      <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', backgroundColor: '#fef2f2', borderRadius: '12px', border: '1px solid #fecaca' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <AlertCircle size={24} color="#dc2626" />
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#b91c1c' }}>{error}</h3>
+      <div className="teacher-container">
+        <div className="eh-card p-8 text-center my-8">
+          <AlertCircle size={32} className="text-danger mx-auto mb-3" />
+          <h3 className="font-serif text-lg font-bold text-main mb-2">
+            {isVi ? 'Không thể tải thông tin bài tập' : 'Failed to load assignment'}
+          </h3>
+          <p className="text-sm text-muted mb-4">{error}</p>
+          <button type="button" onClick={handleRetry} className="btn btn-secondary">
+            {isVi ? 'Thử lại' : 'Retry'}
+          </button>
         </div>
-        <button 
-          className="btn btn-secondary bg-white btn-sm"
-          onClick={handleRetry}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-        >
-          <RefreshCw size={14} />
-          <span>{isVi ? 'Thử lại' : 'Retry'}</span>
-        </button>
       </div>
     );
   }
@@ -763,37 +767,28 @@ export const TeacherEditAssignment: React.FC = () => {
           <span>{isVi ? 'Quản lý bài tập' : 'Assignments Library'}</span>
         </button>
         <span>/</span>
-        <span>{assignmentData.className}</span>
+        <span>{assignmentData.className || (isVi ? 'Lớp học' : 'Class')}</span>
         <span>/</span>
-        <span style={{ fontWeight: 700, color: 'var(--on-surface, #111827)' }}>
-          {isVi ? 'Chỉnh sửa bài tập: ' : 'Edit Assignment: '} {assignmentData.code}
+        <span style={{ fontWeight: 700, color: 'var(--eh-text-primary, #161B19)' }}>
+          {isVi ? 'Chỉnh sửa bài tập' : 'Edit Assignment'}
         </span>
       </div>
 
-      {/* Main Header Row */}
+      {/* Header */}
       <div className="assignment-edit-header">
-        <div className="assignment-edit-title-row">
-          <span className="assignment-edit-code-badge">{assignmentData.code}</span>
-          <input 
-            type="text" 
-            className="assignment-edit-title-input"
-            value={assignmentData.title}
-            onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
-            placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
-          />
-        </div>
+        <input 
+          type="text" 
+          className="assignment-edit-title-input"
+          value={assignmentData.title}
+          onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
+          placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
+        />
 
-        {/* Status indicator & class badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select 
-            className="select-input"
             value={selectedClassId ? String(selectedClassId) : ''}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              setSelectedClassId(val);
-              const m = classes.find((c) => c.id === val);
-              if (m) setAssignmentData((prev) => ({ ...prev, className: m.name }));
-            }}
+            onChange={(e) => setSelectedClassId(Number(e.target.value))}
+            className="select-input font-semibold text-sm"
           >
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
@@ -808,8 +803,8 @@ export const TeacherEditAssignment: React.FC = () => {
             gap: '6px', 
             padding: '6px 14px', 
             borderRadius: '20px', 
-            backgroundColor: assignmentData.status === 'active' ? '#dcfce7' : assignmentData.status === 'draft' ? '#f1f5f9' : '#fee2e2',
-            color: assignmentData.status === 'active' ? '#15803d' : assignmentData.status === 'draft' ? '#475569' : '#b91c1c',
+            backgroundColor: currentDbStatus === 'PUBLISHED' ? '#dcfce7' : currentDbStatus === 'DRAFT' ? '#f1f5f9' : '#fee2e2',
+            color: currentDbStatus === 'PUBLISHED' ? '#15803d' : currentDbStatus === 'DRAFT' ? '#475569' : '#b91c1c',
             fontWeight: 700,
             fontSize: '12.5px'
           }}>
@@ -817,81 +812,195 @@ export const TeacherEditAssignment: React.FC = () => {
               width: '8px', 
               height: '8px', 
               borderRadius: '50%', 
-              backgroundColor: assignmentData.status === 'active' ? '#16a34a' : assignmentData.status === 'draft' ? '#64748b' : '#ef4444' 
+              backgroundColor: currentDbStatus === 'PUBLISHED' ? '#16a34a' : currentDbStatus === 'DRAFT' ? '#64748b' : '#ef4444' 
             }}></span>
-            {assignmentData.status === 'active' ? (isVi ? 'Đang mở (Active)' : 'Active') : assignmentData.status === 'draft' ? (isVi ? 'Bản nháp (Draft)' : 'Draft') : (isVi ? 'Đã đóng (Closed)' : 'Closed')}
+            {currentDbStatus === 'PUBLISHED' ? (isVi ? 'Đang mở (Active)' : 'Active') : currentDbStatus === 'DRAFT' ? (isVi ? 'Bản nháp (Draft)' : 'Draft') : (isVi ? 'Đã đóng (Closed)' : 'Closed')}
           </div>
         </div>
       </div>
 
-      {/* 4 Skills Navigation Tabs */}
-      <div className="skill-tabs-nav">
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'writing' ? 'active-writing' : ''}`}
-          onClick={() => handleSkillChange('writing')}
-        >
-          <PenTool size={16} />
-          <span>Writing (Kỹ năng Viết)</span>
-        </button>
+      {/* DYNAMIC MULTI-MODULE MANAGEMENT BAR */}
+      <div className="tae-module-bar-wrap">
+        <div className="tae-module-bar-header">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-forest" />
+            <span className="tae-module-bar-title">
+              {isVi ? 'Các phần thi / Modules của bài tập' : 'Assignment Modules & Exam Parts'}
+            </span>
+            <span className="tae-module-count-badge">
+              {assignmentData.modules.length} {isVi ? 'phần thi' : 'parts'}
+            </span>
+          </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'speaking' ? 'active-speaking' : ''}`}
-          onClick={() => handleSkillChange('speaking')}
-        >
-          <Mic size={16} />
-          <span>Speaking (Kỹ năng Nói)</span>
-        </button>
+          {/* Add Module Dropdown */}
+          <div className="relative" ref={addMenuRef}>
+            <button
+              type="button"
+              className="tae-btn-add-module"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              <Plus size={15} />
+              <span>{isVi ? 'Thêm module' : 'Add Module'}</span>
+              <ChevronDown size={14} />
+            </button>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'reading' ? 'active-reading' : ''}`}
-          onClick={() => handleSkillChange('reading')}
-        >
-          <BookOpen size={16} />
-          <span>Reading (Kỹ năng Đọc)</span>
-        </button>
+            {showAddMenu && (
+              <div className="tae-add-module-menu">
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('writing')}
+                >
+                  <PenTool size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Viết (Writing)' : 'Add Writing Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('speaking')}
+                >
+                  <Mic size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nói (Speaking)' : 'Add Speaking Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('reading')}
+                >
+                  <BookOpen size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Đọc (Reading)' : 'Add Reading Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('listening')}
+                >
+                  <Headphones size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nghe (Listening)' : 'Add Listening Module'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'listening' ? 'active-listening' : ''}`}
-          onClick={() => handleSkillChange('listening')}
-        >
-          <Headphones size={16} />
-          <span>Listening (Kỹ năng Nghe)</span>
-        </button>
+        {/* Module Chips Row */}
+        <div className="tae-module-chips-list">
+          {assignmentData.modules.map((mod, idx) => {
+            const isSelected = idx === activeModuleIndex;
+            const skillCode = mod.skill;
+            return (
+              <div
+                key={mod.id || idx}
+                className={`tae-module-chip ${isSelected ? 'active' : ''} skill-${skillCode}`}
+                onClick={() => setActiveModuleIndex(idx)}
+              >
+                <div className="tae-chip-badge">{idx + 1}</div>
+                <div className="tae-chip-icon">{getSkillIcon(mod.skill, 14)}</div>
+                <div className="tae-chip-text">
+                  <span className="tae-chip-skill">{getSkillName(mod.skill)}</span>
+                  {mod.title && <span className="tae-chip-sub">• {mod.title}</span>}
+                </div>
+
+                {/* Move & Delete controls */}
+                <div className="tae-chip-actions" onClick={(e) => e.stopPropagation()}>
+                  {idx > 0 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang trái' : 'Move left'}
+                      onClick={(e) => handleMoveModule(idx, 'up', e)}
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                  )}
+                  {idx < assignmentData.modules.length - 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang phải' : 'Move right'}
+                      onClick={(e) => handleMoveModule(idx, 'down', e)}
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  )}
+                  {assignmentData.modules.length > 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn delete"
+                      title={isVi ? 'Xóa phần thi này' : 'Remove module'}
+                      onClick={(e) => handleRemoveModule(idx, e)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Grid: Skill Workspace (Left) + Settings Sidebar (Right) */}
+      {/* Grid: Active Module Workspace (Left) + Settings Sidebar (Right) */}
       <div className="assignment-edit-grid">
-        {/* LEFT COLUMN: Skill Workspace */}
+        {/* LEFT COLUMN: Active Module Workspace */}
         <div>
-          {assignmentData.skill === 'writing' && (
+          {/* Active Module Meta Row */}
+          {activeModule && (
+            <div className="tae-active-mod-meta-card">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="tae-meta-tag">
+                  {isVi ? `Đang chỉnh sửa: Phần ${activeModuleIndex + 1}` : `Editing Part ${activeModuleIndex + 1}`}
+                </span>
+                <input
+                  type="text"
+                  className="tae-meta-title-input"
+                  value={activeModule.title || ''}
+                  onChange={(e) => handleActiveModuleMetaChange('title', e.target.value)}
+                  placeholder={isVi ? 'Tên gợi nhớ (VD: Passage 1, Task 1: Chart Description...)' : 'Module custom title (optional)...'}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted">
+                  {isVi ? 'Thang điểm:' : 'Max score:'}
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="tae-meta-score-input"
+                  value={activeModule.maxScore || 10}
+                  onChange={(e) => handleActiveModuleMetaChange('maxScore', Math.max(1, Number(e.target.value) || 10))}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeModule?.skill === 'writing' && (
             <SkillWritingEditor 
-              config={assignmentData.writing}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, writing: updated })}
+              config={activeModule.config as WritingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'speaking' && (
+          {activeModule?.skill === 'speaking' && (
             <SkillSpeakingEditor 
-              config={assignmentData.speaking}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, speaking: updated })}
+              config={activeModule.config as SpeakingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'reading' && (
+          {activeModule?.skill === 'reading' && (
             <SkillReadingEditor 
-              config={assignmentData.reading}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, reading: updated })}
+              config={activeModule.config as ReadingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'listening' && (
+          {activeModule?.skill === 'listening' && (
             <SkillListeningEditor 
-              config={assignmentData.listening}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, listening: updated })}
+              config={activeModule.config as ListeningConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
         </div>
@@ -944,97 +1053,104 @@ export const TeacherEditAssignment: React.FC = () => {
             </div>
           </section>
 
-          {/* Quick Stats Summary Card */}
-          <section className="edit-card" style={{ backgroundColor: 'var(--surface-dim, #f4efe6)' }}>
-            <div style={{ marginBottom: '12px' }}>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary, #262320)' }}>
-                {isVi ? 'Thống Kê Lớp Học' : 'Turnout Metrics'}
-              </h4>
+          {/* Turnout Stats Card */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <h3 className="edit-card-title">
+                {isVi ? 'Thống kê nộp bài lớp' : 'Class Turnout'}
+              </h3>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Sĩ số lớp:' : 'Class size:'}</span>
-              <strong style={{ color: '#0f172a' }}>{turnoutStats.total} {isVi ? 'học viên' : 'students'}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderBottom: '1px solid #e2e8f0' }}>
-              <span style={{ color: '#64748b' }}>{isVi ? 'Số bài đã nộp:' : 'Submitted:'}</span>
-              <strong style={{ color: '#16a34a' }}>
-                {turnoutStats.submitted} {isVi ? 'bài' : 'items'} ({turnoutStats.total > 0 ? Math.round((turnoutStats.submitted / turnoutStats.total) * 100) : 0}%)
-              </strong>
-            </div>
-            {lastSavedTime && (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: '#94a3b8', textAlign: 'right' }}>
-                {isVi ? `Đã lưu lần cuối: ${lastSavedTime}` : `Last saved at: ${lastSavedTime}`}
+            <div className="edit-card-body">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-muted">{isVi ? 'Đã nộp bài:' : 'Submitted:'}</span>
+                <span className="font-bold text-main">
+                  {turnoutStats.submitted} / {turnoutStats.total} {isVi ? 'học viên' : 'students'}
+                </span>
               </div>
-            )}
+              <div className="w-full bg-light h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-forest h-full transition-all duration-300"
+                  style={{ width: `${turnoutStats.total > 0 ? (turnoutStats.submitted / turnoutStats.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Modules Overview Summary Card */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <h3 className="edit-card-title">
+                {isVi ? 'Tổng quan đề thi' : 'Exam Structure'}
+              </h3>
+            </div>
+            <div className="edit-card-body">
+              <div className="flex flex-col gap-2">
+                {assignmentData.modules.map((m, i) => {
+                  const displayName = m.title?.trim() || getSkillName(m.skill);
+                  return (
+                    <div key={m.id || i} className="flex items-center justify-between py-2 border-b border-light text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-forest flex-shrink-0">#{i + 1}</span>
+                        <span className="font-semibold text-main truncate" title={displayName}>
+                          {displayName}
+                        </span>
+                      </div>
+                      <span className="font-semibold text-muted flex-shrink-0 ml-2">
+                        {m.maxScore || 10} {isVi ? 'điểm' : 'pts'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </section>
         </div>
       </div>
 
       {/* Sticky Action Bar */}
-      <StickyActionBar 
+      <StickyActionBar
         leftActions={
-          <button 
+          <button
             type="button"
-            onClick={() => navigate('/teacher/assignments')}
-            style={{ 
-              padding: '8px 16px', 
-              fontSize: '13px', 
-              fontWeight: 600, 
-              color: '#475569', 
-              background: 'none', 
-              border: 'none', 
-              cursor: 'pointer', 
-              borderRadius: '8px' 
-            }}
+            className="btn btn-secondary bg-white btn-sm"
+            onClick={() => setShowPreviewModal(true)}
           >
-            {isVi ? 'Hủy bỏ' : 'Cancel'}
+            <Eye size={16} />
+            <span>{isVi ? 'Xem trước đề thi' : 'Preview Exam'}</span>
           </button>
         }
         rightActions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button 
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              onClick={() => setShowPreviewModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Eye size={14} />
-              <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
-            </button>
-
-            {currentDbStatus !== 'PUBLISHED' && (
-              <button 
-                type="button"
-                className="btn btn-secondary bg-white btn-sm"
-                disabled={isSaving}
-                onClick={handleSaveDraft}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Save size={14} />
-                <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
-              </button>
-            )}
-
-            <button 
+          <div className="flex items-center gap-3">
+            <button
               type="button"
               className="btn btn-primary btn-sm"
+              onClick={() => saveAssignmentChanges()}
               disabled={isSaving}
-              onClick={handleSaveAndPublish}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
             >
-              {isSaving ? (
-                <RefreshCw size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              <span>
-                {isSaving 
-                  ? (isVi ? 'Đang lưu...' : 'Saving...') 
-                  : currentDbStatus === 'PUBLISHED' 
-                    ? (isVi ? 'Lưu thay đổi' : 'Save Changes') 
-                    : (isVi ? 'Cập nhật & Xuất bản' : 'Update & Publish')}
-              </span>
+              <Save size={16} />
+              <span>{isVi ? 'Lưu thay đổi bài tập' : 'Save Changes'}</span>
             </button>
+            {currentDbStatus === 'DRAFT' ? (
+              <button
+                type="button"
+                className="btn btn-secondary bg-white btn-sm text-forest"
+                onClick={() => saveAssignmentChanges('PUBLISHED')}
+                disabled={isSaving}
+              >
+                <Send size={16} />
+                <span>{isVi ? 'Xuất bản bài tập' : 'Publish'}</span>
+              </button>
+            ) : currentDbStatus === 'PUBLISHED' ? (
+              <button
+                type="button"
+                className="btn btn-secondary bg-white btn-sm text-danger"
+                onClick={() => saveAssignmentChanges('CLOSED')}
+                disabled={isSaving}
+              >
+                <AlertCircle size={16} />
+                <span>{isVi ? 'Đóng nộp bài' : 'Close Assignment'}</span>
+              </button>
+            ) : null}
           </div>
         }
       />
@@ -1042,16 +1158,17 @@ export const TeacherEditAssignment: React.FC = () => {
       {/* Preview Modal */}
       {showPreviewModal && (
         <AssignmentPreviewModal 
-          data={assignmentData} 
-          onClose={() => setShowPreviewModal(false)} 
+          onClose={() => setShowPreviewModal(false)}
+          data={assignmentData}
         />
       )}
 
-      {/* Toast Alert */}
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="edit-toast">
-          <CheckCircle2 size={18} color="#4ade80" />
+        <div className="fixed bottom-24 right-8 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-forest text-white shadow-xl animate-fade-in font-medium text-sm">
+          <CheckCircle2 size={16} />
           <span>{toastMessage}</span>
+          {lastSavedTime && <span className="text-xs opacity-80">• {lastSavedTime}</span>}
         </div>
       )}
     </div>

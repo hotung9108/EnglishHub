@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-044",
+  "title": "Đổi mật khẩu tài khoản QA riêng và đăng nhập lại",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:14.802Z",
+  "finishedAt": "2026-11-04T07:18:15.266Z"
+}

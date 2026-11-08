@@ -419,3 +419,34 @@ it('warns when subModuleId is missing in submission', async () => {
   await userEvent.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
   expect(screen.getByText('Không tìm thấy thông tin phần làm bài viết trong bài nộp.')).toBeVisible();
 });
+
+it('supports URL with moduleId query parameter and completes last module to overview', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({
+    id: 12,
+    title: 'Multi Exam',
+    status: 'PUBLISHED',
+    modules: [
+      { id: 30, skill: 'WRITING' },
+      { id: 31, skill: 'READING' },
+    ],
+  });
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    id: 40,
+    studentId: 5,
+    assignmentId: 12,
+    status: 'IN_PROGRESS',
+    submittedAt: null,
+    createdAt: '2026-10-22T00:00:00Z',
+    modules: [
+      { id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'IN_PROGRESS', grading: null },
+      { id: 51, moduleId: 31, skill: 'READING', taskType: 'QUIZ', status: 'SUBMITTED', grading: null },
+    ],
+    attemptNumber: 1,
+  });
+
+  const { editor, user } = await setup('/student/writing/12?moduleId=30&submissionId=40');
+  fireEvent.change(editor, { target: { value: 'This is the completed essay text for multi exam.' } });
+
+  await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
+  expect(await screen.findByText(/Nộp bài thành công! Đang chuyển đến màn hình kết quả/)).toBeVisible();
+});

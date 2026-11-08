@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-021",
+  "title": "Đánh giá định kỳ: lọc giáo viên và mở lớp",
+  "role": "student",
+  "phase": "login",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "unknown error: net::ERR_INTERNET_DISCONNECTED\n  (Session info: chrome=156.0.8078.80)",
+  "actualUrl": "https://staging.hotung9108.me/",
+  "startedAt": "2026-11-04T03:08:26.895Z",
+  "finishedAt": "2026-11-04T03:08:27.560Z"
+}

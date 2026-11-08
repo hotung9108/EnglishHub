@@ -1,0 +1,295 @@
+{
+  "id": "6160ea07e61044cd646e0af685e484fa",
+  "name": "EnglishHub Staging - grading",
+  "values": [
+    {
+      "key": "_above_max_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_baseline_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_before",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_changed_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_control_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_decimal_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_equal_score_repr",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_fixture",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_max_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_representative_score",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "adminEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "aiPollCount",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "annotation",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "answer",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "apiBaseUrl",
+      "value": "https://api-staging.hotung9108.me/api/v1",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "class1",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "classId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "disposablePendingGradingId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "expiredAccessToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredTeacherToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "fixture_",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "g",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "gradingFixtureWaitSeconds",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "legacyNullSnapshotRejectGradingId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "legacyNullSnapshotSuccessGradingId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "missing",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "missingGradingId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "noEvaluationStudentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "nonMemberId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "ownedGradingId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "runExtendedCases",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "seedClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "seedPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "sm",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "stagingOrigin",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentBId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "teacherPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

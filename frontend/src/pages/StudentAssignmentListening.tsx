@@ -139,8 +139,13 @@ const StudentAssignmentListening: React.FC = () => {
         if (!currentAssignment.modules.every(module => Number.isSafeInteger(module?.id) && module.id > 0 && typeof module.skill === 'string')) throw new Error(UNCONFIRMED_MESSAGE);
         setAssignment(currentAssignment);
         const skillModules = currentAssignment.modules.filter(module => module?.skill === 'LISTENING');
-        if (skillModules.length !== 1) throw new Error(UNCONFIRMED_MESSAGE);
-        const moduleId = skillModules[0].id;
+        if (skillModules.length === 0) throw new Error(UNCONFIRMED_MESSAGE);
+        const queryModParam = searchParams.get('moduleId');
+        const matchedQueryMod = queryModParam && Number.isSafeInteger(Number(queryModParam))
+          ? skillModules.find(m => m.id === Number(queryModParam))
+          : null;
+        const targetModule = matchedQueryMod || skillModules[0];
+        const moduleId = targetModule.id;
         if (!Number.isSafeInteger(moduleId) || moduleId <= 0) throw new Error(UNCONFIRMED_MESSAGE);
 
         if (!isMounted) return;
@@ -585,7 +590,7 @@ const StudentAssignmentListening: React.FC = () => {
                       className={`exam-bookmark-btn ${bookmarkedQuestions[activeQuestion] ? 'is-active' : ''}`}
                       aria-label="Đánh dấu câu hỏi"
                     >
-                      <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? '#EAB308' : 'none'} />
+                      <Bookmark size={18} fill={bookmarkedQuestions[activeQuestion] ? 'var(--eh-gold, #9a7e56)' : 'none'} />
                     </button>
                   </div>
 

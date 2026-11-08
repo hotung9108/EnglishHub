@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-032",
+  "title": "Kích hoạt AI Writing và chờ gợi ý",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:07.112Z",
+  "finishedAt": "2026-11-04T07:18:07.876Z"
+}

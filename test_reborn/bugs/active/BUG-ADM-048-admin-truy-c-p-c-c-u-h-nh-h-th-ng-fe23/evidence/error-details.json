@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-048",
+  "title": "Admin truy cập được cấu hình hệ thống FE23",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không tìm thấy form cấu hình hệ thống FE-23 tại Cài đặt: Missing or ambiguous labelled field /Mô hình chấm Writing|Writing Evaluation Model/i",
+  "actualUrl": "http://localhost:5173/admin/settings",
+  "startedAt": "2026-11-07T05:26:21.287Z",
+  "finishedAt": "2026-11-07T05:26:29.013Z"
+}

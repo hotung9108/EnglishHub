@@ -506,27 +506,27 @@
 }
 
 .grade-score-pill.high {
-  background-color: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
+  background-color: var(--eh-success-bg);
+  color: var(--eh-success);
+  border: 1px solid var(--eh-success-border);
 }
 
 .grade-score-pill.good {
-  background-color: #eff6ff;
-  color: var(--eh-primary, #1B4D3E);
-  border: 1px solid #bfdbfe;
+  background-color: var(--eh-primary-light);
+  color: var(--eh-primary);
+  border: 1px solid var(--eh-primary-border);
 }
 
 .grade-score-pill.medium {
-  background-color: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background-color: var(--eh-warning-bg);
+  color: var(--eh-warning);
+  border: 1px solid var(--eh-warning-border);
 }
 
 .grade-score-pill.pending {
-  background-color: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  background-color: var(--eh-surface-dim);
+  color: var(--eh-text-muted);
+  border: 1px solid var(--eh-border);
   font-weight: 500;
 }
 
@@ -697,21 +697,21 @@
 }
 
 .analytics-diagnostic-card.weakness {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background-color: var(--eh-danger-bg);
+  border: 1px solid var(--eh-danger-border);
+  color: var(--eh-danger);
 }
 
 .analytics-diagnostic-card.strength {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background-color: var(--eh-success-bg);
+  border: 1px solid var(--eh-success-border);
+  color: var(--eh-success);
 }
 
 .analytics-diagnostic-card.recommendation {
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: var(--eh-primary-hover, #133D30);
+  background-color: var(--eh-info-bg);
+  border: 1px solid var(--eh-info-border);
+  color: var(--eh-info);
 }
 
 /* Scoped Analytics Elements */
@@ -1010,7 +1010,7 @@
 .std-asg-select:focus {
   border-color: var(--primary, #1B4D3E);
   box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.12);
-  background-color: #FFFFFF;
+  background-color: var(--eh-surface, #FFFFFF);
 }
 
 .std-asg-select-wrap.has-value .std-asg-select {
@@ -1028,7 +1028,7 @@
 }
 
 .std-asg-select option {
-  background-color: #FFFFFF;
+  background-color: var(--eh-surface, #FFFFFF);
   color: var(--text-primary, #262320);
   font-weight: 500;
   padding: 8px 12px;

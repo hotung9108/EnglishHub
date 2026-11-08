@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-024",
+  "title": "Lịch sử lượt nộp bài đã chấm",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "Cannot read properties of undefined (reading 'className')",
+  "actualUrl": "https://staging.hotung9108.me/student/classes",
+  "startedAt": "2026-11-04T07:19:32.773Z",
+  "finishedAt": "2026-11-04T07:19:35.377Z"
+}

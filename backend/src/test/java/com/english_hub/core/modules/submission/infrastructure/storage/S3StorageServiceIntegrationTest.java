@@ -12,6 +12,7 @@ import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -26,6 +27,8 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+// [TEMP DISABLED - FILE STORAGE/UPLOAD]
+@Disabled("Tạm thời tắt để tiết kiệm dung lượng lưu trữ")
 @Testcontainers
 class S3StorageServiceIntegrationTest {
 

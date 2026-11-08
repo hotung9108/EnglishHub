@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-012",
+  "title": "Giao bài Reading và đọc lại nội dung/kỹ năng",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(xpath, //button[normalize-space(.)='Thêm đoạn văn mới' or normalize-space(.)='Add Paragraph'])\nWait timed out after 30165ms",
+  "actualUrl": "http://localhost:5173/teacher/assignments/create",
+  "startedAt": "2026-11-07T05:16:13.732Z",
+  "finishedAt": "2026-11-07T05:16:52.927Z"
+}

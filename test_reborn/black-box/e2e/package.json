@@ -1,0 +1,17 @@
+{
+  "name": "englishhub-e2e-suite",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "check": "node run-parallel.js --check-only",
+    "check:syntax": "node --check admin/run.js teacher/run.js student/run.js run-parallel.js",
+    "test:parallel": "node run-parallel.js",
+    "test:parallel:qase": "node run-parallel.js --sync-qase",
+    "test:admin": "node admin/run.js",
+    "test:teacher": "node teacher/run.js",
+    "test:student": "node student/run.js"
+  },
+  "dependencies": {
+    "selenium-webdriver": "4.35.0"
+  }
+}

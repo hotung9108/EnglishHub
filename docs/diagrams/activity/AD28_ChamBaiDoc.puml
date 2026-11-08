@@ -1,0 +1,43 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #2C3E50
+skinparam ActivityBackgroundColor #F8F9FA
+skinparam ActivityDiamondBorderColor #2C3E50
+skinparam ActivityDiamondBackgroundColor #EBF5FB
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam SwimlaneBorderColor #7F8C8D
+skinparam SwimlaneTitleFontSize 13
+skinparam SwimlaneTitleFontStyle bold
+skinparam SwimlaneTitleBackgroundColor #EAEDED
+skinparam roundCorner 14
+skinparam dpi 250
+skinparam shadowing false
+
+|Hệ thống|
+start
+:Kích hoạt khi học viên nộp bài Reading hoặc hết giờ làm bài;
+:Kích hoạt tiến trình tự động chấm (Auto-Grading Engine);
+:Truy xuất danh sách câu trả lời từ answers và đáp án đúng từ questions;
+:So khớp từng lựa chọn (selected_options vs correct_answer);
+:Tính tổng điểm bài làm dựa trên số câu trả lời chính xác;
+:Lưu điểm vào gradings, ghi nhận reviewed_by và chuyển Giáo viên xác nhận;
+:Hiển thị bảng tổng hợp kết quả lên danh sách chấm của lớp học;
+
+|Giáo viên|
+:Truy cập xem lại bảng điểm bài đọc của lớp học;
+if (Cần điều chỉnh điểm số?) then (Có)
+  :Cập nhật điểm số điều chỉnh và ghi nhận lý do sửa đổi;
+  |Hệ thống|
+  :Cập nhật final_score và gán reviewed_by = TeacherId vào CSDL;
+else (Không)
+  |Giáo viên|
+  :Xác nhận đồng ý với kết quả chấm tự động của hệ thống;
+endif
+
+|Hệ thống|
+:Công bố kết quả điểm thi chính thức cho học viên;
+:Cập nhật trạng thái bài làm thành GRADED;
+stop
+@enduml

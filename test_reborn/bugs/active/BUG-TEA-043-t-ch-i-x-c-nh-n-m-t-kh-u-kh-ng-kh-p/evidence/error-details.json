@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-043",
+  "title": "Từ chối xác nhận mật khẩu không khớp",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:14.265Z",
+  "finishedAt": "2026-11-04T07:18:14.768Z"
+}

@@ -9,8 +9,17 @@ import { useUsers } from '../hooks/useUsers';
 import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
-import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import { Button, MetricCard, EmptyState, Pagination, ConfirmModal } from '../components/common';
 import { useToast } from '../components/common/ToastContext';
+
+interface StudentRow {
+  id: number;
+  name: string;
+  code: string;
+  email: string;
+  status: 'ACTIVE' | 'LOCKED';
+  enrolledClasses: number;
+}
 
 export const Students: React.FC = () => {
   const { t, language } = useLanguage();
@@ -20,6 +29,8 @@ export const Students: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
+  const [statusModalStudent, setStatusModalStudent] = useState<StudentRow | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
 
   const {
     users,
@@ -215,20 +226,9 @@ export const Students: React.FC = () => {
                         <Button 
                           variant="secondary"
                           size="sm"
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            const nextStatus = st.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
-                            try {
-                              await userService.updateStatus(st.id, nextStatus);
-                              await refetch();
-                              toastSuccess(
-                                isVi
-                                  ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${st.name} thành công.`
-                                  : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} student ${st.name}.`
-                              );
-                            } catch {
-                              toastError(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
-                            }
+                            setStatusModalStudent(st);
                           }}
                         >
                           {st.status === 'ACTIVE' ? t('students.actionLock') : t('students.actionUnlock')}
@@ -272,6 +272,55 @@ export const Students: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Two-Step Confirmation Modal for Student Status Change */}
+      {statusModalStudent && (
+        <ConfirmModal
+          isOpen={Boolean(statusModalStudent)}
+          title={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi ? 'Xác nhận khóa tài khoản học viên' : 'Lock Student Account')
+              : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock Student Account')
+          }
+          message={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn khóa tài khoản học viên "${statusModalStudent.name}"? Học viên này sẽ không thể đăng nhập hoặc nộp bài tập.`
+                  : `Are you sure you want to lock student account "${statusModalStudent.name}"? The student will lose access to assignments and classes.`)
+              : (isVi
+                  ? `Khôi phục quyền truy cập cho học viên "${statusModalStudent.name}"?`
+                  : `Restore system access for student "${statusModalStudent.name}"?`)
+          }
+          confirmText={
+            statusModalStudent.status === 'ACTIVE'
+              ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+              : (isVi ? 'Mở khóa' : 'Unlock Account')
+          }
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant={statusModalStudent.status === 'ACTIVE' ? 'danger' : 'primary'}
+          isLoading={isUpdatingStatus}
+          onConfirm={async () => {
+            if (!statusModalStudent) return;
+            const nextStatus = statusModalStudent.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE';
+            setIsUpdatingStatus(true);
+            try {
+              await userService.updateStatus(statusModalStudent.id, nextStatus);
+              await refetch();
+              toastSuccess(
+                isVi
+                  ? `Đã ${nextStatus === 'ACTIVE' ? 'mở khóa' : 'khóa'} tài khoản ${statusModalStudent.name} thành công.`
+                  : `Successfully ${nextStatus === 'ACTIVE' ? 'activated' : 'locked'} student ${statusModalStudent.name}.`
+              );
+              setStatusModalStudent(null);
+            } catch {
+              toastError(isVi ? 'Không thể cập nhật trạng thái học viên.' : 'Failed to update student status.');
+            } finally {
+              setIsUpdatingStatus(false);
+            }
+          }}
+          onCancel={() => setStatusModalStudent(null)}
+        />
+      )}
     </div>
   );
 };

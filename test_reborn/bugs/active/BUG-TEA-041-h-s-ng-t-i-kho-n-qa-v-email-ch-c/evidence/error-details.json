@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-041",
+  "title": "Hồ sơ đúng tài khoản QA và email chỉ đọc",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:12.819Z",
+  "finishedAt": "2026-11-04T07:18:13.385Z"
+}

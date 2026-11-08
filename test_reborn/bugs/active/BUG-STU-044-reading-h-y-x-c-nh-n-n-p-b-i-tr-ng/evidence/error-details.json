@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-044",
+  "title": "Reading: hủy xác nhận nộp bài trắng",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "Waiting for alert to be present\nWait timed out after 5020ms",
+  "actualUrl": "https://staging.hotung9108.me/student/assignments/reading/2915?submissionId=2601",
+  "startedAt": "2026-11-06T13:33:11.051Z",
+  "finishedAt": "2026-11-06T13:33:38.480Z"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "englishhub-test-reborn",
+  "version": "2.0.0",
+  "description": "Comprehensive, clean, role-driven testing framework for EnglishHub",
+  "type": "module",
+  "scripts": {
+    "api:list": "node black-box/api/run.cjs --list",
+    "api:check": "node black-box/api/run.cjs --dry-run",
+    "api:run": "node black-box/api/run.cjs",
+    "api:local": "node black-box/api/run.cjs --env=local",
+    "api:staging": "node black-box/api/run.cjs --env=staging",
+    "api:parallel": "node black-box/api/run.cjs --parallel",
+    "e2e:check": "npm --prefix black-box/e2e run check",
+    "e2e:local": "node black-box/e2e/run-parallel.js --env=local",
+    "e2e:staging": "node black-box/e2e/run-parallel.js --env=staging",
+    "e2e:parallel": "cmd /c scripts\\Run-Parallel.cmd",
+    "e2e:parallel:qase": "cmd /c scripts\\Run-Parallel-Qase.cmd",
+    "e2e:admin": "cmd /c scripts\\Admin-Run.cmd",
+    "e2e:teacher": "cmd /c scripts\\Teacher-Run.cmd",
+    "e2e:student": "cmd /c scripts\\Student-Run.cmd",
+    "test:self": "node --test black-box/e2e/framework-tests/*.test.js",
+    "test:smoke": "node black-box/e2e/common/cases/auth-smoke.spec.js",
+    "docs:generate": "node tools/document-cases.mjs",
+    "test:all": "cmd /c scripts\\All-Run.cmd"
+  },
+  "dependencies": {
+    "axios": "^1.6.5",
+    "newman": "^6.1.2",
+    "selenium-webdriver": "4.35.0"
+  }
+}

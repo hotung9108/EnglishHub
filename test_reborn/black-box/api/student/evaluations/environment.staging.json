@@ -1,0 +1,295 @@
+{
+  "id": "da90f87c9cf7f20592550d28f960dda3",
+  "name": "EnglishHub Staging - evaluations",
+  "values": [
+    {
+      "key": "_cleanupId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_createdIds",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "_qa19Eval61Content",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "adminEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminTokenRefresh",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "aiPollCount",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "authorEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "authzDeleteEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "authzUpdateEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "classId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "classIdA",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "createdEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "deleteEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "evaluationCountOfStudent",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "evaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "expiredAccessToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "extraFieldEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "malformedToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "noEvaluationStudentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "nonMemberId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "originalClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "originalContent",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherTokenRefresh",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "overLimitContent",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "ownEvaluationId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "qa19Results",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "stagingOrigin",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentBId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentTokenRefresh",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "teacherPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherTokenRefresh",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

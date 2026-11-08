@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-032",
+  "title": "Settings hồ sơ Admin chỉ đọc",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(css selector, main input[type=email])\nWait timed out after 30200ms",
+  "actualUrl": "https://staging.hotung9108.me/admin/settings",
+  "startedAt": "2026-11-06T13:33:59.951Z",
+  "finishedAt": "2026-11-06T13:34:34.745Z"
+}

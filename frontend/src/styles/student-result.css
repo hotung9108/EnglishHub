@@ -609,27 +609,27 @@
 }
 
 .hl-grammar {
-  background-color: #fee2e2;
-  color: #991b1b;
-  border-bottom: 2px solid #ef4444;
+  background-color: var(--eh-danger-bg);
+  color: var(--eh-danger);
+  border-bottom: 2px solid var(--eh-danger-border);
 }
 
 .hl-vocabulary {
-  background-color: #fef3c7;
-  color: #92400e;
-  border-bottom: 2px solid #f59e0b;
+  background-color: var(--eh-warning-bg);
+  color: var(--eh-warning);
+  border-bottom: 2px solid var(--eh-warning-border);
 }
 
 .hl-positive {
-  background-color: #d1fae5;
-  color: #065f46;
-  border-bottom: 2px solid #10b981;
+  background-color: var(--eh-success-bg);
+  color: var(--eh-success);
+  border-bottom: 2px solid var(--eh-success-border);
 }
 
 .hl-cohesion {
-  background-color: #ede9fe;
-  color: #5b21b6;
-  border-bottom: 2px solid #8b5cf6;
+  background-color: var(--eh-skill-speaking-bg);
+  color: var(--eh-skill-speaking);
+  border-bottom: 2px solid var(--eh-skill-speaking-border);
 }
 
 .hl-span:hover {
@@ -658,15 +658,15 @@
 }
 
 .diff-box.original {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
+  background-color: var(--eh-danger-bg);
+  border: 1px solid var(--eh-danger-border);
+  color: var(--eh-danger);
 }
 
 .diff-box.suggestion {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background-color: var(--eh-success-bg);
+  border: 1px solid var(--eh-success-border);
+  color: var(--eh-success);
   font-weight: 600;
 }
 
@@ -683,9 +683,9 @@
 .teacher-annotation-note {
   padding: 12px 14px;
   border-radius: 8px;
-  background-color: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background-color: var(--eh-warning-bg);
+  border: 1px solid var(--eh-warning-border);
+  color: var(--eh-warning);
   font-size: 12.5px;
   display: flex;
   flex-direction: column;
@@ -770,7 +770,7 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: #93c5fd;
+  color: var(--eh-primary);
 }
 
 .waveform-container {
@@ -793,7 +793,7 @@
 }
 
 .waveform-bar.active {
-  background-color: #93c5fd;
+  background-color: var(--eh-gold, #9a7e56);
 }
 
 .audio-controls-row {
@@ -808,13 +808,13 @@
   height: 44px;
   border-radius: 50%;
   background-color: var(--eh-primary, #1B4D3E);
-  color: #ffffff;
+  color: var(--eh-on-primary, #ffffff);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  box-shadow: var(--eh-shadow-md);
   transition: all 0.2s;
 }
 
@@ -826,7 +826,7 @@
 .audio-time-label {
   font-size: 13px;
   font-family: monospace;
-  color: #cbd5e1;
+  color: var(--eh-text-muted);
 }
 
 .audio-speed-chips {
@@ -904,15 +904,15 @@
 }
 
 .stt-word.mispronounced {
-  background-color: #fee2e2;
-  color: #991b1b;
-  border-bottom: 2px solid #ef4444;
+  background-color: var(--eh-danger-bg);
+  color: var(--eh-danger);
+  border-bottom: 2px solid var(--eh-danger-border);
 }
 
 .stt-word.hesitation {
-  background-color: #fef3c7;
-  color: #92400e;
-  border-bottom: 2px dashed #f59e0b;
+  background-color: var(--eh-warning-bg);
+  color: var(--eh-warning);
+  border-bottom: 2px dashed var(--eh-warning-border);
 }
 
 .stt-word:hover {
@@ -1025,23 +1025,23 @@
 }
 
 .choice-item.student-correct {
-  background-color: #f0fdf4;
-  border-color: #86efac;
-  color: #166534;
+  background-color: var(--eh-success-bg);
+  border-color: var(--eh-success-border);
+  color: var(--eh-success);
   font-weight: 600;
 }
 
 .choice-item.student-wrong {
-  background-color: #fef2f2;
-  border-color: #fca5a5;
-  color: #991b1b;
+  background-color: var(--eh-danger-bg);
+  border-color: var(--eh-danger-border);
+  color: var(--eh-danger);
   font-weight: 600;
 }
 
 .choice-item.official-correct {
-  background-color: #f0fdf4;
-  border-color: #86efac;
-  color: #166534;
+  background-color: var(--eh-success-bg);
+  border-color: var(--eh-success-border);
+  color: var(--eh-success);
   font-weight: 600;
 }
 

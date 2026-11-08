@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-049",
+  "title": "Hủy tạo bài không sinh assignment",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:17.627Z",
+  "finishedAt": "2026-11-04T07:18:18.048Z"
+}

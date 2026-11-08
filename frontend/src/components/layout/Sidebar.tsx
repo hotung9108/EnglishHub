@@ -18,9 +18,12 @@ import {
   Globe,
   ShieldCheck,
   ChevronsUpDown,
+  Sun,
+  Moon,
   X
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useStudentAssignmentBadge } from '../../hooks';
 
@@ -50,6 +53,7 @@ interface SidebarProps {
 const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
   const navigate = useNavigate();
   const { t, language, toggleLanguage } = useLanguage();
+  const { theme, setTheme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -281,7 +285,7 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
           </NavLink>
         )}
 
-        {/* 2. Language Switcher Row */}
+        {/* 2. Language & Theme Switcher Rows */}
         <div className="sidebar-lang-row">
           <span className="sidebar-lang-label">
             <Globe size={14} />
@@ -303,6 +307,33 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
               title="English"
             >
               EN
+            </button>
+          </div>
+        </div>
+
+        <div className="sidebar-lang-row" style={{ marginTop: '8px' }}>
+          <span className="sidebar-lang-label">
+            {theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
+            <span>{language === 'vi' ? 'Giao diện' : 'Theme'}</span>
+          </span>
+          <div className="sidebar-lang-segmented">
+            <button
+              type="button"
+              className={`sidebar-lang-seg-btn ${theme === 'light' ? 'active' : ''}`}
+              onClick={() => setTheme('light')}
+              title={language === 'vi' ? 'Giao diện Sáng (Alabaster)' : 'Light Mode'}
+            >
+              <Sun size={12} style={{ display: 'inline', marginRight: 3, verticalAlign: -1 }} />
+              {language === 'vi' ? 'Sáng' : 'Light'}
+            </button>
+            <button
+              type="button"
+              className={`sidebar-lang-seg-btn ${theme === 'dark' ? 'active' : ''}`}
+              onClick={() => setTheme('dark')}
+              title={language === 'vi' ? 'Giao diện Tối (Obsidian)' : 'Dark Mode'}
+            >
+              <Moon size={12} style={{ display: 'inline', marginRight: 3, verticalAlign: -1 }} />
+              {language === 'vi' ? 'Tối' : 'Dark'}
             </button>
           </div>
         </div>
@@ -389,6 +420,21 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
                   <span>{language === 'vi' ? 'Cài đặt hệ thống' : 'System Settings'}</span>
                 </Link>
               )}
+
+              <button
+                type="button"
+                className="sidebar-popover-item"
+                onClick={() => {
+                  toggleTheme();
+                }}
+              >
+                {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                <span>
+                  {theme === 'dark'
+                    ? (language === 'vi' ? 'Giao diện Sáng' : 'Light Mode')
+                    : (language === 'vi' ? 'Giao diện Tối' : 'Dark Mode')}
+                </span>
+              </button>
             </div>
 
             <div className="sidebar-popover-divider" />

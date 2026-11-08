@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStudentDetails, type StudentIdentityHint } from '../hooks/useStudentDetails';
-import { Button, EmptyState } from '../components/common';
+import { Button, EmptyState, ConfirmModal } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +22,7 @@ export const StudentDetails: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'evaluations' | 'security'>('overview');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
@@ -87,9 +88,9 @@ export const StudentDetails: React.FC = () => {
         <div style={{
           padding: '12px 18px',
           borderRadius: 'var(--radius-md, 8px)',
-          backgroundColor: 'var(--secondary-container, #e7f3ec)',
-          border: '1px solid var(--border-color, #e6dfd5)',
-          color: 'var(--on-secondary-container, #17523f)',
+          backgroundColor: 'var(--eh-success-bg)',
+          border: '1px solid var(--eh-success-border)',
+          color: 'var(--eh-success)',
           fontWeight: 600,
           display: 'flex',
           alignItems: 'center',
@@ -115,7 +116,7 @@ export const StudentDetails: React.FC = () => {
       )}
 
       {isLoading ? (
-        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
+        <div style={{ padding: '64px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
           <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px' }} />
           <div>{isVi ? 'Đang tải thông tin học viên...' : 'Loading student details...'}</div>
         </div>
@@ -130,8 +131,8 @@ export const StudentDetails: React.FC = () => {
                   width: '84px',
                   height: '84px',
                   borderRadius: '50%',
-                  backgroundColor: 'var(--primary, #1b4d3e)',
-                  color: '#ffffff',
+                  backgroundColor: 'var(--eh-primary)',
+                  color: 'var(--eh-on-primary, #ffffff)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -145,7 +146,7 @@ export const StudentDetails: React.FC = () => {
 
               <div style={{ flex: 1, minWidth: '240px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary, #262320)', margin: 0 }}>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--eh-text-primary)', margin: 0 }}>
                     {studentName}
                   </h2>
                   <span className="badge badge-primary font-mono">{studentCode}</span>
@@ -156,13 +157,13 @@ export const StudentDetails: React.FC = () => {
                     type="button"
                     disabled={isTogglingStatus}
                     className={`btn ${!isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                    onClick={handleToggleSuspend}
+                    onClick={() => setShowStatusConfirmModal(true)}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
                     <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
                   </button>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--text-secondary, #736b63)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--eh-text-secondary)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <Mail size={15} /> {studentEmail}
                   </span>
@@ -174,20 +175,20 @@ export const StudentDetails: React.FC = () => {
                 <div style={{
                   padding: '16px 20px',
                   borderRadius: 'var(--radius-lg, 12px)',
-                  background: 'var(--surface-dim, #f4efe6)',
-                  border: '1px solid var(--border-color, #e6dfd5)',
+                  background: 'var(--eh-surface-dim)',
+                  border: '1px solid var(--eh-border)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
                   minWidth: '220px'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Bài đã hoàn thành:' : 'Completed Tests:'}</span>
-                    <span style={{ color: 'var(--primary, #1b4d3e)', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Bài đã hoàn thành:' : 'Completed Tests:'}</span>
+                    <span style={{ color: 'var(--eh-primary)', fontWeight: 700 }}>
                       {completedTimelineCount} {isVi ? 'bài' : 'items'}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #736b63)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--eh-text-secondary)' }}>
                     <span>{isVi ? 'Điểm TB: ' : 'Avg Score: '}<strong>{avgSkillScore}%</strong></span>
                     <span>{progressData.skillAverages?.length ?? 0} {isVi ? 'kỹ năng' : 'skills'}</span>
                   </div>
@@ -197,7 +198,7 @@ export const StudentDetails: React.FC = () => {
           </div>
 
           {/* Navigation Tabs */}
-          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color, #e6dfd5)', marginBottom: '24px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--eh-border)', marginBottom: '24px', overflowX: 'auto' }}>
             {(
               [
                 { key: 'overview', label: t('studentDetails.infoTitle'), icon: User },
@@ -221,8 +222,8 @@ export const StudentDetails: React.FC = () => {
                     background: 'none',
                     fontSize: '14px',
                     fontWeight: isTabActive ? 600 : 500,
-                    color: isTabActive ? 'var(--primary, #1b4d3e)' : 'var(--text-secondary, #736b63)',
-                    borderBottom: isTabActive ? '3px solid var(--primary, #1b4d3e)' : '3px solid transparent',
+                    color: isTabActive ? 'var(--eh-primary)' : 'var(--eh-text-secondary)',
+                    borderBottom: isTabActive ? '3px solid var(--eh-primary)' : '3px solid transparent',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s ease'
@@ -244,16 +245,16 @@ export const StudentDetails: React.FC = () => {
                   {isVi ? 'Hồ Sơ CSDL (Student Profile)' : 'Database Student Profile'}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color, #e6dfd5)' }}>
-                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--eh-border)' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Mã định danh hệ thống (ID)' : 'System User ID'}</span>
                     <span className="font-semibold">{studentCode}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--border-color, #e6dfd5)' }}>
-                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>Email</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '10px', borderBottom: '1px solid var(--eh-border)' }}>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>Email</span>
                     <span className="font-semibold">{studentEmail}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-secondary, #736b63)' }}>{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
+                    <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
                     <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
                       {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Locked')}
                     </span>
@@ -268,9 +269,9 @@ export const StudentDetails: React.FC = () => {
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '14px' }}>
                     {progressData.skillAverages.map(sk => (
-                      <div key={sk.skill} style={{ padding: '14px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--surface-dim, #f4efe6)', border: '1px solid var(--border-color, #e6dfd5)' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary, #736b63)' }}>{sk.skill}</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary, #1b4d3e)', marginTop: '4px' }}>
+                      <div key={sk.skill} style={{ padding: '14px', borderRadius: 'var(--radius-md, 8px)', background: 'var(--eh-surface-dim)', border: '1px solid var(--eh-border)' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--eh-text-secondary)' }}>{sk.skill}</div>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--eh-primary)', marginTop: '4px' }}>
                           {sk.averageScorePercent}%
                         </div>
                       </div>
@@ -288,7 +289,7 @@ export const StudentDetails: React.FC = () => {
                 <h3 className="headline-md card-section-header-title">{isVi ? 'Dòng Thời Gian Điểm Số Bài Tập' : 'Score Timeline'}</h3>
               </div>
               {!progressData || !progressData.scoreTimeline || progressData.scoreTimeline.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
                   <Award size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có kết quả bài nộp nào cho học viên này' : 'No submission timeline available'}
@@ -325,7 +326,7 @@ export const StudentDetails: React.FC = () => {
           {activeTab === 'evaluations' && (
             <div>
               {evaluations.length === 0 ? (
-                <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary, #736b63)' }}>
+                <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--eh-text-secondary)' }}>
                   <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có nhận xét hoặc đánh giá học tập nào' : 'No evaluations recorded'}
@@ -334,15 +335,15 @@ export const StudentDetails: React.FC = () => {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {evaluations.map((ev) => (
-                    <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--primary, #1b4d3e)' }}>
+                    <div key={ev.id} className="card" style={{ borderLeft: '4px solid var(--eh-primary)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                           <strong style={{ fontSize: '15px' }}>{ev.teacherName || (isVi ? 'Giảng viên phụ trách' : 'Instructor')}</strong>
-                          <span className="badge" style={{ backgroundColor: 'var(--surface-dim, #f4efe6)', fontSize: '12px' }}>#{ev.id}</span>
+                          <span className="badge" style={{ backgroundColor: 'var(--eh-surface-dim)', fontSize: '12px' }}>#{ev.id}</span>
                         </div>
                         <span className="label-md text-muted">{ev.createdAt || '—'}</span>
                       </div>
-                      <p className="body-md" style={{ color: 'var(--text-primary, #262320)', marginBottom: '8px', lineHeight: 1.6 }}>
+                      <p className="body-md" style={{ color: 'var(--eh-text-primary)', marginBottom: '8px', lineHeight: 1.6 }}>
                         "{ev.content}"
                       </p>
                     </div>
@@ -396,7 +397,7 @@ export const StudentDetails: React.FC = () => {
                   {isVi ? `Đặt lại mật khẩu cho học viên ${studentName} (${studentCode})` : `Set new password for ${studentName}`}
                 </p>
                 {passwordSuccess ? (
-                  <div style={{ padding: '16px', borderRadius: '8px', background: 'var(--secondary-container, #e7f3ec)', color: 'var(--on-secondary-container, #17523f)', fontWeight: 600, textAlign: 'center' }}>
+                  <div style={{ padding: '16px', borderRadius: '8px', background: 'var(--eh-success-bg)', color: 'var(--eh-success)', fontWeight: 600, textAlign: 'center' }}>
                     <CheckCircle2 size={24} style={{ margin: '0 auto 8px' }} />
                     {isVi ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!'}
                   </div>
@@ -432,6 +433,39 @@ export const StudentDetails: React.FC = () => {
                 )}
               </div>
             </div>
+          )}
+          {/* Two-Step Confirmation Modal for Student Status Change */}
+          {showStatusConfirmModal && studentUser && (
+            <ConfirmModal
+              isOpen={showStatusConfirmModal}
+              title={
+                isActive
+                  ? (isVi ? 'Xác nhận khóa tài khoản học viên' : 'Lock Student Account')
+                  : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock Student Account')
+              }
+              message={
+                isActive
+                  ? (isVi
+                      ? `Bạn có chắc chắn muốn khóa tài khoản học viên "${studentName}" (${studentCode})? Học viên này sẽ không thể đăng nhập hoặc làm bài tập.`
+                      : `Are you sure you want to lock student account "${studentName}" (${studentCode})? The student will lose access to assignments and classes.`)
+                  : (isVi
+                      ? `Khôi phục quyền truy cập cho học viên "${studentName}" (${studentCode})?`
+                      : `Restore system access for student "${studentName}" (${studentCode})?`)
+              }
+              confirmText={
+                isActive
+                  ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+                  : (isVi ? 'Mở khóa' : 'Unlock Account')
+              }
+              cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+              variant={isActive ? 'danger' : 'primary'}
+              isLoading={isTogglingStatus}
+              onConfirm={async () => {
+                await handleToggleSuspend();
+                setShowStatusConfirmModal(false);
+              }}
+              onCancel={() => setShowStatusConfirmModal(false)}
+            />
           )}
         </>
       ) : null}

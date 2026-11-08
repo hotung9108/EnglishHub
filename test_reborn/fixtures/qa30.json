@@ -1,0 +1,192 @@
+{
+  "runId": "2026-11-03T16-00-05-012Z",
+  "studentId": 1468,
+  "teacherId": 4,
+  "assignments": {
+    "writing": {
+      "id": 2901,
+      "title": "QA30-WRITING-writing-2026-11-03T16-00-06-485Z",
+      "skill": "WRITING",
+      "maxSubmissions": 10,
+      "taskType": "ESSAY",
+      "moduleId": 4076,
+      "ready": true
+    },
+    "reading": {
+      "id": 2902,
+      "title": "QA30-READING-reading-2026-11-03T16-00-08-662Z",
+      "skill": "READING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4077,
+      "questionType": "SHORT_ANSWER",
+      "questionText": "QA30: type the phrase daily practice.",
+      "questionId": 2974,
+      "ready": true
+    },
+    "listening": {
+      "id": 2904,
+      "title": "QA30-LISTENING-listening-2026-11-03T16-00-10-927Z",
+      "skill": "LISTENING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4079,
+      "questionType": "SHORT_ANSWER",
+      "questionText": "QA30: type the phrase daily practice.",
+      "questionId": 2976,
+      "ready": true
+    },
+    "speaking": {
+      "id": 2905,
+      "title": "QA30-SPEAKING-speaking-2026-11-03T16-00-12-774Z",
+      "skill": "SPEAKING",
+      "maxSubmissions": 10,
+      "taskType": "RECORDING",
+      "moduleId": 4080,
+      "ready": true
+    },
+    "draft": {
+      "id": 2906,
+      "title": "QA30-WRITING-draft-2026-11-03T16-00-14-038Z",
+      "skill": "WRITING",
+      "maxSubmissions": 10,
+      "taskType": "ESSAY",
+      "moduleId": 4081,
+      "ready": true
+    },
+    "document": {
+      "id": 2907,
+      "title": "QA30-WRITING-document-2026-11-03T16-00-15-506Z",
+      "skill": "WRITING",
+      "maxSubmissions": 10,
+      "taskType": "ESSAY",
+      "moduleId": 4082,
+      "ready": true
+    },
+    "wrong": {
+      "id": 2908,
+      "title": "QA30-READING-wrong-2026-11-03T16-00-16-868Z",
+      "skill": "READING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4083,
+      "questionType": "SHORT_ANSWER",
+      "questionText": "QA30: type the phrase daily practice.",
+      "questionId": 2977,
+      "ready": true
+    },
+    "graded": {
+      "id": 2909,
+      "title": "QA30-READING-graded-2026-11-03T16-00-19-025Z",
+      "skill": "READING",
+      "maxSubmissions": 1,
+      "taskType": "QUIZ",
+      "moduleId": 4084,
+      "questionType": "SHORT_ANSWER",
+      "questionText": "QA30: type the phrase daily practice.",
+      "questionId": 2978,
+      "ready": true,
+      "submissionId": 2580,
+      "submissionModuleId": 4393,
+      "gradingId": 3525
+    },
+    "mcqReading": {
+      "id": 2910,
+      "title": "QA30-READING-mcqReading-2026-11-03T16-00-21-014Z",
+      "skill": "READING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4085,
+      "questionType": "MULTIPLE_CHOICE",
+      "questionText": "QA30: choose the phrase daily practice.",
+      "options": [
+        "daily practice",
+        "once a year",
+        "never study",
+        "skip feedback"
+      ],
+      "questionId": 2979,
+      "ready": true
+    },
+    "mcqWrong": {
+      "id": 2911,
+      "title": "QA30-READING-mcqWrong-2026-11-03T16-00-23-050Z",
+      "skill": "READING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4086,
+      "questionType": "MULTIPLE_CHOICE",
+      "questionText": "QA30: choose the phrase daily practice.",
+      "options": [
+        "daily practice",
+        "once a year",
+        "never study",
+        "skip feedback"
+      ],
+      "questionId": 2980,
+      "ready": true
+    },
+    "mcqListening": {
+      "id": 2912,
+      "title": "QA30-LISTENING-mcqListening-2026-11-03T16-00-24-940Z",
+      "skill": "LISTENING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4087,
+      "questionType": "MULTIPLE_CHOICE",
+      "questionText": "QA30: choose the phrase daily practice.",
+      "options": [
+        "daily practice",
+        "once a year",
+        "never study",
+        "skip feedback"
+      ],
+      "questionId": 2981,
+      "ready": true
+    },
+    "speakingValidation": {
+      "id": 2913,
+      "title": "QA30-SPEAKING-speakingValidation-2026-11-03T16-00-26-885Z",
+      "skill": "SPEAKING",
+      "maxSubmissions": 10,
+      "taskType": "RECORDING",
+      "moduleId": 4088,
+      "ready": true
+    },
+    "navigation": {
+      "id": 2914,
+      "title": "QA30-WRITING-navigation-2026-11-03T16-00-28-403Z",
+      "skill": "WRITING",
+      "maxSubmissions": 10,
+      "taskType": "ESSAY",
+      "moduleId": 4089,
+      "ready": true
+    },
+    "mcqCancel": {
+      "id": 2915,
+      "title": "QA30-READING-mcqCancel-2026-11-03T16-00-29-828Z",
+      "skill": "READING",
+      "maxSubmissions": 10,
+      "taskType": "QUIZ",
+      "moduleId": 4090,
+      "questionType": "MULTIPLE_CHOICE",
+      "questionText": "QA30: choose the phrase daily practice.",
+      "options": [
+        "daily practice",
+        "once a year",
+        "never study",
+        "skip feedback"
+      ],
+      "questionId": 2982,
+      "ready": true
+    }
+  },
+  "schemaVersion": 3,
+  "className": "QA30-Student-2026-11-03T16-00-05-012Z",
+  "classId": 295,
+  "feedback": "QA30 official feedback 2026-11-03T16-00-05-012Z: clear response; practise examples.",
+  "evaluation": {
+    "id": 116,
+    "content": "QA30 periodic evaluation 2026-11-03T16-00-05-012Z: steady progress in all four skills."
+  }
+}

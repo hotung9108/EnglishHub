@@ -1,0 +1,418 @@
+[
+  {
+    "role": "admin",
+    "id": "ADM-008",
+    "title": "Accounts khóa rồi mở lại tài khoản QA",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Expected one row action /Mở khóa|Unlock/"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-011",
+    "title": "Teachers tìm và mở hồ sơ QA",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Missing button /^Xem chi tiết$|^View Details$/"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-015",
+    "title": "Classes tìm và mở đúng lớp QA",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-baseClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-018",
+    "title": "Tạo lớp qua đủ các bước",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Dropdown chưa có option 1493 sau khi chờ dữ liệu API"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-019",
+    "title": "Danh sách học viên trong lớp đối chiếu API",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-baseClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-020",
+    "title": "Mở hồ sơ từ học viên trong lớp",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-baseClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-021",
+    "title": "Admin xem nội dung bài tập trong lớp",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-baseClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-022",
+    "title": "Lưu cài đặt lớp và kiểm tra bền vững",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-editClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-024",
+    "title": "Mở lại lớp đã hoàn thành qua UI",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-archiveClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-026",
+    "title": "Reports lọc giáo viên QA",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Dropdown chưa có option 1493 sau khi chờ dữ liệu API"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-028",
+    "title": "Reports xóa bộ lọc",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "false == true"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-038",
+    "title": "Accounts tạo Student phải lưu đúng vai trò STUDENT",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Transport error 28: admin GET /admin/users?q=qa31-144edde75756-student-accounts-ui%40example.invalid&limit=100"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-041",
+    "title": "Students khóa rồi mở khóa QA từ danh sách",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Expected one row action /^Mở khóa$|^Unlock$/"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-042",
+    "title": "Student profile khóa rồi mở khóa đúng danh tính QA",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không thấy thẻ lớp QA31-baseClass-144edde75756"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-043",
+    "title": "Reports lọc ngày có chứa bài QA đã chấm",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Dropdown chưa có option 1493 sau khi chờ dữ liệu API"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-044",
+    "title": "Reports lọc ngày tương lai loại bài QA hiện tại",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Dropdown chưa có option 1493 sau khi chờ dữ liệu API"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-045",
+    "title": "Reports reset cả ngày Teacher và lớp",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Dropdown chưa có option 1493 sau khi chờ dữ liệu API"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-048",
+    "title": "Admin truy cập được cấu hình hệ thống FE23",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không tìm thấy form cấu hình hệ thống FE-23 tại Cài đặt: Missing or ambiguous labelled field /Mô hình chấm Writing|Writing Evaluation Model/i"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-049",
+    "title": "Cấu hình hệ thống lưu sau reload và reset",
+    "status": "BLOCKED",
+    "classification": "PRODUCT_DEPENDENCY",
+    "reason": "Chưa có form cấu hình hệ thống theo FE-23; chưa kiểm tra lưu/reset"
+  },
+  {
+    "role": "admin",
+    "id": "ADM-050",
+    "title": "Xác định điểm vào quản lý nội dung Admin",
+    "status": "BLOCKED",
+    "classification": "SCOPE_REVIEW",
+    "reason": "Chưa xác định được luồng/entry quản lý nội dung theo nghiệp vụ; không suy ra thiếu chức năng chỉ từ sidebar. Cần xác định nội dung và đường đi trước k"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-004",
+    "title": "Mở báo cáo phân tích bốn kỹ năng của lớp",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(xpath, //main//button[normalize-space(.)='Phân tích 4KN & AI Insights' or normalize-space(.)='4-Skill Analytics &"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-012",
+    "title": "Giao bài Reading và đọc lại nội dung/kỹ năng",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(xpath, //button[normalize-space(.)='Thêm đoạn văn mới' or normalize-space(.)='Add Paragraph'])"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-013",
+    "title": "Giao bài Listening và đọc lại nội dung/kỹ năng",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(css selector, [placeholder=\"listening_track_01.mp3\"])"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-017",
+    "title": "Xem thử Listening, đóng và giữ nội dung editor",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(css selector, [placeholder=\"listening_track_01.mp3\"])"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-032",
+    "title": "Kích hoạt AI Writing và chờ gợi ý",
+    "status": "BLOCKED",
+    "classification": "BLOCKED",
+    "reason": "AI Writing không sẵn sàng theo API canTriggerAi=false; editor chấm thủ công vẫn truy cập được"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-033",
+    "title": "AI không hợp lệ cho Reading vẫn chấm thủ công được",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "GET /submission-modules/4425/grading/ai-suggestion: HTTP 400"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-037",
+    "title": "Xuất báo cáo lớp thành file",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Không có file export hoàn tất sau 60 giây. Cần đối chiếu handler/network; toast không chứng minh tải file."
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-038",
+    "title": "Xuất danh sách bài nộp thành file",
+    "status": "BLOCKED",
+    "classification": "BLOCKED",
+    "reason": "Xuất báo cáo assignment: chưa có control trên giao diện staging hiện tại"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-039",
+    "title": "Teacher không phụ trách không đọc được lớp QA ngoài quyền",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "GET /classes/undefined: HTTP 400"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-040",
+    "title": "Teacher không phụ trách không đọc được assignment QA ngoài quyền",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Cannot read properties of undefined (reading 'id')"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-045",
+    "title": "Tùy chọn thông báo lưu qua reload",
+    "status": "BLOCKED",
+    "classification": "BLOCKED",
+    "reason": "Cài đặt notifications: chưa có control trên giao diện staging hiện tại"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-046",
+    "title": "Tùy chọn giao diện lưu qua reload",
+    "status": "BLOCKED",
+    "classification": "BLOCKED",
+    "reason": "Cài đặt preferences: chưa có control trên giao diện staging hiện tại"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-047",
+    "title": "Đăng xuất về login và xóa token frontend",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(css selector, a.sidebar-link-logout[href=\"/login\"])"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-048",
+    "title": "Ngân hàng đề / modal giao nhanh",
+    "status": "BLOCKED",
+    "classification": "BLOCKED",
+    "reason": "Ngân hàng đề / giao nhanh: chưa có control trên giao diện staging hiện tại"
+  },
+  {
+    "role": "teacher",
+    "id": "TEA-050",
+    "title": "Mở lộ trình/buổi học của lớp",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(xpath, //main//button[starts-with(normalize-space(.),'Lộ trình')])"
+  },
+  {
+    "role": "student",
+    "id": "STU-007",
+    "title": "Tổng quan bài và số lượt",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This overview case requires a fresh assignment; use --fresh-fixtures"
+  },
+  {
+    "role": "student",
+    "id": "STU-011",
+    "title": "Writing văn bản: đối chiếu khả năng lưu nội dung",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-012",
+    "title": "Nộp Writing đính kèm PDF",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-013",
+    "title": "Nộp Reading đáp án đúng",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-014",
+    "title": "Nộp Reading đáp án sai",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-015",
+    "title": "Nộp Listening câu trả lời ngắn",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-016",
+    "title": "Speaking: ghi âm và nộp bản ghi thật",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-017",
+    "title": "Mở kết quả bài đã chấm",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "QA30 data wait: result score loaded"
+  },
+  {
+    "role": "student",
+    "id": "STU-018",
+    "title": "Điểm thô khớp thang điểm API",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Raw score cell must match API score and maximum"
+  },
+  {
+    "role": "student",
+    "id": "STU-025",
+    "title": "Reading MCQ: đáp án đúng, điểm 10",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-026",
+    "title": "Reading MCQ: đáp án sai, điểm 0",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-027",
+    "title": "Listening MCQ: đáp án đúng, điểm 10",
+    "status": "FAILED",
+    "classification": "FIXTURE_REVIEW",
+    "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures."
+  },
+  {
+    "role": "student",
+    "id": "STU-030",
+    "title": "Lọc bài theo lớp và trạng thái đã chấm",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(xpath, //main//button[contains(normalize-space(.),'Đã có kết quả')])"
+  },
+  {
+    "role": "student",
+    "id": "STU-035",
+    "title": "Lịch sử: mở kết quả đúng lượt",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "QA30 data wait: result score loaded"
+  },
+  {
+    "role": "student",
+    "id": "STU-036",
+    "title": "Kết quả: tab nhận xét của giáo viên",
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "reason": "Result must expose teacher feedback tab"
+  },
+  {
+    "role": "student",
+    "id": "STU-037",
+    "title": "Kết quả: chuyển về Bảng điểm",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for element to be located By(xpath, //main//button[contains(normalize-space(.),'Xem bảng điểm')])"
+  },
+  {
+    "role": "student",
+    "id": "STU-044",
+    "title": "Reading: hủy xác nhận nộp bài trắng",
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "reason": "Waiting for alert to be present"
+  }
+]

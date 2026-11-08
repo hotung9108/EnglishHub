@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-028",
+  "title": "Sửa điểm đã chấm thành 4.5",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:04.350Z",
+  "finishedAt": "2026-11-04T07:18:05.325Z"
+}

@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-044",
+  "title": "Reports lọc ngày tương lai loại bài QA hiện tại",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Dropdown chưa có option 1503 sau khi chờ dữ liệu API\nWait timed out after 30231ms",
+  "actualUrl": "https://staging.hotung9108.me/admin/reports",
+  "startedAt": "2026-11-06T13:37:35.409Z",
+  "finishedAt": "2026-11-06T13:38:12.399Z"
+}

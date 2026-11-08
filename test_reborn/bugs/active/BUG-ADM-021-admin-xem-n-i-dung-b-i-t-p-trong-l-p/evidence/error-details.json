@@ -1,0 +1,16 @@
+{
+  "caseId": "ADM-021",
+  "title": "Admin xem nội dung bài tập trong lớp",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "API_ACCESS_REVIEW",
+  "reason": "GET /classes/107/assignments: HTTP 403",
+  "actualUrl": "http://localhost:5173/admin/classes/107",
+  "httpError": {
+    "status": 403,
+    "endpoint": "/classes/107/assignments",
+    "method": "GET"
+  },
+  "startedAt": "2026-11-07T05:18:29.528Z",
+  "finishedAt": "2026-11-07T05:18:44.726Z"
+}

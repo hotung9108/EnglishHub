@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
+import { ConfirmModal } from '../components/common';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
 import type { UserListItem } from '../api/services/user.service';
@@ -39,6 +40,8 @@ export const TeacherDetails: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [isSuspended, setIsSuspended] = useState(false);
+  const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 1 : 1;
@@ -248,8 +251,10 @@ export const TeacherDetails: React.FC = () => {
               {/* Quick Actions */}
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <button 
+                  type="button"
+                  disabled={isUpdatingStatus}
                   className={`btn ${isSuspended ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={handleToggleSuspend}
+                  onClick={() => setShowStatusConfirmModal(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Ban size={15} />
@@ -407,6 +412,44 @@ export const TeacherDetails: React.FC = () => {
                 </button>
               </form>
             </div>
+          )}
+          {/* Two-Step Confirmation Modal for Teacher Status Change */}
+          {showStatusConfirmModal && teacherUser && (
+            <ConfirmModal
+              isOpen={showStatusConfirmModal}
+              title={
+                !isSuspended
+                  ? (isVi ? 'Xác nhận khóa tài khoản giảng viên' : 'Suspend Teacher Account')
+                  : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Reactivate Teacher Account')
+              }
+              message={
+                !isSuspended
+                  ? (isVi
+                      ? `Bạn có chắc chắn muốn tạm khóa tài khoản giảng viên "${teacherName}" (${teacherCode})? Giảng viên này sẽ không thể đăng nhập hoặc chấm điểm các lớp học phụ trách.`
+                      : `Are you sure you want to suspend teacher "${teacherName}" (${teacherCode})? The teacher will not be able to log in or grade assignments.`)
+                  : (isVi
+                      ? `Khôi phục quyền truy cập cho giảng viên "${teacherName}" (${teacherCode})?`
+                      : `Restore system access for teacher "${teacherName}" (${teacherCode})?`)
+              }
+              confirmText={
+                !isSuspended
+                  ? (isVi ? 'Khóa tài khoản' : 'Suspend Account')
+                  : (isVi ? 'Mở khóa' : 'Reactivate')
+              }
+              cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+              variant={!isSuspended ? 'danger' : 'primary'}
+              isLoading={isUpdatingStatus}
+              onConfirm={async () => {
+                setIsUpdatingStatus(true);
+                try {
+                  await handleToggleSuspend();
+                  setShowStatusConfirmModal(false);
+                } finally {
+                  setIsUpdatingStatus(false);
+                }
+              }}
+              onCancel={() => setShowStatusConfirmModal(false)}
+            />
           )}
         </>
       )}

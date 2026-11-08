@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-017",
+  "title": "Tạo lớp chặn thiếu tên",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Ambiguous button /Tạo lớp học mới|Create New Class/: 2",
+  "actualUrl": "https://staging.hotung9108.me/admin/classes",
+  "startedAt": "2026-11-04T03:10:58.714Z",
+  "finishedAt": "2026-11-04T03:11:23.107Z"
+}

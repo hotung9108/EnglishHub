@@ -1,0 +1,54 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #2C3E50
+skinparam ActivityBackgroundColor #F8F9FA
+skinparam ActivityDiamondBorderColor #2C3E50
+skinparam ActivityDiamondBackgroundColor #EBF5FB
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam SwimlaneBorderColor #7F8C8D
+skinparam SwimlaneTitleFontSize 13
+skinparam SwimlaneTitleFontStyle bold
+skinparam SwimlaneTitleBackgroundColor #EAEDED
+skinparam roundCorner 14
+skinparam dpi 250
+skinparam shadowing false
+
+|Giáo viên|
+start
+:Mở bài nộp kỹ năng Nói trong Teacher Grading Studio;
+:Nhấn nút "Gợi ý chấm bài Nói bằng AI";
+
+|Hệ thống|
+:Truy xuất audio_storage_key từ bảng answers;
+:Tạo Presigned GET URL hoặc đọc bytes âm thanh từ MinIO S3;
+:Đóng gói tệp âm thanh cùng Speaking Rubric Prompt;
+:Gửi yêu cầu sang Google Gemini 2.5 Flash SDK;
+
+|AI Service (Gemini)|
+:Lắng nghe âm thanh và phiên âm bài nói (Speech-to-Text);
+:Phân tích từ phát âm sai theo bảng ký hiệu quốc tế IPA;
+:Đánh giá nhịp điệu, tốc độ nói (WPM) và độ trôi chảy (Fluency);
+:Đề xuất điểm số theo 4 tiêu chí (Fluency, Pronunciation, Grammar, Vocab);
+:Tổng hợp nhận xét chi tiết và trả kết quả có cấu trúc;
+
+|Hệ thống|
+:Tiếp nhận kết quả phân tích âm thanh từ AI;
+:Hiển thị waveform phát lại, bản phiên âm kèm highlight lỗi IPA và điểm tiêu chí;
+
+|Giáo viên|
+:Nghe lại âm thanh, đối chiếu transcript và các lỗi phát âm;
+if (Cần điều chỉnh điểm tiêu chí?) then (Có)
+  :Chỉnh sửa điểm tiêu chí thành phần hoặc sửa nhận xét;
+else (Không)
+  :Xác nhận đồng ý với điểm đề xuất của AI;
+endif
+:Nhấn nút "Xác nhận điểm bài Nói";
+
+|Hệ thống|
+:Lưu final_score, final_feedback, ai_suggested_score,\nmethod = AI và reviewed_by = TeacherId vào bảng gradings;
+:Cập nhật trạng thái bài nộp thành GRADED;
+:Thông báo hoàn tất chấm bài Nói;
+stop
+@enduml

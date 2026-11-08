@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-003",
+  "title": "Accounts tìm tài khoản QA vừa tạo",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Tài khoản QA tồn tại trên API nhưng Accounts không tìm thấy\n\n0 !== 1\n",
+  "actualUrl": "http://localhost:5173/admin/accounts",
+  "startedAt": "2026-11-07T05:14:18.863Z",
+  "finishedAt": "2026-11-07T05:14:30.618Z"
+}
