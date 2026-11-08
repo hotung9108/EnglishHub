@@ -739,6 +739,32 @@
   text-align: center;
 }
 
+.result-speaking-transcript-wrap {
+  margin-top: 14px;
+  background-color: var(--surface-container-low, #f4efe6);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-sm, 8px);
+  padding: 12px 16px;
+}
+
+.result-speaking-transcript-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.result-speaking-transcript-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--on-surface);
+  white-space: pre-line;
+  user-select: text;
+}
+
 .result-teacher-feedback-content {
   font-size: 14px;
   line-height: 1.7;

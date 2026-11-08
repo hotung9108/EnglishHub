@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Login from '../../pages/Login';
 import { renderPage } from './renderPage';
@@ -52,7 +52,7 @@ it.each(['admin', 'teacher', 'student'])('submits credentials and redirects auth
   await user.type(email, identity.email); await user.type(password, 'secret');
   await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
   expect(login).toHaveBeenCalledExactlyOnceWith('/auth/login', { email: identity.email, password: 'secret' }, { skipAuth: true });
-  expect(screen.getByTestId('location')).toHaveTextContent(`/${role}`);
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/${role}`));
 });
 it.each([
   ['admin', '/admin/classes', '/admin/classes'], ['teacher', '/teacher/classes', '/teacher/classes'],
@@ -62,7 +62,7 @@ it.each([
   const { user, email, password } = setup({ from: { pathname: from } });
   await user.type(email, identity.email); await user.type(password, 'secret');
   await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
-  expect(screen.getByTestId('location')).toHaveTextContent(target);
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(target));
 });
 it.each([
   { language: 'vi', status: 401 }, { language: 'en', status: 401 },
