@@ -29,6 +29,7 @@ vi.mock('../../api/services/submission.service', async (original) => ({
     listSubmissions: vi.fn(),
     getSubmission: vi.fn(),
     getSubmissionModuleDetail: vi.fn(),
+    getAudioDownloadUrl: vi.fn(),
   },
 }));
 
@@ -152,6 +153,25 @@ const publishedResult: StudentGradingResult = {
   gradedAt: null,
 };
 
+const FALLBACK_AUDIO_URL = 'https://storage.example.test/submissions/40/audio-fallback.webm?signature=fallback';
+
+function configureAudio(audio: HTMLAudioElement, duration: number, initialTime = 0) {
+  let currentTime = initialTime;
+  let currentDuration = duration;
+  Object.defineProperty(audio, 'duration', {
+    configurable: true,
+    get: () => currentDuration,
+  });
+  Object.defineProperty(audio, 'currentTime', {
+    configurable: true,
+    get: () => currentTime,
+    set: (value: number) => { currentTime = Number(value); },
+  });
+  return {
+    getCurrentTime: () => currentTime,
+  };
+}
+
 function controllableRequest<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -183,7 +203,7 @@ function arrangeSkill(skill: SubmissionSkill) {
   const detail: SubmissionModuleDetailResponse = {
     ...mockModuleDetail, skill, taskType: skill === 'SPEAKING' ? 'RECORDING' : 'ESSAY',
     answers: skill === 'SPEAKING'
-      ? [{ id: 60, questionId: null, content: null, audioStorageKey: 'speaking.webm' }]
+      ? [{ id: 60, questionId: null, content: null, audioStorageKey: 'speaking.webm', audioDownloadUrl: 'https://storage.example.test/speaking.webm?signature=answer' }]
       : mockModuleDetail.answers,
   };
   vi.mocked(submissionService.getSubmission).mockResolvedValue({
@@ -211,9 +231,20 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue(mockModuleDetail);
     vi.mocked(gradingService.getStudentGradingResult).mockResolvedValue(publishedResult);
     vi.mocked(gradingService.getById).mockResolvedValue({ id: 80, aiTranscript: null } as unknown as GradingDetailResponse);
+    vi.mocked(submissionService.getAudioDownloadUrl).mockResolvedValue({
+      submissionModuleId: 50,
+      downloadUrl: FALLBACK_AUDIO_URL,
+      storageKey: 'submissions/40/audio.webm',
+      fileName: 'audio.webm',
+      mimeType: 'audio/webm',
+      expiresAt: '2026-11-09T12:00:00Z',
+    });
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({
       data: mockAnnotations,
     });
+    vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+    vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   });
 
   it('correctly slices real text snippets for 3 annotations at different positions and avoids raw technical strings', async () => {
@@ -288,14 +319,14 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
   });
 
   it('shows accepted Speaking annotations without transcript and keeps audio from module detail', async () => {
-    const audioKey = 'submissions/40/module-50/audio.webm';
+    const audioUrl = 'https://storage.example.test/submissions/40/module-50/audio.webm?signature=answer';
     vi.mocked(submissionService.getSubmission).mockResolvedValue({
       ...mockSubmission,
       modules: [{ ...mockSubmission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' }],
     });
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
       ...mockModuleDetail, skill: 'SPEAKING', taskType: 'RECORDING',
-      answers: [{ id: 60, questionId: null, content: null, audioStorageKey: audioKey }],
+      answers: [{ id: 60, questionId: null, content: null, audioStorageKey: 'submissions/40/module-50/audio.webm', audioDownloadUrl: audioUrl }],
     });
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [{
       ...mockAnnotations[0], errorType: 'PRONUNCIATION',
@@ -307,8 +338,124 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     expect(screen.getByText('Đoạn văn bản không khả dụng', { exact: false })).toBeVisible();
     expect(screen.getByText('Improved pronunciation')).toBeVisible();
     expect(screen.getByText('PRONUNCIATION')).toBeVisible();
-    expect(container.querySelector('audio')?.getAttribute('src')).toContain(audioKey);
+    expect(container.querySelector('audio')).toHaveAttribute('src', audioUrl);
+    expect(submissionService.getAudioDownloadUrl).not.toHaveBeenCalled();
     expect(answerAnnotationService.listAnnotations).toHaveBeenCalledWith(60);
+  });
+
+  it('selects a Speaking answer that has a presigned URL without a storage key', async () => {
+    const detail = arrangeSkill('SPEAKING');
+    const audioUrl = 'https://storage.example.test/speaking-only-url.webm?signature=answer';
+    detail.answers = [{ id: 62, questionId: null, content: null, audioDownloadUrl: audioUrl }];
+
+    const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', audioUrl));
+    expect(submissionService.getAudioDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([null, ''] as const)('requests a presigned URL when the answer URL is %s', async audioDownloadUrl => {
+    const detail = arrangeSkill('SPEAKING');
+    detail.answers = [{
+      id: 60,
+      questionId: null,
+      content: null,
+      audioStorageKey: 'submissions/40/audio.webm',
+      audioDownloadUrl,
+    }];
+
+    const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+
+    await waitFor(() => expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50));
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50);
+  });
+
+  it('refreshes an expired URL once and restores playback position after metadata loads', async () => {
+    arrangeSkill('SPEAKING');
+    const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/speaking.webm?signature=answer'));
+    const initialAudio = container.querySelector('audio')!;
+    configureAudio(initialAudio!, 90, 37);
+
+    fireEvent.error(initialAudio!);
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    const refreshedAudio = container.querySelector('audio')!;
+    const media = configureAudio(refreshedAudio, 90);
+    fireEvent.loadedMetadata(refreshedAudio);
+    expect(media.getCurrentTime()).toBe(37);
+
+    fireEvent.error(refreshedAudio);
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error when fallback fails and lets the student start a new retry cycle', async () => {
+    const detail = arrangeSkill('SPEAKING');
+    detail.answers = [{ ...detail.answers[0], audioDownloadUrl: null }];
+    vi.mocked(submissionService.getAudioDownloadUrl).mockRejectedValueOnce(new Error('Unavailable'));
+    const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Thử lại' }));
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    fireEvent.error(container.querySelector('audio')!);
+
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets the one-refresh limit when the attempt changes its module and answer', async () => {
+    const firstAttempt: SubmissionDetail = {
+      ...mockSubmission,
+      modules: [{ ...mockSubmission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' }],
+    };
+    const secondAttempt: SubmissionDetail = {
+      ...firstAttempt,
+      id: 41,
+      attemptNumber: 2,
+      modules: [{ ...firstAttempt.modules[0], id: 51 }],
+    };
+    arrangeAttempts([firstAttempt, secondAttempt]);
+    vi.mocked(submissionService.getSubmission).mockImplementation(async submissionId =>
+      submissionId === 41 ? secondAttempt : firstAttempt
+    );
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async moduleId => ({
+      ...mockModuleDetail,
+      id: moduleId,
+      skill: 'SPEAKING',
+      taskType: 'RECORDING',
+      answers: [{
+        id: moduleId === 50 ? 60 : 61,
+        questionId: null,
+        content: null,
+        audioStorageKey: `submissions/${moduleId}/audio.webm`,
+        audioDownloadUrl: `https://storage.example.test/${moduleId}/audio.webm?signature=answer`,
+      }],
+    }));
+    const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/50/audio.webm?signature=answer'));
+    let audio = container.querySelector('audio')!;
+    configureAudio(audio!, 90);
+    fireEvent.error(audio!);
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    fireEvent.error(container.querySelector('audio')!);
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50);
+
+    await selectAttemptAndFlush(41);
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm?signature=answer'));
+    audio = container.querySelector('audio')!;
+    expect(audio).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm?signature=answer');
+    configureAudio(audio!, 90);
+    fireEvent.error(audio!);
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenNthCalledWith(2, 51);
   });
 
   it.each(['PENDING', 'AI_GRADED', 'FAILED'] as const)(
@@ -472,7 +619,15 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async id => ({
       ...mockModuleDetail, id, moduleId: id + 100, skill: id === 51 ? 'SPEAKING' : id === 52 ? 'READING' : 'WRITING',
       questions: [{ id: 1, content: 'Question', questionType: 'SHORT_ANSWER', score: 1, orderIndex: 1 }],
-      answers: [{ id: id + 10, questionId: 1, content: { text: essayText }, ...(id === 51 ? { audioStorageKey: 'current-speaking.webm' } : {}) }],
+      answers: [{
+        id: id + 10,
+        questionId: 1,
+        content: { text: essayText },
+        ...(id === 51 ? {
+          audioStorageKey: 'current-speaking.webm',
+          audioDownloadUrl: 'https://storage.example.test/current-speaking.webm?signature=answer',
+        } : {}),
+      }],
     }));
     return renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
   }
@@ -507,7 +662,7 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
       }
       expect(screen.getByText('Private transcript')).toBeVisible();
       expect(screen.queryByText('Không thể tải kết quả chấm bài. Vui lòng thử lại.')).not.toBeInTheDocument();
-      expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('current-speaking.webm'));
+      expect(view.container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/current-speaking.webm?signature=answer');
     },
   );
 

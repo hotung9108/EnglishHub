@@ -34,10 +34,21 @@ const MCQ_OPTION_LABELS = ['A', 'B', 'C', 'D'];
 const NAVIGATION_DELAY_MS = 1200;
 const PENDING_MESSAGE = 'Đáp án của bạn đã được lưu, nhưng hệ thống chưa xác nhận hoàn tất bài thi. Vui lòng thử nộp lại.';
 const UNCONFIRMED_MESSAGE = 'Chưa thể xác nhận trạng thái nộp bài. Vui lòng tải lại trang để kiểm tra trước khi thử lại.';
+const AUDIO_NOT_FOUND_MESSAGE = 'Bài nghe chưa có tệp audio.';
+const AUDIO_LOAD_ERROR_MESSAGE = 'Không tải được audio đề bài. Vui lòng thử lại.';
+const AUDIO_PLAY_ERROR_MESSAGE = 'Phát audio thất bại. Vui lòng bấm phát lại.';
+const AUDIO_MEDIA_ERROR_MESSAGE = 'Không thể phát audio đề bài. Vui lòng thử lại.';
 // An unavailable scope disables submission; these values are never sent to the API.
 const UNAVAILABLE_SCOPE: StudentQuizSubmitScope = {
   assignmentId: 0, submissionId: 0, moduleId: 0, submissionModuleId: 0, expectedModuleIds: [],
 };
+
+function formatAudioTime(seconds: number): string {
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+}
 
 function createSubmitScope(assignment: AssignmentDetail, submission: SubmissionDetail, moduleId: number, submissionId: number): StudentQuizSubmitScope {
   if (!Array.isArray(assignment.modules) || !Array.isArray(submission?.modules)) return UNAVAILABLE_SCOPE;
@@ -74,11 +85,25 @@ const StudentAssignmentListening: React.FC = () => {
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
+  const [audioModuleId, setAudioModuleId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<unknown>([]);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioProgress, setAudioProgress] = useState(30);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  useLayoutEffect(() => () => {
+    audioRef.current?.pause();
+  }, []);
+  const audioRequestId = useRef(0);
+  const audioRefetchUsed = useRef(false);
+  const pendingAudioTime = useRef<number | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioErrorCanRetry, setAudioErrorCanRetry] = useState(false);
+  const [playError, setPlayError] = useState<string | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [selectedAnswers, setSelectedAnswers] = useState<StudentQuizAnswers>({});
   const answerScope = useRef<{ assignmentId: number | null; submissionId: number | null; moduleId: number | null }>({
@@ -92,6 +117,150 @@ const StudentAssignmentListening: React.FC = () => {
   }, [id]);
 
   const handleRetry = () => setReloadKey((k) => k + 1);
+
+  const loadAudioUrl = useCallback(async (currentModuleId: number, requestId: number) => {
+    setIsAudioLoading(true);
+    setAudioError(null);
+    setAudioErrorCanRetry(false);
+    try {
+      const response = await moduleService.getAudioDownloadUrl(currentModuleId);
+      if (requestId !== audioRequestId.current) return;
+      if (!response.downloadUrl) {
+        setAudioUrl(null);
+        setAudioError(AUDIO_LOAD_ERROR_MESSAGE);
+        setAudioErrorCanRetry(true);
+        setIsAudioLoading(false);
+        return;
+      }
+      setAudioUrl(response.downloadUrl);
+    } catch (err: unknown) {
+      if (requestId !== audioRequestId.current) return;
+      const apiError = parseApiError(err);
+      setAudioUrl(null);
+      setAudioError(apiError.statusCode === 404 ? AUDIO_NOT_FOUND_MESSAGE : AUDIO_LOAD_ERROR_MESSAGE);
+      setAudioErrorCanRetry(apiError.statusCode !== 404);
+      setIsAudioLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const requestId = ++audioRequestId.current;
+    audioRefetchUsed.current = false;
+    pendingAudioTime.current = null;
+    audioRef.current?.pause();
+    setAudioUrl(null);
+    setAudioError(null);
+    setAudioErrorCanRetry(false);
+    setPlayError(null);
+    setIsPlaying(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+
+    if (audioModuleId) {
+      void loadAudioUrl(audioModuleId, requestId);
+    } else {
+      setIsAudioLoading(false);
+    }
+
+    return () => {
+      if (audioRequestId.current === requestId) audioRequestId.current += 1;
+      audioRef.current?.pause();
+    };
+  }, [audioModuleId, loadAudioUrl]);
+
+  useEffect(() => {
+    if (audioUrl) audioRef.current?.load();
+  }, [audioUrl]);
+
+  const handleAudioRetry = () => {
+    if (!audioModuleId) return;
+    audioRefetchUsed.current = false;
+    pendingAudioTime.current = null;
+    audioRef.current?.pause();
+    setAudioUrl(null);
+    setAudioError(null);
+    setAudioErrorCanRetry(false);
+    setPlayError(null);
+    setIsPlaying(false);
+    setAudioCurrentTime(0);
+    setAudioDuration(0);
+    void loadAudioUrl(audioModuleId, ++audioRequestId.current);
+  };
+
+  const handleAudioPlay = async () => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl || isAudioLoading) return;
+    setPlayError(null);
+    try {
+      await audio.play();
+      setIsPlaying(true);
+    } catch {
+      setIsPlaying(false);
+      setPlayError(AUDIO_PLAY_ERROR_MESSAGE);
+    }
+  };
+
+  const handleAudioError = () => {
+    if (!audioModuleId || (isAudioLoading && !audioUrl)) return;
+    const audio = audioRef.current;
+    if (audio && Number.isFinite(audio.currentTime)) {
+      pendingAudioTime.current = audio.currentTime;
+    }
+    audio?.pause();
+    setIsPlaying(false);
+    setAudioUrl(null);
+
+    if (audioRefetchUsed.current) {
+      pendingAudioTime.current = null;
+      setAudioError(AUDIO_MEDIA_ERROR_MESSAGE);
+      setAudioErrorCanRetry(true);
+      setIsAudioLoading(false);
+      return;
+    }
+
+    audioRefetchUsed.current = true;
+    void loadAudioUrl(audioModuleId, ++audioRequestId.current);
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const duration = audio.duration;
+    if (!Number.isFinite(duration) || duration <= 0) {
+      setAudioDuration(0);
+      setAudioCurrentTime(0);
+      pendingAudioTime.current = null;
+      setIsAudioLoading(false);
+      return;
+    }
+
+    setAudioDuration(duration);
+    if (pendingAudioTime.current !== null) {
+      const restoredTime = Math.min(Math.max(pendingAudioTime.current, 0), duration);
+      audio.currentTime = restoredTime;
+      setAudioCurrentTime(restoredTime);
+      pendingAudioTime.current = null;
+    } else {
+      setAudioCurrentTime(Number.isFinite(audio.currentTime) ? audio.currentTime : 0);
+    }
+    setIsAudioLoading(false);
+  };
+
+  const handleAudioTimeUpdate = () => {
+    const currentTime = audioRef.current?.currentTime ?? 0;
+    setAudioCurrentTime(Number.isFinite(currentTime) ? currentTime : 0);
+  };
+
+  const handleAudioSeek = (value: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audioDuration) || audioDuration <= 0) return;
+    const nextTime = Math.min(Math.max(value, 0), audioDuration);
+    audio.currentTime = nextTime;
+    setAudioCurrentTime(nextTime);
+  };
+
+  const canSeekAudio = Boolean(audioUrl) && !isAudioLoading && Number.isFinite(audioDuration) && audioDuration > 0;
+  const audioProgress = canSeekAudio ? Math.min((audioCurrentTime / audioDuration) * 100, 100) : 0;
 
   useEffect(() => {
     let isMounted = true;
@@ -120,6 +289,7 @@ const StudentAssignmentListening: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
+      setAudioModuleId(null);
       setLoadedScope({ key: viewKey, scope: UNAVAILABLE_SCOPE });
       setSubmission(null);
       const requestedId = searchParams.get('submissionId');
@@ -149,6 +319,7 @@ const StudentAssignmentListening: React.FC = () => {
         if (!Number.isSafeInteger(moduleId) || moduleId <= 0) throw new Error(UNCONFIRMED_MESSAGE);
 
         if (!isMounted) return;
+        setAudioModuleId(moduleId);
         if (answerScope.current.moduleId !== (moduleId ?? null)) {
           answerScope.current.moduleId = moduleId ?? null;
           setSelectedAnswers({});
@@ -433,11 +604,30 @@ const StudentAssignmentListening: React.FC = () => {
 
             {/* Audio Controls */}
             <div className="exam-audio-player-box">
+              <audio
+                ref={audioRef}
+                src={audioUrl ?? undefined}
+                preload="metadata"
+                aria-label="Audio đề bài Listening"
+                onPlay={() => {
+                  setIsPlaying(true);
+                  setPlayError(null);
+                }}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={handleAudioTimeUpdate}
+                onLoadedMetadata={handleAudioMetadata}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  setAudioCurrentTime(audioDuration);
+                }}
+                onError={handleAudioError}
+              />
               <div className="exam-audio-controls-row">
                 <div className="exam-audio-btn-group">
                   <button 
                     type="button"
-                    onClick={() => setAudioProgress(Math.max(0, audioProgress - 10))}
+                    onClick={() => handleAudioSeek(audioCurrentTime - 10)}
+                    disabled={!canSeekAudio}
                     className="exam-audio-skip-btn"
                     aria-label="Tua lùi 10s"
                   >
@@ -445,7 +635,15 @@ const StudentAssignmentListening: React.FC = () => {
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setIsPlaying(!isPlaying)}
+                    onClick={() => {
+                      if (isPlaying) {
+                        audioRef.current?.pause();
+                        setIsPlaying(false);
+                      } else {
+                        void handleAudioPlay();
+                      }
+                    }}
+                    disabled={!audioUrl || isAudioLoading}
                     className="exam-audio-play-btn"
                     aria-label={isPlaying ? 'Tạm dừng' : 'Phát âm thanh'}
                   >
@@ -453,7 +651,8 @@ const StudentAssignmentListening: React.FC = () => {
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setAudioProgress(Math.min(100, audioProgress + 10))}
+                    onClick={() => handleAudioSeek(audioCurrentTime + 10)}
+                    disabled={!canSeekAudio}
                     className="exam-audio-skip-btn"
                     aria-label="Tua tới 10s"
                   >
@@ -463,24 +662,55 @@ const StudentAssignmentListening: React.FC = () => {
 
                 <div className="exam-audio-time-info">
                   <Volume2 size={18} />
-                  <span>01:24 / 04:30</span>
+                  <span role="status" aria-live="polite">
+                    {isAudioLoading
+                      ? 'Đang tải audio...'
+                      : `${formatAudioTime(audioDuration > 0 ? audioCurrentTime : 0)} / ${formatAudioTime(audioDuration)}`}
+                  </span>
                 </div>
               </div>
 
-              {/* Progress Bar (width is dynamic runtime progress) */}
-              <div 
-                className="exam-audio-progress-bar"
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const pos = ((e.clientX - rect.left) / rect.width) * 100;
-                  setAudioProgress(pos);
-                }}
-              >
+              <div className="exam-audio-progress-bar">
                 <div 
                   className="exam-audio-progress-fill" 
-                  style={{ width: `${audioProgress}%` }} 
+                  style={{ width: `${audioProgress}%` }}
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={audioDuration > 0 ? audioDuration : 1}
+                  step={0.1}
+                  value={audioDuration > 0 ? Math.min(audioCurrentTime, audioDuration) : 0}
+                  disabled={!canSeekAudio}
+                  aria-label="Tiến trình audio"
+                  aria-valuetext={`${formatAudioTime(audioDuration > 0 ? audioCurrentTime : 0)} / ${formatAudioTime(audioDuration)}`}
+                  onChange={(event) => handleAudioSeek(Number(event.currentTarget.value))}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    margin: 0,
+                    opacity: 0.01,
+                    cursor: canSeekAudio ? 'pointer' : 'not-allowed',
+                  }}
                 />
               </div>
+              {(audioError || playError) && (
+                <div className="exam-alert-error" role="alert">
+                  <span>{audioError || playError}</span>
+                  {audioError && audioErrorCanRetry && (
+                    <button
+                      type="button"
+                      className="exam-audio-skip-btn"
+                      onClick={handleAudioRetry}
+                      disabled={isAudioLoading}
+                    >
+                      Thử lại
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

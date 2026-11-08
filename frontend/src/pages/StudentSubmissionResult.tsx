@@ -32,7 +32,6 @@ import { questionService, extractMcqOptions, extractShortAnswerText } from '../a
 import { gradingService, type StudentGradingResult } from '../api/services/grading.service';
 import { useStudentAnswerAnnotations } from '../hooks/useStudentAnswerAnnotations';
 import { Button, MarkdownView } from '../components/common';
-import { resolveAudioUrl } from '../utils/audioUrl.utils';
 import {
   formatAnnotationBadgeLabel,
   normalizeAnnotationCategory,
@@ -128,7 +127,14 @@ export const StudentSubmissionResult: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | StudentAnnotationCategory>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
-  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
+  const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
+  const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRequestRef = useRef(0);
+  const audioFallbackUsedRef = useRef(false);
+  const pendingAudioTimeRef = useRef<number | null>(null);
+  const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -650,13 +656,120 @@ export const StudentSubmissionResult: React.FC = () => {
     return moduleDetail?.answers?.find(a => a.docStorageKey)?.docStorageKey || null;
   }, [moduleDetail?.answers]);
 
-  const audioStorageKey = useMemo(() => {
-    return moduleDetail?.answers?.find(a => a.audioStorageKey)?.audioStorageKey || null;
-  }, [moduleDetail?.answers]);
+  const currentModuleDetail = moduleDetail?.id === selectedModuleId ? moduleDetail : null;
+  const audioAnswer = useMemo(() => currentModuleDetail?.answers?.find(answer =>
+    Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
+  ), [currentModuleDetail?.answers]);
+  const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
+  const currentAudioContext = selectedModuleId !== null && audioAnswer
+    ? { moduleId: selectedModuleId, answerId: audioAnswer.id }
+    : null;
+  audioContextRef.current = currentAudioContext;
 
-  const audioUrl = useMemo(() => resolveAudioUrl(audioStorageKey), [audioStorageKey]);
+  const audioUrl = currentAudioContext && audioUrlOverride?.moduleId === currentAudioContext.moduleId &&
+    audioUrlOverride.answerId === currentAudioContext.answerId
+    ? audioUrlOverride.url
+    : directAudioUrl;
+  const audioError = Boolean(currentAudioContext && audioErrorContext?.moduleId === currentAudioContext.moduleId &&
+    audioErrorContext.answerId === currentAudioContext.answerId);
+  const showAudioLoading = isAudioLoading || Boolean(currentAudioContext && !audioUrl && !audioError);
 
-  const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
+  const loadAudioFallback = useCallback(async (
+    moduleId: number,
+    answerId: number,
+    requestId: number,
+    preserveTime: boolean,
+  ) => {
+    if (preserveTime && audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    setIsAudioLoading(true);
+    setAudioErrorContext(null);
+    try {
+      const response = await submissionService.getAudioDownloadUrl(moduleId);
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      const downloadUrl = response.downloadUrl?.trim();
+      if (!downloadUrl) throw new Error('Audio URL is empty.');
+      setAudioUrlOverride({ moduleId, answerId, url: downloadUrl });
+    } catch {
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      setAudioErrorContext({ moduleId, answerId });
+    } finally {
+      if (requestId === audioRequestRef.current &&
+        audioContextRef.current?.moduleId === moduleId && audioContextRef.current.answerId === answerId) {
+        setIsAudioLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const requestId = ++audioRequestRef.current;
+    audioFallbackUsedRef.current = false;
+    pendingAudioTimeRef.current = null;
+    audioRef.current?.pause();
+    setAudioUrlOverride(null);
+    setAudioErrorContext(null);
+    setIsAudioLoading(false);
+
+    if (currentAudioContext && !directAudioUrl) {
+      audioFallbackUsedRef.current = true;
+      void loadAudioFallback(currentAudioContext.moduleId, currentAudioContext.answerId, requestId, false);
+    }
+
+    return () => {
+      audioRequestRef.current += 1;
+      audioRef.current?.pause();
+    };
+  }, [
+    currentAudioContext?.moduleId,
+    currentAudioContext?.answerId,
+    directAudioUrl,
+    loadAudioFallback,
+  ]);
+
+  const handleAudioError = () => {
+    if (!currentAudioContext || isAudioLoading) return;
+    if (audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    audioRef.current?.pause();
+
+    if (audioFallbackUsedRef.current) {
+      setAudioErrorContext(currentAudioContext);
+      return;
+    }
+
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    const pendingTime = pendingAudioTimeRef.current;
+    if (!audio || pendingTime === null) return;
+    pendingAudioTimeRef.current = null;
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = Math.min(Math.max(pendingTime, 0), audio.duration);
+    }
+  };
+
+  const handleAudioRetry = () => {
+    if (!currentAudioContext) return;
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
 
   const teacherFeedbackText = gradingResult?.finalFeedback || '';
 
@@ -1123,37 +1236,41 @@ export const StudentSubmissionResult: React.FC = () => {
             </div>
 
             <div className="result-card-body">
-              {audioUrl ? (
-                audioError ? (
-                  <div className="result-audio-error">
-                    <div className="result-audio-error-msg">
-                      <AlertCircle size={16} />
-                      <span>
-                        {isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại.' : 'Failed to load audio recording.'}
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={RefreshCw}
-                      onClick={() => setAudioErrorUrl(null)}
-                    >
-                      {isVi ? 'Thử lại' : 'Retry'}
-                    </Button>
+              {showAudioLoading ? (
+                <div className="result-audio-empty" role="status">
+                  {isVi ? 'Đang tải audio bài nộp...' : 'Loading submission audio...'}
+                </div>
+              ) : audioError ? (
+                <div className="result-audio-error">
+                  <div className="result-audio-error-msg">
+                    <AlertCircle size={16} />
+                    <span>
+                      {isVi ? 'Không thể tải audio bài nộp. Vui lòng thử lại.' : 'Unable to load submission audio. Please try again.'}
+                    </span>
                   </div>
-                ) : (
-                  <div className="result-audio-player-wrap">
-                    <audio
-                      controls
-                      src={audioUrl}
-                      className="result-audio-player"
-                      onError={() => setAudioErrorUrl(audioUrl)}
-                    >
-                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
-                    </audio>
-                  </div>
-                )
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={RefreshCw}
+                    onClick={handleAudioRetry}
+                  >
+                    {isVi ? 'Thử lại' : 'Retry'}
+                  </Button>
+                </div>
+              ) : audioUrl ? (
+                <div className="result-audio-player-wrap">
+                  <audio
+                    ref={audioRef}
+                    controls
+                    src={audioUrl}
+                    className="result-audio-player"
+                    onError={handleAudioError}
+                    onLoadedMetadata={handleAudioMetadata}
+                  >
+                    {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                  </audio>
+                </div>
               ) : (
                 <div className="result-audio-empty">
                   {isVi ? 'Chưa tìm thấy bản ghi âm của bài nộp này.' : 'No audio recording found for this submission.'}

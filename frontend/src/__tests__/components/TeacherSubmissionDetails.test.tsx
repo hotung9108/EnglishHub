@@ -1,8 +1,8 @@
 import type { MouseEvent } from 'react';
 import type { ButtonProps } from '../../components/common/Button';
 import { ApiClientError } from '../../api/core/errors';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TeacherSubmissionDetails from '../../pages/TeacherSubmissionDetails';
 import { assignmentService } from '../../api/services/assignment.service';
@@ -25,7 +25,7 @@ vi.mock('../../components/common/Button', async original => {
 });
 
 vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { getAssignment: vi.fn(), listAssignments: vi.fn() } }));
-vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn() } }));
+vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getAudioDownloadUrl: vi.fn() } }));
 vi.mock('../../api/services/grading.service', () => ({ gradingService: { getBySubmissionModuleId: vi.fn(), getAiSuggestion: vi.fn(), submitGrade: vi.fn(), requestAiAnalysis: vi.fn(), getById: vi.fn() } }));
 vi.mock('../../api/services/class.service', () => ({ classService: { list: vi.fn(), listMembers: vi.fn() } }));
 vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn().mockResolvedValue({ id: 30, instructions: 'Sample module instructions' }) } }));
@@ -39,6 +39,7 @@ const moduleDetail: SubmissionModuleDetailResponse = {
   id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'SUBMITTED', grading: null, questions: [],
   answers: [{ id: 60, questionId: 1, content: { text: 'My essay about the city.' } }],
 };
+const SIGNED_AUDIO_URL = 'https://storage.example.test/submissions/40/audio.webm?signature=initial';
 const ai: AiGradingSuggestionResponse = {
   submissionModuleId: 50, gradingId: 80, skill: 'WRITING', status: 'AI_GRADED', suggestedScore: 7.5, maxScore: 10,
   aiFeedback: 'Add supporting examples.', criteriaScores: null, metrics: null, annotations: [{ id: 91, answerId: 60, source: 'AI', startOffset: 0, endOffset: 5, errorType: 'SPELLING', comment: 'Fix spelling', suggestedFix: 'The', reviewStatus: 'PENDING' }], transcript: [{ word: 'Hello' }, { word: 'city' }, 'essay'], modelUsed: 'AI Model', providerUsed: null,
@@ -52,12 +53,28 @@ beforeEach(() => {
   vi.mocked(submissionService.listSubmissions).mockResolvedValue({ data: [5, 6, 7].map((studentId, index) => ({ id: 40 + index, assignmentId: 12, studentId, attemptNumber: 1, status: 'SUBMITTED', submittedAt: null, modules: [] })), pagination: { page: 1, limit: 100, total: 3 } });
   vi.mocked(submissionService.getSubmission).mockResolvedValue(submission);
   vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue(moduleDetail);
+  vi.mocked(submissionService.getAudioDownloadUrl).mockReset().mockResolvedValue({
+    submissionModuleId: 50,
+    downloadUrl: SIGNED_AUDIO_URL,
+    storageKey: 'submissions/40/audio.webm',
+    fileName: 'audio.webm',
+    mimeType: 'audio/webm',
+    expiresAt: '2026-11-07T12:00:00Z',
+  });
   vi.mocked(gradingService.getBySubmissionModuleId).mockResolvedValue({ id: 80, method: 'TEACHER_MANUAL', status: 'PENDING', finalScore: 7 });
   vi.mocked(gradingService.getAiSuggestion).mockResolvedValue(ai);
   vi.mocked(gradingService.getById).mockRejectedValue(new Error('Optional grading detail unavailable'));
   vi.mocked(gradingService.submitGrade).mockResolvedValue({ message: 'Saved' });
   vi.mocked(gradingService.requestAiAnalysis).mockResolvedValue({ message: 'Queued' });
   vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [] });
+  vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
 });
 
 async function setup(studentId = 5) {
@@ -65,6 +82,43 @@ async function setup(studentId = 5) {
   expect(screen.getByText('Đang tải bài làm học viên và phân tích AI...')).toBeVisible();
   await screen.findByRole('spinbutton');
   return { ...result, user: userEvent.setup(), score: screen.getByRole('spinbutton') };
+}
+
+function configureAudio(audio: HTMLAudioElement, duration: number, initialTime = 0) {
+  let currentTime = initialTime;
+  Object.defineProperty(audio, 'duration', { configurable: true, get: () => duration });
+  Object.defineProperty(audio, 'currentTime', {
+    configurable: true,
+    get: () => currentTime,
+    set: (value: number) => { currentTime = Number(value); },
+  });
+  return { getCurrentTime: () => currentTime };
+}
+
+function mockSpeakingModule(
+  answersByModule: Record<number, SubmissionModuleDetailResponse['answers']>,
+  modules: SubmissionDetail['modules'] = [{ ...submission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' }],
+) {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async (id) => ({
+    ...moduleDetail,
+    id,
+    moduleId: id === 51 ? 31 : 30,
+    skill: 'SPEAKING',
+    taskType: 'RECORDING',
+    answers: answersByModule[id] ?? [],
+  }));
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({ ...ai, skill: 'SPEAKING' });
+}
+
+async function renderSpeaking() {
+  const view = renderPage(
+    <TeacherSubmissionDetails />,
+    '/teacher/assignments/:id/submissions/:studentId',
+    '/teacher/assignments/12/submissions/5',
+  );
+  await screen.findByRole('spinbutton');
+  return view;
 }
 
 describe('TeacherSubmissionDetails', () => {
@@ -86,7 +140,7 @@ describe('TeacherSubmissionDetails', () => {
     const viewButtons = screen.getAllByRole('button', { name: 'Xem' });
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     await user.click(viewButtons[0]);
-    expect(openSpy).toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith('/s3-upload/englishhub-dev/essay.pdf', '_blank', 'noopener,noreferrer');
     openSpy.mockRestore();
 
     await user.click(screen.getByRole('button', { name: 'Save feedback draft' }));
@@ -421,10 +475,13 @@ it.each([
   const { container } = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, language);
   const score = await screen.findByRole('spinbutton');
   if (storageKey) {
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', SIGNED_AUDIO_URL));
     const audioEl = container.querySelector('audio')!;
-    expect(audioEl).toHaveAttribute('src', storageKey.startsWith('http') ? storageKey : '/s3-upload/englishhub-dev/recordings/audio.mp3');
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50);
     fireEvent.error(audioEl);
-    expect(screen.getByText(language === 'vi' ? 'Không thể tải bản ghi âm.' : 'Failed to load audio.')).toBeVisible();
+    expect(screen.getByText(language === 'vi'
+      ? 'Không thể tải audio bài nộp. Vui lòng thử lại.'
+      : 'Unable to load submission audio. Please try again.')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: language === 'vi' ? 'Thử lại' : 'Retry' }));
   }
   else expect(screen.getByText(language === 'vi' ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.')).toBeVisible();
@@ -437,6 +494,109 @@ it.each([
   expect(screen.getByRole('button', { name: language === 'vi' ? 'Đang chấm điểm...' : 'Grading...' })).toBeDisabled();
   expect(await screen.findByText(language === 'vi' ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...')).toBeVisible();
 });
+
+describe('TeacherSubmissionDetails speaking audio URLs', () => {
+  it('prefers the answer presigned URL and does not call the fallback service', async () => {
+    const answerUrl = 'https://storage.example.test/direct/audio.webm?signature=answer';
+    mockSpeakingModule({ 50: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'old/audio.webm', audioDownloadUrl: answerUrl }] });
+    const { container } = await renderSpeaking();
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', answerUrl));
+    expect(submissionService.getAudioDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it('selects an answer with a presigned URL even when its storage key is missing', async () => {
+    const answerUrl = 'https://storage.example.test/direct/no-key.webm?signature=answer';
+    mockSpeakingModule({ 50: [{ id: 60, questionId: 1, content: null, audioDownloadUrl: answerUrl }] });
+    const { container } = await renderSpeaking();
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', answerUrl));
+    expect(submissionService.getAudioDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([null, ''])('requests a presigned URL when the answer URL is %s', async (answerUrl) => {
+    mockSpeakingModule({ 50: [{
+      id: 60,
+      questionId: 1,
+      content: null,
+      audioStorageKey: 'submissions/40/audio.webm',
+      audioDownloadUrl: answerUrl,
+    }] });
+    const { container } = await renderSpeaking();
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', SIGNED_AUDIO_URL));
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledExactlyOnceWith(50);
+  });
+
+  it('refreshes once on media error, preserves playback position, then stops on another error', async () => {
+    const initialUrl = 'https://storage.example.test/direct/expired.webm?signature=old';
+    const refreshedUrl = 'https://storage.example.test/direct/refreshed.webm?signature=new';
+    mockSpeakingModule({ 50: [{ id: 60, questionId: 1, content: null, audioDownloadUrl: initialUrl }] });
+    vi.mocked(submissionService.getAudioDownloadUrl).mockResolvedValueOnce({
+      submissionModuleId: 50,
+      downloadUrl: refreshedUrl,
+      storageKey: 'submissions/40/audio.webm',
+      fileName: 'audio.webm',
+      mimeType: 'audio/webm',
+      expiresAt: '2026-11-07T12:00:00Z',
+    });
+    const { container } = await renderSpeaking();
+    const initialAudio = container.querySelector('audio')!;
+    configureAudio(initialAudio, 120);
+    fireEvent.loadedMetadata(initialAudio);
+    initialAudio.currentTime = 47;
+    fireEvent.error(initialAudio);
+
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', refreshedUrl));
+    const refreshedAudio = container.querySelector('audio')!;
+    const media = configureAudio(refreshedAudio, 60);
+    fireEvent.loadedMetadata(refreshedAudio);
+    expect(media.getCurrentTime()).toBe(47);
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledExactlyOnceWith(50);
+
+    fireEvent.error(refreshedAudio);
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the existing audio error layout when fallback rejects', async () => {
+    mockSpeakingModule({ 50: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'submissions/40/audio.webm' }] });
+    vi.mocked(submissionService.getAudioDownloadUrl).mockRejectedValueOnce(new ApiClientError('Unavailable', 500));
+    renderSpeaking();
+
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Thử lại' })).toBeVisible();
+  });
+
+  it('resets the one-fallback limit when switching submission modules', async () => {
+    const modules: SubmissionDetail['modules'] = [
+      { ...submission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' },
+      { id: 51, moduleId: 31, skill: 'SPEAKING', taskType: 'RECORDING', status: 'SUBMITTED', grading: null },
+    ];
+    mockSpeakingModule({
+      50: [{ id: 60, questionId: 1, content: null, audioDownloadUrl: 'https://storage.example.test/50/audio.webm' }],
+      51: [{ id: 61, questionId: 1, content: null, audioDownloadUrl: 'https://storage.example.test/51/audio.webm' }],
+    }, modules);
+    const { container } = await renderSpeaking();
+    let audio = container.querySelector('audio')!;
+    fireEvent.error(audio);
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', SIGNED_AUDIO_URL));
+    audio = container.querySelector('audio')!;
+    fireEvent.error(audio);
+    expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
+
+    const moduleTabs = container.querySelectorAll('.tsd-module-tabs button');
+    fireEvent.click(moduleTabs[1]);
+    await waitFor(() => expect(submissionService.getSubmissionModuleDetail).toHaveBeenCalledWith(51));
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm'));
+    fireEvent.error(container.querySelector('audio')!);
+
+    await waitFor(() => expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(2));
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenNthCalledWith(1, 50);
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenNthCalledWith(2, 51);
+  });
+});
+
 it.each(['vi', 'en'] as const)('reports AI request failures and allows retry (%s)', async language => {
   vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
   vi.mocked(gradingService.requestAiAnalysis).mockRejectedValue(new Error('AI unavailable'));
@@ -1174,6 +1334,14 @@ async function remediationSetup() {
   vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async id =>
     ({ ...makeModuleDetail(id, id + 10, id === 50 ? 'WRITING' : id === 51 ? 'SPEAKING' : 'READING'),
       ...(id === 51 ? { answers: [{ id: 61, questionId: null, content: null, audioStorageKey: 'module-b.webm' }] } : {}) }));
+  vi.mocked(submissionService.getAudioDownloadUrl).mockImplementation(async submissionModuleId => ({
+    submissionModuleId,
+    downloadUrl: `https://storage.example.test/submissions/${submissionModuleId}/audio.webm?signature=signed`,
+    storageKey: `submissions/${submissionModuleId}/audio.webm`,
+    fileName: 'audio.webm',
+    mimeType: 'audio/webm',
+    expiresAt: '2026-11-07T12:00:00Z',
+  }));
   vi.mocked(gradingService.getBySubmissionModuleId).mockImplementation(async id => ({ id: id + 30, method: 'AUTO', status: 'COMPLETED', finalScore: id === 50 ? 7 : 9 }));
   vi.mocked(answerAnnotationService.listAnnotations).mockImplementation(async id => ({ data: [makeAnnotation(id, `Answer note ${id}`)] }));
   const view = renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5?moduleId=50');
@@ -1209,7 +1377,7 @@ it.each(['switch', 'return', 'unmount'] as const)('R3 timer cancellation on %s',
   if (mode === 'switch') {
     expect(screen.getByText('Answer note 61')).toBeVisible();
     expect(screen.getByRole('spinbutton')).toHaveValue(9);
-    expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('module-b.webm'));
+    expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('/submissions/51/audio.webm?signature=signed'));
   }
   if (mode === 'unmount') expect(view.container).toBeEmptyDOMElement();
 });
