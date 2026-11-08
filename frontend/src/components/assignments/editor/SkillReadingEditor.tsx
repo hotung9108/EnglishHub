@@ -158,6 +158,25 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             >
               <Plus size={13} /> {isVi ? 'Điền từ / Ngắn' : 'Short Answer'}
             </button>
+            <button
+              type="button"
+              className="btn btn-secondary bg-white btn-sm"
+              onClick={() => {
+                const newOrder = config.questions.length + 1;
+                const newQuestion: ReadingQuestionItem = {
+                  id: `rq-${Date.now()}`,
+                  order: newOrder,
+                  type: 'short_answer',
+                  prompt: isVi ? `Ô trống [${newOrder}]: Nhập từ/cụm từ điền vào vị trí [${newOrder}]` : `Blank [${newOrder}]: Word/phrase to fill in blank [${newOrder}]`,
+                  correctAnswer: '',
+                  points: 1
+                };
+                updateField('questions', [...config.questions, newQuestion]);
+              }}
+              title={isVi ? 'Thêm ô trống điền từ riêng biệt cho Diagram / Đề bài' : 'Add separate blank for diagram/passage'}
+            >
+              <Plus size={13} /> {isVi ? 'Ô trống Diagram' : 'Diagram Blank'}
+            </button>
           </div>
         </div>
 

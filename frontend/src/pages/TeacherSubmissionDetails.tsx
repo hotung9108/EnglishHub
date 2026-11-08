@@ -28,6 +28,7 @@ import {
   type GradingAnnotation
 } from '../api/services/answer-annotation.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
+import { moduleService } from '../api/services/module.service';
 import { classService } from '../api/services/class.service';
 import { resolveAudioUrl } from '../utils/audioUrl.utils';
 import { extractTranscriptText, extractAnnotationSnippet } from '../utils/annotationSnippet.utils';
@@ -78,6 +79,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return modParam && Number.isFinite(Number(modParam)) ? Number(modParam) : null;
   });
   const [moduleDetail, setModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
+  const [moduleInstructions, setModuleInstructions] = useState<string>('');
   const [aiSuggestion, setAiSuggestion] = useState<AiGradingSuggestionResponse | null>(null);
   const [gradingSummary, setGradingSummary] = useState<SubmissionModuleGradingResponse | null>(null);
   const [gradingDetail, setGradingDetail] = useState<GradingDetailResponse | null>(null);
@@ -234,6 +236,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setAnnotationError(null);
     setUsingAnnotationFallback(false);
     setReviewingAnnotationIds({});
+    setFinalScoreInput('');
+    setFeedbackText('');
+    setGradingSummary(null);
+    setGradingDetail(null);
+    setAiSuggestion(null);
+    setModuleInstructions('');
 
     const isCurrentModuleLoad = () =>
       isMountedRef.current &&
@@ -249,6 +257,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentModuleLoad()) return;
       setModuleDetail(modDetailRes);
       currentModDetail = modDetailRes;
+
+      if (modDetailRes.moduleId && typeof moduleService?.getModule === 'function') {
+        void moduleService.getModule(modDetailRes.moduleId).then((mRes) => {
+          if (isCurrentModuleLoad() && mRes?.instructions) {
+            setModuleInstructions(mRes.instructions);
+          }
+        }).catch(() => {
+          // ignore
+        });
+      }
     } catch {
       if (!isCurrentModuleLoad()) return;
       setModuleDetail(null);
@@ -1425,6 +1443,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
             const isSelected = m.id === (activeModule?.id || selectedModuleId);
             const label = m.skill || (isVi ? `Phần ${m.id}` : `Module ${m.id}`);
             const isDone = isModuleGraded(m);
+            const scoreDisplay = m.grading?.finalScore != null
+              ? ` (${m.grading.finalScore}/${m.grading.maxScoreSnapshot || 10})`
+              : '';
             return (
               <button
                 key={m.id}
@@ -1433,7 +1454,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 onClick={() => handleSelectModule(m.id)}
                 title={isDone ? (isVi ? 'Phần này đã có điểm' : 'Module graded') : (isVi ? 'Chưa chấm điểm' : 'Pending grading')}
               >
-                {label} {isDone ? '✓' : ''}
+                {label}{scoreDisplay} {isDone ? '✓' : ''}
               </button>
             );
           })}
@@ -1445,13 +1466,18 @@ export const TeacherSubmissionDetails: React.FC = () => {
         <div className="tsd-metrics-grid">
           <MetricCard
             title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
-            value={gradingDetail?.finalScore != null
-              ? String(gradingDetail.finalScore)
-              : (aiSuggestion?.suggestedScore != null
-                  ? String(aiSuggestion.suggestedScore)
-                  : '--')}
+            value={aiSuggestion?.suggestedScore != null
+              ? String(aiSuggestion.suggestedScore)
+              : (gradingDetail?.aiFeedback || isAnalyzingAi ? (isVi ? 'Đang phân tích' : 'Analyzing') : '--')}
             suffix="/ 10"
           />
+          {gradingDetail?.finalScore != null && (
+            <MetricCard
+              title={isVi ? 'Điểm giáo viên đã chấm' : 'Teacher Score'}
+              value={String(gradingDetail.finalScore)}
+              suffix={`/ ${gradingDetail.maxScoreSnapshot || activeModule?.grading?.maxScoreSnapshot || 10}`}
+            />
+          )}
         </div>
       )}
 
@@ -1470,6 +1496,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <div className="tsd-prompt-label">
                 {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
+              {moduleInstructions && (
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed whitespace-pre-line">
+                  <strong>{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                  <div className="mt-1">{moduleInstructions}</div>
+                </div>
+              )}
 
               <div className="tsd-speaking-audio-bar">
                 {audioUrl ? (
@@ -1535,15 +1567,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 <span className="tsd-speaking-panel-title">
                   {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
                 </span>
-                {(gradingDetail?.finalScore != null) ||
-                 (aiSuggestion?.suggestedScore != null) ? (
+                {aiSuggestion?.suggestedScore != null ? (
                   <span className="tsd-speaking-ai-score">
-                    {isVi ? 'Điểm đề xuất: ' : 'Suggested: '}
-                    <strong>
-                      {gradingDetail?.finalScore != null
-                        ? String(gradingDetail.finalScore)
-                        : String(aiSuggestion?.suggestedScore)}
-                    </strong> / 10
+                    {isVi ? 'Điểm AI đề xuất: ' : 'AI Suggested: '}
+                    <strong>{String(aiSuggestion.suggestedScore)}</strong> / 10
                   </span>
                 ) : null}
               </div>
@@ -1625,6 +1652,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
               <div className="tsd-prompt-label">
                 {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
+              {moduleInstructions && (
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed whitespace-pre-line">
+                  <strong>{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                  <div className="mt-1">{moduleInstructions}</div>
+                </div>
+              )}
 
               {/* Display attached document files if student uploaded file */}
               {attachedDocAnswers.length > 0 && (

@@ -97,7 +97,7 @@ describe('FE-78 Multi-Module Assignment Creation & Execution', () => {
     assert.equal(steps[3].route, '/student/assignments/writing/10?submissionId=5&moduleId=104');
   });
 
-  it('isModuleAccessible locks future modules until all prior modules in sequence are completed', () => {
+  it('isModuleAccessible allows student to freely access modules in any order', () => {
     const modules: ExamModuleItem[] = [
       { id: 101, skill: 'READING', orderIndex: 1 },
       { id: 102, skill: 'READING', orderIndex: 2 },
@@ -112,12 +112,10 @@ describe('FE-78 Multi-Module Assignment Creation & Execution', () => {
     ];
 
     assert.equal(isModuleAccessible(0, modules, subModules), true); // Reading 1 is accessible
-    assert.equal(isModuleAccessible(1, modules, subModules), true); // Reading 2 is accessible (Reading 1 done)
-    assert.equal(isModuleAccessible(2, modules, subModules), false); // Writing is NOT accessible (Reading 2 pending)
-
-    // Mark Module 2 as SUBMITTED
-    subModules[1].status = 'SUBMITTED';
-    assert.equal(isModuleAccessible(2, modules, subModules), true); // Writing is now accessible!
+    assert.equal(isModuleAccessible(1, modules, subModules), true); // Reading 2 is accessible
+    assert.equal(isModuleAccessible(2, modules, subModules), true); // Writing is accessible (students choose freely!)
+    assert.equal(isModuleAccessible(-1, modules, subModules), false); // Out-of-bounds is false
+    assert.equal(isModuleAccessible(5, modules, subModules), false); // Out-of-bounds is false
   });
 
   it('isAllModulesCompleted returns true only when every single module is completed', () => {

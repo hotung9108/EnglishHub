@@ -79,7 +79,7 @@
 .assignment-edit-title-input {
   font-size: 22px;
   font-weight: 700;
-  color: var(--on-surface, #111827);
+  color: var(--eh-text-primary, var(--on-surface, #111827));
   border: 1px solid transparent;
   background-color: transparent;
   border-radius: 8px;
@@ -88,6 +88,11 @@
   max-width: 680px;
   transition: all 0.2s ease;
   outline: none;
+}
+
+.assignment-edit-title-input::placeholder {
+  color: var(--eh-text-muted, #736B63);
+  opacity: 0.7;
 }
 
 .assignment-edit-title-input:hover {

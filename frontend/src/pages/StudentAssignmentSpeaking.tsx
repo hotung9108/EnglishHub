@@ -131,7 +131,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
               sub,
               'SPEAKING',
               numericId,
-              currentAssignment?.modules
+              currentAssignment?.modules,
+              moduleId
             );
             if (redirectRoute) {
               navigate(redirectRoute, { replace: true });
@@ -164,7 +165,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 sub,
                 'SPEAKING',
                 numericId,
-                currentAssignment?.modules
+                currentAssignment?.modules,
+                moduleId
               );
               if (redirectRoute) {
                 navigate(redirectRoute, { replace: true });
@@ -190,7 +192,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   sub,
                   'SPEAKING',
                   numericId,
-                  currentAssignment?.modules
+                  currentAssignment?.modules,
+                  moduleId
                 );
                 if (redirectRoute) {
                   navigate(redirectRoute, { replace: true });

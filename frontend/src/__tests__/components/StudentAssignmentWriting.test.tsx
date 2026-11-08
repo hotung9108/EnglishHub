@@ -57,7 +57,7 @@ describe('StudentAssignmentWriting', () => {
   it.each([['', 0], ['   \n\t ', 0], ['Hello', 1], ['  Hello   world\nfrom\tVietnam  ', 4]])('counts words for %j', async (text, count) => {
     const { editor } = await setup();
     fireEvent.change(editor, { target: { value: text } });
-    expect(screen.getByText(/Đếm từ:/)).toHaveTextContent(`Đếm từ: ${count} / 150-250 từ`);
+    expect(screen.getByText(/Đếm từ:/)).toHaveTextContent(`Đếm từ: ${count} / tối thiểu 150 từ`);
   });
 
   it.each(['', '  \n\t '])('warns and prevents submission for an empty essay (%j)', async (text) => {
@@ -356,7 +356,7 @@ it('navigates to assignment result when submission id is missing on final submit
   expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/12/result');
 });
 
-it('redirects to the earlier incomplete module via route guard on mount', async () => {
+it('allows student to work on writing directly without being forced to earlier incomplete modules', async () => {
   vi.mocked(assignmentService.getAssignment).mockResolvedValue({
     id: 12,
     title: 'Reading and Writing',
@@ -372,7 +372,7 @@ it('redirects to the earlier incomplete module via route guard on mount', async 
     ],
   });
   renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
-  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/reading/12'));
+  await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/student/writing/12'));
 });
 
 
@@ -449,4 +449,48 @@ it('supports URL with moduleId query parameter and completes last module to over
 
   await user.click(screen.getByRole('button', { name: /Nộp bài \(Submit/ }));
   expect(await screen.findByText(/Nộp bài thành công! Đang chuyển đến màn hình kết quả/)).toBeVisible();
+});
+
+it('navigates when clicking an accessible uncompleted step in multi-module stepper', async () => {
+  vi.mocked(assignmentService.getAssignment).mockResolvedValue({
+    id: 12,
+    title: 'Multi Exam Stepper',
+    status: 'PUBLISHED',
+    modules: [
+      { id: 30, skill: 'WRITING' },
+      { id: 31, skill: 'READING' },
+    ],
+  });
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    id: 40,
+    studentId: 5,
+    assignmentId: 12,
+    status: 'IN_PROGRESS',
+    submittedAt: null,
+    createdAt: '2026-10-22T00:00:00Z',
+    modules: [
+      { id: 50, moduleId: 30, skill: 'WRITING', taskType: 'ESSAY', status: 'IN_PROGRESS', grading: null },
+      { id: 51, moduleId: 31, skill: 'READING', taskType: 'QUIZ', status: 'IN_PROGRESS', grading: null },
+    ],
+    attemptNumber: 1,
+  });
+  const { user } = await setup('/student/writing/12?moduleId=30&submissionId=40');
+  const readingStep = screen.getByRole('button', { name: /Đọc|Reading/ });
+  await user.click(readingStep);
+  expect(screen.getByTestId('location')).toHaveTextContent('/student/assignments/reading/12');
+});
+
+it('parses custom minWords and diagram from markdown instructions', async () => {
+  vi.mocked(moduleService.getModule).mockResolvedValue({
+    id: 30,
+    skill: 'WRITING',
+    taskType: 'ESSAY',
+    orderIndex: 1,
+    maxScore: 10,
+    instructions: '<!-- minWords: 350 -->\nSpecial custom prompt text.\n\n![Diagram](https://example.com/chart.png)',
+  });
+  renderPage(<StudentAssignmentWriting />, '/student/writing/:id', '/student/writing/12');
+  expect(await screen.findByText('Special custom prompt text.')).toBeVisible();
+  expect(screen.getByText(/tối thiểu 350 từ/)).toBeVisible();
+  expect(screen.getByAltText('Writing Task Diagram')).toHaveAttribute('src', 'https://example.com/chart.png');
 });

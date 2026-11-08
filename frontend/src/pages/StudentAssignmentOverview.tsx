@@ -17,9 +17,9 @@ import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
   getNextIncompleteModule,
-  isModuleAccessible,
   getSkillLabel,
-  resolveEffectiveModules
+  resolveEffectiveModules,
+  normalizeSkill
 } from '../utils/examStepper.utils';
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-overview.css';
@@ -195,14 +195,10 @@ const StudentAssignmentOverview: React.FC = () => {
       }
     }
 
-    // Verify sequential unlocking: If targetIndex > 0, make sure previous modules are completed
-    if (targetIndex !== undefined && targetIndex > 0 && effectiveModules.length > 0) {
-      const accessible = isModuleAccessible(targetIndex, effectiveModules, inProgressSub?.modules);
-      if (!accessible) {
-        setError(`Vui lòng hoàn thành phần thi trước (Phần ${targetIndex}) để tiếp tục.`);
-        return;
-      }
-    }
+    const targetModule = (targetIndex !== undefined && effectiveModules[targetIndex])
+      ? effectiveModules[targetIndex]
+      : effectiveModules.find(m => normalizeSkill(m.skill) === normalizeSkill(targetSkill)) || effectiveModules[0];
+    const targetModuleId = targetModule?.id;
 
     setIsStarting(true);
     setError(null);
@@ -223,7 +219,7 @@ const StudentAssignmentOverview: React.FC = () => {
       }
 
       const idParam = id || '1';
-      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId);
+      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId, targetModuleId);
       navigate(targetRoute);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
@@ -286,7 +282,7 @@ const StudentAssignmentOverview: React.FC = () => {
       const nextMod = getNextIncompleteModule(resolvedMods, activeModules) || resolvedMods[0];
       const targetSkill = nextMod?.skill || 'WRITING';
       const idParam = id || '1';
-      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId);
+      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId, nextMod?.id);
       navigate(targetRoute);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
