@@ -31,6 +31,7 @@ import {
   SkillListeningEditor,
   AssignmentPreviewModal
 } from '../components/assignments/editor';
+import { useToast } from '../components/common/ToastContext';
 import { StickyActionBar } from '../components/common';
 import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
@@ -40,6 +41,7 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   // Get initial skill from query param ?type=speaking | reading | listening | writing
   const querySkill = searchParams.get('type') as AssignmentSkill | null;
@@ -117,6 +119,7 @@ export const TeacherCreateAssignment: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toastWarning(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -442,6 +445,8 @@ export const TeacherCreateAssignment: React.FC = () => {
         if (createdModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
           const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
           if (qList.length > 0) {
+            const moduleTotalScore = mod.maxScore || 10;
+            const scorePerQ = moduleTotalScore / qList.length;
             const questionPromises = qList.map((q, i) => {
               const payload = q.type === 'multiple_choice'
                 ? buildMcqPayload({
@@ -450,13 +455,13 @@ export const TeacherCreateAssignment: React.FC = () => {
                       ? ((q as { options?: string[] }).options || [])
                       : [],
                     correctOptionIndexOrText: q.correctAnswer,
-                    score: q.points || 1,
+                    score: scorePerQ,
                     orderIndex: i + 1,
                   })
                 : buildShortAnswerPayload({
                     content: q.prompt,
                     answerText: q.correctAnswer,
-                    score: q.points || 1,
+                    score: scorePerQ,
                     orderIndex: i + 1,
                   });
               return questionService.createQuestion(createdModuleId, payload);
@@ -475,16 +480,20 @@ export const TeacherCreateAssignment: React.FC = () => {
         }
       }
 
-      showToast(isVi 
+      const successMsg = isVi 
         ? (status === 'PUBLISHED' ? 'Giao bài tập mới thành công!' : 'Đã lưu bản nháp bài tập mới!') 
-        : (status === 'PUBLISHED' ? 'Assignment published successfully!' : 'Assignment draft saved!'));
+        : (status === 'PUBLISHED' ? 'Assignment published successfully!' : 'Assignment draft saved!');
+      toastSuccess(successMsg);
+      setToastMessage(successMsg);
 
       setTimeout(() => {
         navigate('/teacher/assignments');
       }, 1000);
     } catch (err) {
       console.error('Failed to create assignment:', err);
-      showToast(isVi ? 'Có lỗi xảy ra khi tạo bài tập. Vui lòng thử lại!' : 'Failed to create assignment. Please try again!');
+      const errMsg = isVi ? 'Có lỗi xảy ra khi tạo bài tập. Vui lòng thử lại!' : 'Failed to create assignment. Please try again!';
+      toastError(errMsg);
+      showToast(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -720,6 +729,7 @@ export const TeacherCreateAssignment: React.FC = () => {
             <SkillReadingEditor 
               config={activeModule.config as ReadingConfig}
               onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
 
@@ -727,6 +737,7 @@ export const TeacherCreateAssignment: React.FC = () => {
             <SkillListeningEditor 
               config={activeModule.config as ListeningConfig}
               onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
         </div>
@@ -849,12 +860,12 @@ export const TeacherCreateAssignment: React.FC = () => {
             </button>
             <button
               type="button"
-              className="btn btn-secondary bg-white btn-sm"
+              className="btn btn-secondary bg-white btn-sm flex items-center gap-2"
               onClick={() => executeCreateAssignment('DRAFT')}
               disabled={isSubmitting}
             >
-              <Save size={16} />
-              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
+              {isSubmitting ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              <span>{isSubmitting ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu bản nháp' : 'Save Draft')}</span>
             </button>
             <button
               type="button"

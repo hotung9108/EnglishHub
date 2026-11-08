@@ -262,10 +262,13 @@ export const TeacherDashboard: React.FC = () => {
         // Include all published or assigned exercises (exclude unassigned DRAFTs)
         if (statusUpper !== 'DRAFT') {
           const enrolled = ec.members.length;
-          const submittedCount = ec.submissions.filter((s) => s.assignmentId === a.id).length;
-          const pendingGradingCount = ec.submissions.filter(
-            (s) => s.assignmentId === a.id && !isSubmissionGraded(s)
-          ).length;
+          const assignmentSubs = ec.submissions.filter((s) => s.assignmentId === a.id);
+          const submittedStudentIds = new Set(assignmentSubs.map((s) => s.studentId));
+          const submittedCount = submittedStudentIds.size;
+          const pendingStudentIds = new Set(
+            assignmentSubs.filter((s) => !isSubmissionGraded(s)).map((s) => s.studentId)
+          );
+          const pendingGradingCount = pendingStudentIds.size;
 
           const submissionRate = enrolled > 0 
             ? Math.min(100, Math.round((submittedCount / enrolled) * 100))
@@ -369,9 +372,12 @@ export const TeacherDashboard: React.FC = () => {
       const cls = ec.summary;
       const totalEnrolled = ec.members.length;
       
-      const pendingCount = ec.submissions.filter(
-        (s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING')
-      ).length;
+      const pendingStudentIds = new Set(
+        ec.submissions
+          .filter((s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
+          .map((s) => s.studentId)
+      );
+      const pendingCount = pendingStudentIds.size;
 
       const gradedScores: number[] = [];
       for (const s of ec.submissions) {
