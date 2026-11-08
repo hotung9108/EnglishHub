@@ -122,6 +122,25 @@ test('GradingService #51 - GET grading detail', async () => {
   });
 });
 
+test('GradingService getById parses stringified aiTranscript into JSON object', async () => {
+  const http = new MockHttpClient();
+  http.mockResponse = {
+    id: 5,
+    submissionModuleId: 7,
+    status: 'COMPLETED',
+    aiTranscript: JSON.stringify({
+      modelUsed: 'gemini-3.1-flash-lite',
+      transcript: [{ word: 'Hello', start: 0.1, end: 0.5 }],
+    }),
+  };
+  const service = new GradingService(http);
+  const detail = await service.getById(5);
+  assert.deepStrictEqual(detail.aiTranscript, {
+    modelUsed: 'gemini-3.1-flash-lite',
+    transcript: [{ word: 'Hello', start: 0.1, end: 0.5 }],
+  });
+});
+
 test('GradingService #52 - GET gradings with the backend query names', async () => {
   const params: GradingListParams = { classId: 1, studentId: 23, status: 'COMPLETED', page: 2, limit: 10 };
   const options = { signal: new AbortController().signal };
@@ -155,6 +174,7 @@ test('getStudentGradingResult - completed grading returns only the allowlisted f
     { endpoint: 'grading', id: 5, options: undefined },
   ]);
   assert.deepStrictEqual(Object.keys(result).sort(), [
+    'aiTranscript',
     'finalFeedback',
     'finalScore',
     'gradedAt',
@@ -171,6 +191,7 @@ test('getStudentGradingResult - completed grading returns only the allowlisted f
     maxScoreSnapshot: 10,
     finalFeedback: 'Published feedback',
     gradedAt: '2026-10-01T00:00:00Z',
+    aiTranscript: { private: true },
   });
 });
 

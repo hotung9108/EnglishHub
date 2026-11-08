@@ -35,6 +35,7 @@ vi.mock('../../api/services/submission.service', async (original) => ({
 vi.mock('../../api/services/grading.service', () => ({
   gradingService: {
     getStudentGradingResult: vi.fn(),
+    getById: vi.fn().mockResolvedValue({ id: 1, aiTranscript: null }),
   },
 }));
 
@@ -500,9 +501,10 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
       expect(screen.getByText('Current B feedback')).toBeVisible();
       expect(view.container.querySelector('.result-hero-score-box')).toHaveTextContent('0/10');
       expect(screen.queryByText('Late A feedback')).not.toBeInTheDocument();
-      for (const privateValue of ['Private transcript', 'Private reviewer', 'Private review time', 'Private instruction']) {
+      for (const privateValue of ['Private reviewer', 'Private review time', 'Private instruction']) {
         expect(screen.queryByText(privateValue)).not.toBeInTheDocument();
       }
+      expect(screen.getByText('Private transcript')).toBeVisible();
       expect(screen.queryByText('Không thể tải kết quả chấm bài. Vui lòng thử lại.')).not.toBeInTheDocument();
       expect(view.container.querySelector('audio')).toHaveAttribute('src', expect.stringContaining('current-speaking.webm'));
     },
