@@ -1146,7 +1146,8 @@ class GeminiService:
             criteriaScores=criteria,
             annotations=annotations,
             modelUsed=model_used,
-            providerUsed=provider_used
+            providerUsed=provider_used,
+            extractedText=content
         )
 
     @classmethod
@@ -1242,5 +1243,6 @@ class GeminiService:
             criteriaScores=criteria,
             annotations=annotations,
             modelUsed=model_used or "benchmark/qa-21-deterministic",
-            providerUsed=provider_used or "mock"
+            providerUsed=provider_used or "mock",
+            extractedText=content
         )

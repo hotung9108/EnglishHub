@@ -3,9 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown, AlertCircle
+  Layers, CheckCircle2, ChevronDown, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { 
   assignmentService, 
@@ -55,6 +56,7 @@ export const TeacherEditAssignment: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { language } = useLanguage();
   const isVi = language === 'vi';
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -116,6 +118,7 @@ export const TeacherEditAssignment: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toastWarning(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -705,6 +708,8 @@ export const TeacherEditAssignment: React.FC = () => {
         // Create / sync questions for reading / listening
         if (targetModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
           const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
+          const moduleTotalScore = mod.maxScore || 10;
+          const scorePerQ = qList.length > 0 ? moduleTotalScore / qList.length : 1;
           for (let i = 0; i < qList.length; i++) {
             const q = qList[i];
             const isExistingQuestion = q.id && !q.id.startsWith('new-') && !q.id.startsWith('mod-') && Number.isFinite(Number(q.id));
@@ -716,13 +721,13 @@ export const TeacherEditAssignment: React.FC = () => {
                       ? ((q as { options?: string[] }).options || [])
                       : [],
                     correctOptionIndexOrText: q.correctAnswer,
-                    score: q.points || 1,
+                    score: scorePerQ,
                     orderIndex: i + 1,
                   })
                 : buildShortAnswerPayload({
                     content: q.prompt,
                     answerText: q.correctAnswer,
-                    score: q.points || 1,
+                    score: scorePerQ,
                     orderIndex: i + 1,
                   });
               try {
@@ -737,10 +742,14 @@ export const TeacherEditAssignment: React.FC = () => {
 
       setAssignmentData((prev) => ({ ...prev, modules: updatedModulesList }));
       setLastSavedTime(new Date().toLocaleTimeString('vi-VN'));
-      showToast(isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!');
+      const successMsg = isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!';
+      toastSuccess(successMsg);
+      setToastMessage(successMsg);
     } catch (err) {
       console.error('Failed to save assignment changes:', err);
-      showToast(isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!');
+      const errorMsg = isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!';
+      toastError(errorMsg);
+      setToastMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -1026,6 +1035,7 @@ export const TeacherEditAssignment: React.FC = () => {
             <SkillReadingEditor 
               config={activeModule.config as ReadingConfig}
               onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
 
@@ -1033,6 +1043,7 @@ export const TeacherEditAssignment: React.FC = () => {
             <SkillListeningEditor 
               config={activeModule.config as ListeningConfig}
               onChange={handleActiveModuleConfigChange}
+              moduleMaxScore={activeModule.maxScore || 10}
             />
           )}
         </div>
@@ -1169,12 +1180,12 @@ export const TeacherEditAssignment: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary btn-sm flex items-center gap-2"
               onClick={() => saveAssignmentChanges()}
               disabled={isSaving}
             >
-              <Save size={16} />
-              <span>{isVi ? 'Lưu thay đổi bài tập' : 'Save Changes'}</span>
+              {isSaving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              <span>{isSaving ? (isVi ? 'Đang lưu thay đổi...' : 'Saving...') : (isVi ? 'Lưu thay đổi bài tập' : 'Save Changes')}</span>
             </button>
             {currentDbStatus === 'DRAFT' ? (
               <button

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import type { 
   ListeningConfig, ListeningQuestionItem 
 } from '../../../types/assignment-editor.types';
@@ -9,12 +9,17 @@ import { useToast } from '../../common/ToastContext';
 interface SkillListeningEditorProps {
   config: ListeningConfig;
   onChange: (updated: ListeningConfig) => void;
+  moduleMaxScore?: number;
 }
 
-export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ config, onChange }) => {
+export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ config, onChange, moduleMaxScore }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
   const { error: toastError } = useToast();
+
+  const currentTotalScore = moduleMaxScore !== undefined && moduleMaxScore > 0 ? moduleMaxScore : 10;
+  const calculatedScorePerQ = config.questions.length > 0 ? (currentTotalScore / config.questions.length) : 1;
+  const pointsDisplay = Number.isInteger(calculatedScorePerQ) ? calculatedScorePerQ : calculatedScorePerQ.toFixed(2);
 
   const updateField = <K extends keyof ListeningConfig>(key: K, value: ListeningConfig[K]) => {
     onChange({ ...config, [key]: value });
@@ -23,14 +28,9 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
   const handleAddQuestion = (type: 'multiple_choice' | 'short_answer') => {
     const newOrder = config.questions.length + 1;
     const initialOptions = type === 'multiple_choice'
-      ? [
-          isVi ? 'Lựa chọn A' : 'Option A',
-          isVi ? 'Lựa chọn B' : 'Option B',
-          isVi ? 'Lựa chọn C' : 'Option C',
-          isVi ? 'Lựa chọn D' : 'Option D'
-        ]
+      ? ['', '', '', '']
       : undefined;
-    const defaultAns = initialOptions ? initialOptions[0] : '';
+    const defaultAns = type === 'multiple_choice' ? 'A' : '';
 
     const newQ: ListeningQuestionItem = {
       id: `lq-${Date.now()}`,
@@ -43,6 +43,36 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
     };
 
     updateField('questions', [...config.questions, newQ]);
+  };
+
+  const handleInsertQuestionAfter = (targetIndex: number, type: 'multiple_choice' | 'short_answer') => {
+    const newQ: ListeningQuestionItem = {
+      id: `lq-${Date.now()}`,
+      order: targetIndex + 2,
+      type,
+      prompt: isVi
+        ? (type === 'multiple_choice' ? 'Câu hỏi trắc nghiệm mới: Nhập nội dung...' : 'Câu hỏi điền từ mới: Nhập nội dung...')
+        : (type === 'multiple_choice' ? 'New MCQ: Enter question statement...' : 'New blank: Enter statement...'),
+      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
+      correctAnswer: type === 'multiple_choice' ? 'A' : '',
+      points: 1
+    };
+
+    const nextQuestions = [...config.questions];
+    nextQuestions.splice(targetIndex + 1, 0, newQ);
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
+  };
+
+  const handleMoveQuestion = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= config.questions.length) return;
+    const nextQuestions = [...config.questions];
+    const temp = nextQuestions[index];
+    nextQuestions[index] = nextQuestions[targetIndex];
+    nextQuestions[targetIndex] = temp;
+    const reordered = nextQuestions.map((q, i) => ({ ...q, order: i + 1 }));
+    updateField('questions', reordered);
   };
 
   const handleUpdateQuestion = <K extends keyof ListeningQuestionItem>(
@@ -108,106 +138,76 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
     }
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleSelectedAudioFile(file);
-    }
-  };
-
-  const handleRemoveFile = () => {
-    if (config.audioPreviewUrl) {
-      URL.revokeObjectURL(config.audioPreviewUrl);
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    onChange({
-      ...config,
-      audioFile: null,
-      audioPreviewUrl: '',
-      audioUrl: '',
-    });
-  };
-
-  const hasAudio = Boolean(config.audioFile || config.audioPreviewUrl || config.audioUrl);
-  const audioSrc = config.audioPreviewUrl || config.audioUrl;
-  const fileNameDisplay = config.audioFile
-    ? `${config.audioFile.name} (${(config.audioFile.size / (1024 * 1024)).toFixed(2)} MB)`
-    : config.audioUrl;
-
   return (
     <div className="flex flex-col gap-5">
-      {/* SECTION 1: Audio Track & Transcript */}
+      {/* SECTION 1: Audio Resource */}
       <section className="edit-card">
         <div className="edit-card-header">
           <div>
-            <h2 className="edit-card-title">
-              {isVi ? 'Tệp Âm Thanh & Lời Thoại' : 'Audio Track & Transcript'}
-            </h2>
+            <h2 className="edit-card-title">{isVi ? 'Tệp Âm Thanh Đề Bài' : 'Audio Track'}</h2>
             <p className="edit-card-desc">
               {isVi 
-                ? 'Cung cấp nguồn âm thanh bài nghe và lời thoại hướng dẫn học viên.' 
-                : 'Provide listening audio source and transcript instructions.'}
+                ? 'Tải lên file bài nghe (.mp3, .wav, .m4a). Học sinh sẽ nghe file này khi làm bài.' 
+                : 'Upload audio file (.mp3, .wav, .m4a). Students will listen to this track.'}
             </p>
           </div>
         </div>
 
-        {/* Audio Drag and Drop Upload */}
-        <div className="edit-form-group">
-          <label className="edit-form-label">
-            {isVi ? 'Tệp âm thanh bài nghe' : 'Listening Audio File'} <span className="text-danger">*</span>
-          </label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/mp3,audio/wav,audio/m4a,audio/*,.mp3,.wav,.m4a"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              handleSelectedAudioFile(file);
+            }
+          }}
+        />
+
+        {config.audioPreviewUrl || config.audioUrl ? (
+          <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-sm truncate max-w-md text-main">
+                {config.audioFile?.name || config.audioUrl || (isVi ? 'Tệp bài nghe' : 'Audio track')}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary bg-white btn-sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isVi ? 'Thay đổi file' : 'Change File'}
+              </button>
+            </div>
+            {config.audioPreviewUrl && (
+              <audio controls className="w-full h-10 mt-1" src={config.audioPreviewUrl}>
+                {isVi ? 'Trình duyệt không hỗ trợ thẻ phát âm thanh.' : 'Your browser does not support audio element.'}
+              </audio>
+            )}
+          </div>
+        ) : (
           <div
+            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+              isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 dark:border-slate-700 hover:border-primary'
+            }`}
+            onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`audio-dropzone ${isDragging ? 'dragging' : ''}`}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/mp3,audio/wav,audio/m4a,audio/*,.mp3,.wav,.m4a"
-              className="hidden"
-              onChange={handleFileInputChange}
-            />
-            {hasAudio ? (
-              <div>
-                <div className="text-sm font-semibold text-main break-all">
-                  {fileNameDisplay}
-                </div>
-                <div className="text-xs text-muted mt-1">
-                  {isVi ? 'Bấm hoặc kéo thả tệp khác để thay đổi' : 'Click or drag another file to replace'}
-                </div>
-                <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-                  <audio controls src={audioSrc} className="audio-player-preview" />
-                </div>
-                <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary bg-white btn-sm"
-                    onClick={handleRemoveFile}
-                  >
-                    {isVi ? 'Gỡ tệp' : 'Remove'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-sm font-semibold text-main">
-                  {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag and drop audio file here or click to browse'}
-                </div>
-                <div className="text-xs text-muted mt-1">
-                  {isVi ? 'Định dạng hỗ trợ: MP3, WAV, M4A' : 'Supported formats: MP3, WAV, M4A'}
-                </div>
-              </div>
-            )}
+            <div className="text-3xl mb-2">🎧</div>
+            <p className="font-semibold text-sm text-main mb-1">
+              {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag & drop audio here or click to browse'}
+            </p>
+            <p className="text-xs text-muted">
+              {isVi ? 'Hỗ trợ .mp3, .wav, .m4a (tối đa 50MB)' : 'Supports .mp3, .wav, .m4a (up to 50MB)'}
+            </p>
           </div>
-        </div>
+        )}
 
         {/* Transcript / Instructions */}
-        <div className="edit-form-group mb-0">
+        <div className="edit-form-group mb-0 mt-4">
           <label className="edit-form-label">
             {isVi ? 'Lời thoại / Hướng dẫn bài nghe' : 'Transcript / Instructions'}
           </label>
@@ -231,8 +231,8 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               {isVi ? 'Danh Sách Câu Hỏi & Đáp Án' : 'Listening Questions & Answer Keys'}
             </h2>
             <p className="edit-card-desc">
-              {isVi 
-                ? 'Tạo các câu hỏi trắc nghiệm hoặc điền từ cho bài nghe.' 
+              {isVi
+                ? 'Tạo các câu hỏi trắc nghiệm hoặc điền từ cho bài nghe.'
                 : 'Create multiple choice or short answer questions.'}
             </p>
           </div>
@@ -253,6 +253,21 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
               <Plus size={13} /> {isVi ? 'Điền từ / Ngắn' : 'Short Answer'}
             </button>
           </div>
+        </div>
+
+        {/* Score Summary Badge */}
+        <div className="flex flex-wrap items-center justify-between bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg p-3 text-xs mb-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={15} className="text-blue-600 dark:text-blue-400" />
+            <span className="text-slate-700 dark:text-slate-200 font-medium">
+              {isVi 
+                ? `Tổng điểm module: ${currentTotalScore} điểm • Gồm ${config.questions.length} câu hỏi • Mỗi câu: ${pointsDisplay} điểm` 
+                : `Module Total: ${currentTotalScore} pts • ${config.questions.length} questions • ${pointsDisplay} pts/question`}
+            </span>
+          </div>
+          <span className="text-muted">
+            {isVi ? '(Điểm chia đều tự động theo thang điểm tổng module)' : '(Points distributed evenly by module score)'}
+          </span>
         </div>
 
         {/* Questions list */}
@@ -276,17 +291,33 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 text-xs text-muted">
-                        <span>{isVi ? 'Điểm:' : 'Score:'}</span>
-                        <input 
-                          type="number" 
-                          min={0.25}
-                          step={0.25}
-                          value={q.points}
-                          onChange={(e) => handleUpdateQuestion(qIdx, 'points', parseFloat(e.target.value) || 1)}
-                          className="question-points-input"
-                        />
+                      {/* Move Up / Move Down buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === 0}
+                          onClick={() => handleMoveQuestion(qIdx, 'up')}
+                          title={isVi ? 'Di chuyển câu hỏi lên trên' : 'Move up'}
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary bg-white btn-sm p-1.5"
+                          disabled={qIdx === config.questions.length - 1}
+                          onClick={() => handleMoveQuestion(qIdx, 'down')}
+                          title={isVi ? 'Di chuyển câu hỏi xuống dưới' : 'Move down'}
+                        >
+                          <ChevronDown size={14} />
+                        </button>
                       </div>
+
+                      {/* Readonly Score Pill */}
+                      <div className="flex items-center gap-1.5 text-xs text-muted bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
+                        <span className="font-semibold text-primary">{pointsDisplay} {isVi ? 'điểm' : 'pts'}</span>
+                      </div>
+
                       <button 
                         type="button" 
                         className="btn btn-secondary bg-white btn-sm text-danger"
@@ -319,27 +350,30 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                         {isVi ? 'Các lựa chọn (Tích chọn radio vào đáp án đúng):' : 'Options (Select correct radio):'}
                       </label>
                       <div className="question-options-list">
-                        {(q.options || ['A', 'B', 'C', 'D']).map((opt, oIdx) => {
+                        {(q.options || ['', '', '', '']).map((opt, oIdx) => {
                           const letter = String.fromCharCode(65 + oIdx);
-                          const isCorrect = q.correctAnswer === opt;
+                          const isCorrect = q.correctAnswer === letter || (opt.trim() !== '' && q.correctAnswer === opt);
                           return (
                             <div key={oIdx} className={`question-option-row ${isCorrect ? 'correct' : ''}`}>
                               <input 
                                 type="radio" 
-                                name={`correct-${q.id}`}
+                                name={`correct-${q.id}`} 
                                 checked={isCorrect}
-                                onChange={() => handleUpdateQuestion(qIdx, 'correctAnswer', opt)}
+                                onChange={() => handleUpdateQuestion(qIdx, 'correctAnswer', opt.trim() || letter)}
                               />
                               <span className="question-option-letter">{letter}.</span>
                               <input 
                                 type="text" 
                                 className="edit-form-input bg-white py-1 px-3"
                                 value={opt}
+                                placeholder={isVi ? `Lựa chọn ${letter} (nhập đáp án...)` : `Option ${letter} (enter text...)`}
                                 onChange={(e) => {
-                                  const newOpts = [...(q.options || [])];
+                                  const newOpts = [...(q.options || ['', '', '', ''])];
                                   newOpts[oIdx] = e.target.value;
                                   handleUpdateQuestion(qIdx, 'options', newOpts);
-                                  if (isCorrect) handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value);
+                                  if (isCorrect) {
+                                    handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value.trim() || letter);
+                                  }
                                 }}
                               />
                             </div>
@@ -362,6 +396,29 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                       />
                     </div>
                   )}
+
+                  {/* Quick Insert Below Action Bar */}
+                  <div className="flex items-center justify-between pt-2.5 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                    <span className="text-muted font-medium">
+                      {isVi ? 'Chèn câu hỏi ngay bên dưới câu này:' : 'Insert question below this one:'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
+                      >
+                        <Plus size={11} /> {isVi ? '+ Trắc nghiệm' : '+ MCQ'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
+                        onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
+                      >
+                        <Plus size={11} /> {isVi ? '+ Điền từ' : '+ Blank'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })}

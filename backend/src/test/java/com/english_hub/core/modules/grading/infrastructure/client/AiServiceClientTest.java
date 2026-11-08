@@ -232,7 +232,8 @@ class AiServiceClientTest {
 				    }
 				  ],
 				  "modelUsed": "google/gemini-2.5-flash",
-				  "providerUsed": "openrouter"
+				  "providerUsed": "openrouter",
+				  "extractedText": "Community service help teenagers in their lives."
 				}
 				""";
 
@@ -250,6 +251,7 @@ class AiServiceClientTest {
 		assertThat(response.annotations().getFirst().errorType()).isEqualTo("GRAMMAR");
 		assertThat(response.modelUsed()).isEqualTo("google/gemini-2.5-flash");
 		assertThat(response.providerUsed()).isEqualTo("openrouter");
+		assertThat(response.extractedText()).isEqualTo("Community service help teenagers in their lives.");
 	}
 
 	@Test

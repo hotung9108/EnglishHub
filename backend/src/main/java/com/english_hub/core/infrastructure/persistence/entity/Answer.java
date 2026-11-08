@@ -115,6 +115,12 @@ public class Answer {
 				: JsonbValueCodec.serialize(content);
 	}
 
+	public void setExtractedTextContent(String extractedText) {
+		if (extractedText != null && !extractedText.isBlank()) {
+			this.content = JsonbValueCodec.text(extractedText);
+		}
+	}
+
 	/**
 	 * Merges the auto-grading verdict into the answer content so the per-question outcome travels
 	 * with the answer itself, matching the {@code isCorrect}/{@code score} shape the submission

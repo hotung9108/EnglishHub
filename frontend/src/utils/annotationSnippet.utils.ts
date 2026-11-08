@@ -52,13 +52,17 @@ export function extractTranscriptText(rawTranscript: unknown): string {
     }
   }
 
-  // 2. If it's an object with a `transcript` or `words` property, unwrap it
+  // 2. If it's an object with a `transcript` or `words` or `text` property, unwrap it
   if (typeof current === 'object' && current !== null && !Array.isArray(current)) {
     const record = current as Record<string, unknown>;
     if ('transcript' in record && record.transcript !== undefined && record.transcript !== null) {
       current = record.transcript;
     } else if ('words' in record && record.words !== undefined && record.words !== null) {
       current = record.words;
+    } else if ('text' in record && record.text !== undefined && record.text !== null) {
+      current = record.text;
+    } else if ('aiTranscript' in record && record.aiTranscript !== undefined && record.aiTranscript !== null) {
+      current = record.aiTranscript;
     }
   }
 

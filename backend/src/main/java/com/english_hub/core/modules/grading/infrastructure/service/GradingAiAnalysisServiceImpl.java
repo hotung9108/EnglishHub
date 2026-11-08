@@ -269,8 +269,18 @@ public class GradingAiAnalysisServiceImpl implements GradingAiAnalysisService {
 
 		Object aiAnalysisDetails = formatWritingAnalysisDetails(response);
 
+		if (response.extractedText() != null && !response.extractedText().isBlank()) {
+			if (answer.getContent() == null || answer.getContent().isBlank()) {
+				answer.setExtractedTextContent(response.extractedText());
+				answerRepository.save(answer);
+			}
+		}
+
 		Grading updatedGrading = grading.withAiSuggestion(aiSuggestedScore, aiFeedback, aiAnalysisDetails);
-		Integer contentLength = textSubmission ? content.codePointCount(0, content.length()) : null;
+		String effectiveContent = textSubmission ? content : response.extractedText();
+		Integer contentLength = (effectiveContent != null && !effectiveContent.isBlank())
+				? effectiveContent.codePointCount(0, effectiveContent.length())
+				: null;
 		List<AnswerAnnotation> annotations = validAnnotations(
 				submissionModuleId,
 				answer.getId(),
