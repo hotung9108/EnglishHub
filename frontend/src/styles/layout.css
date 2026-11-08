@@ -322,13 +322,10 @@
   left: 268px;
   bottom: 16px;
   width: 264px;
-  background-color: #FFFFFF;
-  border: 1px solid #D1C7B7;
+  background-color: var(--eh-surface);
+  border: 1px solid var(--eh-border);
   border-radius: var(--radius-lg, 16px);
-  box-shadow: 
-    0 0 0 1px rgba(27, 77, 62, 0.08),
-    0 22px 48px -8px rgba(27, 77, 62, 0.22),
-    0 10px 24px -4px rgba(38, 35, 32, 0.12);
+  box-shadow: var(--eh-shadow-lg);
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -360,7 +357,7 @@
 
 .sidebar-popover-header {
   padding: 14px 16px 12px;
-  background: linear-gradient(135deg, #1B4D3E 0%, #12382D 100%);
+  background: linear-gradient(135deg, var(--eh-primary) 0%, #0c2f25 100%);
   border-bottom: 1px solid rgba(197, 168, 128, 0.35);
   display: flex;
   flex-direction: column;
@@ -386,7 +383,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1.5px solid #C5A880;
+  border: 1.5px solid var(--eh-gold);
   overflow: hidden;
 }
 
@@ -437,7 +434,7 @@
 
 .sidebar-popover-body {
   padding: 8px 6px;
-  background-color: #FFFFFF;
+  background-color: var(--eh-surface);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -451,7 +448,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #262320;
+  color: var(--eh-text-primary);
   text-decoration: none;
   background: transparent;
   border: none;
@@ -462,14 +459,14 @@
 }
 
 .sidebar-popover-item svg {
-  color: #1B4D3E;
+  color: var(--eh-primary);
   flex-shrink: 0;
   transition: transform 0.15s ease;
 }
 
 .sidebar-popover-item:hover {
-  background-color: #F4EFE6;
-  color: #1B4D3E;
+  background-color: var(--eh-surface-dim);
+  color: var(--eh-primary);
   font-weight: 600;
 }
 
@@ -479,39 +476,30 @@
 
 .sidebar-popover-divider {
   height: 1px;
-  background-color: #EDE7DC;
+  background-color: var(--eh-border);
   margin: 2px 8px;
 }
 
 .sidebar-popover-footer {
   padding: 6px;
-  background-color: #FFFFFF;
+  background-color: var(--eh-surface);
 }
 
 .sidebar-popover-item.danger {
-  color: #DC2626;
+  color: var(--eh-danger);
 }
 
 .sidebar-popover-item.danger svg {
-  color: #DC2626;
+  color: var(--eh-danger);
 }
 
 .sidebar-popover-item.danger:hover {
-  background-color: #FEE2E2;
-  color: #B91C1C;
+  background-color: var(--eh-danger-bg);
+  color: var(--eh-danger);
 }
 
 .sidebar-popover-item.danger:hover svg {
-  color: #B91C1C;
-}
-
-.sidebar-popover-item.danger svg {
-  color: var(--color-danger, #DC2626);
-}
-
-.sidebar-popover-item.danger:hover {
-  background-color: var(--color-danger-light, #FEF2F2);
-  color: var(--color-danger, #DC2626);
+  color: var(--eh-danger);
 }
 
 /* === Mobile Header & Backdrop === */

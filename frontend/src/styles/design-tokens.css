@@ -1,75 +1,78 @@
 /* ==========================================================================
    EnglishHub Design Tokens — Royal Academic & Minimalism Luxury System
-   Single Source of Truth for Colors, Typography, Spacing, Shadows & Radius
+   Dual-Theme Engine: Light (Quiet Academic Luxury) & Dark (Obsidian Atelier)
+   Ergonomic, High Legibility, Non-fatiguing Eye Care
    ========================================================================== */
 
 :root {
-  /* --- Canvas & Surfaces --- */
-  --eh-canvas: #faf8f5;
-  --eh-canvas-subtle: #f4efe6;
+  color-scheme: light;
+
+  /* --- Canvas & Surfaces (Alabaster & Clean Whites - No Muddy Sepia) --- */
+  --eh-canvas: #f8f9fa;
+  --eh-canvas-subtle: #f1f3f5;
   --eh-surface: #ffffff;
-  --eh-surface-dim: #f4efe6;
-  --eh-surface-container: #eae3d7;
-  --eh-surface-container-high: #ded5c6;
-  --eh-surface-container-highest: #c8bdab;
+  --eh-surface-dim: #f3f5f7;
+  --eh-surface-container: #e9ecef;
+  --eh-surface-container-high: #dee2e6;
+  --eh-surface-container-highest: #ced4da;
   --eh-surface-elevated: #ffffff;
-  --eh-surface-hover: #f7f4ee;
+  --eh-surface-hover: #f4f6f8;
 
   /* --- Typography --- */
   --eh-font-serif: 'Lora', Georgia, 'Times New Roman', serif;
   --eh-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --eh-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* --- Brand Core: Royal Sovereign Green & Deep Forest --- */
-  --eh-primary: #1b4d3e;
-  --eh-primary-hover: #133d30;
-  --eh-primary-active: #0e2c22;
-  --eh-primary-light: #eaf0e8;
-  --eh-primary-subtle: #f2f6f1;
-  --eh-primary-border: #c2d9c5;
+  /* --- Brand Core: Deep Sovereign Emerald --- */
+  --eh-primary: #164e3e;
+  --eh-primary-hover: #113f32;
+  --eh-primary-active: #0c2f25;
+  --eh-primary-light: #e8f3ef;
+  --eh-primary-subtle: #f0f7f4;
+  --eh-primary-border: #b8ded0;
   --eh-on-primary: #ffffff;
 
-  /* --- Metallic Elegance: Antique Gold & Brushed Brass --- */
-  --eh-gold: #c5a880;
-  --eh-gold-hover: #b3956c;
-  --eh-gold-light: #f5eedf;
-  --eh-gold-subtle: #faf6ee;
-  --eh-gold-dark: #8c5e14;
-  --eh-gold-border: #e2d2be;
+  /* --- Metallic Elegance: Restrained Champagne --- */
+  --eh-gold: #9a7e56;
+  --eh-gold-hover: #866d48;
+  --eh-gold-light: #f7f3ed;
+  --eh-gold-subtle: #fbf9f6;
+  --eh-gold-dark: #6e5532;
+  --eh-gold-border: #e8ded2;
 
-  /* --- Text & Warm Neutrals (Imperial Charcoal & Warm Umber) --- */
-  --eh-text-primary: #262320;
-  --eh-text-secondary: #736b63;
-  --eh-text-muted: #968e85;
+  /* --- Text & Neutrals (Deep Charcoal Slate - Non-glare) --- */
+  --eh-text-primary: #161b19;
+  --eh-text-secondary: #525e59;
+  --eh-text-muted: #7f8d87;
   --eh-text-inverse: #ffffff;
-  --eh-text-disabled: #b5ada3;
+  --eh-text-disabled: #a8b3ae;
 
-  /* --- Borders & Dividers --- */
-  --eh-border: #e6dfd5;
-  --eh-border-subtle: #f0ebe2;
-  --eh-border-strong: #d1c4b2;
-  --eh-border-hover: #c2a882;
-  --eh-border-focus: #1b4d3e;
+  /* --- Borders & Dividers: Whisper-quiet Hairlines --- */
+  --eh-border: #e5e8eb;
+  --eh-border-subtle: #edf0f2;
+  --eh-border-strong: #d1d6dc;
+  --eh-border-hover: #9a7e56;
+  --eh-border-focus: #164e3e;
 
   /* --- Status & Semantics (Refined Academic Tones) --- */
-  --eh-success: #17523f;
-  --eh-success-bg: #e7f3ec;
-  --eh-success-border: #b7dec8;
-  --eh-on-success: #17523f;
+  --eh-success: #155d47;
+  --eh-success-bg: #e6f4ee;
+  --eh-success-border: #b2dec9;
+  --eh-on-success: #155d47;
 
-  --eh-warning: #8c5e14;
-  --eh-warning-bg: #fbf4e6;
-  --eh-warning-border: #ecd8b0;
-  --eh-on-warning: #66430b;
+  --eh-warning: #855b16;
+  --eh-warning-bg: #fdf6ea;
+  --eh-warning-border: #edd5a4;
+  --eh-on-warning: #5a3c0c;
 
-  --eh-danger: #8f2222;
-  --eh-danger-bg: #fbebeb;
-  --eh-danger-border: #f3c5c5;
-  --eh-on-danger: #661515;
+  --eh-danger: #9c2727;
+  --eh-danger-bg: #fdf0f0;
+  --eh-danger-border: #f5c4c4;
+  --eh-on-danger: #6b1414;
 
-  --eh-info: #1b4d3e;
-  --eh-info-bg: #eaf0e8;
-  --eh-info-border: #c2d9c5;
+  --eh-info: #164e3e;
+  --eh-info-bg: #e8f3ef;
+  --eh-info-border: #b8ded0;
 
   /* --- 4 English Skills Tokens --- */
   --eh-skill-listening: #1e3a8a;
@@ -89,11 +92,11 @@
   --eh-skill-writing-border: #ecd8b0;
 
   /* --- Elevation Shadows --- */
-  --eh-shadow-xs: 0 1px 2px rgba(38, 35, 32, 0.04);
-  --eh-shadow-sm: 0 1px 3px rgba(38, 35, 32, 0.06), 0 0 0 1px var(--eh-border);
-  --eh-shadow-md: 0 4px 12px -2px rgba(38, 35, 32, 0.08), 0 0 0 1px var(--eh-border);
-  --eh-shadow-lg: 0 12px 32px -4px rgba(38, 35, 32, 0.12), 0 0 0 1px var(--eh-border);
-  --eh-shadow-focus: 0 0 0 3px rgba(27, 77, 62, 0.16);
+  --eh-shadow-xs: 0 1px 2px rgba(22, 27, 25, 0.04);
+  --eh-shadow-sm: 0 1px 3px rgba(22, 27, 25, 0.05), 0 0 0 1px var(--eh-border);
+  --eh-shadow-md: 0 4px 16px -2px rgba(22, 27, 25, 0.06), 0 0 0 1px var(--eh-border);
+  --eh-shadow-lg: 0 12px 32px -4px rgba(22, 27, 25, 0.08), 0 0 0 1px var(--eh-border);
+  --eh-shadow-focus: 0 0 0 3px rgba(22, 78, 62, 0.16);
 
   /* --- Radii --- */
   --eh-radius-xs: 2px;
@@ -108,4 +111,99 @@
   --eh-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --eh-transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --eh-transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   Dark Theme: Obsidian Atelier (Midnight Academic)
+   Velvet Obsidian Slate with Calibrated Ambient Luminance
+   ========================================================================== */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* --- Canvas & Surfaces --- */
+  --eh-canvas: #0c100e;
+  --eh-canvas-subtle: #101513;
+  --eh-surface: #131917;
+  --eh-surface-dim: #101513;
+  --eh-surface-container: #19221f;
+  --eh-surface-container-high: #202b27;
+  --eh-surface-container-highest: #283631;
+  --eh-surface-elevated: #1a2320;
+  --eh-surface-hover: #18211e;
+
+  /* --- Brand Core: Luminous Emerald --- */
+  --eh-primary: #2ba880;
+  --eh-primary-hover: #33be92;
+  --eh-primary-active: #228b69;
+  --eh-primary-light: #132b22;
+  --eh-primary-subtle: #0f221b;
+  --eh-primary-border: #1e4d3c;
+  --eh-on-primary: #061510;
+
+  /* --- Metallic Elegance: Soft Champagne Glow --- */
+  --eh-gold: #d5bc98;
+  --eh-gold-hover: #e2ccac;
+  --eh-gold-light: #2c251c;
+  --eh-gold-subtle: #1e1913;
+  --eh-gold-dark: #f0deb8;
+  --eh-gold-border: #4d3f2e;
+
+  /* --- Text & Neutrals (Soft Pearl - Zero Halation) --- */
+  --eh-text-primary: #e3eae6;
+  --eh-text-secondary: #8c9d96;
+  --eh-text-muted: #5f7068;
+  --eh-text-inverse: #0c100e;
+  --eh-text-disabled: #44514b;
+
+  /* --- Borders & Dividers: Frosted Translucent Lines --- */
+  --eh-border: #212c27;
+  --eh-border-subtle: #18221e;
+  --eh-border-strong: #2c3a34;
+  --eh-border-hover: #d5bc98;
+  --eh-border-focus: #2ba880;
+
+  /* --- Status & Semantics (Calibrated for Dark Contrast) --- */
+  --eh-success: #34d399;
+  --eh-success-bg: #0f291e;
+  --eh-success-border: #1a4d39;
+  --eh-on-success: #34d399;
+
+  --eh-warning: #fbbf24;
+  --eh-warning-bg: #2b210c;
+  --eh-warning-border: #4d3c16;
+  --eh-on-warning: #fbbf24;
+
+  --eh-danger: #f87171;
+  --eh-danger-bg: #2d1414;
+  --eh-danger-border: #522020;
+  --eh-on-danger: #f87171;
+
+  --eh-info: #38bdf8;
+  --eh-info-bg: #0d2433;
+  --eh-info-border: #17425e;
+
+  /* --- 4 English Skills Tokens --- */
+  --eh-skill-listening: #60a5fa;
+  --eh-skill-listening-bg: #132238;
+  --eh-skill-listening-border: #1e3a63;
+
+  --eh-skill-speaking: #a78bfa;
+  --eh-skill-speaking-bg: #221838;
+  --eh-skill-speaking-border: #3b2a60;
+
+  --eh-skill-reading: #34d399;
+  --eh-skill-reading-bg: #102920;
+  --eh-skill-reading-border: #1a4736;
+
+  --eh-skill-writing: #fbbf24;
+  --eh-skill-writing-bg: #2e220a;
+  --eh-skill-writing-border: #523c11;
+
+  /* --- Elevation Shadows (Deep Ambient Glow) --- */
+  --eh-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --eh-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--eh-border);
+  --eh-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--eh-border);
+  --eh-shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.75), 0 0 0 1px var(--eh-border);
+  --eh-shadow-focus: 0 0 0 3px rgba(43, 168, 128, 0.25);
 }

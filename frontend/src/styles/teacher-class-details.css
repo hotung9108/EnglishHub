@@ -153,8 +153,8 @@
 }
 
 .tcd-class-select:hover {
-  background-color: #ffffff;
-  border-color: #94a3b8;
+  background-color: var(--eh-surface);
+  border-color: var(--eh-border-hover);
 }
 
 .tcd-btn-primary {
@@ -182,8 +182,9 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background-color: #ffffff;
-  color: #334155;
+  background-color: var(--eh-surface);
+  color: var(--eh-text-primary);
+  border: 1px solid var(--eh-border);
   font-weight: 600;
   font-size: 13px;
   padding: 9px 15px;
@@ -355,7 +356,7 @@
    4. Tab 1: Gradebook & Roster
    -------------------------------------------------------------------------- */
 .tcd-card-section {
-  background-color: #ffffff;
+  background-color: var(--eh-surface);
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 16px;
   padding: 24px;
@@ -383,7 +384,7 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--eh-text-muted);
   pointer-events: none;
 }
 
@@ -394,14 +395,14 @@
   border-radius: 10px;
   border: 1px solid var(--border-color, #e2e8f0);
   outline: none;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--eh-surface-dim);
+  color: var(--eh-text-primary);
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .tcd-search-input:focus {
   border-color: var(--primary, #1b4d3e);
-  background-color: #ffffff;
+  background-color: var(--eh-surface);
   box-shadow: 0 0 0 3px rgba(27, 77, 62, 0.12);
 }
 

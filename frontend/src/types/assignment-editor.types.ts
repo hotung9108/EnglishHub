@@ -149,10 +149,116 @@ export interface ListeningConfig {
   aiInstruction?: string;
 }
 
+// ---------------- MODULE ITEM TYPE ----------------
+export interface EditorModuleItem {
+  id: string; // client UUID (e.g. `mod-${Date.now()}-${idx}`)
+  dbId?: number; // backend module id if editing existing
+  skill: AssignmentSkill; // 'writing' | 'speaking' | 'reading' | 'listening'
+  title?: string; // Optional custom title e.g. "Passage 1", "Task 1: Chart Description"
+  orderIndex: number;
+  maxScore: number;
+  config: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+}
+
+// ---------------- FACTORY HELPERS ----------------
+export function createDefaultWritingConfig(taskType: WritingTaskType = 'task2'): WritingConfig {
+  return {
+    taskType,
+    promptText: '',
+    minWords: taskType === 'task1' ? 150 : 250,
+    scale: '10',
+    rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
+    enableAi: true,
+    aiInstruction: '',
+    enablePlagiarismCheck: true,
+    modelAnswer: '',
+    attachments: []
+  };
+}
+
+export function createDefaultSpeakingConfig(partType: SpeakingPartType = 'part2'): SpeakingConfig {
+  return {
+    promptText: '',
+    aiInstruction: '',
+    partType,
+    cueCardTopic: '',
+    cueCardBullets: [],
+    prepTimeSeconds: 60,
+    speakingTimeSeconds: 120,
+    maxRetries: 3,
+    examinerSampleAudioUrl: '',
+    examinerTranscript: '',
+    followUpQuestions: [],
+    rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
+    enableAi: true,
+    aiModel: 'Whisper V3 Large'
+  };
+}
+
+export function createDefaultReadingConfig(): ReadingConfig {
+  return {
+    passageTitle: '',
+    passageContent: '',
+    questions: [],
+    paragraphs: [],
+    timeLimitMinutes: 20,
+    enableAiExplanation: true,
+    aiInstruction: ''
+  };
+}
+
+export function createDefaultListeningConfig(): ListeningConfig {
+  return {
+    audioUrl: '',
+    transcript: '',
+    questions: [],
+    audioDurationSeconds: 180,
+    playbackLimit: 'double',
+    hideTranscriptUntilGraded: true,
+    enableAiDistractorCheck: true,
+    aiInstruction: ''
+  };
+}
+
+export function createDefaultModuleItem(
+  skill: AssignmentSkill,
+  orderIndex: number,
+  title?: string
+): EditorModuleItem {
+  const timestamp = Date.now();
+  const id = `mod-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+  
+  let config: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
+  switch (skill) {
+    case 'writing':
+      config = createDefaultWritingConfig();
+      break;
+    case 'speaking':
+      config = createDefaultSpeakingConfig();
+      break;
+    case 'reading':
+      config = createDefaultReadingConfig();
+      break;
+    case 'listening':
+      config = createDefaultListeningConfig();
+      break;
+  }
+
+  return {
+    id,
+    skill,
+    title: title || '',
+    orderIndex,
+    maxScore: 10,
+    config
+  };
+}
+
 // Combined Assignment Editor State
 export interface AssignmentEditorData extends BaseAssignmentData {
-  writing: WritingConfig;
-  speaking: SpeakingConfig;
-  reading: ReadingConfig;
-  listening: ListeningConfig;
+  modules: EditorModuleItem[];
+  writing?: WritingConfig;
+  speaking?: SpeakingConfig;
+  reading?: ReadingConfig;
+  listening?: ListeningConfig;
 }

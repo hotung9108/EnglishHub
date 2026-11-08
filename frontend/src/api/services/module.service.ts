@@ -52,6 +52,7 @@ export interface UpdateModulePayload {
   instructions?: string;
   aiInstruction?: string;
   maxScore?: number;
+  orderIndex?: number;
 }
 
 export interface CreatedModuleResponse extends MessageResponse {

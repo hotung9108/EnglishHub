@@ -181,10 +181,10 @@
   transition: width 0.6s ease;
 }
 
-.skill-bar-fill.listening { background-color: var(--eh-skill-listening, #1E3A8A); }
-.skill-bar-fill.reading { background-color: #10b981; }
-.skill-bar-fill.writing { background-color: #f59e0b; }
-.skill-bar-fill.speaking { background-color: #8b5cf6; }
+.skill-bar-fill.listening { background-color: var(--eh-skill-listening, #1e3a8a); }
+.skill-bar-fill.reading { background-color: var(--eh-skill-reading, #16533d); }
+.skill-bar-fill.writing { background-color: var(--eh-skill-writing, #8c5e14); }
+.skill-bar-fill.speaking { background-color: var(--eh-skill-speaking, #5b21b6); }
 
 /* AI Recommendation Box */
 .ai-recommend-box {

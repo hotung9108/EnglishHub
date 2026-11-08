@@ -460,7 +460,7 @@ export const StudentFeedback: React.FC = () => {
 
                 {item.score && (
                   <span className="grade-score-pill high">
-                    <Star size={13} fill="#059669" />
+                    <Star size={13} fill="var(--eh-success, #155d47)" />
                     {item.score}
                   </span>
                 )}

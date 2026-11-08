@@ -81,7 +81,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #991B1B;
+  color: var(--eh-danger);
   font-size: 14px;
   font-weight: 500;
 }
@@ -90,12 +90,12 @@
   margin: 16px 24px;
   padding: 14px 18px;
   border-radius: 8px;
-  background-color: var(--color-success-light, #F0FDF4);
-  border: 1px solid #BBF7D0;
+  background-color: var(--eh-success-bg);
+  border: 1px solid var(--eh-success-border);
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #166534;
+  color: var(--eh-success);
   font-size: 14px;
   font-weight: 600;
 }
@@ -420,36 +420,39 @@
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
-  background-color: #F1F5F9;
-  color: #475569;
+  background-color: var(--eh-surface-dim);
+  color: var(--eh-text-secondary);
+  border: 1px solid var(--eh-border);
   transition: all 0.15s ease;
 }
 
 .exam-nav-btn:hover {
-  background-color: #E2E8F0;
+  background-color: var(--eh-surface-hover);
+  border-color: var(--eh-border-hover);
 }
 
 .exam-nav-btn.is-active {
-  background-color: var(--eh-primary, #1B4D3E);
-  color: #FFFFFF;
-  border-color: var(--eh-primary, #1B4D3E);
+  background-color: var(--eh-primary);
+  color: var(--eh-on-primary, #ffffff);
+  border-color: var(--eh-primary);
 }
 
 .exam-nav-btn.is-bookmarked {
-  background-color: #FEF08A;
-  color: #854D0E;
-  border-color: #FDE047;
+  background-color: var(--eh-gold-light);
+  color: var(--eh-gold-dark);
+  border-color: var(--eh-gold-border);
 }
 
 .exam-nav-btn.is-answered {
-  background-color: #DBEAFE;
-  color: var(--eh-primary-hover, #133D30);
+  background-color: var(--eh-primary-light);
+  color: var(--eh-primary);
+  border-color: var(--eh-primary-border);
 }
 
 .exam-nav-btn.is-active.is-bookmarked {
-  background-color: var(--eh-primary, #1B4D3E);
-  color: #FFFFFF;
-  box-shadow: 0 0 0 2px #EAB308;
+  background-color: var(--eh-primary);
+  color: var(--eh-on-primary, #ffffff);
+  box-shadow: 0 0 0 2px var(--eh-gold);
 }
 
 .exam-skeleton-group {
@@ -570,13 +573,13 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid #CBD5E1;
+  border: 2px solid var(--eh-border-strong, #CBD5E1);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
-  background-color: #FFFFFF;
+  background-color: var(--eh-surface, #FFFFFF);
   transition: border-color 0.15s;
 }
 

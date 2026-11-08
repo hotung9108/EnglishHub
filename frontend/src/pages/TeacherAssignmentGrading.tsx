@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  ArrowLeft, Edit2, FileText, Search, Bell, 
+  ArrowLeft, Edit2, FileText, Search, 
   RefreshCw, AlertCircle, CheckCircle2, Lock,
   Users, Clock, Award
 } from 'lucide-react';
@@ -588,17 +588,6 @@ export const TeacherAssignmentGrading: React.FC = () => {
                 className="teacher-search-input"
               />
             </div>
-
-            {metrics.missingCount > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Bell}
-                onClick={() => showToast(isVi ? `Đã gửi thông báo nhắc nộp bài tới ${metrics.missingCount} học viên` : `Sent reminders to ${metrics.missingCount} students`)}
-              >
-                {t('assignmentDetails.btnRemind')} ({metrics.missingCount}{t('assignmentDetails.unitFriends')})
-              </Button>
-            )}
           </div>
         </div>
 
@@ -693,13 +682,7 @@ export const TeacherAssignmentGrading: React.FC = () => {
                       </Button>
                     )}
                     {student.gradingStatus === 'none' && (
-                      <Button 
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => showToast(isVi ? `Đã gửi nhắc nhở tới ${student.name}` : `Reminder sent to ${student.name}`)}
-                      >
-                        {t('assignmentDetails.btnSendReminder')}
-                      </Button>
+                      <span className="text-muted text-xs">—</span>
                     )}
                   </td>
                 </tr>

@@ -63,16 +63,17 @@ Theo chỉ đạo của người dùng:
 
 ---
 
-## 3. CHI TIẾT CÁC SƠ ĐỒ ĐƯỢC CHỈNH SỬA BẰNG THUẬT TOÁN PILLOW
+## 3. CHI TIẾT CÁC SƠ ĐỒ ĐƯỢC CHỈNH SỬA VÀ QUY TRÌNH KIỂM TOÁN TỰ ĐỘNG BẰNG SUBAGENT
 
 ### 3.1. Sơ đồ AD17 - Làm bài tập nói (`final/images/Activity Diagram/AD17 - Làm bài tập nói.png`)
-* **Lỗi logic ban đầu**:
+* **Lỗi logic ban đầu & khiếm khuyết đồ họa**:
   - Ghi nhầm dịch vụ lưu trữ là "Cloudflare R2" trong khi hệ thống sử dụng **MinIO S3**.
-  - Luồng quyết định "Hài lòng với bản ghi âm? -> Không": Mũi tên từ hộp "Xóa bản ghi tạm và ghi âm lại" không lặp lại bước ghi âm mà kết thúc đột ngột hoặc chỉ chéo gây hiểu nhầm.
-* **Nội dung đã sửa**:
+  - Luồng quyết định "Hài lòng với bản ghi âm? -> Không": Mũi tên từ hộp "Xóa bản ghi tạm và ghi âm lại" lặp luồng sai hướng, xuất hiện mũi tên thừa đâm ngang ở giữa thân line đứng `Không` và vòng lặp loopback gập góc đè lên văn bản.
+* **Nội dung đã sửa chuẩn hóa (Pixel-Perfect Reconstruction)**:
   - Thay thế toàn bộ cụm "Cloudflare R2" bằng "MinIO S3".
-  - Vẽ lại cung lặp: từ quyết định "Không" $\rightarrow$ "Xóa bản ghi tạm và thực hiện ghi âm lại" $\rightarrow$ quay ngược lên bước "Nhấn Ghi âm để bắt đầu".
-  - Nhánh "Có" $\rightarrow$ "Tải file ghi âm lên MinIO S3 qua Presigned URL" $\rightarrow$ nhập vào điểm nối hoàn thành câu trả lời.
+  - Tái thiết kế toàn bộ khu vực dưới-trái: xóa sạch mũi tên rác, căn lề hành lang trái 35px.
+  - Vẽ lại cung lặp: từ cạnh trái hộp `Xóa bản ghi tạm và ghi âm lại` tại `(85, 436)` $\rightarrow$ rẽ trái ra tọa độ `x=37` $\rightarrow$ đi thẳng đứng lên `y=185` $\rightarrow$ rẽ phải vào tâm mũi tên `(185, 185)` dẫn vào hộp `Nhấn "Ghi âm"`.
+  - Nhánh `Không`: chỉ duy nhất 1 đầu mũi tên chuẩn UML cắm thẳng vào đỉnh merge diamond tại `(332, 515)`.
 * **Sơ đồ logic chuẩn hóa**:
 ```mermaid
 flowchart TD
@@ -94,11 +95,16 @@ flowchart TD
 ---
 
 ### 3.2. Sơ đồ AD27 - Hỗ trợ chấm chữa bài nói bằng AI (`final/images/Activity Diagram/AD27 - Hỗ trợ chấm chữa bài nói bằng AI.png`)
-* **Lỗi logic ban đầu**:
-  - Giữa luồng sau bước hệ thống lấy URL âm thanh từ S3 và chuyển đổi định dạng, xuất hiện một ký hiệu kết thúc (bullseye) nằm ngay giữa sơ đồ, khiến tiến trình phân tích AI bị ngắt quãng hoàn toàn về mặt ngữ nghĩa UML.
-* **Nội dung đã sửa**:
-  - Dùng thuật toán đồ họa xóa bỏ ký hiệu kết thúc sai lệch.
-  - Tái tạo đường chuyển tiếp liên tục nối liền từ bước chuẩn bị tệp âm thanh xuống bước gửi yêu cầu sang Google Gemini 2.5 Flash SDK với prompt chuyên biệt đánh giá Speaking (Pronunciation, Fluency, Grammar, Vocabulary).
+* **Lỗi logic ban đầu & khiếm khuyết swimlane nghiêm trọng**:
+  - Xuất hiện nút kết thúc (bullseye) cụt nằm lơ lửng ngay giữa sơ đồ.
+  - Toàn bộ 3 hộp tác vụ phân tích AI cốt lõi (`Phân tích từ phát âm sai (IPA)...`, `Đánh giá nhịp điệu và ngữ điệu...`, `Đề xuất điểm tiêu chí...`) bị đặt nhầm vào cột **Giáo viên** thay vì cột **AI**, vi phạm nghiêm trọng bản chất của ca sử dụng UC027 và làm sai lệch sơ đồ chuẩn AD26.
+  - Đường kẻ phân chia swimlane bị thủng lỗ trắng 20px do thao tác xóa trước đó.
+* **Nội dung đã sửa chuẩn hóa**:
+  - Hàn gắn 100% đường kẻ dọc phân cách swimlane (màu `#CCCCCC`, nét liền mạch xuyên suốt).
+  - Tái phân bổ chính xác 3 làn bơi (3 Swimlanes):
+    * **Làn Hệ thống**: Nhận yêu cầu $\rightarrow$ Lấy audio URL $\rightarrow$ Gửi S3 URL & Rubric sang Gemini $\rightarrow$ Nhận phản hồi $\rightarrow$ Lưu `ai_suggested_score`, annotations $\rightarrow$ Cập nhật giao diện chấm $\rightarrow$ Kết thúc tại bullseye chuẩn ở đáy làn Hệ thống `(221, 924)`.
+    * **Làn AI**: Tiếp nhận audio & rubric $\rightarrow$ Phân tích phát âm sai (IPA) $\rightarrow$ Đánh giá nhịp điệu, ngữ điệu & độ trôi chảy $\rightarrow$ Đề xuất điểm tiêu chí (Fluency, Pronunciation, Grammar, Vocab) và sinh feedback $\rightarrow$ Chuyển giao sang Hệ thống.
+    * **Làn Giáo viên**: Khởi tạo yêu cầu gợi ý chấm $\rightarrow$ Chờ AI phân tích $\rightarrow$ Xem xét transcript & điểm tiêu chí $\rightarrow$ Điều chỉnh hoặc xác nhận kết quả cuối.
 * **Sơ đồ logic chuẩn hóa**:
 ```mermaid
 flowchart TD
@@ -115,11 +121,13 @@ flowchart TD
 ---
 
 ### 3.3. Sơ đồ AD28 - Chấm bài đọc (`final/images/Activity Diagram/AD28 - Chấm bài đọc.png`)
-* **Lỗi logic ban đầu**:
-  - Sử dụng trạng thái `NEEDS_REVIEW` ("Ghi trạng thái Cần giáo viên duyệt lại") làm điều kiện chuyển đổi. Tuy nhiên trong Domain Entity `GradingStatus` của Backend chỉ tồn tại các trạng thái: `PENDING`, `AI_FAILED`, `GRADED`. Việc đưa trạng thái không có trong code làm sai lệch đặc tả CSDL.
-* **Nội dung đã sửa**:
-  - Loại bỏ hoàn toàn chuỗi `NEEDS_REVIEW`.
-  - Thay bằng luồng chuẩn: Hệ thống tự động so khớp `selected_options` với `correct_answer`, tính điểm số thực tế, lưu bản ghi vào `gradings`, gán `reviewed_by = null` và hiển thị để Giáo viên có thể duyệt hoặc điều chỉnh khi cần thiết.
+* **Lỗi logic & khiếm khuyết viền bao**:
+  - Sử dụng trạng thái `NEEDS_REVIEW` không có trong Domain Entity `GradingStatus` (`PENDING`, `AI_FAILED`, `GRADED`).
+  - Đường viền bo tròn của hộp hành động bị mất (0 border pixels) khiến hộp bị thủng đáy.
+* **Nội dung đã sửa chuẩn hóa**:
+  - Dựng lại hộp hành động bo tròn khép kín 100% tại tọa độ `[(200, 283), (460, 333)]` với bán kính góc cong `radius=12`, viền đen `width=1` sắc nét.
+  - Cập nhật text chính xác: `Lưu điểm vào gradings, ghi nhận reviewed_by và chuyển Giáo viên xác nhận`.
+  - Kết nối hoàn hảo mũi tên đi vào từ đỉnh và mũi tên đi ra từ đáy dẫn sang làn Giáo viên.
 * **Sơ đồ logic chuẩn hóa**:
 ```mermaid
 flowchart TD
@@ -137,12 +145,14 @@ flowchart TD
 ---
 
 ### 3.4. Sơ đồ AD25 - Hỗ trợ chấm chữa bài bằng AI (Chung) (`final/images/Activity Diagram/AD25 - Hỗ trợ chấm chữa bài bằng AI (Chung).png`)
-* **Lỗi logic ban đầu**:
-  - Ở cột Giáo viên (Teacher swimlane), có một ô hành động ghi: `Lưu "ai_suggested_score", "ai_feedback" vào bảng "gradings" ("method = AI")`.
-  - Đây là vi phạm nghiêm trọng nguyên tắc phân chia trách nhiệm (Separation of Concerns) trong UML: Người dùng (con người) không bao giờ trực tiếp thao tác ghi dữ liệu vào bảng cơ sở dữ liệu.
-* **Nội dung đã sửa**:
-  - Tái tạo hộp hành động tại làn Giáo viên thành: `Xem xét điểm đề xuất và nhận xét do AI phân tích`.
-  - Thao tác lưu giữ dữ liệu vào cơ sở dữ liệu được đảm nhận hoàn toàn bởi làn Hệ thống (System swimlane) khi giáo viên bấm "Xác nhận kết quả cuối".
+* **Lỗi logic & trùng lặp hộp**:
+  - Ở làn Giáo viên có tới 3 hộp hành động liên tiếp, trong đó Giáo viên lại làm thao tác CSDL: `Lưu vào bảng gradings`.
+  - Nút bullseye kết thúc đặt tách rời bên ngoài làn xử lý.
+* **Nội dung đã sửa chuẩn hóa**:
+  - Thiết kế lại chuẩn hóa luồng 3 làn bơi:
+    * **Giáo viên**: Bấm yêu cầu $\rightarrow$ Đợi phản hồi $\rightarrow$ Xem xét điểm đề xuất & feedback $\rightarrow$ Bấm xác nhận kết quả.
+    * **AI**: Nhận bài nộp & barem $\rightarrow$ Phân tích ngữ pháp/từ vựng $\rightarrow$ Đề xuất điểm số & nhận xét.
+    * **Hệ thống**: Tiếp nhận yêu cầu $\rightarrow$ Gọi AI $\rightarrow$ Hiển thị kết quả lên giao diện $\rightarrow$ Sau khi GV duyệt, Lưu `final_score`, `final_feedback` vào CSDL $\rightarrow$ Kết thúc chuẩn xác tại bullseye `(635, 866)` nằm trực tiếp dưới hộp lưu DB.
 * **Sơ đồ logic chuẩn hóa**:
 ```mermaid
 sequenceDiagram
@@ -169,18 +179,69 @@ sequenceDiagram
 ---
 
 ### 3.5. Sơ đồ AD16 - Làm bài tập viết (`final/images/Activity Diagram/AD16 - Làm bài tập viết.png`)
-* **Lỗi logic ban đầu**:
-  - Hộp lưu bài làm chỉ ghi sơ sài "Lưu bài nộp", không phản ánh rõ 2 cơ chế nộp bài viết của hệ thống: nhập văn bản trực tiếp qua Text Editor (`content`) hoặc tải tệp tài liệu luận văn (`doc_storage_key`).
-* **Nội dung đã sửa**:
-  - Cập nhật nội dung chính xác: `Lưu bài gõ (content) hoặc tệp S3 (doc_storage_key) vào answers (gắn với submission_modules tương ứng)`.
+* **Lỗi logic & khuyết tật viền**:
+  - Thao tác xóa text cũ trước đó làm mất toàn bộ cạnh đáy của hộp hành động (hình chữ U hở).
+* **Nội dung đã sửa chuẩn hóa**:
+  - Tái tạo trọn vẹn hộp chữ nhật bo tròn đóng kín `[(584, 380), (946, 448)]` (`radius=12`, viền `width=1`).
+  - Ghi chuẩn xác nội dung nộp bài: `Lưu bài gõ (content) hoặc tệp S3 (doc_storage_key) vào answers (gắn với submission_modules tương ứng)`.
+  - Căn chỉnh text cân đối, kết nối mũi tên vào/ra hoàn hảo.
 
 ---
 
 ### 3.6. Sơ đồ AD36 - Xem báo cáo và thống kê học tập (`final/images/Activity Diagram/AD36 - Xem báo cáo và thống kê học tập.png`)
-* **Lỗi logic ban đầu**:
-  - Sơ đồ chứa bộ lọc "theo chi nhánh". Trong khi đó, hệ thống EnglishHub được thiết kế theo mô hình trung tâm đơn lẻ / phòng đào tạo thống nhất, quản trị các Khóa học (`courses`), Lớp học (`classes`) và Giáo viên (`teachers`), không chia multi-branch.
-* **Nội dung đã sửa**:
-  - Điều chỉnh bộ tiêu chí lọc thống kê: `theo khóa học/lớp/giáo viên`.
+* **Lỗi kiến trúc & viền hộp**:
+  - Bộ lọc "theo chi nhánh" không đúng với mô hình thực tế của EnglishHub.
+  - Hộp hành động bị mất cạnh đáy tương tự AD16.
+  - Mã nguồn LaTeX dòng 1497 của `final/reports/Chapter/YeuCauChucNang.tex` vẫn còn giữ cụm từ cũ.
+* **Nội dung đã sửa chuẩn hóa**:
+  - Dựng lại hộp bo tròn kín hoàn toàn `[(40, 171), (290, 219)]` với bán kính `radius=12`.
+  - Text chuẩn hóa: `theo khóa học/lớp/giáo viên`.
+  - Đồng bộ dòng 1497 trong `final/reports/Chapter/YeuCauChucNang.tex` thành: `...cho phép lọc theo khóa học/lớp/giáo viên và xuất dữ liệu báo cáo...`.
+
+---
+
+## 4. BÁO CÁO NGHIỆM THU TỰ ĐỘNG CỦA SUBAGENT QA TESTER
+
+Một subagent độc lập (`diagram-qa-tester`, Conversation ID: `744940ef-b782-4d8d-a610-e4e26b07e499`) đã được khởi tạo để thực thi kiểm toán tự động bằng thuật toán thị giác máy tính OpenCV và phân tích ngữ nghĩa UML:
+
+| Biểu đồ kiểm toán | Kiểm tra hình học & viền bao (OpenCV Contours) | Kiểm tra ranh giới làn bơi & phân vai (Swimlane Integrity) | Kiểm tra mũi tên, đường nối & Bullseye | Kết luận Subagent |
+|:---|:---:|:---:|:---:|:---:|
+| **AD16 - Làm bài tập viết** | PASS (Viền khép kín 100%, không hở đáy) | PASS (Học viên thực hiện lưu đúng answers) | PASS (Mũi tên vào/ra kết nối hoàn hảo) | **PASS - ĐẠT CHUẨN** |
+| **AD17 - Làm bài tập nói** | PASS (Tất cả hộp bo tròn nguyên vẹn) | PASS (Tác nhân Học viên & MinIO S3 rõ ràng) | PASS (Mũi tên loopback chuẩn, không có mũi tên đâm ngang) | **PASS - ĐẠT CHUẨN** |
+| **AD25 - Chấm bằng AI (Chung)** | PASS (Viền các hộp rõ ràng, không đè lấn) | PASS (GV chỉ duyệt, Hệ thống ghi DB, AI phân tích) | PASS (Bullseye thẳng trục dưới hộp DB) | **PASS - ĐẠT CHUẨN** |
+| **AD27 - Chấm bài nói AI** | PASS (Viền các hộp rõ ràng, thẩm mỹ cao) | PASS (3 hộp AI đã nằm đúng làn AI; line phân cách liền mạch) | PASS (Bullseye ở đáy làn Hệ thống, mũi tên chuyển giao chuẩn) | **PASS - ĐẠT CHUẨN** |
+| **AD28 - Chấm bài đọc** | PASS (Hộp đóng kín 100%, không mất border) | PASS (Hệ thống so khớp & tính điểm, GV xem duyệt) | PASS (Mũi tên chuyển giao giữa 2 làn mượt mà) | **PASS - ĐẠT CHUẨN** |
+| **AD36 - Báo cáo thống kê** | PASS (Hộp đóng kín 100%, font Arial sắc nét) | PASS (Bộ lọc khớp 100% với LaTeX dòng 1497) | PASS (Đường nối và luồng tuần tự hoàn hảo) | **PASS - ĐẠT CHUẨN** |
+
+**Tổng kết Subagent QA**: `PASS - PERFECT FIDELITY (6/6 BIỂU ĐỒ ĐẠT CHUẨN 100%)`.
+
+---
+
+## 5. TÍCH HỢP PLANTUML MCP VÀ ĐỒNG BỘ OVERLEAF CLOUD TOÀN DIỆN
+
+### 5.1. Tích hợp PlantUML MCP & Kho mã nguồn `.puml`
+Nhằm đảm bảo tính chính quy, chuẩn hóa và khả năng bảo trì lâu dài, toàn bộ các biểu đồ đã được chuyển đổi sang mã nguồn PlantUML chuẩn hóa:
+- **Plugin MCP**: Khởi tạo plugin tại `.agents/plugins/plantuml/` tích hợp `plantuml-mcp-server` qua stdio JSON-RPC.
+- **Thư mục lưu trữ mã nguồn**: `docs/diagrams/activity/`:
+  * `AD16_LamBaiTapViet.puml`
+  * `AD17_LamBaiTapNoi.puml`
+  * `AD25_HoTroChamChuaBaiBangAI_Chung.puml`
+  * `AD27_HoTroChamChuaBaiNoiBangAI.puml`
+  * `AD28_ChamBaiDoc.puml`
+  * `AD36_XemBaoCaoVaThongKeHocTap.puml`
+- **Công cụ biên dịch**: `scripts/plantuml_client.py` và `scripts/compile_activity_diagrams.py` xuất ảnh 250 DPI siêu nét (>3500px).
+
+### 5.2. Danh mục đồng bộ Overleaf Cloud (`Project_1` - Project ID: `6a8d98489e5b4896f3515c11`)
+
+| Tệp tin | Vị trí trên Overleaf Cloud | Entity ID trên Cloud | Kích thước | Trạng thái |
+|:---|:---|:---:|:---:|:---:|
+| `AD16 - Làm bài tập viết.png` | `final/images/Activity Diagram/` | `6aefe69da934e0abb1d549aa` | 133.6 KB | **Đã đồng bộ** |
+| `AD17 - Làm bài tập nói.png` | `final/images/Activity Diagram/` | `6aefe6a18762a10b6eced39a` | 138.3 KB | **Đã đồng bộ** |
+| `AD25 - Hỗ trợ chấm chữa bài bằng AI (Chung).png` | `final/images/Activity Diagram/` | `6aefe6a75d4ccedd23a5e695` | 176.7 KB | **Đã đồng bộ** |
+| `AD27 - Hỗ trợ chấm chữa bài nói bằng AI.png` | `final/images/Activity Diagram/` | `6aefe6af5d645cc783cf4f20` | 207.3 KB | **Đã đồng bộ** |
+| `AD28 - Chấm bài đọc.png` | `final/images/Activity Diagram/` | `6aefe6b3583be0fcd1274ced` | 145.3 KB | **Đã đồng bộ** |
+| `AD36 - Xem báo cáo và thống kê học tập.png` | `final/images/Activity Diagram/` | `6aefe6b78762a10b6ecedb84` | 151.9 KB | **Đã đồng bộ** |
+| `YeuCauChucNang.tex` | `final/reports/Chapter/` | `6aefe6bd8762a10b6ecedfb7` | 61.0 KB | **Đã đồng bộ** |
 
 ---
 

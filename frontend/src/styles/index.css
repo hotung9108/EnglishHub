@@ -3,112 +3,112 @@
 
 :root {
   /* ==========================================================================
-     Design Tokens — Royal Academic Theme (Warm Ivory & Sovereign Green)
+     Design Tokens — Unified Dual-Theme Mapping (Synced with design-tokens.css)
      ========================================================================== */
 
-  /* Canvas (Warm Ivory #FAF8F5) & Surface (Alabaster White #FFFFFF) */
-  --bg-canvas: #faf8f5;
-  --background: #faf8f5;
-  --surface: #ffffff;
-  --surface-bright: #ffffff;
-  --surface-container-lowest: #ffffff;
-  --surface-dim: #f4efe6;
-  --surface-container-low: #f4efe6;
-  --surface-muted: #f4efe6;
-  --surface-container: #eae3d7;
-  --surface-container-high: #ded5c6;
-  --surface-container-highest: #c8bdab;
-  --inverse-surface: #1e1b18;
-  --inverse-on-surface: #faf8f5;
+  /* Canvas & Surface */
+  --bg-canvas: var(--eh-canvas);
+  --background: var(--eh-canvas);
+  --surface: var(--eh-surface);
+  --surface-bright: var(--eh-surface);
+  --surface-container-lowest: var(--eh-surface);
+  --surface-dim: var(--eh-surface-dim);
+  --surface-container-low: var(--eh-surface-dim);
+  --surface-muted: var(--eh-surface-dim);
+  --surface-container: var(--eh-surface-container);
+  --surface-container-high: var(--eh-surface-container-high);
+  --surface-container-highest: var(--eh-surface-container-highest);
+  --inverse-surface: var(--eh-text-primary);
+  --inverse-on-surface: var(--eh-canvas);
 
-  /* Primary text (Imperial Charcoal #262320) & Secondary text (Warm Umber #736B63) */
-  --text-primary: #262320;
-  --on-surface: #262320;
-  --on-background: #262320;
-  --text-secondary: #736b63;
-  --text-muted: #736b63;
-  --on-surface-variant: #736b63;
+  /* Primary text & Secondary text */
+  --text-primary: var(--eh-text-primary);
+  --on-surface: var(--eh-text-primary);
+  --on-background: var(--eh-text-primary);
+  --text-secondary: var(--eh-text-secondary);
+  --text-muted: var(--eh-text-muted);
+  --on-surface-variant: var(--eh-text-secondary);
 
-  /* Border (Antique Gold Line #E6DFD5 & Brushed Brass #D1C4B2) */
-  --border: #e6dfd5;
-  --border-color: #e6dfd5;
-  --border-subtle: #f0ebe2;
-  --border-strong: #d1c4b2;
-  --border-hover: #c2a882;
-  --outline: #d1c4b2;
-  --outline-variant: #e6dfd5;
+  /* Borders */
+  --border: var(--eh-border);
+  --border-color: var(--eh-border);
+  --border-subtle: var(--eh-border-subtle);
+  --border-strong: var(--eh-border-strong);
+  --border-hover: var(--eh-border-hover);
+  --outline: var(--eh-border-strong);
+  --outline-variant: var(--eh-border-subtle);
 
-  /* Accent (Royal Sovereign Green #1B4D3E) & Royal Gold (#C5A880) */
-  --accent: #1b4d3e;
-  --primary: #1b4d3e;
-  --color-primary: #1b4d3e;
-  --primary-hover: #133d30;
-  --color-primary-hover: #133d30;
-  --primary-active: #0e2c22;
-  --primary-light: #eaf0e8;
-  --color-primary-light: #eaf0e8;
-  --primary-container: #eaf0e8;
-  --on-primary: #ffffff;
-  --on-primary-container: #0e2c22;
-  --primary-fixed: #eaf0e8;
-  --primary-fixed-dim: #c2d9c5;
-  --primary-gold: #c5a880;
-  --primary-gold-light: #f5eedf;
-  --surface-tint: #1b4d3e;
-  --focus-ring: 0 0 0 3px rgba(27, 77, 62, 0.16);
+  /* Accent & Primary */
+  --accent: var(--eh-primary);
+  --primary: var(--eh-primary);
+  --color-primary: var(--eh-primary);
+  --primary-hover: var(--eh-primary-hover);
+  --color-primary-hover: var(--eh-primary-hover);
+  --primary-active: var(--eh-primary-active);
+  --primary-light: var(--eh-primary-light);
+  --color-primary-light: var(--eh-primary-light);
+  --primary-container: var(--eh-primary-light);
+  --on-primary: var(--eh-on-primary);
+  --on-primary-container: var(--eh-primary);
+  --primary-fixed: var(--eh-primary-light);
+  --primary-fixed-dim: var(--eh-primary-border);
+  --primary-gold: var(--eh-gold);
+  --primary-gold-light: var(--eh-gold-light);
+  --surface-tint: var(--eh-primary);
+  --focus-ring: var(--eh-shadow-focus);
 
-  /* Hover States (Royal Academic Interactions) */
-  --surface-hover: #f7f4ee;
-  --hover-row: rgba(27, 77, 62, 0.035);
-  --link-hover: #144a38;
-  --nav-hover-bg: #f1f4ee;
-  --nav-hover-text: #1b4d3e;
-  --nav-active-hover-bg: #dfe8dc;
+  /* Hover States */
+  --surface-hover: var(--eh-surface-hover);
+  --hover-row: rgba(22, 78, 62, 0.05);
+  --link-hover: var(--eh-primary-hover);
+  --nav-hover-bg: var(--eh-surface-hover);
+  --nav-hover-text: var(--eh-primary);
+  --nav-active-hover-bg: var(--eh-primary-light);
 
-  /* Status Colors (Semantic - Royal Academic Theme) */
-  --secondary: #17523F;
+  /* Status Colors */
+  --secondary: var(--eh-success);
   --on-secondary: #ffffff;
-  --secondary-container: #E7F3EC;
-  --on-secondary-container: #17523F;
-  --secondary-fixed: #B7DEC8;
-  --color-success: #17523F;
-  --color-success-light: #E7F3EC;
-  --color-success-border: #B7DEC8;
+  --secondary-container: var(--eh-success-bg);
+  --on-secondary-container: var(--eh-success);
+  --secondary-fixed: var(--eh-success-border);
+  --color-success: var(--eh-success);
+  --color-success-light: var(--eh-success-bg);
+  --color-success-border: var(--eh-success-border);
 
-  --tertiary: #8C5E14;
+  --tertiary: var(--eh-warning);
   --on-tertiary: #ffffff;
-  --tertiary-container: #FBF4E6;
-  --on-tertiary-container: #66430B;
-  --tertiary-fixed: #ECD8B0;
-  --color-warning: #8C5E14;
-  --color-warning-light: #FBF4E6;
-  --color-warning-border: #ECD8B0;
+  --tertiary-container: var(--eh-warning-bg);
+  --on-tertiary-container: var(--eh-warning);
+  --tertiary-fixed: var(--eh-warning-border);
+  --color-warning: var(--eh-warning);
+  --color-warning-light: var(--eh-warning-bg);
+  --color-warning-border: var(--eh-warning-border);
 
-  --error: #8F2222;
+  --error: var(--eh-danger);
   --on-error: #ffffff;
-  --error-container: #FBEBEB;
-  --on-error-container: #661515;
-  --color-danger: #8F2222;
-  --color-danger-light: #FBEBEB;
-  --color-danger-border: #F3C5C5;
+  --error-container: var(--eh-danger-bg);
+  --on-error-container: var(--eh-danger);
+  --color-danger: var(--eh-danger);
+  --color-danger-light: var(--eh-danger-bg);
+  --color-danger-border: var(--eh-danger-border);
 
-  /* English 4 Skills Tokens (Royal Academic Jewel Tones) */
-  --skill-listening: #1E3A8A;
-  --skill-listening-bg: #EDF3FB;
-  --skill-listening-border: #C8DCF5;
-  --skill-speaking: #5B21B6;
-  --skill-speaking-bg: #F3EEFA;
-  --skill-speaking-border: #D8C7F0;
-  --skill-reading: #16533D;
-  --skill-reading-bg: #E9F3ED;
-  --skill-reading-border: #B9DBC5;
-  --skill-writing: #8C5E14;
-  --skill-writing-bg: #FAF3E5;
-  --skill-writing-border: #ECD8B0;
+  /* English 4 Skills Tokens */
+  --skill-listening: var(--eh-skill-listening);
+  --skill-listening-bg: var(--eh-skill-listening-bg);
+  --skill-listening-border: var(--eh-skill-listening-border);
+  --skill-speaking: var(--eh-skill-speaking);
+  --skill-speaking-bg: var(--eh-skill-speaking-bg);
+  --skill-speaking-border: var(--eh-skill-speaking-border);
+  --skill-reading: var(--eh-skill-reading);
+  --skill-reading-bg: var(--eh-skill-reading-bg);
+  --skill-reading-border: var(--eh-skill-reading-border);
+  --skill-writing: var(--eh-skill-writing);
+  --skill-writing-bg: var(--eh-skill-writing-bg);
+  --skill-writing-border: var(--eh-skill-writing-border);
 
-  /* === Typography Tokens (The Oxford Scholar: Lora + Plus Jakarta Sans) === */
-  --font-serif: 'Lora', Georgia, 'Times New Roman', serif;
-  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  /* === Typography Tokens === */
+  --font-serif: var(--eh-font-serif);
+  --font-sans: var(--eh-font-sans);
   --font-family: var(--font-sans);
   --font-heading: var(--font-serif);
 
@@ -121,18 +121,18 @@
   --container-max-width: 1280px;
 
   /* === Radius === */
-  --radius-sm: 0.25rem;
-  --radius-default: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-full: 9999px;
+  --radius-sm: var(--eh-radius-sm);
+  --radius-default: var(--eh-radius-md);
+  --radius-md: var(--eh-radius-md);
+  --radius-lg: var(--eh-radius-lg);
+  --radius-xl: var(--eh-radius-xl);
+  --radius-full: var(--eh-radius-full);
 
-  /* === Elevation (Subtle, border-first, warm tones) === */
-  --shadow-sm: 0 1px 3px rgba(38, 35, 32, 0.05);
-  --shadow-card: 0 2px 8px -2px rgba(38, 35, 32, 0.06), 0 0 0 1px var(--border-color);
-  --shadow-modal: 0 12px 32px -4px rgba(38, 35, 32, 0.12), 0 0 0 1px var(--border-color);
-  --shadow-btn: 0 1px 2px 0 rgba(27, 77, 62, 0.15);
+  /* === Elevation === */
+  --shadow-sm: var(--eh-shadow-xs);
+  --shadow-card: var(--eh-shadow-sm);
+  --shadow-modal: var(--eh-shadow-lg);
+  --shadow-btn: 0 1px 2px 0 rgba(0, 0, 0, 0.15);
 }
 
 /* === Reset === */

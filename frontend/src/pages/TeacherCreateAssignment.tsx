@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
-  Eye, Save, Send, CheckCircle2, RefreshCw
+  Eye, Save, Send, Plus, Trash2, ArrowUp, ArrowDown,
+  Layers, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -13,8 +14,15 @@ import {
   buildMcqPayload, 
   buildShortAnswerPayload 
 } from '../api/services/question.service';
-import type { 
-  AssignmentEditorData, AssignmentSkill 
+import { 
+  type AssignmentEditorData, 
+  type AssignmentSkill,
+  type EditorModuleItem,
+  type WritingConfig,
+  type SpeakingConfig,
+  type ReadingConfig,
+  type ListeningConfig,
+  createDefaultModuleItem
 } from '../types/assignment-editor.types';
 import { 
   SkillWritingEditor, 
@@ -47,59 +55,41 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
-    id: `new-${Date.now()}`,
-    code: initialSkill === 'speaking' ? 'HW-SP' : initialSkill === 'reading' ? 'HW-RD' : initialSkill === 'listening' ? 'HW-LS' : 'HW-WR',
-    title: '',
-    skill: initialSkill,
-    className: '',
-    startDate: formatToLocalDateTimeInput(),
-    dueDate: formatToLocalDateTimeInput(addDays(new Date(), 7)),
-    durationMinutes: initialSkill === 'reading' ? 60 : initialSkill === 'listening' ? 30 : 60,
-    allowLate: true,
-    status: 'active',
-    targetAudience: 'all',
-    notifyStudents: true,
-    maxSubmissions: 3,
-    writing: {
-      taskType: 'task2',
-      promptText: '',
-      minWords: 250,
-      scale: '10',
-      rubrics: { tr: 25, cc: 25, lr: 25, gra: 25 },
-      enableAi: true,
-      aiInstruction: '',
-      enablePlagiarismCheck: true,
-      modelAnswer: '',
-      attachments: []
-    },
-    speaking: {
-      promptText: '',
-      aiInstruction: '',
-      partType: 'part2',
-      cueCardTopic: '',
-      cueCardBullets: [],
-      prepTimeSeconds: 60,
-      speakingTimeSeconds: 120,
-      maxRetries: 3,
-      examinerSampleAudioUrl: '',
-      examinerTranscript: '',
-      followUpQuestions: [],
-      rubrics: { fc: 25, lr: 25, gra: 25, pr: 25 },
-      enableAi: true,
-      aiModel: 'Whisper V3 Large'
-    },
-    reading: {
-      passageTitle: '',
-      passageContent: '',
-      questions: []
-    },
-    listening: {
-      audioUrl: '',
-      transcript: '',
-      questions: []
-    }
-  }));
+  // Multi-module management state
+  const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
+  const [showAddMenu, setShowAddMenu] = useState<boolean>(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => {
+    const initialMod = createDefaultModuleItem(initialSkill, 1);
+    return {
+      id: `new-${Date.now()}`,
+      code: `HW-${initialSkill.slice(0, 2).toUpperCase()}`,
+      title: '',
+      skill: initialSkill,
+      className: '',
+      startDate: formatToLocalDateTimeInput(),
+      dueDate: formatToLocalDateTimeInput(addDays(new Date(), 7)),
+      durationMinutes: 60,
+      allowLate: true,
+      status: 'active',
+      targetAudience: 'all',
+      notifyStudents: true,
+      maxSubmissions: 3,
+      modules: [initialMod]
+    };
+  });
+
+  // Close add menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch classes from backend
   useEffect(() => {
@@ -138,48 +128,123 @@ export const TeacherCreateAssignment: React.FC = () => {
     }
   };
 
-  const getInstructionsFor = (skill: AssignmentSkill): string => {
-    switch (skill) {
-      case 'writing':
-        return assignmentData.writing.promptText.trim();
-      case 'speaking':
-        return (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
-      case 'reading': {
-        const pTitle = assignmentData.reading.passageTitle.trim();
-        const pContent = (assignmentData.reading.passageContent 
-          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
-          || '').trim();
-        return pTitle ? `${pTitle}\n\n${pContent}` : pContent;
-      }
-      case 'listening':
-        return (assignmentData.listening.transcript || assignmentData.listening.audioTitle || '').trim();
-      default:
-        return '';
+  // Add a new module of any skill
+  const handleAddModule = (skill: AssignmentSkill) => {
+    const nextOrder = assignmentData.modules.length + 1;
+    const newMod = createDefaultModuleItem(skill, nextOrder);
+    setAssignmentData((prev) => ({
+      ...prev,
+      modules: [...prev.modules, newMod]
+    }));
+    setActiveModuleIndex(assignmentData.modules.length);
+    setShowAddMenu(false);
+    showToast(isVi ? `Đã thêm phần thi ${getSkillName(skill)} mới.` : `Added new ${skill} module.`);
+  };
+
+  // Remove a module by index
+  const handleRemoveModule = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (assignmentData.modules.length <= 1) {
+      showToast(isVi ? 'Bài tập phải có ít nhất 1 phần thi / module!' : 'Assignment must contain at least 1 module!');
+      return;
+    }
+
+    const updated = assignmentData.modules.filter((_, idx) => idx !== index);
+    const reordered = updated.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+
+    if (activeModuleIndex >= reordered.length) {
+      setActiveModuleIndex(Math.max(0, reordered.length - 1));
+    } else if (activeModuleIndex === index) {
+      setActiveModuleIndex(Math.max(0, index - 1));
     }
   };
 
-  const isSkillConfigured = (skill: AssignmentSkill): boolean => {
+  // Move module up or down
+  const handleMoveModule = (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= assignmentData.modules.length) return;
+
+    const list = [...assignmentData.modules];
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    const reordered = list.map((m, idx) => ({ ...m, orderIndex: idx + 1 }));
+    setAssignmentData((prev) => ({ ...prev, modules: reordered }));
+    setActiveModuleIndex(targetIndex);
+  };
+
+  // Update current active module's config
+  const handleActiveModuleConfigChange = (updatedConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, config: updatedConfig };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  // Update current active module's metadata (title, maxScore)
+  const handleActiveModuleMetaChange = (field: 'title' | 'maxScore', val: string | number) => {
+    setAssignmentData((prev) => {
+      const updatedModules = prev.modules.map((m, idx) => {
+        if (idx === activeModuleIndex) {
+          return { ...m, [field]: val };
+        }
+        return m;
+      });
+      return { ...prev, modules: updatedModules };
+    });
+  };
+
+  const getSkillName = (skill: AssignmentSkill): string => {
     switch (skill) {
-      case 'writing':
-        return Boolean(assignmentData.writing.promptText.trim());
-      case 'speaking':
-        return Boolean((assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim());
-      case 'reading':
-        return Boolean(
-          assignmentData.reading.passageTitle.trim() ||
-          assignmentData.reading.passageContent?.trim() ||
-          assignmentData.reading.paragraphs?.some(p => p.content.trim()) ||
-          assignmentData.reading.questions.length > 0
-        );
-      case 'listening':
-        return Boolean(
-          assignmentData.listening.audioFile ||
-          assignmentData.listening.audioUrl?.trim() ||
-          assignmentData.listening.transcript?.trim() ||
-          assignmentData.listening.questions.length > 0
-        );
+      case 'writing': return isVi ? 'Viết (Writing)' : 'Writing';
+      case 'speaking': return isVi ? 'Nói (Speaking)' : 'Speaking';
+      case 'reading': return isVi ? 'Đọc (Reading)' : 'Reading';
+      case 'listening': return isVi ? 'Nghe (Listening)' : 'Listening';
+      default: return skill;
+    }
+  };
+
+  const getSkillIcon = (skill: AssignmentSkill, size = 16) => {
+    switch (skill) {
+      case 'writing': return <PenTool size={size} />;
+      case 'speaking': return <Mic size={size} />;
+      case 'reading': return <BookOpen size={size} />;
+      case 'listening': return <Headphones size={size} />;
+    }
+  };
+
+  const getInstructionsForModule = (mod: EditorModuleItem): string => {
+    switch (mod.skill) {
+      case 'writing': {
+        const c = mod.config as WritingConfig;
+        return c.promptText.trim();
+      }
+      case 'speaking': {
+        const c = mod.config as SpeakingConfig;
+        return (c.promptText || c.cueCardTopic || '').trim();
+      }
+      case 'reading': {
+        const c = mod.config as ReadingConfig;
+        const pTitle = c.passageTitle.trim();
+        const pContent = (c.passageContent 
+          || c.paragraphs?.map(p => p.content).join('\n\n') 
+          || '').trim();
+        return pTitle ? `${pTitle}\n\n${pContent}` : pContent;
+      }
+      case 'listening': {
+        const c = mod.config as ListeningConfig;
+        return (c.transcript || c.audioTitle || '').trim();
+      }
       default:
-        return false;
+        return '';
     }
   };
 
@@ -206,78 +271,85 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
-    const allSkills: AssignmentSkill[] = ['listening', 'reading', 'writing', 'speaking'];
-    const configuredSkills = allSkills.filter(isSkillConfigured);
-    const targetSkills = configuredSkills.length > 0 ? configuredSkills : [assignmentData.skill];
+    if (assignmentData.modules.length === 0) {
+      showToast(isVi ? 'Bài tập phải có ít nhất 1 phần thi!' : 'Assignment must have at least 1 module!');
+      return;
+    }
 
-    // Validation for each target skill
-    for (const skill of targetSkills) {
-      if (skill === 'writing') {
-        if (!assignmentData.writing.promptText.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'writing' }));
-          showToast(isVi ? 'Nội dung đề bài Writing không được để trống!' : 'Writing prompt cannot be empty!');
+    // Comprehensive validation for all modules
+    for (let i = 0; i < assignmentData.modules.length; i++) {
+      const mod = assignmentData.modules[i];
+      const modNum = i + 1;
+      const modLabel = mod.title ? `"${mod.title}" (Phần ${modNum})` : `Phần ${modNum}: ${getSkillName(mod.skill)}`;
+
+      if (mod.skill === 'writing') {
+        const c = mod.config as WritingConfig;
+        if (!c.promptText.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Writing không được để trống!` : `${modLabel}: Writing prompt cannot be empty!`);
           return;
         }
-      } else if (skill === 'speaking') {
-        const spPrompt = (assignmentData.speaking.promptText || assignmentData.speaking.cueCardTopic || '').trim();
+      } else if (mod.skill === 'speaking') {
+        const c = mod.config as SpeakingConfig;
+        const spPrompt = (c.promptText || c.cueCardTopic || '').trim();
         if (!spPrompt) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'speaking' }));
-          showToast(isVi ? 'Nội dung đề bài Speaking không được để trống!' : 'Speaking prompt cannot be empty!');
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung đề bài Speaking không được để trống!` : `${modLabel}: Speaking prompt cannot be empty!`);
           return;
         }
-      } else if (skill === 'reading') {
-        if (!assignmentData.reading.passageTitle.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Tiêu đề bài đọc không được để trống!' : 'Passage title cannot be empty!');
+      } else if (mod.skill === 'reading') {
+        const c = mod.config as ReadingConfig;
+        if (!c.passageTitle.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Tiêu đề bài đọc không được để trống!` : `${modLabel}: Reading passage title cannot be empty!`);
           return;
         }
-        const pContent = (assignmentData.reading.passageContent 
-          || assignmentData.reading.paragraphs?.map(p => p.content).join('\n\n') 
-          || '').trim();
+        const pContent = (c.passageContent || c.paragraphs?.map(p => p.content).join('\n\n') || '').trim();
         if (!pContent) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Nội dung văn bản bài đọc không được để trống!' : 'Passage content cannot be empty!');
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Nội dung văn bản bài đọc không được để trống!` : `${modLabel}: Reading passage content cannot be empty!`);
           return;
         }
-        const qList = assignmentData.reading.questions;
-        if (qList.length === 0) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!' : 'Please add at least 1 question for the reading assignment!');
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài đọc!` : `${modLabel}: Please add at least 1 question!`);
           return;
         }
-        for (let i = 0; i < qList.length; i++) {
-          if (!qList[i].prompt.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-            showToast(isVi ? `Nội dung câu hỏi Reading #${i + 1} không được để trống!` : `Reading question #${i + 1} statement cannot be empty!`);
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Nội dung câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
             return;
           }
-          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'reading' }));
-            showToast(isVi ? `Đáp án chính xác cho câu hỏi Reading #${i + 1} không được để trống!` : `Correct answer for reading question #${i + 1} cannot be empty!`);
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
-      } else if (skill === 'listening') {
-        if (!assignmentData.listening.audioFile && !assignmentData.listening.audioUrl?.trim()) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-          showToast(isVi ? 'Vui lòng chọn tệp âm thanh cho bài nghe!' : 'Please select an audio file for the listening assignment!');
+      } else if (mod.skill === 'listening') {
+        const c = mod.config as ListeningConfig;
+        if (!c.audioFile && !c.audioUrl?.trim()) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng chọn tệp âm thanh cho bài nghe!` : `${modLabel}: Please select an audio file!`);
           return;
         }
-        const qList = assignmentData.listening.questions;
-        if (qList.length === 0) {
-          setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-          showToast(isVi ? 'Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!' : 'Please add at least 1 question for the listening assignment!');
+        if (!c.questions || c.questions.length === 0) {
+          setActiveModuleIndex(i);
+          showToast(isVi ? `${modLabel}: Vui lòng tạo ít nhất 1 câu hỏi cho bài nghe!` : `${modLabel}: Please add at least 1 question!`);
           return;
         }
-        for (let i = 0; i < qList.length; i++) {
-          if (!qList[i].prompt.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-            showToast(isVi ? `Nội dung câu hỏi Listening #${i + 1} không được để trống!` : `Listening question #${i + 1} statement cannot be empty!`);
+        for (let qIdx = 0; qIdx < c.questions.length; qIdx++) {
+          const q = c.questions[qIdx];
+          if (!q.prompt.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Nội dung câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Question #${qIdx + 1} cannot be empty!`);
             return;
           }
-          if (qList[i].type === 'short_answer' && !qList[i].correctAnswer.trim()) {
-            setAssignmentData((prev) => ({ ...prev, skill: 'listening' }));
-            showToast(isVi ? `Đáp án chính xác cho câu hỏi Listening #${i + 1} không được để trống!` : `Correct answer for listening question #${i + 1} cannot be empty!`);
+          if (q.type === 'short_answer' && !q.correctAnswer.trim()) {
+            setActiveModuleIndex(i);
+            showToast(isVi ? `${modLabel}: Đáp án câu hỏi #${qIdx + 1} không được để trống!` : `${modLabel}: Correct answer #${qIdx + 1} cannot be empty!`);
             return;
           }
         }
@@ -293,9 +365,9 @@ export const TeacherCreateAssignment: React.FC = () => {
         ? new Date(assignmentData.dueDate).toISOString() 
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const mainDescription = targetSkills.length === 1
-        ? getInstructionsFor(targetSkills[0])
-        : targetSkills.map((s) => `[${s.toUpperCase()}]: ${getInstructionsFor(s)}`).join('\n\n');
+      const mainDescription = assignmentData.modules
+        .map((m, idx) => `[Phần ${idx + 1} - ${m.skill.toUpperCase()}${m.title ? `: ${m.title}` : ''}]: ${getInstructionsForModule(m)}`)
+        .join('\n\n');
 
       // 1. Create assignment on backend
       const res = await assignmentService.createAssignment(selectedClassId, {
@@ -323,90 +395,68 @@ export const TeacherCreateAssignment: React.FC = () => {
         listening: 'QUIZ'
       };
 
-      for (let sIdx = 0; sIdx < targetSkills.length; sIdx++) {
-        const skill = targetSkills[sIdx];
+      for (let sIdx = 0; sIdx < assignmentData.modules.length; sIdx++) {
+        const mod = assignmentData.modules[sIdx];
         const orderIndex = sIdx + 1;
-        const instructions = getInstructionsFor(skill);
-        const aiInstruction = skill === 'writing'
-          ? (assignmentData.writing.aiInstruction || undefined)
-          : skill === 'speaking'
-          ? (assignmentData.speaking.aiInstruction || undefined)
-          : undefined;
-
-        let createdModuleId: number | null = null;
-        try {
-          const modRes = await moduleService.createModule(newAssignmentId, {
-            skill: apiSkillMap[skill],
-            taskType: taskTypeMap[skill],
-            orderIndex,
-            instructions,
-            aiInstruction,
-            maxScore: 10
-          });
-          createdModuleId = modRes.id;
-        } catch (modErr) {
-          console.warn(`Module creation fallback for ${skill}:`, modErr);
-          throw modErr;
+        const instructions = getInstructionsForModule(mod);
+        let aiInstruction: string | undefined = undefined;
+        if (mod.skill === 'writing') {
+          aiInstruction = (mod.config as WritingConfig).aiInstruction || undefined;
+        } else if (mod.skill === 'speaking') {
+          aiInstruction = (mod.config as SpeakingConfig).aiInstruction || undefined;
         }
 
-        // Upload audio file if skill is listening
-        if (createdModuleId && skill === 'listening' && assignmentData.listening.audioFile) {
-          try {
-            await moduleService.uploadAudio(createdModuleId, assignmentData.listening.audioFile);
-          } catch (audioErr) {
-            console.error('Failed to upload audio file:', audioErr);
-            showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe. Vui lòng thử lại!' : 'Failed to upload audio file!');
-            throw audioErr;
+        const modRes = await moduleService.createModule(newAssignmentId, {
+          skill: apiSkillMap[mod.skill],
+          taskType: taskTypeMap[mod.skill],
+          orderIndex,
+          instructions,
+          aiInstruction,
+          maxScore: mod.maxScore || 10
+        });
+        const createdModuleId = modRes.id;
+
+        // Upload audio file if skill is listening and file is present
+        if (createdModuleId && mod.skill === 'listening') {
+          const lConfig = mod.config as ListeningConfig;
+          if (lConfig.audioFile) {
+            try {
+              await moduleService.uploadAudio(createdModuleId, lConfig.audioFile);
+            } catch (audioErr) {
+              console.error('Failed to upload audio file:', audioErr);
+              showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe. Vui lòng thử lại!' : 'Failed to upload audio file!');
+              throw audioErr;
+            }
           }
         }
 
         // Create questions for reading / listening
-        if (createdModuleId) {
-          if (skill === 'reading') {
-            const readingQuestions = assignmentData.reading.questions;
-            for (let i = 0; i < readingQuestions.length; i++) {
-              const q = readingQuestions[i];
-              const payload = q.type === 'multiple_choice'
-                ? buildMcqPayload({
-                    content: q.prompt,
-                    options: q.options,
-                    correctOptionIndexOrText: q.correctAnswer,
-                    score: q.points,
-                    orderIndex: i + 1,
-                  })
-                : buildShortAnswerPayload({
-                    content: q.prompt,
-                    answerText: q.correctAnswer,
-                    score: q.points,
-                    orderIndex: i + 1,
-                  });
-              await questionService.createQuestion(createdModuleId, payload);
-            }
-          } else if (skill === 'listening') {
-            const listeningQuestions = assignmentData.listening.questions;
-            for (let i = 0; i < listeningQuestions.length; i++) {
-              const q = listeningQuestions[i];
-              const payload = q.type === 'multiple_choice'
-                ? buildMcqPayload({
-                    content: q.prompt,
-                    options: q.options,
-                    correctOptionIndexOrText: q.correctAnswer,
-                    score: q.points,
-                    orderIndex: i + 1,
-                  })
-                : buildShortAnswerPayload({
-                    content: q.prompt,
-                    answerText: q.correctAnswer,
-                    score: q.points,
-                    orderIndex: i + 1,
-                  });
-              await questionService.createQuestion(createdModuleId, payload);
-            }
+        if (createdModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
+          const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
+          for (let i = 0; i < qList.length; i++) {
+            const q = qList[i];
+            const payload = q.type === 'multiple_choice'
+              ? buildMcqPayload({
+                  content: q.prompt,
+                  options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
+                    ? ((q as { options?: string[] }).options || [])
+                    : [],
+                  correctOptionIndexOrText: q.correctAnswer,
+                  score: q.points || 1,
+                  orderIndex: i + 1,
+                })
+              : buildShortAnswerPayload({
+                  content: q.prompt,
+                  answerText: q.correctAnswer,
+                  score: q.points || 1,
+                  orderIndex: i + 1,
+                });
+            await questionService.createQuestion(createdModuleId, payload);
           }
         }
       }
 
-      // If status is PUBLISHED and backend requires explicit publish
+      // If status is PUBLISHED, publish assignment
       if (status === 'PUBLISHED') {
         try {
           await assignmentService.updateAssignmentStatus(newAssignmentId, 'PUBLISHED');
@@ -430,13 +480,7 @@ export const TeacherCreateAssignment: React.FC = () => {
     }
   };
 
-  const handleSaveDraft = () => {
-    executeCreateAssignment('DRAFT');
-  };
-
-  const handlePublish = () => {
-    executeCreateAssignment('PUBLISHED');
-  };
+  const activeModule = assignmentData.modules[activeModuleIndex] || assignmentData.modules[0];
 
   return (
     <div className="assignment-edit-container">
@@ -453,7 +497,7 @@ export const TeacherCreateAssignment: React.FC = () => {
         <span>/</span>
         <span>{assignmentData.className || (isVi ? 'Chọn lớp học' : 'Class')}</span>
         <span>/</span>
-        <span style={{ fontWeight: 700, color: 'var(--on-surface, #111827)' }}>
+        <span style={{ fontWeight: 700, color: 'var(--eh-text-primary, #161B19)' }}>
           {isVi ? 'Giao bài tập mới' : 'Create New Assignment'}
         </span>
       </div>
@@ -481,74 +525,188 @@ export const TeacherCreateAssignment: React.FC = () => {
         </select>
       </div>
 
-      {/* Skill Tabs Navigation */}
-      <div className="skill-tabs-nav">
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'writing' ? 'active-writing' : ''}`}
-          onClick={() => setAssignmentData({ ...assignmentData, skill: 'writing' })}
-        >
-          <PenTool size={16} />
-          <span>Writing (Kỹ năng Viết)</span>
-        </button>
+      {/* DYNAMIC MULTI-MODULE MANAGEMENT BAR */}
+      <div className="tae-module-bar-wrap">
+        <div className="tae-module-bar-header">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-forest" />
+            <span className="tae-module-bar-title">
+              {isVi ? 'Các phần thi / Modules của bài tập' : 'Assignment Modules & Exam Parts'}
+            </span>
+            <span className="tae-module-count-badge">
+              {assignmentData.modules.length} {isVi ? 'phần thi' : 'parts'}
+            </span>
+          </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'speaking' ? 'active-speaking' : ''}`}
-          onClick={() => setAssignmentData({ ...assignmentData, skill: 'speaking' })}
-        >
-          <Mic size={16} />
-          <span>Speaking (Kỹ năng Nói)</span>
-        </button>
+          {/* Add Module Dropdown */}
+          <div className="relative" ref={addMenuRef}>
+            <button
+              type="button"
+              className="tae-btn-add-module"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              <Plus size={15} />
+              <span>{isVi ? 'Thêm module' : 'Add Module'}</span>
+              <ChevronDown size={14} />
+            </button>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'reading' ? 'active-reading' : ''}`}
-          onClick={() => setAssignmentData({ ...assignmentData, skill: 'reading' })}
-        >
-          <BookOpen size={16} />
-          <span>Reading (Kỹ năng Đọc)</span>
-        </button>
+            {showAddMenu && (
+              <div className="tae-add-module-menu">
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('writing')}
+                >
+                  <PenTool size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Viết (Writing)' : 'Add Writing Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('speaking')}
+                >
+                  <Mic size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nói (Speaking)' : 'Add Speaking Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('reading')}
+                >
+                  <BookOpen size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Đọc (Reading)' : 'Add Reading Module'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="tae-add-menu-item"
+                  onClick={() => handleAddModule('listening')}
+                >
+                  <Headphones size={14} className="text-forest" />
+                  <span>{isVi ? 'Thêm phần Nghe (Listening)' : 'Add Listening Module'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <button 
-          type="button"
-          className={`skill-tab-btn ${assignmentData.skill === 'listening' ? 'active-listening' : ''}`}
-          onClick={() => setAssignmentData({ ...assignmentData, skill: 'listening' })}
-        >
-          <Headphones size={16} />
-          <span>Listening (Kỹ năng Nghe)</span>
-        </button>
+        {/* Module Chips Row */}
+        <div className="tae-module-chips-list">
+          {assignmentData.modules.map((mod, idx) => {
+            const isSelected = idx === activeModuleIndex;
+            const skillCode = mod.skill;
+            return (
+              <div
+                key={mod.id || idx}
+                className={`tae-module-chip ${isSelected ? 'active' : ''} skill-${skillCode}`}
+                onClick={() => setActiveModuleIndex(idx)}
+              >
+                <div className="tae-chip-badge">{idx + 1}</div>
+                <div className="tae-chip-icon">{getSkillIcon(mod.skill, 14)}</div>
+                <div className="tae-chip-text">
+                  <span className="tae-chip-skill">{getSkillName(mod.skill)}</span>
+                  {mod.title && <span className="tae-chip-sub">• {mod.title}</span>}
+                </div>
+
+                {/* Move & Delete controls */}
+                <div className="tae-chip-actions" onClick={(e) => e.stopPropagation()}>
+                  {idx > 0 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang trái' : 'Move left'}
+                      onClick={(e) => handleMoveModule(idx, 'up', e)}
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                  )}
+                  {idx < assignmentData.modules.length - 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn"
+                      title={isVi ? 'Di chuyển sang phải' : 'Move right'}
+                      onClick={(e) => handleMoveModule(idx, 'down', e)}
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  )}
+                  {assignmentData.modules.length > 1 && (
+                    <button
+                      type="button"
+                      className="tae-chip-action-btn delete"
+                      title={isVi ? 'Xóa phần thi này' : 'Remove module'}
+                      onClick={(e) => handleRemoveModule(idx, e)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Grid: Skill Workspace (Left) + Settings Sidebar (Right) */}
+      {/* Grid: Active Module Workspace (Left) + Settings Sidebar (Right) */}
       <div className="assignment-edit-grid">
-        {/* LEFT COLUMN: Skill Workspace */}
+        {/* LEFT COLUMN: Active Module Workspace */}
         <div>
-          {assignmentData.skill === 'writing' && (
+          {/* Active Module Meta Row */}
+          {activeModule && (
+            <div className="tae-active-mod-meta-card">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="tae-meta-tag">
+                  {isVi ? `Đang chỉnh sửa: Phần ${activeModuleIndex + 1}` : `Editing Part ${activeModuleIndex + 1}`}
+                </span>
+                <input
+                  type="text"
+                  className="tae-meta-title-input"
+                  value={activeModule.title || ''}
+                  onChange={(e) => handleActiveModuleMetaChange('title', e.target.value)}
+                  placeholder={isVi ? 'Tên gợi nhớ (VD: Passage 1, Task 1: Chart Description...)' : 'Module custom title (optional)...'}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted">
+                  {isVi ? 'Thang điểm:' : 'Max score:'}
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  className="tae-meta-score-input"
+                  value={activeModule.maxScore || 10}
+                  onChange={(e) => handleActiveModuleMetaChange('maxScore', Math.max(1, Number(e.target.value) || 10))}
+                />
+              </div>
+            </div>
+          )}
+
+          {activeModule?.skill === 'writing' && (
             <SkillWritingEditor 
-              config={assignmentData.writing}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, writing: updated })}
+              config={activeModule.config as WritingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'speaking' && (
+          {activeModule?.skill === 'speaking' && (
             <SkillSpeakingEditor 
-              config={assignmentData.speaking}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, speaking: updated })}
+              config={activeModule.config as SpeakingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'reading' && (
+          {activeModule?.skill === 'reading' && (
             <SkillReadingEditor 
-              config={assignmentData.reading}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, reading: updated })}
+              config={activeModule.config as ReadingConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
 
-          {assignmentData.skill === 'listening' && (
+          {activeModule?.skill === 'listening' && (
             <SkillListeningEditor 
-              config={assignmentData.listening}
-              onChange={(updated) => setAssignmentData({ ...assignmentData, listening: updated })}
+              config={activeModule.config as ListeningConfig}
+              onChange={handleActiveModuleConfigChange}
             />
           )}
         </div>
@@ -558,107 +716,113 @@ export const TeacherCreateAssignment: React.FC = () => {
           {/* Schedule */}
           <section className="edit-card">
             <div className="edit-card-header">
+              <h3 className="edit-card-title">
+                {isVi ? 'Lịch trình bài tập' : 'Assignment Schedule'}
+              </h3>
+            </div>
+            <div className="edit-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                <p className="edit-card-desc">{isVi ? 'Thời gian mở đề và hạn nộp.' : 'Open time and due date.'}</p>
+                <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-1">
+                  {isVi ? 'Thời gian mở đề' : 'Open Date'}
+                </label>
+                <input 
+                  type="datetime-local" 
+                  className="text-input"
+                  value={assignmentData.startDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-1">
+                  {isVi ? 'Hạn chót nộp bài (Deadline)' : 'Due Date'}
+                </label>
+                <input 
+                  type="datetime-local" 
+                  className="text-input"
+                  value={assignmentData.dueDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-muted uppercase tracking-wider block mb-1">
+                  {isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}
+                </label>
+                <input 
+                  type="number"
+                  min="1"
+                  max="10"
+                  className="text-input"
+                  value={assignmentData.maxSubmissions ?? 1}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: Math.max(1, Number(e.target.value) || 1) })}
+                />
               </div>
             </div>
+          </section>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Thời gian mở đề (Open at)' : 'Open Time'}</label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.startDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
-              />
+          {/* Modules Overview Summary Card */}
+          <section className="edit-card">
+            <div className="edit-card-header">
+              <h3 className="edit-card-title">
+                {isVi ? 'Tổng quan đề thi' : 'Exam Structure'}
+              </h3>
             </div>
-
-            <div className="edit-form-group">
-              <label className="edit-form-label">
-                {isVi ? 'Hạn chót nộp bài (Close at)' : 'Due Date'} <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.dueDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
-                style={{ fontWeight: 600 }}
-              />
-            </div>
-
-            <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <label className="edit-form-label">{isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}</label>
-              <input 
-                type="number" 
-                min={1}
-                max={10}
-                className="edit-form-input" 
-                value={assignmentData.maxSubmissions ?? 1}
-                onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: parseInt(e.target.value) || 1 })}
-                style={{ width: '90px' }}
-              />
+            <div className="edit-card-body">
+              <div className="flex flex-col gap-2">
+                {assignmentData.modules.map((m, i) => {
+                  const displayName = m.title?.trim() || getSkillName(m.skill);
+                  return (
+                    <div key={m.id || i} className="flex items-center justify-between py-2 border-b border-light text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-forest flex-shrink-0">#{i + 1}</span>
+                        <span className="font-semibold text-main truncate" title={displayName}>
+                          {displayName}
+                        </span>
+                      </div>
+                      <span className="font-semibold text-muted flex-shrink-0 ml-2">
+                        {m.maxScore || 10} {isVi ? 'điểm' : 'pts'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </section>
         </div>
       </div>
 
       {/* Sticky Action Bar */}
-      <StickyActionBar 
+      <StickyActionBar
         leftActions={
-          <button 
+          <button
             type="button"
-            onClick={() => navigate('/teacher/assignments')}
-            style={{ 
-              padding: '8px 16px', 
-              fontSize: '13px', 
-              fontWeight: 600, 
-              color: '#475569', 
-              background: 'none', 
-              border: 'none', 
-              cursor: 'pointer', 
-              borderRadius: '8px' 
-            }}
+            className="btn btn-secondary bg-white btn-sm"
+            onClick={() => setShowPreviewModal(true)}
           >
-            {isVi ? 'Hủy bỏ' : 'Cancel'}
+            <Eye size={16} />
+            <span>{isVi ? 'Xem trước đề thi' : 'Preview Exam'}</span>
           </button>
         }
         rightActions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button 
+          <div className="flex items-center gap-3">
+            <button
               type="button"
               className="btn btn-secondary bg-white btn-sm"
-              onClick={() => setShowPreviewModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Eye size={14} />
-              <span>{isVi ? 'Xem thử giao diện học viên' : 'Preview as Student'}</span>
-            </button>
-
-            <button 
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
+              onClick={() => executeCreateAssignment('DRAFT')}
               disabled={isSubmitting}
-              onClick={handleSaveDraft}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Save size={14} />
-              <span>{isVi ? 'Lưu bản nháp' : 'Save Draft'}</span>
+              <Save size={16} />
+              <span>{isVi ? 'Lưu bản nháp' : 'Save as Draft'}</span>
             </button>
-
-            <button 
+            <button
               type="button"
               className="btn btn-primary btn-sm"
+              onClick={() => executeCreateAssignment('PUBLISHED')}
               disabled={isSubmitting}
-              onClick={handlePublish}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px' }}
             >
-              {isSubmitting ? (
-                <RefreshCw size={14} className="animate-spin" />
-              ) : (
-                <Send size={14} />
-              )}
-              <span>{isSubmitting ? (isVi ? 'Đang giao bài...' : 'Publishing...') : (isVi ? 'Giao bài tập' : 'Create & Publish')}</span>
+              <Send size={16} />
+              <span>{isVi ? 'Giao bài tập ngay' : 'Publish Assignment'}</span>
             </button>
           </div>
         }
@@ -667,15 +831,15 @@ export const TeacherCreateAssignment: React.FC = () => {
       {/* Preview Modal */}
       {showPreviewModal && (
         <AssignmentPreviewModal 
-          data={assignmentData} 
-          onClose={() => setShowPreviewModal(false)} 
+          onClose={() => setShowPreviewModal(false)}
+          data={assignmentData}
         />
       )}
 
-      {/* Toast Alert */}
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="edit-toast">
-          <CheckCircle2 size={18} color="#4ade80" />
+        <div className="fixed bottom-24 right-8 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-forest text-white shadow-xl animate-fade-in font-medium text-sm">
+          <CheckCircle2 size={16} />
           <span>{toastMessage}</span>
         </div>
       )}

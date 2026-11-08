@@ -64,11 +64,15 @@ export function getSkillLabel(skill?: string | null): string {
 export function getSkillRoute(
   skill: string,
   assignmentId: number | string,
-  submissionId?: number
+  submissionId?: number,
+  moduleId?: number
 ): string {
   const code = normalizeSkill(skill);
   const idParam = String(assignmentId || '1');
-  const queryStr = submissionId ? `?submissionId=${submissionId}` : '';
+  const params = new URLSearchParams();
+  if (submissionId) params.set('submissionId', String(submissionId));
+  if (moduleId) params.set('moduleId', String(moduleId));
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
 
   switch (code) {
     case 'speaking':
@@ -138,9 +142,9 @@ export function isModuleAccessible(
 
   for (let i = 0; i < targetIndex; i++) {
     const prevMod = effectiveModules[i];
-    const prevSubMod = submissionModules?.find(
-      (sm) => sm.moduleId === prevMod.id || normalizeSkill(sm.skill) === normalizeSkill(prevMod.skill)
-    );
+    const prevSubMod =
+      submissionModules?.find((sm) => sm.moduleId === prevMod.id) ||
+      submissionModules?.find((sm) => Boolean(sm.skill) && normalizeSkill(sm.skill) === normalizeSkill(prevMod.skill));
     if (!isModuleSubmittedOrGraded(prevSubMod)) {
       return false;
     }
@@ -160,9 +164,9 @@ export function getNextIncompleteModule(
 
   for (let i = 0; i < effectiveModules.length; i++) {
     const m = effectiveModules[i];
-    const subMod = submissionModules?.find(
-      (sm) => sm.moduleId === m.id || normalizeSkill(sm.skill) === normalizeSkill(m.skill)
-    );
+    const subMod =
+      submissionModules?.find((sm) => sm.moduleId === m.id) ||
+      submissionModules?.find((sm) => Boolean(sm.skill) && normalizeSkill(sm.skill) === normalizeSkill(m.skill));
     if (!isModuleSubmittedOrGraded(subMod)) {
       return m;
     }
@@ -183,9 +187,9 @@ export function isAllModulesCompleted(
   if (!submissionModules || submissionModules.length === 0) return false;
 
   return effectiveModules.every((m) => {
-    const subMod = submissionModules.find(
-      (sm) => sm.moduleId === m.id || normalizeSkill(sm.skill) === normalizeSkill(m.skill)
-    );
+    const subMod =
+      submissionModules.find((sm) => sm.moduleId === m.id) ||
+      submissionModules.find((sm) => Boolean(sm.skill) && normalizeSkill(sm.skill) === normalizeSkill(m.skill));
     return isModuleSubmittedOrGraded(subMod);
   });
 }
@@ -209,9 +213,9 @@ export function calculateExamSteps(
   const isActive = hasActiveAttempt ?? Boolean(currentCode);
 
   return effectiveModules.map((module, index) => {
-    const subMod = submissionModules?.find(
-      (sm) => sm.moduleId === module.id || normalizeSkill(sm.skill) === normalizeSkill(module.skill)
-    );
+    const subMod =
+      submissionModules?.find((sm) => sm.moduleId === module.id) ||
+      submissionModules?.find((sm) => Boolean(sm.skill) && normalizeSkill(sm.skill) === normalizeSkill(module.skill));
     const isCompleted = isModuleSubmittedOrGraded(subMod);
     const isAccessible = isModuleAccessible(index, effectiveModules, submissionModules);
     const skillCode = normalizeSkill(module.skill);
@@ -234,14 +238,23 @@ export function calculateExamSteps(
       status = 'LOCKED';
     }
 
+    // Numbered label if multiple modules exist
+    const baseLabel = getSkillLabel(module.skill);
+    const hasMultipleOfSameSkill = effectiveModules.filter((m) => normalizeSkill(m.skill) === skillCode).length > 1;
+    let skillDisplayName = baseLabel;
+    if (hasMultipleOfSameSkill) {
+      const occurrenceIndex = effectiveModules.slice(0, index + 1).filter((m) => normalizeSkill(m.skill) === skillCode).length;
+      skillDisplayName = `${baseLabel} (Phần ${occurrenceIndex})`;
+    }
+
     return {
       index,
       module,
       subModule: subMod,
       status,
-      skillName: getSkillLabel(module.skill),
+      skillName: skillDisplayName,
       skillCode,
-      route: getSkillRoute(module.skill, assignmentId || '1', submissionId),
+      route: getSkillRoute(module.skill, assignmentId || '1', submissionId, module.id),
       isCompleted,
       isAccessible
     };
