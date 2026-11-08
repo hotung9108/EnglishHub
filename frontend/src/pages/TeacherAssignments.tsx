@@ -130,10 +130,17 @@ export const TeacherAssignments: React.FC = () => {
                   submissions = [];
                 }
 
-                const submittedCount = submissions.filter((s) => s.status !== 'IN_PROGRESS').length;
-                const pendingGradingCount = submissions.filter(
-                  (s) => s.status !== 'IN_PROGRESS' && (s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
-                ).length;
+                const isSubmissionFullyGraded = (s: SubmissionListItem) => {
+                  if (s.status === 'GRADED') return true;
+                  if (s.modules && s.modules.length > 0) {
+                    return s.modules.every((m) => m.grading?.status === 'COMPLETED');
+                  }
+                  return false;
+                };
+
+                const submittedSubmissions = submissions.filter((s) => s.status !== 'IN_PROGRESS');
+                const submittedCount = submittedSubmissions.length;
+                const pendingGradingCount = submittedSubmissions.filter((s) => !isSubmissionFullyGraded(s)).length;
 
                 // Days left & Status
                 const closeDate = raw.closeAt ? new Date(raw.closeAt) : null;
@@ -531,7 +538,12 @@ export const TeacherAssignments: React.FC = () => {
                   </div>
 
                   <div className="teacher-assignment-card-status">
-                    {item.pendingGradingCount > 0 ? (
+                    {item.submittedCount === 0 ? (
+                      <span className="teacher-assignment-upcoming-pill">
+                        <span className="teacher-assignment-status-dot" style={{ backgroundColor: '#94a3b8' }} />
+                        <span>{isVi ? 'Chưa có bài nộp' : 'No submissions'}</span>
+                      </span>
+                    ) : item.pendingGradingCount > 0 ? (
                       <span className="teacher-assignment-pending-pill">
                         <span className="teacher-assignment-status-dot pending" />
                         <span>{item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}</span>

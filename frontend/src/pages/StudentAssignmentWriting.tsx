@@ -161,7 +161,8 @@ const StudentAssignmentWriting: React.FC = () => {
               sub,
               'WRITING',
               numericId,
-              currentAssignment?.modules
+              currentAssignment?.modules,
+              moduleId
             );
             if (redirectRoute) {
               navigate(redirectRoute, { replace: true });
@@ -195,7 +196,8 @@ const StudentAssignmentWriting: React.FC = () => {
                 sub,
                 'WRITING',
                 numericId,
-                currentAssignment?.modules
+                currentAssignment?.modules,
+                moduleId
               );
               if (redirectRoute) {
                 navigate(redirectRoute, { replace: true });
@@ -230,7 +232,8 @@ const StudentAssignmentWriting: React.FC = () => {
                   sub,
                   'WRITING',
                   numericId,
-                  currentAssignment?.modules
+                  currentAssignment?.modules,
+                  moduleId
                 );
                 if (redirectRoute) {
                   navigate(redirectRoute, { replace: true });
@@ -494,7 +497,7 @@ const StudentAssignmentWriting: React.FC = () => {
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
           setSuccessMessage(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
-          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId, nextMod.id);
           setTimeout(() => {
             navigate(nextRoute, { replace: true });
           }, 1200);
@@ -514,8 +517,32 @@ const StudentAssignmentWriting: React.FC = () => {
     }
   };
 
-  const instructionsText = moduleDetail?.instructions || 
-    'Yêu cầu: Hoàn thành bài viết Writing (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và bố cục mạch lạc. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo thang điểm 10.';
+  const parsedInstructions = useMemo(() => {
+    const raw = moduleDetail?.instructions || '';
+    if (!raw.trim()) {
+      return {
+        prompt: 'Yêu cầu: Hoàn thành bài viết Writing (tối thiểu 150 từ). Trình bày rõ ràng các luận điểm, phân tích dẫn chứng trọng tâm và bố cục mạch lạc. Bài nộp sẽ được AI phân tích từ vựng, ngữ pháp và chấm điểm theo thang điểm 10.',
+        minWords: 150,
+        diagramUrl: null as string | null
+      };
+    }
+    const minWordsMatch = raw.match(/<!--\s*minWords:\s*(\d+)\s*-->/i) || raw.match(/tối thiểu\s*(\d+)\s*từ/i) || raw.match(/minimum\s*(\d+)\s*words/i);
+    const minWords = minWordsMatch ? Number(minWordsMatch[1]) : 150;
+    
+    const imgMatch = raw.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+    const diagramUrl = imgMatch ? imgMatch[1] : null;
+
+    const cleanPrompt = raw
+      .replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '')
+      .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
+      .trim();
+
+    return {
+      prompt: cleanPrompt || raw,
+      minWords,
+      diagramUrl
+    };
+  }, [moduleDetail?.instructions]);
 
   const writingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
   const maxScore = moduleDetail?.maxScore ?? writingSubMod?.grading?.maxScoreSnapshot ?? 10;
@@ -582,9 +609,20 @@ const StudentAssignmentWriting: React.FC = () => {
           <div className="writing-card">
             <div className="writing-prompt-box">
               <span className="writing-prompt-icon"><Info size={16} /></span>
-              <p className="writing-prompt-text">
-                {isLoading ? 'Đang tải yêu cầu đề bài...' : instructionsText}
-              </p>
+              <div className="writing-prompt-content flex flex-col gap-3 flex-1">
+                <p className="writing-prompt-text whitespace-pre-line">
+                  {isLoading ? 'Đang tải yêu cầu đề bài...' : parsedInstructions.prompt}
+                </p>
+                {parsedInstructions.diagramUrl && (
+                  <div className="writing-diagram-container p-2 bg-white rounded-lg border border-slate-200 shadow-sm max-w-xl">
+                    <img 
+                      src={parsedInstructions.diagramUrl} 
+                      alt="Writing Task Diagram" 
+                      className="w-full max-h-96 object-contain rounded"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -593,7 +631,7 @@ const StudentAssignmentWriting: React.FC = () => {
             <div className="writing-editor-header">
               <div className="flex items-center gap-16">
                 <div className="px-12 py-4 bg-slate-100 rounded-md text-xs text-slate-700 font-medium">
-                  Đếm từ: <span className="text-primary font-bold">{wordCount}</span> / 150-250 từ
+                  Đếm từ: <span className="text-primary font-bold">{wordCount}</span> / tối thiểu {parsedInstructions.minWords} từ
                 </div>
                 {isDraftSaved && (
                   <div className="flex items-center gap-6 text-xs text-emerald-600 font-medium">

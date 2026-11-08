@@ -99,7 +99,7 @@ const StudentAssignmentReading: React.FC = () => {
       const progress = classifyStudentQuizProgress(sub, scope);
       if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
       if (!isStudentQuizPendingFinalization(sub, scope)) {
-        const redirectRoute = getExamPageRedirectRoute(sub, 'READING', numericId, currentAssignment.modules);
+        const redirectRoute = getExamPageRedirectRoute(sub, 'READING', numericId, currentAssignment.modules, moduleId);
         if (redirectRoute) {
           navigate(redirectRoute, { replace: true });
           return;
@@ -564,18 +564,23 @@ const StudentAssignmentReading: React.FC = () => {
 
                   {isShortAnswer ? (
                     <div className="exam-short-answer-group">
-                      <label 
-                        htmlFor={`short-answer-${currentQuestionItem.id || activeQuestion}`} 
-                        className="exam-short-answer-label"
-                      >
-                        Câu trả lời của bạn:
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label 
+                          htmlFor={`short-answer-${currentQuestionItem.id || activeQuestion}`} 
+                          className="exam-short-answer-label font-bold text-sm text-slate-800"
+                        >
+                          Điền đáp án cho ô trống [{activeQuestion}]:
+                        </label>
+                        <span className="text-xs text-muted">
+                          (Không quá 3 từ / Chữ số)
+                        </span>
+                      </div>
                       <input
                         id={`short-answer-${currentQuestionItem.id || activeQuestion}`}
                         type="text"
                         className="exam-short-answer-input"
                         disabled={!canSubmitModule}
-                        placeholder="Nhập câu trả lời ngắn của bạn tại đây..."
+                        placeholder={`Nhập từ/cụm từ điền vào ô trống #${activeQuestion}...`}
                         value={currentAnswer?.questionType === 'SHORT_ANSWER' ? currentAnswer.text : ''}
                         onChange={(e) => handleSelectAnswer(currentQuestionItem.id, { questionType: 'SHORT_ANSWER', text: e.target.value })}
                         autoComplete="off"

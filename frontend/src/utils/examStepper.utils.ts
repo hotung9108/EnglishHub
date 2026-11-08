@@ -129,7 +129,7 @@ export function isModuleSubmittedOrGraded(subModule?: SubmissionModuleItem): boo
 }
 
 /**
- * Checks if target module index is accessible (all previous modules must be completed)
+ * Checks if target module index is accessible (all valid module indices are accessible so students can choose freely)
  */
 export function isModuleAccessible(
   targetIndex: number,
@@ -137,18 +137,7 @@ export function isModuleAccessible(
   submissionModules?: SubmissionModuleItem[]
 ): boolean {
   const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
-  if (targetIndex <= 0) return true;
-  if (targetIndex >= effectiveModules.length) return false;
-
-  for (let i = 0; i < targetIndex; i++) {
-    const prevMod = effectiveModules[i];
-    const prevSubMod =
-      submissionModules?.find((sm) => sm.moduleId === prevMod.id) ||
-      submissionModules?.find((sm) => Boolean(sm.skill) && normalizeSkill(sm.skill) === normalizeSkill(prevMod.skill));
-    if (!isModuleSubmittedOrGraded(prevSubMod)) {
-      return false;
-    }
-  }
+  if (targetIndex < 0 || targetIndex >= effectiveModules.length) return false;
   return true;
 }
 
@@ -203,7 +192,8 @@ export function calculateExamSteps(
   currentSkill?: string,
   assignmentId?: number | string,
   submissionId?: number,
-  hasActiveAttempt?: boolean
+  hasActiveAttempt?: boolean,
+  currentModuleId?: number
 ): ExamStepInfo[] {
   const effectiveModules = resolveEffectiveModules(assignmentModules, submissionModules);
   if (!effectiveModules || effectiveModules.length === 0) return [];
@@ -220,16 +210,20 @@ export function calculateExamSteps(
     const isAccessible = isModuleAccessible(index, effectiveModules, submissionModules);
     const skillCode = normalizeSkill(module.skill);
 
+    const isMatchCurrent = currentModuleId
+      ? module.id === currentModuleId
+      : (currentCode && skillCode === currentCode);
+
     let status: ExamStepStatus;
     if (isCompleted) {
       status = 'COMPLETED';
-    } else if (currentCode && skillCode === currentCode) {
+    } else if (isMatchCurrent) {
       status = 'ACTIVE';
     } else if (
       isActive &&
       !currentCode &&
       firstIncomplete &&
-      (firstIncomplete.id === module.id || normalizeSkill(firstIncomplete.skill) === skillCode)
+      firstIncomplete.id === module.id
     ) {
       status = 'ACTIVE';
     } else if (isAccessible) {
@@ -322,16 +316,17 @@ export function getStudentAssignmentActionRoute(target: StudentAssignmentActionT
  * Determines whether an exam taking page should redirect the student away
  * because:
  * 1. The parent submission is already SUBMITTED or GRADED,
- * 2. The current skill does not exist in the assignment,
- * 3. The current skill module is already completed (SUBMITTED or GRADED), or
- * 4. The current skill module is LOCKED (previous modules in sequence are incomplete).
+ * 2. The current skill/module does not exist in the assignment, or
+ * 3. The current module is already completed (SUBMITTED or GRADED).
+ * Students are free to choose the order of uncompleted modules without artificial sequence locking.
  * Returns the target redirect route, or null if the student is allowed to take this module.
  */
 export function getExamPageRedirectRoute(
   submission: { id: number; status: string; modules?: SubmissionModuleItem[] },
   currentSkill: string,
   assignmentId: number | string,
-  assignmentModules?: ExamModuleItem[]
+  assignmentModules?: ExamModuleItem[],
+  targetModuleId?: number
 ): string | null {
   const parentStatus = submission.status?.toUpperCase();
   if (parentStatus === 'SUBMITTED' || parentStatus === 'GRADED') {
@@ -340,40 +335,34 @@ export function getExamPageRedirectRoute(
 
   const effectiveModules = resolveEffectiveModules(assignmentModules, submission.modules);
   const targetCode = normalizeSkill(currentSkill);
-  const currentIndex = effectiveModules.findIndex(
-    (m) => normalizeSkill(m.skill) === targetCode
-  );
-  const currentSubMod = submission.modules?.find(
-    (m) => normalizeSkill(m.skill) === targetCode
-  );
+  
+  const currentSubMod = targetModuleId
+    ? submission.modules?.find((m) => m.moduleId === targetModuleId || m.id === targetModuleId)
+    : submission.modules?.find((m) => normalizeSkill(m.skill) === targetCode);
 
-  // If current skill is not part of this assignment at all, redirect to first incomplete module
-  if (effectiveModules.length > 0 && currentIndex === -1 && !currentSubMod) {
+  const currentMod = targetModuleId
+    ? effectiveModules.find((m) => m.id === targetModuleId)
+    : effectiveModules.find((m) => normalizeSkill(m.skill) === targetCode);
+
+  // If current skill / module is not part of this assignment at all, redirect to first incomplete module
+  if (effectiveModules.length > 0 && !currentMod && !currentSubMod) {
     const nextMod = getNextIncompleteModule(effectiveModules, submission.modules) || effectiveModules[0];
-    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
-      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
+    if (nextMod) {
+      return getSkillRoute(nextMod.skill, assignmentId, submission.id, nextMod.id);
     }
   }
 
   // If current module is already completed, advance to next incomplete module or submission result
   if (isModuleSubmittedOrGraded(currentSubMod)) {
     const nextMod = getNextIncompleteModule(effectiveModules, submission.modules);
-    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
-      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
+    if (nextMod && (targetModuleId ? nextMod.id !== targetModuleId : normalizeSkill(nextMod.skill) !== targetCode)) {
+      return getSkillRoute(nextMod.skill, assignmentId, submission.id, nextMod.id);
     }
     const totalMods = Math.max(effectiveModules.length, submission.modules?.length ?? 0);
     if (totalMods <= 1) {
       return `/student/submissions/${submission.id}`;
     }
     return `/student/assignments/${assignmentId}/overview`;
-  }
-
-  // If current module is locked (previous modules in sequence are not completed yet), redirect to first incomplete module
-  if (currentIndex > 0 && !isModuleAccessible(currentIndex, effectiveModules, submission.modules)) {
-    const nextMod = getNextIncompleteModule(effectiveModules, submission.modules);
-    if (nextMod && normalizeSkill(nextMod.skill) !== targetCode) {
-      return getSkillRoute(nextMod.skill, assignmentId, submission.id);
-    }
   }
 
   return null;

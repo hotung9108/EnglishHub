@@ -231,9 +231,25 @@ export const TeacherEditAssignment: React.FC = () => {
           let modConfig: WritingConfig | SpeakingConfig | ReadingConfig | ListeningConfig;
 
           if (sKey === 'writing') {
+            let pText = inst;
+            let chartUrl = '';
+            const imgMatch = pText.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+            if (imgMatch) {
+              chartUrl = imgMatch[1];
+              pText = pText.replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '').trim();
+            }
+            const isTask1 = mod.taskType === 'REWRITE' || chartUrl !== '' || /task\s*1/i.test(pText);
+            let minWords = isTask1 ? 150 : 250;
+            const minWordsMatch = pText.match(/<!--\s*minWords:\s*(\d+)\s*-->/i) || pText.match(/tối thiểu\s*(\d+)\s*từ/i);
+            if (minWordsMatch) {
+              minWords = Number(minWordsMatch[1]);
+              pText = pText.replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '').trim();
+            }
             modConfig = {
-              ...createDefaultWritingConfig(),
-              promptText: inst,
+              ...createDefaultWritingConfig(isTask1 ? 'task1' : 'task2'),
+              promptText: pText,
+              chartImageUrl: chartUrl,
+              minWords,
               aiInstruction: aiInst,
             };
           } else if (sKey === 'speaking') {
@@ -299,7 +315,7 @@ export const TeacherEditAssignment: React.FC = () => {
             modConfig = {
               ...createDefaultListeningConfig(),
               transcript: inst,
-              audioUrl: modDetail?.audioDownloadUrl || modDetail?.sourceAudioStorageKey || '',
+              audioUrl: modDetail?.audioDownloadUrl || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : ''),
               questions: qList,
               aiInstruction: aiInst,
             };
@@ -457,7 +473,11 @@ export const TeacherEditAssignment: React.FC = () => {
     switch (mod.skill) {
       case 'writing': {
         const c = mod.config as WritingConfig;
-        return c.promptText.trim();
+        const basePrompt = c.promptText.trim();
+        const defaultMin = c.taskType === 'task1' ? 150 : 250;
+        const minWordsHeader = (c.minWords && c.minWords !== defaultMin) ? `<!-- minWords: ${c.minWords} -->\n` : '';
+        const chartMarkdown = c.chartImageUrl?.trim() ? `\n\n![Diagram](${c.chartImageUrl.trim()})` : '';
+        return `${minWordsHeader}${basePrompt}${chartMarkdown}`.trim();
       }
       case 'speaking': {
         const c = mod.config as SpeakingConfig;
@@ -675,7 +695,9 @@ export const TeacherEditAssignment: React.FC = () => {
             try {
               await moduleService.uploadAudio(targetModuleId, lConfig.audioFile);
             } catch (audioErr) {
-              console.warn('Failed to upload audio file:', audioErr);
+              console.error('Failed to upload audio file:', audioErr);
+              showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe mới. Vui lòng thử lại!' : 'Failed to upload new listening audio file!');
+              throw audioErr;
             }
           }
         }
@@ -965,12 +987,22 @@ export const TeacherEditAssignment: React.FC = () => {
                   {isVi ? 'Thang điểm:' : 'Max score:'}
                 </span>
                 <input
-                  type="number"
-                  min="1"
-                  max="100"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="tae-meta-score-input"
-                  value={activeModule.maxScore || 10}
-                  onChange={(e) => handleActiveModuleMetaChange('maxScore', Math.max(1, Number(e.target.value) || 10))}
+                  value={activeModule.maxScore === 0 ? '' : (activeModule.maxScore || 10)}
+                  placeholder="10"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const clean = raw.replace(/^0+/, '');
+                    handleActiveModuleMetaChange('maxScore', clean === '' ? (raw === '0' ? 0 : 10) : Number(clean));
+                  }}
+                  onBlur={() => {
+                    if (!activeModule.maxScore || activeModule.maxScore <= 0) {
+                      handleActiveModuleMetaChange('maxScore', 10);
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -1046,8 +1078,22 @@ export const TeacherEditAssignment: React.FC = () => {
                 min={1}
                 max={10}
                 className="edit-form-input" 
-                value={assignmentData.maxSubmissions ?? 1}
-                onChange={(e) => setAssignmentData({ ...assignmentData, maxSubmissions: parseInt(e.target.value) || 1 })}
+                value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
+                placeholder="1"
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                    return;
+                  }
+                  const clean = raw.replace(/^0+/, '');
+                  setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                }}
+                onBlur={() => {
+                  if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
+                    setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                  }
+                }}
                 style={{ width: '90px' }}
               />
             </div>

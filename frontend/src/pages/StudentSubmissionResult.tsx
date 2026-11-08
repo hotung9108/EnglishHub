@@ -201,10 +201,11 @@ export const StudentSubmissionResult: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const txtAnswer = moduleDetail?.answers?.find(
-      (a) => a.docStorageKey?.toLowerCase().endsWith('.txt') || a.docMimeType === 'text/plain'
-    );
-    if (!txtAnswer || !selectedModuleId) {
+    const existing = extractAnswerText(moduleDetail?.answers);
+    if (existing && existing.trim()) {
+      return;
+    }
+    if (!selectedModuleId || selectedSkill !== 'WRITING' || typeof submissionService?.getDocumentFileBlob !== 'function') {
       return;
     }
 
@@ -212,7 +213,9 @@ export const StudentSubmissionResult: React.FC = () => {
       .getDocumentFileBlob(selectedModuleId)
       .then((blob) => blob.text())
       .then((text) => {
-        if (isMounted) setLoadedDocText(text);
+        if (isMounted && text && text.trim()) {
+          setLoadedDocText(text);
+        }
       })
       .catch((err) => {
         console.warn('Failed to load essay.txt in StudentSubmissionResult:', err);
@@ -222,7 +225,7 @@ export const StudentSubmissionResult: React.FC = () => {
       isMounted = false;
       setLoadedDocText(null);
     };
-  }, [moduleDetail, selectedModuleId]);
+  }, [moduleDetail, selectedModuleId, selectedSkill]);
 
   const targetAnswer = moduleDetail?.answers?.find(answer => !!answer.audioStorageKey) || moduleDetail?.answers?.[0];
   const annotationResult = useStudentAnswerAnnotations(targetAnswer?.id);
