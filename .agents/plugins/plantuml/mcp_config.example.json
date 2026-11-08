@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "plantuml": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "plantuml-mcp-server"
+      ],
+      "env": {
+        "PLANTUML_SERVER_URL": "https://www.plantuml.com/plantuml",
+        "PLANTUML_ALLOWED_DIRS": "*"
+      }
+    }
+  }
+}

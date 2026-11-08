@@ -191,3 +191,31 @@ it('initializes datetime-local defaults with local time rather than UTC clock te
   expect(dates[0]).toHaveValue('2026-10-22T10:00');
   expect(dates[1]).toHaveValue('2026-10-29T10:00');
 });
+
+it('supports multi-module operations: adding, switching, reordering, and removing modules', async () => {
+  const { container, user } = await setup('writing', 'vi');
+  await user.click(screen.getByRole('button', { name: /Thêm module/i }));
+  await user.click(screen.getByRole('button', { name: /Thêm phần Nói/i }));
+  expect(screen.getByText(/2\s*phần thi/i)).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: /Thêm module/i }));
+  await user.click(screen.getByRole('button', { name: /Thêm phần Đọc/i }));
+  expect(screen.getByText(/3\s*phần thi/i)).toBeVisible();
+
+  // Click on a chip tab
+  const chips = container.querySelectorAll('.tae-module-chip');
+  if (chips.length > 0) {
+    fireEvent.click(chips[0]);
+  }
+
+  // Reorder
+  const moveRight = screen.getAllByTitle('Di chuyển sang phải')[0];
+  await user.click(moveRight);
+  const moveLeft = screen.getAllByTitle('Di chuyển sang trái')[0];
+  await user.click(moveLeft);
+
+  // Remove module
+  const deleteBtns = screen.getAllByTitle('Xóa phần thi này');
+  await user.click(deleteBtns[0]);
+  expect(screen.getByText(/2\s*phần thi/i)).toBeVisible();
+});

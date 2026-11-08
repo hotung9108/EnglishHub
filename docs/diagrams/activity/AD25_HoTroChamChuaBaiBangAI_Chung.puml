@@ -1,0 +1,51 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #2C3E50
+skinparam ActivityBackgroundColor #F8F9FA
+skinparam ActivityDiamondBorderColor #2C3E50
+skinparam ActivityDiamondBackgroundColor #EBF5FB
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam SwimlaneBorderColor #7F8C8D
+skinparam SwimlaneTitleFontSize 13
+skinparam SwimlaneTitleFontStyle bold
+skinparam SwimlaneTitleBackgroundColor #EAEDED
+skinparam roundCorner 14
+skinparam dpi 250
+skinparam shadowing false
+
+|Giáo viên|
+start
+:Mở chi tiết bài nộp của học viên trong Teacher Grading Studio;
+:Nhấn nút "Gợi ý chấm bằng AI";
+
+|Hệ thống|
+:Truy xuất đề bài, đáp án mẫu, rubric và nội dung nộp từ CSDL;
+:Đóng gói prompt có cấu trúc JSON;
+:Gửi yêu cầu phân tích sang Google Gemini 2.5 Flash SDK;
+
+|AI Service (Gemini)|
+:Tiếp nhận bài nộp và tiêu chí barem điểm;
+:Phân tích nội dung, đánh giá lỗi và đề xuất điểm;
+:Trả về kết quả có cấu trúc: suggested_score, feedback, errors_highlight;
+
+|Hệ thống|
+:Phân tích JSON phản hồi từ AI;
+:Hiển thị điểm đề xuất và vùng lỗi được highlight lên giao diện chấm;
+
+|Giáo viên|
+:Xem xét điểm gợi ý và nhận xét chi tiết của AI;
+if (Cần điều chỉnh kết quả?) then (Có)
+  :Chỉnh sửa điểm số hoặc bổ sung nhận xét chuyên môn;
+else (Không)
+  :Giữ nguyên điểm số và nhận xét đề xuất của AI;
+endif
+:Nhấn nút "Xác nhận kết quả cuối";
+
+|Hệ thống|
+:Lưu final_score, final_feedback, ai_suggested_score,\nmethod = AI và reviewed_by = TeacherId vào bảng gradings;
+:Cập nhật trạng thái bài nộp thành GRADED;
+:Thông báo hoàn tất quá trình chấm điểm;
+stop
+@enduml

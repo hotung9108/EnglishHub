@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { X, Mic } from 'lucide-react';
-import type { AssignmentEditorData } from '../../../types/assignment-editor.types';
+import type { 
+  AssignmentEditorData, 
+  WritingConfig, 
+  SpeakingConfig, 
+  ReadingConfig, 
+  ListeningConfig 
+} from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface AssignmentPreviewModalProps {
@@ -12,10 +18,13 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
   const { language } = useLanguage();
   const isVi = language === 'vi';
 
+  // Multi-module preview selection
+  const [selectedModuleIdx, setSelectedModuleIdx] = useState<number>(0);
+
   // Preview interactive state
   const [essayContent, setEssayContent] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedSeconds, setRecordedSeconds] = useState(0);
+  const recordedSeconds = 0;
   const [activeAnswers, setActiveAnswers] = useState<Record<string, string>>({});
 
   const wordCount = essayContent.trim() ? essayContent.trim().split(/\s+/).length : 0;
@@ -23,6 +32,26 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
   const handleSelectAnswer = (qId: string, val: string) => {
     setActiveAnswers(prev => ({ ...prev, [qId]: val }));
   };
+
+  const hasModules = Array.isArray(data.modules) && data.modules.length > 0;
+  const activeModule = hasModules ? (data.modules[selectedModuleIdx] || data.modules[0]) : null;
+  const activeSkill = activeModule ? activeModule.skill : data.skill;
+
+  const writingConfig: WritingConfig = (activeSkill === 'writing' && activeModule
+    ? activeModule.config
+    : data.writing) as WritingConfig;
+
+  const speakingConfig: SpeakingConfig = (activeSkill === 'speaking' && activeModule
+    ? activeModule.config
+    : data.speaking) as SpeakingConfig;
+
+  const readingConfig: ReadingConfig = (activeSkill === 'reading' && activeModule
+    ? activeModule.config
+    : data.reading) as ReadingConfig;
+
+  const listeningConfig: ListeningConfig = (activeSkill === 'listening' && activeModule
+    ? activeModule.config
+    : data.listening) as ListeningConfig;
 
   return (
     <div className="preview-modal-overlay" onClick={onClose}>
@@ -48,9 +77,9 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
               backgroundColor: 'var(--eh-primary-light, #EAF0E8)', 
               color: 'var(--eh-primary, #1B4D3E)' 
             }}>
-              {isVi ? 'GIAO DIỆN HỌC VIÊN LÀM BÀI (STUDENT VIEW PREVIEW)' : 'STUDENT EXAM RUNNER PREVIEW'}
+              {isVi ? 'GIAO DIỆN HỌC VIÊN LÀM BÀI (PREVIEW)' : 'STUDENT EXAM PREVIEW'}
             </span>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--eh-text-primary, #1e293b)' }}>
               {data.title}
             </span>
           </div>
@@ -69,131 +98,176 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
           </div>
         </div>
 
-        {/* Modal Content - Depends on selected skill */}
+        {/* Multi-module tabs switcher */}
+        {hasModules && data.modules.length > 1 && (
+          <div style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            padding: '10px 20px', 
+            borderBottom: '1px solid var(--eh-border, #e2e8f0)', 
+            overflowX: 'auto', 
+            backgroundColor: 'var(--eh-canvas, #f8fafc)' 
+          }}>
+            {data.modules.map((m, idx) => (
+              <button
+                key={m.id || idx}
+                type="button"
+                onClick={() => setSelectedModuleIdx(idx)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  border: idx === selectedModuleIdx ? '1px solid var(--eh-primary, #1B4D3E)' : '1px solid var(--eh-border, #cbd5e1)',
+                  backgroundColor: idx === selectedModuleIdx ? 'var(--eh-primary, #1B4D3E)' : 'var(--eh-surface, #ffffff)',
+                  color: idx === selectedModuleIdx ? '#ffffff' : 'var(--eh-text-primary, #475569)',
+                  fontWeight: 700,
+                  fontSize: '12.5px',
+                  cursor: 'pointer'
+                }}
+              >
+                {idx + 1}. {m.skill.toUpperCase()}{m.title ? ` • ${m.title}` : ''}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Modal Content - Depends on active skill */}
         <div className="preview-modal-body">
           {/* WRITING PREVIEW */}
-          {data.skill === 'writing' && (
+          {activeSkill === 'writing' && writingConfig && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+              <div style={{ padding: '18px', backgroundColor: 'var(--eh-canvas, #f8fafc)', borderRadius: '10px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', fontWeight: 700, color: 'var(--eh-text-primary, #0f172a)' }}>
                   {isVi ? 'Đề Bài Viết' : 'Writing Prompt'}
                 </h4>
-                <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6, color: '#334155' }}>
-                  {data.writing.promptText}
+                <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.6, color: 'var(--eh-text-secondary, #334155)' }}>
+                  {writingConfig.promptText}
                 </p>
                 <div style={{ display: 'flex', gap: '16px', marginTop: '12px', fontSize: '12.5px', color: '#64748b' }}>
-                  <span>{isVi ? 'Yêu cầu tối thiểu:' : 'Min requirement:'} <strong>{data.writing.minWords} {isVi ? 'từ' : 'words'}</strong></span>
+                  <span>{isVi ? 'Yêu cầu tối thiểu:' : 'Min requirement:'} <strong>{writingConfig.minWords} {isVi ? 'từ' : 'words'}</strong></span>
                   <span>{isVi ? 'Hạn nộp:' : 'Deadline:'} <strong>{data.dueDate}</strong></span>
                 </div>
               </div>
 
-              {data.writing.chartImageUrl && (
-                <div style={{ textAlign: 'center', padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <img src={data.writing.chartImageUrl} alt="Chart" style={{ maxWidth: '400px', height: 'auto', borderRadius: '6px' }} />
+              {writingConfig.chartImageUrl && (
+                <div style={{ textAlign: 'center', padding: '12px', backgroundColor: 'var(--eh-surface, #ffffff)', borderRadius: '8px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
+                  <img src={writingConfig.chartImageUrl} alt="Chart" style={{ maxWidth: '400px', height: 'auto', borderRadius: '6px' }} />
                 </div>
               )}
 
+              {/* Student Essay Editor Simulator */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>
-                    {isVi ? 'Phần bài làm của học viên (Student Essay Textarea):' : 'Student Essay Box:'}
-                  </span>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--eh-text-primary, #1e293b)' }}>
+                    {isVi ? 'Bài Làm Của Học Viên (Mô Phỏng Trực Tiếp)' : 'Student Essay Response Simulator'}
+                  </label>
                   <span style={{ 
                     fontSize: '12px', 
                     fontWeight: 700, 
-                    color: wordCount >= data.writing.minWords ? '#16a34a' : '#d97706' 
+                    color: wordCount >= writingConfig.minWords ? '#16a34a' : '#d97706' 
                   }}>
-                    {wordCount} / {data.writing.minWords} {isVi ? 'từ' : 'words'}
+                    {wordCount} / {writingConfig.minWords} {isVi ? 'từ' : 'words'}
                   </span>
                 </div>
-                <textarea 
+
+                <textarea
                   rows={8}
                   className="edit-form-textarea"
-                  style={{ backgroundColor: '#ffffff', border: '2px solid #cbd5e1' }}
+                  style={{ width: '100%', fontFamily: 'inherit', fontSize: '14px', lineHeight: 1.6 }}
+                  placeholder={isVi ? "Nhập bài văn trả lời thử nghiệm tại đây..." : "Type sample essay response here..."}
                   value={essayContent}
                   onChange={(e) => setEssayContent(e.target.value)}
-                  placeholder={isVi ? 'Học viên sẽ gõ bài luận trực tiếp tại đây...' : 'Student will type here...'}
                 />
               </div>
             </div>
           )}
 
           {/* SPEAKING PREVIEW */}
-          {data.skill === 'speaking' && (
+          {activeSkill === 'speaking' && speakingConfig && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="cue-card-container">
-                <div className="cue-card-header">
-                  <Mic size={18} />
-                  <span>{isVi ? 'ĐỀ BÀI SPEAKING' : 'SPEAKING PROMPT'}</span>
+                <div className="cue-card-badge">
+                  {speakingConfig.partType === 'part1' ? 'IELTS Speaking Part 1' : speakingConfig.partType === 'part3' ? 'IELTS Speaking Part 3' : 'IELTS Speaking Part 2'}
                 </div>
-                <div style={{ margin: 0, fontSize: '15px', lineHeight: 1.6, color: '#1e293b', whiteSpace: 'pre-line' }}>
-                  {data.speaking.promptText || data.speaking.cueCardTopic || (isVi ? 'Chưa có nội dung đề bài...' : 'No prompt statement...')}
-                </div>
+                <h3 className="cue-card-topic">
+                  {speakingConfig.cueCardTopic || speakingConfig.promptText || (isVi ? 'Chủ đề thi nói chưa có nội dung' : 'No speaking topic prompt')}
+                </h3>
+
+                {speakingConfig.cueCardBullets && speakingConfig.cueCardBullets.length > 0 && (
+                  <div className="cue-card-points">
+                    <span className="cue-card-points-label">
+                      {isVi ? 'Bạn nên trình bày về:' : 'You should say:'}
+                    </span>
+                    <ul className="cue-card-list">
+                      {speakingConfig.cueCardBullets.map((bullet, idx) => (
+                        <li key={idx}>{bullet}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
-              {/* Recording Mock Controls */}
-              <div style={{ textAlign: 'center', padding: '24px', backgroundColor: '#faf5ff', borderRadius: '12px', border: '1px solid #e9d5ff' }}>
-                <div style={{ marginBottom: '14px' }}>
-                  <span style={{ fontSize: '28px', fontWeight: 800, color: isRecording ? '#dc2626' : '#7e22ce' }}>
-                    {isRecording ? `00:${recordedSeconds.toString().padStart(2, '0')}` : '00:00'}
-                  </span>
-                </div>
-
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  style={{ 
-                    backgroundColor: isRecording ? '#dc2626' : '#7e22ce',
-                    padding: '10px 24px',
-                    borderRadius: '24px'
-                  }}
-                  onClick={() => {
-                    setIsRecording(!isRecording);
-                    if (!isRecording) setRecordedSeconds(12);
+              {/* Speaking Simulator */}
+              <div style={{ textAlign: 'center', padding: '24px', backgroundColor: 'var(--eh-canvas, #f8fafc)', borderRadius: '12px', border: '1px dashed var(--eh-border, #cbd5e1)' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsRecording(!isRecording)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 24px',
+                    borderRadius: '30px',
+                    backgroundColor: isRecording ? '#ef4444' : 'var(--eh-primary, #1B4D3E)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                   }}
                 >
-                  <Mic size={16} />
-                  <span>{isRecording ? (isVi ? 'Dừng thu âm' : 'Stop Recording') : (isVi ? 'Bắt đầu thu âm' : 'Start Recording')}</span>
+                  <Mic size={18} />
+                  <span>{isRecording ? (isVi ? `Đang ghi âm (${recordedSeconds}s)...` : `Recording (${recordedSeconds}s)...`) : (isVi ? 'Bấm để ghi âm thử' : 'Test Recording')}</span>
                 </button>
               </div>
             </div>
           )}
 
           {/* READING PREVIEW */}
-          {data.skill === 'reading' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {/* Left Column: Passage */}
-              <div style={{ padding: '18px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', maxHeight: '420px', overflowY: 'auto' }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>
-                  {data.reading.passageTitle || (isVi ? 'Bài đọc chưa có tiêu đề' : 'Untitled Passage')}
+          {activeSkill === 'reading' && readingConfig && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Passage text block */}
+              <div style={{ padding: '20px', backgroundColor: 'var(--eh-canvas, #f8fafc)', borderRadius: '10px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '18px', fontWeight: 800, color: 'var(--eh-text-primary, #0f172a)' }}>
+                  {readingConfig.passageTitle || (isVi ? 'Bài đọc chưa có tiêu đề' : 'Untitled Passage')}
                 </h3>
-                <div style={{ fontSize: '13.5px', lineHeight: 1.7, color: '#334155', whiteSpace: 'pre-line' }}>
-                  {data.reading.passageContent 
-                    || data.reading.paragraphs?.map(p => p.content).join('\n\n') 
+                <div style={{ fontSize: '13.5px', lineHeight: 1.7, color: 'var(--eh-text-secondary, #334155)', whiteSpace: 'pre-line' }}>
+                  {readingConfig.passageContent 
+                    || readingConfig.paragraphs?.map(p => p.content).join('\n\n') 
                     || (isVi ? 'Chưa có nội dung văn bản bài đọc...' : 'No passage content...')}
                 </div>
               </div>
 
-              {/* Right Column: Questions */}
-              <div style={{ padding: '18px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', maxHeight: '420px', overflowY: 'auto' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
-                  {isVi ? `Bộ câu hỏi (${data.reading.questions.length} câu):` : `Questions (${data.reading.questions.length}):`}
+              {/* Questions list */}
+              <div>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 700, color: 'var(--eh-text-primary, #0f172a)' }}>
+                  {isVi ? `Bộ câu hỏi (${readingConfig.questions.length} câu):` : `Questions (${readingConfig.questions.length}):`}
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {data.reading.questions.map((q) => (
-                    <div key={q.id} style={{ padding: '12px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {readingConfig.questions.map((q) => (
+                    <div key={q.id} style={{ padding: '12px', backgroundColor: 'var(--eh-surface, #ffffff)', borderRadius: '8px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--eh-primary, #1B4D3E)' }}>Q{q.order}.</span>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{q.prompt}</span>
+                        <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--eh-text-primary, #0f172a)' }}>{q.prompt}</span>
                       </div>
 
-                      {q.type === 'multiple_choice' && (
+                      {q.type === 'multiple_choice' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                           {(q.options || []).map((opt, i) => (
-                            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer' }}>
+                            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer', color: 'var(--eh-text-secondary, #334155)' }}>
                               <input 
                                 type="radio" 
-                                name={`prev-${q.id}`} 
+                                name={`prev-q-${q.id}`} 
                                 checked={activeAnswers[q.id] === opt}
                                 onChange={() => handleSelectAnswer(q.id, opt)}
                               />
@@ -201,40 +275,15 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                             </label>
                           ))}
                         </div>
-                      )}
-
-                      {(q.type === 'short_answer' || q.type === 'gap_fill') && (
-                        <div style={{ marginTop: '6px' }}>
-                          <input 
-                            type="text" 
-                            className="edit-form-input" 
-                            style={{ padding: '4px 10px', fontSize: '12px' }}
-                            placeholder={isVi ? "Nhập câu trả lời tại đây..." : "Type answer here..."}
-                            value={activeAnswers[q.id] || ''}
-                            onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
-                          />
-                        </div>
-                      )}
-
-                      {q.type === 'true_false_not_given' && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                          {['TRUE', 'FALSE', 'NOT GIVEN'].map((ans) => (
-                            <button
-                              key={ans}
-                              type="button"
-                              className="btn btn-secondary bg-white btn-sm"
-                              style={{ 
-                                fontSize: '11px', 
-                                padding: '3px 8px',
-                                backgroundColor: activeAnswers[q.id] === ans ? '#dcfce7' : '#ffffff',
-                                borderColor: activeAnswers[q.id] === ans ? '#16a34a' : undefined
-                              }}
-                              onClick={() => handleSelectAnswer(q.id, ans)}
-                            >
-                              {ans}
-                            </button>
-                          ))}
-                        </div>
+                      ) : (
+                        <input 
+                          type="text" 
+                          className="edit-form-input" 
+                          style={{ padding: '6px 10px', fontSize: '13px', maxWidth: '300px' }}
+                          placeholder={isVi ? "Nhập câu trả lời..." : "Enter your answer..."}
+                          value={activeAnswers[q.id] || ''}
+                          onChange={(e) => handleSelectAnswer(q.id, e.target.value)}
+                        />
                       )}
                     </div>
                   ))}
@@ -244,47 +293,47 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
           )}
 
           {/* LISTENING PREVIEW */}
-          {data.skill === 'listening' && (
+          {activeSkill === 'listening' && listeningConfig && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '13.5px', fontWeight: 700, display: 'block', marginBottom: '8px', color: '#0f172a' }}>
-                  {isVi ? 'Tệp âm thanh bài nghe:' : 'Audio Track:'}
+              <div style={{ padding: '16px', backgroundColor: 'var(--eh-canvas, #f8fafc)', borderRadius: '10px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                  {isVi ? 'Trình phát âm thanh bài nghe' : 'Audio Player'}
                 </span>
-                {(data.listening.audioPreviewUrl || data.listening.audioUrl) ? (
-                  <audio controls src={data.listening.audioPreviewUrl || data.listening.audioUrl} style={{ width: '100%' }} />
+                {(listeningConfig.audioPreviewUrl || listeningConfig.audioUrl) ? (
+                  <audio controls src={listeningConfig.audioPreviewUrl || listeningConfig.audioUrl} style={{ width: '100%' }} />
                 ) : (
                   <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                    {isVi ? 'Chưa có tệp âm thanh đính kèm' : 'No audio file attached'}
+                    {isVi ? 'Chưa chọn tệp âm thanh nghe.' : 'No audio file uploaded.'}
                   </span>
                 )}
               </div>
 
-              {data.listening.transcript && (
-                <div style={{ padding: '14px 16px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              {listeningConfig.transcript && (
+                <div style={{ padding: '14px 16px', backgroundColor: 'var(--eh-surface, #ffffff)', borderRadius: '10px', border: '1px solid var(--eh-border, #e2e8f0)' }}>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-                    {isVi ? 'Lời thoại / Hướng dẫn:' : 'Transcript / Instructions:'}
+                    {isVi ? 'Văn bản Transcript (Giáo viên xem trước)' : 'Audio Transcript (Teacher Preview)'}
                   </span>
-                  <p style={{ margin: 0, fontSize: '13.5px', lineHeight: 1.6, color: '#334155', whiteSpace: 'pre-line' }}>
-                    {data.listening.transcript}
+                  <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.6, color: 'var(--eh-text-secondary, #334155)', whiteSpace: 'pre-line' }}>
+                    {listeningConfig.transcript}
                   </p>
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                  {isVi ? `Danh sách câu hỏi (${data.listening.questions.length} câu):` : `Questions (${data.listening.questions.length}):`}
+              <div>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 700, color: 'var(--eh-text-primary, #0f172a)' }}>
+                  {isVi ? `Danh sách câu hỏi (${listeningConfig.questions.length} câu):` : `Questions (${listeningConfig.questions.length}):`}
                 </h4>
-                {data.listening.questions.map(q => (
-                  <div key={q.id} style={{ padding: '14px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                {listeningConfig.questions.map(q => (
+                  <div key={q.id} style={{ padding: '14px', backgroundColor: 'var(--eh-surface, #ffffff)', borderRadius: '8px', border: '1px solid var(--eh-border, #e2e8f0)', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 800, color: '#0d9488' }}>Q{q.order}.</span>
-                      <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#0f172a' }}>{q.prompt}</span>
+                      <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--eh-text-primary, #0f172a)' }}>{q.prompt}</span>
                     </div>
 
                     {q.type === 'multiple_choice' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                         {(q.options || []).map((opt, i) => (
-                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer' }}>
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer', color: 'var(--eh-text-secondary, #334155)' }}>
                             <input 
                               type="radio" 
                               name={`prev-list-${q.id}`} 
@@ -313,7 +362,7 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
         </div>
 
         {/* Modal Footer */}
-        <div style={{ padding: '14px 24px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <div style={{ padding: '14px 24px', backgroundColor: 'var(--eh-canvas, #f8fafc)', borderTop: '1px solid var(--eh-border, #e2e8f0)', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button type="button" className="btn btn-secondary bg-white btn-sm" onClick={onClose}>
             {isVi ? 'Đóng xem thử' : 'Close Preview'}
           </button>

@@ -1,0 +1,51 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam ActivityBorderColor #2C3E50
+skinparam ActivityBackgroundColor #F8F9FA
+skinparam ActivityDiamondBorderColor #2C3E50
+skinparam ActivityDiamondBackgroundColor #EBF5FB
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam SwimlaneBorderColor #7F8C8D
+skinparam SwimlaneTitleFontSize 13
+skinparam SwimlaneTitleFontStyle bold
+skinparam SwimlaneTitleBackgroundColor #EAEDED
+skinparam roundCorner 14
+skinparam dpi 250
+skinparam shadowing false
+
+|Học viên|
+start
+:Chọn bài tập kỹ năng Nói trong danh sách;
+:Đọc đề bài, chủ đề nói và tiêu chí chấm điểm;
+
+|Hệ thống|
+:Khởi tạo giao diện làm bài Nói và bộ đếm thời gian;
+
+|Học viên|
+if (Phương thức nộp bài?) then (Ghi âm trực tiếp)
+  repeat
+    :Nhấn "Ghi âm" (cấp quyền micro cho trình duyệt);
+    |Hệ thống|
+    :Kích hoạt Web Audio API / MediaRecorder;
+    |Học viên|
+    :Thực hiện bài nói theo đề bài;
+    :Nhấn "Dừng ghi âm";
+    :Nghe lại bản ghi âm xem trước;
+  repeat while (Hài lòng với bản ghi âm?) is (Không - Xóa bản ghi tạm và ghi âm lại) not (Có)
+else (Tải tệp âm thanh)
+  :Chọn tệp âm thanh (.webm / .wav / .mp3) từ máy;
+  |Hệ thống|
+  :Kiểm tra định dạng hợp lệ và dung lượng (<25MB);
+endif
+
+|Hệ thống|
+:Cấp Presigned PUT URL MinIO S3;
+:Tải tệp âm thanh trực tiếp lên MinIO S3;
+:Lưu audio_storage_key và duration_seconds vào answers;
+:Cập nhật trạng thái câu trả lời đã lưu;
+
+|Học viên|
+stop
+@enduml

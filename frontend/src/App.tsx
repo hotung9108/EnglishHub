@@ -4,6 +4,7 @@ import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/common/ToastContext';
 import { DocumentTitleManager } from './components/common/DocumentTitleManager';
 import { useAuth } from './hooks/useAuth';
@@ -81,10 +82,11 @@ function ReportsRedirect() {
 function App() {
   return (
     <AuthProvider>
-      <LanguageProvider>
-        <ToastProvider>
-          <DocumentTitleManager />
-          <Suspense fallback={<PageLoadingFallback />}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ToastProvider>
+            <DocumentTitleManager />
+            <Suspense fallback={<PageLoadingFallback />}>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -182,7 +184,8 @@ function App() {
           </Suspense>
         </ToastProvider>
       </LanguageProvider>
-    </AuthProvider>
+    </ThemeProvider>
+  </AuthProvider>
   );
 }
 

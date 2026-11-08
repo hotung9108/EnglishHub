@@ -10,7 +10,7 @@ import { useUsers } from '../hooks/useUsers';
 import { useDebounce } from '../hooks/useDebounce';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
-import { Button, EmptyState, Pagination } from '../components/common';
+import { Button, EmptyState, Pagination, ConfirmModal } from '../components/common';
 import { useToast } from '../components/common/ToastContext';
 
 export const Accounts: React.FC = () => {
@@ -21,6 +21,8 @@ export const Accounts: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<'All' | 'STUDENT' | 'TEACHER' | 'ADMIN'>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusModalUser, setStatusModalUser] = useState<UserListItem | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
 
   const {
     users,
@@ -366,7 +368,7 @@ export const Accounts: React.FC = () => {
                           <Button 
                             variant="secondary"
                             size="sm"
-                            onClick={() => handleToggleStatus(user)}
+                            onClick={() => setStatusModalUser(user)}
                             title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
                             className={isActive ? 'text-error' : 'text-success'}
                             icon={isActive ? <Lock size={14} /> : <Unlock size={14} />}
@@ -565,6 +567,45 @@ export const Accounts: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Two-Step Confirmation Modal for Account Status Change */}
+      {statusModalUser && (
+        <ConfirmModal
+          isOpen={Boolean(statusModalUser)}
+          title={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi ? 'Xác nhận khóa tài khoản' : 'Lock User Account')
+              : (isVi ? 'Xác nhận mở khóa tài khoản' : 'Unlock User Account')
+          }
+          message={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn khóa tài khoản "${statusModalUser.fullName || statusModalUser.email}"? Người dùng này sẽ bị tạm dừng quyền truy cập và không thể đăng nhập vào hệ thống.`
+                  : `Are you sure you want to lock account "${statusModalUser.fullName || statusModalUser.email}"? The user will lose access to EnglishHub until unlocked.`)
+              : (isVi
+                  ? `Khôi phục quyền truy cập hệ thống cho tài khoản "${statusModalUser.fullName || statusModalUser.email}"?`
+                  : `Restore system access for "${statusModalUser.fullName || statusModalUser.email}"?`)
+          }
+          confirmText={
+            statusModalUser.status === 'ACTIVE'
+              ? (isVi ? 'Khóa tài khoản' : 'Lock Account')
+              : (isVi ? 'Mở khóa' : 'Unlock Account')
+          }
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant={statusModalUser.status === 'ACTIVE' ? 'danger' : 'primary'}
+          isLoading={isUpdatingStatus}
+          onConfirm={async () => {
+            setIsUpdatingStatus(true);
+            try {
+              await handleToggleStatus(statusModalUser);
+              setStatusModalUser(null);
+            } finally {
+              setIsUpdatingStatus(false);
+            }
+          }}
+          onCancel={() => setStatusModalUser(null)}
+        />
       )}
     </div>
   );

@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Shield, Check, RotateCcw, Save, 
-  HelpCircle, CheckCircle2, ShieldCheck, 
-  Layers
+  Shield, Check, HelpCircle, ShieldCheck, 
+  Layers, Lock
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useToast } from '../components/common/ToastContext';
 
 interface RoleCapability {
   id: string;
@@ -20,13 +18,11 @@ interface RoleCapability {
 export const Roles: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-  const { success: toastSuccess } = useToast();
 
   const [activeRole, setActiveRole] = useState<'admin' | 'teacher' | 'ta' | 'student'>('admin');
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Granular capability matrix
-  const [permissions, setPermissions] = useState<Record<string, RoleCapability[]>>({
+  // Authoritative system capability matrix enforced by Spring Security RBAC
+  const permissions: Record<string, RoleCapability[]> = {
     admin: [
       { id: 'mod-1', module: t('roles.mod1'), description: isVi ? 'Tạo mới, khóa, mở và phân bổ vai trò người dùng' : 'Create, suspend, and assign user identities', read: true, write: true, approve: true, export: true },
       { id: 'mod-2', module: t('roles.mod2'), description: isVi ? 'Quản lý danh sách lớp, sĩ số và giáo viên phụ trách' : 'Manage course cohorts, capacity, and teacher assignments', read: true, write: true, approve: true, export: true },
@@ -55,30 +51,6 @@ export const Roles: React.FC = () => {
       { id: 'mod-4', module: t('roles.mod4'), description: isVi ? 'Xem điểm số, nhận xét của AI và giáo viên' : 'Access graded feedback & error annotations', read: true, write: false, approve: false, export: false },
       { id: 'mod-5', module: t('roles.mod5'), description: isVi ? 'Xem bảng điểm và biểu đồ năng lực cá nhân' : 'Track personal competency radar', read: true, write: false, approve: false, export: false },
     ]
-  });
-
-  const handleToggle = (moduleId: string, field: 'read' | 'write' | 'approve' | 'export') => {
-    setPermissions(prev => ({
-      ...prev,
-      [activeRole]: prev[activeRole].map(mod => {
-        if (mod.id === moduleId) {
-          return { ...mod, [field]: !mod[field] };
-        }
-        return mod;
-      })
-    }));
-  };
-
-  const handleSave = () => {
-    setSaveSuccess(true);
-    toastSuccess(isVi ? 'Đã lưu cấu hình phân quyền vai trò.' : 'Role permissions saved successfully.');
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 2000);
-  };
-
-  const handleApplyPreset = (preset: string) => {
-    toastSuccess(isVi ? `Đã áp dụng mẫu phân quyền "${preset}" thành công.` : `Preset "${preset}" applied successfully.`);
   };
 
   return (
@@ -86,37 +58,24 @@ export const Roles: React.FC = () => {
       {/* Header */}
       <div className="adm-header">
         <div className="adm-title-group">
-          <h1 className="adm-title">
-            {t('roles.title')}
-          </h1>
-        </div>
-
-        <div className="flex gap-2.5">
-          <button 
-            className="btn btn-secondary inline-flex items-center gap-1.5"
-            onClick={() => toastSuccess(isVi ? 'Đã khôi phục các thiết lập phân quyền mặc định của hệ thống.' : 'Default permissions restored.')}
-          >
-            <RotateCcw size={15} />
-            <span>{t('roles.restoreDefault')}</span>
-          </button>
-          <button 
-            className="btn btn-primary inline-flex items-center gap-1.5"
-            onClick={handleSave}
-          >
-            <Save size={15} />
-            <span>{t('roles.updatePerms')}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <h1 className="adm-title">
+              {t('roles.title')}
+            </h1>
+            <span className="badge badge-primary px-2.5 py-1 text-xs font-semibold">
+              <Lock size={12} className="mr-1 inline" />
+              {isVi ? 'RBAC Cố định (Backend Security)' : 'Fixed System RBAC'}
+            </span>
+          </div>
+          <p className="adm-subtitle">
+            {isVi 
+              ? 'Ma trận đặc quyền và phạm vi truy cập hệ thống của từng vai trò được thực thi bảo mật tại Spring Security.' 
+              : 'System role capability matrix and access boundaries strictly enforced by Spring Security.'}
+          </p>
         </div>
       </div>
 
-      {saveSuccess && (
-        <div className="adm-alert-success mb-5">
-          <CheckCircle2 size={18} />
-          <span>{isVi ? 'Cập nhật phân quyền vai trò thành công! Quyền hạn đã có hiệu lực ngay lập tức.' : 'Role permissions updated successfully and propagated.'}</span>
-        </div>
-      )}
-
-      {/* Role Selector Tabs (Mobbin Segmented Bar) */}
+      {/* Role Selector Tabs */}
       <div className="adm-filter-bar mb-6">
         <div className="adm-pills">
           {(
@@ -141,22 +100,6 @@ export const Roles: React.FC = () => {
             );
           })}
         </div>
-
-        {/* Preset Selector */}
-        <div className="adm-roles-preset-wrap">
-          <span>{isVi ? 'Mẫu phân quyền:' : 'Preset:'}</span>
-          <select 
-            className="input adm-roles-preset-select"
-            onChange={(e) => handleApplyPreset(e.target.value)}
-            defaultValue=""
-          >
-            <option value="" disabled>{isVi ? '-- Chọn mẫu có sẵn --' : '-- Choose Preset --'}</option>
-            <option value="super-admin">Super Administrator (Full Privileges)</option>
-            <option value="lead-instructor">Lead Senior Instructor</option>
-            <option value="auditor">Internal Academic Auditor</option>
-            <option value="standard-student">Standard Student Participant</option>
-          </select>
-        </div>
       </div>
 
       {/* RBAC Capabilities Table */}
@@ -167,12 +110,12 @@ export const Roles: React.FC = () => {
               {t('roles.permHeading')}
             </span>
             <div className="text-sm font-semibold text-on-surface mt-0.5">
-              {isVi ? `Đang cấu hình quyền hạn cho: ${activeRole.toUpperCase()}` : `Configuring capability rules for: ${activeRole.toUpperCase()}`}
+              {isVi ? `Đặc quyền hệ thống cho vai trò: ${activeRole.toUpperCase()}` : `System access rules for: ${activeRole.toUpperCase()}`}
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[12.5px] text-on-surface-variant">
             <HelpCircle size={15} />
-            <span>{isVi ? 'Bật công tắc để kích hoạt quyền' : 'Toggle switches to adjust access'}</span>
+            <span>{isVi ? 'Quy định cố định theo vai trò bảo mật' : 'Enforced strictly by role permissions'}</span>
           </div>
         </div>
 
@@ -196,52 +139,48 @@ export const Roles: React.FC = () => {
                   </div>
                 </td>
 
-                {/* Read Toggle */}
+                {/* Read Badge */}
                 <td className="text-center">
-                  <label className="adm-switch mx-auto">
-                    <input 
-                      type="checkbox" 
-                      checked={mod.read} 
-                      onChange={() => handleToggle(mod.id, 'read')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                  {mod.read ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Write Toggle */}
+                {/* Write Badge */}
                 <td className="text-center">
-                  <label className="adm-switch mx-auto">
-                    <input 
-                      type="checkbox" 
-                      checked={mod.write} 
-                      onChange={() => handleToggle(mod.id, 'write')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                  {mod.write ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Approve Toggle */}
+                {/* Approve Badge */}
                 <td className="text-center">
-                  <label className="adm-switch mx-auto">
-                    <input 
-                      type="checkbox" 
-                      checked={mod.approve} 
-                      onChange={() => handleToggle(mod.id, 'approve')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                  {mod.approve ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
 
-                {/* Export Toggle */}
+                {/* Export Badge */}
                 <td className="text-center">
-                  <label className="adm-switch mx-auto">
-                    <input 
-                      type="checkbox" 
-                      checked={mod.export} 
-                      onChange={() => handleToggle(mod.id, 'export')} 
-                    />
-                    <span className="adm-slider"></span>
-                  </label>
+                  {mod.export ? (
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-forest text-xs font-bold">
+                      <Check size={15} />
+                    </span>
+                  ) : (
+                    <span className="text-muted text-sm font-semibold">—</span>
+                  )}
                 </td>
               </tr>
             ))}

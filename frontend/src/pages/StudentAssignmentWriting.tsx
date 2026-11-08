@@ -125,7 +125,11 @@ const StudentAssignmentWriting: React.FC = () => {
         }
 
         // 2. Fetch writing module details & initial submission in parallel
-        const writingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+        const urlModId = Number(searchParams.get('moduleId'));
+        const matchedMod = urlModId
+          ? currentAssignment?.modules?.find((m) => m.id === urlModId)
+          : null;
+        const writingMod = matchedMod || currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
         const moduleId = writingMod?.id || currentAssignment?.modules?.[0]?.id;
         const urlSubmissionId = searchParams.get('submissionId');
 
@@ -400,7 +404,11 @@ const StudentAssignmentWriting: React.FC = () => {
     }
 
     const subId = submission.id;
-    const writingSubMod = submission.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
+    const urlModId = Number(searchParams.get('moduleId'));
+    const matchedSubMod = urlModId
+      ? submission.modules?.find((m) => m.moduleId === urlModId)
+      : null;
+    const writingSubMod = matchedSubMod || submission.modules?.find((m) => m.skill?.toUpperCase() === 'WRITING');
     const subModuleId = writingSubMod?.id || submission.modules?.[0]?.id;
 
     if (!subModuleId) {

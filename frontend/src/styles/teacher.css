@@ -355,13 +355,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #ecfdf5;
-  color: #059669;
+  background-color: var(--eh-success-bg, #ecfdf5);
+  color: var(--eh-success, #059669);
   padding: 3px 10px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 700;
-  border: 1px solid #a7f3d0;
+  border: 1px solid var(--eh-success-border, #a7f3d0);
 }
 
 .teacher-class-status-completed {
@@ -420,8 +420,9 @@
   font-weight: 700;
   padding: 2.5px 8px;
   border-radius: 6px;
-  background-color: #262320;
-  color: #FAF8F5;
+  background-color: var(--eh-surface-container, #262320);
+  color: var(--eh-text-primary, #FAF8F5);
+  border: 1px solid var(--eh-border, transparent);
   letter-spacing: 0.02em;
 }
 
@@ -451,13 +452,13 @@
   font-weight: 700;
   padding: 2.5px 9px;
   border-radius: 6px;
-  background-color: #F6F2EB;
-  color: #8C5E14;
-  border: 1px solid #ECD8B0;
+  background-color: var(--eh-gold-subtle, #F6F2EB);
+  color: var(--eh-gold-dark, #8C5E14);
+  border: 1px solid var(--eh-gold-border, #ECD8B0);
 }
 
 .teacher-skill-combined-badge svg {
-  color: #C2A882;
+  color: var(--eh-gold, #C2A882);
   flex-shrink: 0;
 }
 
@@ -500,15 +501,15 @@
 }
 
 .teacher-assignment-pending-pill {
-  background-color: #FDF6EC;
-  color: #9A6014;
-  border: 1px solid #F6DFBA;
+  background-color: var(--eh-warning-bg, #FDF6EC);
+  color: var(--eh-warning, #9A6014);
+  border: 1px solid var(--eh-warning-border, #F6DFBA);
 }
 
 .teacher-assignment-done-pill {
-  background-color: #E7F3EC;
-  color: #17523F;
-  border: 1px solid #B7DEC8;
+  background-color: var(--eh-success-bg, #E7F3EC);
+  color: var(--eh-success, #17523F);
+  border: 1px solid var(--eh-success-border, #B7DEC8);
 }
 
 .teacher-assignment-status-dot {
@@ -585,14 +586,14 @@
 }
 
 .teacher-assignment-deadline-tag.urgent {
-  background-color: #FBEBEB;
-  color: #8F2222;
-  border-color: #F3C5C5;
+  background-color: var(--eh-danger-bg, #FBEBEB);
+  color: var(--eh-danger, #8F2222);
+  border-color: var(--eh-danger-border, #F3C5C5);
   font-weight: 700;
 }
 
 .teacher-assignment-deadline-tag.urgent svg {
-  color: #8F2222;
+  color: var(--eh-danger, #8F2222);
 }
 
 .teacher-assignment-meta-separator {
@@ -947,9 +948,9 @@
   border: 1px solid var(--secondary-fixed, #b7dec8);
 }
 .tad-status-pill.closed {
-  background-color: #f1f5f9;
-  color: #475569;
-  border: 1px solid #e2e8f0;
+  background-color: var(--eh-surface-dim, #f1f5f9);
+  color: var(--eh-text-muted, #475569);
+  border: 1px solid var(--eh-border, #e2e8f0);
 }
 
 .tad-skill-tag {
@@ -1130,8 +1131,8 @@
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  background-color: #e2e8f0;
-  color: #475569;
+  background-color: var(--eh-surface-container, #e2e8f0);
+  color: var(--eh-text-secondary, #475569);
   flex-shrink: 0;
 }
 .tad-opt-letter.correct {
@@ -1201,9 +1202,9 @@
   box-shadow: 0 2px 6px -1px rgba(27, 77, 62, 0.28);
 }
 .tad-subtab-btn.pending-active {
-  border-color: #fcd34d;
-  background-color: #fef3c7;
-  color: #d97706;
+  border-color: var(--eh-warning-border, #fcd34d);
+  background-color: var(--eh-warning-bg, #fef3c7);
+  color: var(--eh-warning, #d97706);
   font-weight: 600;
 }
 
@@ -1387,13 +1388,14 @@
   position: fixed;
   top: 24px;
   right: 24px;
-  background-color: #0f172a;
-  color: #ffffff;
+  background-color: var(--eh-surface-elevated, #0f172a);
+  color: var(--eh-text-primary, #ffffff);
+  border: 1px solid var(--eh-border, transparent);
   padding: 12px 20px;
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--eh-shadow-lg);
   z-index: 999999;
   display: flex;
   align-items: center;
@@ -1523,9 +1525,9 @@
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  background-color: #d1fae5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
+  background-color: var(--eh-success-bg, #d1fae5);
+  color: var(--eh-success, #065f46);
+  border: 1px solid var(--eh-success-border, #a7f3d0);
 }
 .tsd-student-code {
   font-size: 12px;
@@ -1568,7 +1570,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #10b981;
+  background-color: var(--eh-success, #10b981);
 }
 .tsd-ontime-text {
   font-weight: 500;

@@ -96,7 +96,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
         }
 
         // 2. Fetch speaking module details & initial submission in parallel
-        const speakingMod = currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+        const urlModId = searchParams.get('moduleId');
+        const matchedMod = urlModId && Number.isFinite(Number(urlModId))
+          ? currentAssignment?.modules?.find((m) => m.id === Number(urlModId))
+          : null;
+        const speakingMod = matchedMod || currentAssignment?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
         const moduleId = speakingMod?.id || currentAssignment?.modules?.[0]?.id;
         const urlSubmissionId = searchParams.get('submissionId');
 
@@ -316,7 +320,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
     try {
       const subId = submission?.id;
-      const speakingSubMod = submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
+      const urlModId = searchParams.get('moduleId');
+      const matchedSubMod = urlModId && Number.isFinite(Number(urlModId))
+        ? submission?.modules?.find((m) => m.moduleId === Number(urlModId))
+        : null;
+      const speakingSubMod = matchedSubMod || submission?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING');
       const subModuleId = speakingSubMod?.id || submission?.modules?.[0]?.id;
 
       if (!subModuleId) {

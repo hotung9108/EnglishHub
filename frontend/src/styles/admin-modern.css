@@ -189,13 +189,13 @@
 }
 
 .adm-kpi-delta.pos {
-  background: #f0fdf4;
-  color: #15803d;
+  background: var(--eh-success-bg);
+  color: var(--eh-success);
 }
 
 .adm-kpi-delta.neg {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--eh-danger-bg);
+  color: var(--eh-danger);
 }
 
 .adm-kpi-delta.neutral {
@@ -546,9 +546,9 @@
   color: var(--on-surface-variant);
 }
 
-.adm-avatar.role-admin { background-color: #262320; }
-.adm-avatar.role-teacher { background-color: var(--primary, #1B4D3E); }
-.adm-avatar.role-student { background-color: #C5A880; color: #262320; }
+.adm-avatar.role-admin { background-color: var(--eh-text-primary); color: var(--eh-text-inverse, #ffffff); }
+.adm-avatar.role-teacher { background-color: var(--eh-primary); color: var(--eh-on-primary, #ffffff); }
+.adm-avatar.role-student { background-color: var(--eh-gold); color: var(--eh-canvas, #ffffff); }
 
 .adm-avatar-status {
   position: absolute;
@@ -557,10 +557,10 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  border: 2px solid white;
+  border: 2px solid var(--eh-surface);
 }
-.adm-avatar-status.active { background-color: var(--secondary, #17523F); }
-.adm-avatar-status.blocked { background-color: var(--error, #8F2222); }
+.adm-avatar-status.active { background-color: var(--eh-success); }
+.adm-avatar-status.blocked { background-color: var(--eh-danger); }
 
 .adm-input-icon-wrap {
   position: relative;
@@ -581,9 +581,9 @@
 .adm-alert-error {
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background-color: var(--eh-danger-bg);
+  border: 1px solid var(--eh-danger-border);
+  color: var(--eh-danger);
   font-size: 13px;
   margin-bottom: 14px;
   display: flex;
@@ -1523,15 +1523,15 @@
 }
 
 .adm-gh-delta-pos {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid rgba(22, 163, 74, 0.2);
+  background: var(--eh-success-bg);
+  color: var(--eh-success);
+  border: 1px solid var(--eh-success-border);
 }
 
 .adm-gh-delta-neg {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: var(--eh-danger-bg);
+  color: var(--eh-danger);
+  border: 1px solid var(--eh-danger-border);
 }
 
 .adm-gh-note-cardlet {
@@ -1546,8 +1546,8 @@
 }
 
 .adm-gh-note-cardlet.flagged {
-  background: #fff1f2;
-  border-color: #fecdd3;
+  background: var(--eh-danger-bg);
+  border-color: var(--eh-danger-border);
 }
 
 .adm-gh-note-icon {
@@ -1562,7 +1562,7 @@
 }
 
 .adm-gh-note-text.flagged {
-  color: #9f1239;
+  color: var(--eh-danger);
   font-weight: 500;
 }
 
@@ -1758,9 +1758,9 @@
 }
 
 .adm-gh-drawer-quote.flagged {
-  border-left-color: #ef4444;
-  background: #fff1f2;
-  color: #9f1239;
+  border-left-color: var(--eh-danger);
+  background: var(--eh-danger-bg);
+  color: var(--eh-danger);
 }
 
 .adm-gh-drawer-rubric-row {
@@ -2365,7 +2365,7 @@
 .adm-rep-skill-card:hover {
   transform: translateY(-2px);
   border-color: #bfdbfe;
-  background-color: #ffffff;
+  background-color: var(--eh-surface);
   box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.08);
 }
 
@@ -2672,7 +2672,7 @@
 }
 
 .adm-rep-ai-metric-box {
-  background: #ffffff;
+  background: var(--eh-surface);
   border: 1px solid rgba(99, 102, 241, 0.18);
   border-radius: var(--radius-md, 12px);
   padding: 10px 14px;
