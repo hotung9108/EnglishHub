@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-029",
+  "title": "Chấm bài Reading đã nộp",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:18:05.373Z",
+  "finishedAt": "2026-11-04T07:18:06.014Z"
+}

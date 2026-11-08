@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-035",
+  "title": "Lịch sử: mở kết quả đúng lượt",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "NEEDS_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "QA30 data wait: result score loaded\nWait timed out after 15085ms",
+  "actualUrl": "https://staging.hotung9108.me/student/submissions/2580",
+  "startedAt": "2026-11-06T13:31:19.121Z",
+  "finishedAt": "2026-11-06T13:31:42.582Z"
+}

@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-026",
+  "title": "Reading MCQ: đáp án sai, điểm 0",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "BLOCKED",
+    "classification": "FIXTURE_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "This editor case needs an unsubmitted fixture. Re-run this case with --fresh-fixtures.",
+  "actualUrl": "https://staging.hotung9108.me/student/dashboard",
+  "startedAt": "2026-11-06T13:30:01.295Z",
+  "finishedAt": "2026-11-06T13:30:04.614Z"
+}

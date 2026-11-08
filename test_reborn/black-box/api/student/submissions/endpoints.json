@@ -1,0 +1,557 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 13 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00.1 - Đăng nhập Học viên (Student)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00.2 - Đăng nhập Học viên B (Student B)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00.3 - Đăng nhập Giáo viên (Teacher)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00.4 - Đăng nhập Quản trị viên (Admin / Checker)",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00.5 - Tạo lớp fixture riêng và lưu JWT thật cho kiểm tra hết hạn",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?page=1&limit=1",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2791] [BE18-01] Học viên — bắt đầu attempt lần đầu cho assignment đang mở — tạo submission 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2792] [BE18-02] Học viên — tạo attempt thứ 2 khi attempt trước IN_PROGRESS và còn lượt — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{secondAttemptAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2793] [BE18-03] Học viên — tạo nhiều attempt khi maxSubmissions=null — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{unlimitedAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2794] [BE18-04] Học viên — kiểm tra submission và module đã lưu sau khi bắt đầu attempt — persistence",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2795] [BE18-05] Không có token — không được bắt đầu attempt — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2796] [BE18-06] Token không hợp lệ — không được bắt đầu attempt — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2797] [BE18-07] Token hết hạn — không được bắt đầu attempt — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2798] [BE18-08] Giáo viên gọi API dành cho học viên — bị từ chối — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2799] [BE18-09] Quản trị viên gọi API dành cho học viên — bị từ chối — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{publishedOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2800] [BE18-10] Học viên không thuộc class — không được bắt đầu attempt — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{notMemberAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2801] [BE18-11] Assignment không tồn tại — không tạo attempt — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{unknownAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2802] [BE18-12] Assignment đã xóa mềm — không tạo attempt — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{deletedAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2803] [BE18-13] Assignment DRAFT — không được bắt đầu attempt — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{draftAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2804] [BE18-14] Chưa đến thời điểm openAt — không được bắt đầu attempt — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{notOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2805] [BE18-15] Đã quá thời điểm closeAt — không được bắt đầu attempt — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{closedAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2806] [BE18-16] Đã đạt giới hạn maxSubmissions từ fixture — không tạo attempt — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{limitReachedAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2807] [BE18-17] assignmentId không phải số — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/abc/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2808] [BE18-18] assignmentId là số âm — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/-1/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2809] [BE18-19] Hai attempt tuần tự với maxSubmissions=1 — lượt đầu 201, lượt sau 400 — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{limitedConcurrencyAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2810] [BE18-20] Thiếu assignmentId trên URL — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments//submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2811] [BE18-21] maxSubmissions=1 — lần đầu tạo attempt, lần hai bị từ chối",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{maxOneOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2812] [BE18-22] Đang ở N-1 attempt với maxSubmissions=3 — tạo attempt cuối — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{maxThreeOpenAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2813] [BE18-23] Đã đủ N=3 attempt — không tạo attempt thứ 4 — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{maxThreeAtLimitAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2814] [BE18-24A] Trước openAt — không được bắt đầu — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{exactOpenBoundaryAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2815] [BE18-24B] Sau closeAt — không được bắt đầu — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{exactCloseBoundaryAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2816] [BE18-25] Assignment PUBLISHED không có module — tạo attempt rỗng — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{emptyModulesAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2817] [BE18-26] Token thật của tài khoản bị khóa — bị từ chối — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{lockedAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2818] [BE18-27] Đã có attempt IN_PROGRESS và maxSubmissions=1 — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{inProgressMaxOneAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2819] [BE18-28] Không thuộc class đồng thời assignment DRAFT — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{precedenceAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2820] [BE18-29] Học viên bị remove khỏi class — không được bắt đầu attempt — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{removedMemberAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2821] [BE18-30] Hai học viên cùng làm một assignment — attemptNumber được tính riêng — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{perStudentAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2822] [BE18-31] Hai attempt tuần tự maxSubmissions=null — attemptNumber tăng — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{unlimitedConcurrencyAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2823] [BE18-32] assignmentId=0 — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/0/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2824] [BE18-33] assignmentId vượt giới hạn long — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/9223372036854775808/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2825] [BE18-34] assignmentId là số thập phân — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/1.5/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2826] [BE18-35A] Body JSON có field thừa — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{validationAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2827] [BE18-35B] Endpoint không đọc body — JSON sai cú pháp bị bỏ qua — 201",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/assignments/{{validationAssignmentId}}/submissions",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2828] [BE18-36] GET vào endpoint POST — security denyAll hiện trả 403 — 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/assignments/{{validationAssignmentId}}/submissions",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2829] [BE18-39] Học viên — xem danh sách submission của mình — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?studentId={{studentId}}&page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2830] [BE18-40] Giáo viên — lọc theo assignmentId — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?assignmentId={{teacherAssignmentId}}&page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2831] [BE18-41] Không có token — xem danh sách — 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2832] [BE18-42] Học viên — studentId của người khác — 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?studentId={{studentBId}}&page=1&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2833] [BE18-43A] page=0 — 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?page=0&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2834] [BE18-43B] limit=101 — 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?page=1&limit=101",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2835] [BE18-44] Học viên — xem submission của mình — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{submittedSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2836] [BE18-45] Học viên — xem submission người khác — 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{foreignSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2837] [BE18-46] Submission không tồn tại — 404",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{unknownSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2838] [BE18-47] Không có token — xem detail — 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{submittedSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2839] [BE18-48] Submission IN_PROGRESS — đọc detail được phép — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{inProgressSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2840] [BE18-76] Giáo viên — xem submission thuộc lớp mình — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{teacherVisibleSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2841] [BE18-77] Quản trị viên — xem submission — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/{{submittedSubmissionId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2842] [BE18-78A] id=abc — 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/abc",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2843] [BE18-78B] id=-1 — 404",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions/-1",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2851] [BE18-54] Học viên — xem module SUBMITTED — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{submittedModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2852] [BE18-55] Module IN_PROGRESS — 400",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{inProgressModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2853] [BE18-56] Học viên — xem module người khác — 403",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{foreignModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2854] [BE18-57] Module không tồn tại — 404",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{unknownModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2855] [BE18-58] Module GRADED — correctAnswer xuất hiện — 200",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{gradedModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2856] [BE18-81] Không có token — xem module — 401",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submission-modules/{{submittedModuleId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[Qase:2870] [BE18-71] Học viên — lấy presigned document URL — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{writingModuleId}}/document-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2871] [BE18-72] MIME document không hỗ trợ — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{writingModuleId}}/document-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2872] [BE18-73] Module không phải Writing — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{quizModuleId}}/document-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2873] [BE18-74] Không có token — upload document — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{writingModuleId}}/document-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2874] [BE18-75] Giáo viên — upload document — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{writingModuleId}}/document-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2865] [BE18-66] Học viên — lấy presigned audio URL — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{speakingModuleId}}/audio-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2866] [BE18-67] MIME audio không hỗ trợ — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{speakingModuleId}}/audio-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2867] [BE18-68] Module không phải Speaking — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{quizModuleId}}/audio-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2868] [BE18-69] Không có token — upload audio — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{speakingModuleId}}/audio-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2869] [BE18-70] Giáo viên — upload audio — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{speakingModuleId}}/audio-upload-url",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2857] [BE18-59] Học viên — nộp đáp án Quiz — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{quizModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2858] [BE18-60] Học viên — nộp Short Answer — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{shortAnswerModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2859] [BE18-61] Nộp module lần hai — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{alreadySubmittedModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2860] [BE18-62] Answers rỗng — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{emptyAnswersModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2861] [BE18-63] Question không thuộc module — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{foreignQuestionModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2862] [BE18-64] Giáo viên — submit module — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{authzQuizModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2863] [BE18-65] Quiz content sai shape — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{invalidShapeModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2864] [BE18-82] Không có token — submit module — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submission-modules/{{authnQuizModuleId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2844] [BE18-49] Học viên — nộp attempt của mình — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{finalSubmitSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2845] [BE18-50] Nộp lại submission đã SUBMITTED — 400",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{alreadySubmittedId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2846] [BE18-51] Submission không tồn tại — 404",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{unknownSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2847] [BE18-52] Học viên — nộp submission người khác — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{foreignSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2848] [BE18-53] Giáo viên — nộp submission — 403",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{teacherSubmitSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2849] [BE18-79] Không có token — nộp submission — 401",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{anonSubmitSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:2850] [BE18-80] Persistence — submit chuyển SUBMITTED — 200",
+      "method": "POST",
+      "url": "{{apiBaseUrl}}/submissions/{{persistenceSubmissionId}}/submit",
+      "mayMutate": true
+    },
+    {
+      "name": "99.1 - Soft-delete assignments tạo bởi suite và xóa user tạm",
+      "method": "GET",
+      "url": "{{apiBaseUrl}}/submissions?page=1&limit=1",
+      "mayMutate": false
+    },
+    {
+      "name": "QA19 CONTROL 13 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

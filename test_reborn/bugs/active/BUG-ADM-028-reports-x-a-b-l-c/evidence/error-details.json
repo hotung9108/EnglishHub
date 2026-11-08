@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-028",
+  "title": "Reports xóa bộ lọc",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "false == true",
+  "actualUrl": "http://localhost:5173/admin/reports",
+  "startedAt": "2026-11-07T05:20:20.821Z",
+  "finishedAt": "2026-11-07T05:20:35.360Z"
+}

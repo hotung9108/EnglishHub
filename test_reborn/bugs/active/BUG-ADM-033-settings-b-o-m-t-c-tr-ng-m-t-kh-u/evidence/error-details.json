@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-033",
+  "title": "Settings bảo mật có trường mật khẩu",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Missing button /^Bảo mật tài khoản$|^Account Security$/\nWait timed out after 30095ms",
+  "actualUrl": "https://staging.hotung9108.me/admin/settings",
+  "startedAt": "2026-11-06T13:34:34.809Z",
+  "finishedAt": "2026-11-06T13:35:09.638Z"
+}

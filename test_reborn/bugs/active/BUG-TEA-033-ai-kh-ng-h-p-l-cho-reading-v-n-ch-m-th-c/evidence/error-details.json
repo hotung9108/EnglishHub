@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-033",
+  "title": "AI không hợp lệ cho Reading vẫn chấm thủ công được",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "GET /submission-modules/4386/grading/ai-suggestion: HTTP 400",
+  "actualUrl": "http://localhost:5173/teacher/dashboard",
+  "startedAt": "2026-11-07T05:22:00.290Z",
+  "finishedAt": "2026-11-07T05:22:05.052Z"
+}

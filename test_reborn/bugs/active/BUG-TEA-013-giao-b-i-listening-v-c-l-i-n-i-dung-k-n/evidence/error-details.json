@@ -1,0 +1,11 @@
+{
+  "caseId": "TEA-013",
+  "title": "Giao bài Listening và đọc lại nội dung/kỹ năng",
+  "role": "teacher",
+  "phase": "scenario",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Waiting for element to be located By(css selector, [placeholder=\"listening_track_01.mp3\"])\nWait timed out after 30114ms",
+  "actualUrl": "http://localhost:5173/teacher/assignments/create",
+  "startedAt": "2026-11-07T05:16:52.965Z",
+  "finishedAt": "2026-11-07T05:17:31.439Z"
+}

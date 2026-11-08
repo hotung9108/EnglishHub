@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-036",
+  "title": "Kết quả: tab nhận xét của giáo viên",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "FAILED",
+    "classification": "PRODUCT_CANDIDATE",
+    "stopSuite": false
+  },
+  "reason": "Result must expose teacher feedback tab",
+  "actualUrl": "http://localhost:5173/student/submissions/1242",
+  "startedAt": "2026-11-07T05:21:43.703Z",
+  "finishedAt": "2026-11-07T05:21:52.943Z"
+}

@@ -1,0 +1,8 @@
+# Runtime caches and browser profiles
+.cache/
+
+# Test execution reports and screenshots
+reports/
+
+# Dependencies
+node_modules/

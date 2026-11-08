@@ -1,0 +1,241 @@
+{
+  "id": "d52fd337f01644a0d2063a040f14c508",
+  "name": "EnglishHub Staging - profiles",
+  "values": [
+    {
+      "key": "DEFAULT_PASSWORD",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "accessTokenTtlSeconds",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "aiPollCount",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "apiBaseUrl",
+      "value": "https://api-staging.hotung9108.me/api/v1",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "base_url",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "bearer_token_18qx",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "classId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "expiredAccessRefreshToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredAccessToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "expiredRefreshToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "gradingFixtureWaitSeconds",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "lockedStudentToken",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "noEvaluationStudentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "nonMemberId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherClassId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "otherTeacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "otherTeacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "profile0Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile0Id",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "profile1Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile1Id",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "profile2Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile3Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile4Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile5Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile6Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile7Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile8Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "profile9Email",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "stagingOrigin",
+      "value": "https://api-staging.hotung9108.me",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentBId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "studentEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "studentId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    },
+    {
+      "key": "teacherEmail",
+      "value": "",
+      "enabled": true,
+      "type": "secret"
+    },
+    {
+      "key": "teacherId",
+      "value": "",
+      "enabled": true,
+      "type": "default"
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

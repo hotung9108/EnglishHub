@@ -1,0 +1,215 @@
+{
+  "requests": [
+    {
+      "name": "[Qase:278] Login thành công với tài khoản hợp lệ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:279] Đăng nhập thất bại do sai mật khẩu",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:280] Đăng nhập với email không tồn tại",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:282] Đăng nhập khi bỏ trống email/password",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:283] Đăng nhập với tài khoản đang bị khóa (LOCKED)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:284] Đăng nhập với body JSON bị lỗi cú pháp (malformed JSON)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:285] Đăng nhập thiếu header Content-Type: application/json",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:286] Đăng nhập với input có ký tự đặc biệt / SQL injection payload",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:288] Response đăng nhập không chứa dữ liệu nhạy cảm",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:281] [Bảo mật] Chênh lệch 401 (sai mật khẩu) và 404 (email không tồn tại) có thể lộ thông tin tài khoản",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:287] Đăng nhập với email có khoảng trắng đầu/cuối hoặc khác hoa-thường",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:300] Gọi logout 2 lần liên tiếp với cùng access token",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:309] Authorize bằng access token trên Swagger UI và gọi thử API bảo vệ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:304] refresh_tokens.token_hash không bao giờ trùng với refresh token thô gửi cho client",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:305] Định dạng token_hash trong DB là SHA-256 hex 64 ký tự",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:312] [Regression] Không còn lỗi 07006 khi GHI Instant vào cột timestamptz lúc tạo refresh token",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:313] [Cảnh báo KHÔNG đóng test case] Bug tương tự (07006) có khả năng tồn tại ở features/user (JdbcUserRepository.updatedAt)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:289] Refresh token hợp lệ trả về access token mới",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:290] Refresh bằng refresh token đã bị thu hồi (revoked)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:291] Refresh bằng refresh token đã hết hạn",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:292] Refresh bằng chuỗi token không hợp lệ / rác",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:293] Dùng access token (nhầm loại) gọi API refresh",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:294] [Theo spec] Refresh token có thể tái sử dụng nhiều lần khi còn hạn (không có rotation)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:295] Access token mới từ refresh có claims/hạn hợp lệ",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:296] Đăng xuất thành công khi đã đăng nhập",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:297] Đăng xuất khi không có access token",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:299] Đăng xuất với access token đã hết hạn",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:301] Đăng xuất trên 1 thiết bị không ảnh hưởng phiên đăng nhập trên thiết bị khác",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:302] Access token bị chỉnh sửa (tampered) bị từ chối ở tầng entry point",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:303] Access token hết hạn bị từ chối",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:306] Access token với alg=none hoặc thuật toán khác HS256 bị từ chối",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:307] Truy cập Swagger UI không cần đăng nhập",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:308] GET /v3/api-docs công khai và khai báo đúng security scheme",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "[Qase:311] [Regression] Không còn lỗi 07006 khi ĐỌC timestamptz (login/refresh/logout)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "QA19 CONTROL 8 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

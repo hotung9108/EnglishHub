@@ -1,0 +1,785 @@
+{
+  "requests": [
+    {
+      "name": "QA19 CONTROL 14 SETUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00 AUTO Login — teacherToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00 AUTO Login — otherTeacherToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00 AUTO Login — studentToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00 AUTO Login — adminToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    },
+    {
+      "name": "00 Preflight — verify independent fixture IDs",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "00 Setup — author/own evaluation",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "00 Setup — second evaluation A",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "00 Setup — third evaluation A",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "00 Setup — evaluation in another class",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "00 Setup — verify fixture diversity",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-01] Giáo viên phụ trách lớp — list evaluation học viên — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-02] Giáo viên — list dùng page/limit mặc định — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-03] Giáo viên — filter theo classId — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?classId={{classIdA}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-04] Giáo viên — list sort createdAt giảm dần — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-05] Step 1 — page 1",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=1&limit=2",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-05] Giáo viên — trang 2 không lặp record — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=2&limit=2",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-06] Học viên — list evaluation của mình — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-07] Học viên — list evaluation học viên khác — 403",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{otherStudentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-08] Quản trị viên — list evaluation — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-09] Không gửi token — list evaluation — 401",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-10] Giáo viên — studentId không tồn tại — 404",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{missingStudentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-11] Giáo viên — page=0 — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=0",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-12] Giáo viên — limit=101 — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=101",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-13] Giáo viên — classId âm (query param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?classId=-1",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-14] Giáo viên — studentId abc (path param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/abc/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-15] Giáo viên — studentId=-1 (path param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/-1/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-16] Giáo viên — classId abc (query param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?classId=abc",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-17] Giáo viên — page abc (query param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=abc",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-18] Giáo viên — limit=100 (boundary max hợp lệ) — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-19] Giáo viên — trang vượt tổng số record — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=999&limit=20",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-20] Giáo viên — học viên chưa có evaluation nào — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{noEvaluationStudentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-64] Giáo viên — filter classId không tồn tại trong DB — 404",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?classId={{missingClassId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-65] Giáo viên — limit=1 (boundary min hợp lệ) — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=1",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-69] Token sai định dạng — list evaluation — 401",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-73] Giáo viên KHÔNG phụ trách lớp — list evaluation học viên — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-76] Token đã hết hạn — list evaluation — 401",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-21] Giáo viên phụ trách — tạo evaluation — 201",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-22] Giáo viên — tạo lặp cùng student/class — 201",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-23] Học viên — tạo evaluation — 403",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-24] Quản trị viên — tạo evaluation — 403",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-25] Giáo viên không phụ trách lớp — tạo evaluation — 403",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-26] Giáo viên — create student không phải thành viên lớp — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{nonMemberStudentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-27] Giáo viên — create content chỉ toàn khoảng trắng — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-28] Giáo viên — create thiếu classId — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-29] Giáo viên — create thiếu content — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-30] Giáo viên — create student không tồn tại — 404",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{missingStudentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-31] Giáo viên — create class không tồn tại — 404",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-32] Giáo viên — create JSON sai cú pháp — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-33] Không gửi token — create evaluation — 401",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-66] Giáo viên — create classId=0 trong body — 404",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-70] Giáo viên — create content=null — 400",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-71] Giáo viên — create body có field thừa — 201",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-67] Giáo viên — xác minh content và field sau khi tạo — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{createdEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-35] Giáo viên (tác giả) — xem detail evaluation — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-36] Học viên — xem detail evaluation của mình — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{ownEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-37] Học viên — xem detail evaluation của người khác — 403",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{otherEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-38] Quản trị viên — xem detail evaluation — 200",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-39] Không gửi token — xem detail — 401",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-40] Giáo viên — detail evaluation không tồn tại — 404",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{missingEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-41] Giáo viên — evaluationId abc (path param) — 400",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/abc",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-42] Giáo viên — evaluationId=-1 (path param) — 404",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/-1",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-61] Giáo viên khác (không phải tác giả) — xem detail — 403",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-43] Tác giả — update evaluation và xác minh persist — 200",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-43] Verify persisted update",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-44] Giáo viên không phải tác giả — update — 403",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authzUpdateEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-44] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-45] Học viên — update evaluation của mình — 403",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{ownEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-45] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-46] Quản trị viên — update evaluation — 403",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-46] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-47] Giáo viên — update body rỗng {} — 400",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-47] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-48] Giáo viên — update content chỉ toàn khoảng trắng — 400",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-48] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-49] Giáo viên — update JSON sai cú pháp — 400",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-49] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-50] Không gửi token — update evaluation — 401",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-50] Verify rejected PUT has no side effect",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-51] Giáo viên — update evaluation không tồn tại — 404",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{missingEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-52] Giáo viên — update evaluationId abc (path param) — 400",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/abc",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-62] Giáo viên — update evaluationId=-1 (path param) — 404",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/-1",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-72] Giáo viên — PUT body có classId thừa — 200",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-72] Verify classId unchanged",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-53] Setup — create disposable record",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-53] Tác giả — delete evaluation — 200",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{deleteEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-54] Giáo viên — delete lần hai — 404",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{deleteEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-68] Giáo viên — GET evaluation sau khi đã xóa — 404",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{deleteEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-55] Giáo viên không phải tác giả — delete — 403",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authzDeleteEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-55] Verify rejected DELETE preserved record",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-56] Học viên — delete evaluation của mình — 403",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{ownEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-56] Verify rejected DELETE preserved record",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-57] Quản trị viên — delete evaluation — 403",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-57] Verify rejected DELETE preserved record",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-58] Không gửi token — delete evaluation — 401",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-58] Verify rejected DELETE preserved record",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[BE20-59] Giáo viên — delete evaluation không tồn tại — 404",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{missingEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-60] Giáo viên — delete evaluationId abc (path param) — 400",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/abc",
+      "mayMutate": true
+    },
+    {
+      "name": "[BE20-63] Giáo viên — delete evaluationId=-1 (path param) — 404",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/-1",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] page=-1",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=-1",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] limit=0",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=0",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] limit=-1",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=-1",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] limit=abc",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=abc",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] classId=0 query",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?classId=0",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] studentId long overflow",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/9223372036854775808/evaluations",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] page int overflow",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?page=2147483648",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] POST empty content",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] POST null classId",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] POST blank tab newline",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] PUT null content",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] PUT empty content",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] GET evaluationId long overflow",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/9223372036854775808",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] PUT evaluationId long overflow",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/9223372036854775808",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] DELETE evaluationId long overflow",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/9223372036854775808",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] POST malformedToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] POST expiredToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] GET malformedToken",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] GET expiredToken",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "[ADD] PUT malformedToken",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] PUT expiredToken",
+      "method": "PUT",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] DELETE malformedToken",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] DELETE expiredToken",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{evaluationId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "[ADD] Verify all rejected writes preserved author record",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{authorEvaluationId}}",
+      "mayMutate": false
+    },
+    {
+      "name": "99 Cleanup — delete only records created in this run",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/api/v1/evaluations/{{_cleanupId}}",
+      "mayMutate": true
+    },
+    {
+      "name": "99 Verify cleanup restored baseline",
+      "method": "GET",
+      "url": "{{baseUrl}}/api/v1/students/{{studentId}}/evaluations?limit=100",
+      "mayMutate": false
+    },
+    {
+      "name": "99 AUTO Logout — teacherToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/logout",
+      "mayMutate": true
+    },
+    {
+      "name": "99 AUTO Logout — otherTeacherToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/logout",
+      "mayMutate": true
+    },
+    {
+      "name": "99 AUTO Logout — studentToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/logout",
+      "mayMutate": true
+    },
+    {
+      "name": "99 AUTO Logout — adminToken",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/logout",
+      "mayMutate": true
+    },
+    {
+      "name": "QA19 CONTROL 14 CLEANUP",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/v1/auth/login",
+      "mayMutate": true
+    }
+  ],
+  "fileInputs": []
+}

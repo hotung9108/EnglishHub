@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-014",
+  "title": "Xem thử Writing, đóng và giữ nội dung editor",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:17:56.325Z",
+  "finishedAt": "2026-11-04T07:17:56.769Z"
+}

@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-009",
+  "title": "Chấm bài: từ chối điểm ngoài thang",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot read properties of undefined (reading 'assignmentTitle')",
+  "startedAt": "2026-11-04T07:17:53.397Z",
+  "finishedAt": "2026-11-04T07:17:53.929Z"
+}

@@ -1,0 +1,17 @@
+{
+  "apiBaseUrl": "http://localhost:8080/api/v1",
+  "createdAt": "2026-11-07T02:37:31.249Z",
+  "className": "QA29-Teacher-2026-11-07T02-37-31-250Z",
+  "assignmentTitle": "QA29-Writing-Grading-2026-11-07T02-37-31-250Z",
+  "teacherId": 4,
+  "studentId": 12,
+  "studentName": "Ngô Thị Phương",
+  "classId": 85,
+  "memberId": 146,
+  "assignmentId": 1022,
+  "moduleId": 2983,
+  "submissionId": 1243,
+  "submissionModuleId": 4069,
+  "gradingId": 3674,
+  "verifiedAt": "2026-11-07T02:37:33.042Z"
+}

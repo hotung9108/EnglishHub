@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-011",
+  "title": "Giao bài Speaking và đọc lại nội dung/kỹ năng",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:17:54.390Z",
+  "finishedAt": "2026-11-04T07:17:54.942Z"
+}

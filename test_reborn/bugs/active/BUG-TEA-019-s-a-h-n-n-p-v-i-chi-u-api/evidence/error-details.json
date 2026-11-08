@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-019",
+  "title": "Sửa hạn nộp và đối chiếu API",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot set properties of undefined (setting 'api')",
+  "startedAt": "2026-11-04T07:17:58.805Z",
+  "finishedAt": "2026-11-04T07:17:59.616Z"
+}

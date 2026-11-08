@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-010",
+  "title": "Lưu và trả điểm/nhận xét; mở lại kiểm tra",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot read properties of undefined (reading 'assignmentTitle')",
+  "startedAt": "2026-11-04T07:17:53.942Z",
+  "finishedAt": "2026-11-04T07:17:54.381Z"
+}

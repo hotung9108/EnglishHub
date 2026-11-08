@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-005",
+  "title": "Tìm bài tập và mở chi tiết",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot read properties of undefined (reading 'assignmentTitle')",
+  "startedAt": "2026-11-04T07:17:50.970Z",
+  "finishedAt": "2026-11-04T07:17:51.548Z"
+}

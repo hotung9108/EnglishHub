@@ -1,0 +1,11 @@
+{
+  "caseId": "ADM-024",
+  "title": "Mở lại lớp đã hoàn thành qua UI",
+  "role": "admin",
+  "phase": "scenario",
+  "classification": "PRODUCT_CANDIDATE",
+  "reason": "Không thấy thẻ lớp QA31-archiveClass-2be98c1e51c0",
+  "actualUrl": "https://staging.hotung9108.me/admin/classes",
+  "startedAt": "2026-11-06T13:32:00.932Z",
+  "finishedAt": "2026-11-06T13:32:13.406Z"
+}

@@ -1,0 +1,15 @@
+{
+  "caseId": "STU-007",
+  "title": "Tổng quan bài và số lượt",
+  "role": "student",
+  "phase": "scenario",
+  "classification": {
+    "status": "BLOCKED",
+    "classification": "FIXTURE_REVIEW",
+    "stopSuite": false
+  },
+  "reason": "This overview case requires a fresh assignment; use --fresh-fixtures",
+  "actualUrl": "https://staging.hotung9108.me/student/dashboard",
+  "startedAt": "2026-11-06T13:27:46.107Z",
+  "finishedAt": "2026-11-06T13:27:50.718Z"
+}

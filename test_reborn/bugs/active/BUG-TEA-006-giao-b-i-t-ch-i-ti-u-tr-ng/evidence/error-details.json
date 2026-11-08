@@ -1,0 +1,9 @@
+{
+  "caseId": "TEA-006",
+  "title": "Giao bài: từ chối tiêu đề trống",
+  "role": "teacher",
+  "classification": "NEEDS_REVIEW",
+  "reason": "Cannot read properties of undefined (reading 'className')",
+  "startedAt": "2026-11-04T07:17:51.559Z",
+  "finishedAt": "2026-11-04T07:17:52.059Z"
+}
