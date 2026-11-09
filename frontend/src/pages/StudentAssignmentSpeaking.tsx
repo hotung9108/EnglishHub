@@ -642,9 +642,12 @@ const StudentAssignmentSpeaking: React.FC = () => {
                     <span>Đang tải lên &amp; gửi bài...</span>
                   </>
                 ) : (
-                  <span>Nộp bài</span>
+                  <span>Nộp bài Nói (Submit Speaking)</span>
                 )}
               </button>
+              <p className="text-[11px] text-muted text-center mt-1">
+                Lưu ý: Nộp bản ghi âm cho riêng phần thi Nói này (không nộp toàn bộ bài tập).
+              </p>
             </div>
           </section>
 

@@ -765,8 +765,11 @@ const StudentAssignmentWriting: React.FC = () => {
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >
-                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Assignment)'}
+                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Writing)'}
               </Button>
+              <p className="text-[11px] text-muted text-center -mt-1 mb-1">
+                Lưu ý: Nộp bài cho riêng phần thi Viết này (không nộp toàn bộ bài tập).
+              </p>
 
               <Button 
                 variant="secondary"
