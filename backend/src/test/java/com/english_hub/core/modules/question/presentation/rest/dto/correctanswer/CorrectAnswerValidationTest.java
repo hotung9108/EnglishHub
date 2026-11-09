@@ -24,7 +24,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class CorrectAnswerValidationTest {
 
-	private static final String OPTION_COUNT_MESSAGE = "options phải có đúng 4 lựa chọn.";
+	private static final String OPTION_COUNT_MESSAGE = "options phải có ít nhất 2 lựa chọn.";
 	private static final String ONE_CORRECT_MESSAGE = "options phải có đúng một lựa chọn đúng và id không được trùng.";
 
 	private static ValidatorFactory validatorFactory;
@@ -64,10 +64,20 @@ class CorrectAnswerValidationTest {
 	}
 
 	@Test
-	void rejectsWrongOptionCount() {
-		assertThat(messagesOf(option(1, true), option(2, false), option(3, false)))
-				.contains(OPTION_COUNT_MESSAGE);
+	void acceptsTwoOptionsWithExactlyOneCorrectAndUniqueIds() {
+		assertThat(messagesOf(option(1, true), option(2, false)))
+				.isEmpty();
+	}
+
+	@Test
+	void acceptsFiveOptionsWithExactlyOneCorrectAndUniqueIds() {
 		assertThat(messagesOf(option(1, true), option(2, false), option(3, false), option(4, false), option(5, false)))
+				.isEmpty();
+	}
+
+	@Test
+	void rejectsLessThanTwoOptions() {
+		assertThat(messagesOf(option(1, true)))
 				.contains(OPTION_COUNT_MESSAGE);
 	}
 

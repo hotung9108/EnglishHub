@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
@@ -116,11 +116,11 @@ export const TeacherEditAssignment: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     toastWarning(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
+  }, [toastWarning]);
 
   useEffect(() => {
     let isMounted = true;
@@ -146,6 +146,12 @@ export const TeacherEditAssignment: React.FC = () => {
           modules: []
         };
         setCurrentDbStatus(detail.status);
+
+        if (detail.status === 'CLOSED') {
+          showToast(isVi ? 'Bài tập đã đóng, không thể chỉnh sửa.' : 'This assignment is closed and cannot be edited.');
+          navigate(`/teacher/assignments/${assignmentIdNum}`, { replace: true });
+          return;
+        }
 
         const classList = classRes.status === 'fulfilled' ? (classRes.value.data || []) : [];
         setClasses(classList);
@@ -214,11 +220,25 @@ export const TeacherEditAssignment: React.FC = () => {
               needQuestions ? questionService.listQuestions(mod.id) : Promise.reject('No questions')
             ]);
 
+            const modDetail = mDetailRes.status === 'fulfilled' ? mDetailRes.value : null;
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            let audioDownloadUrl = modDetail?.sourceAudioDownloadUrl || extraAudio || '';
+            if (sKey === 'listening' && !audioDownloadUrl && modDetail?.sourceAudioStorageKey) {
+              try {
+                const audioRes = await moduleService.getAudioDownloadUrl(mod.id);
+                audioDownloadUrl = audioRes.downloadUrl || '';
+              } catch {
+                // Ignore fallback error
+              }
+            }
+
             return {
               mod,
               mIdx,
               sKey,
-              modDetail: mDetailRes.status === 'fulfilled' ? mDetailRes.value : null,
+              modDetail,
+              audioDownloadUrl,
               questions: qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : []
             };
           })
@@ -315,10 +335,16 @@ export const TeacherEditAssignment: React.FC = () => {
                 points: Number(q.score) || 1,
               };
             });
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            const finalAudioUrl = item.audioDownloadUrl || modDetail?.sourceAudioDownloadUrl || extraAudio || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : '');
+            const storageFileName = modDetail?.sourceAudioStorageKey ? modDetail.sourceAudioStorageKey.split('/').pop() : '';
             modConfig = {
               ...createDefaultListeningConfig(),
               transcript: inst,
-              audioUrl: modDetail?.audioDownloadUrl || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : ''),
+              audioTitle: storageFileName || '',
+              audioUrl: finalAudioUrl,
+              audioPreviewUrl: finalAudioUrl,
               questions: qList,
               aiInstruction: aiInst,
             };
@@ -349,7 +375,7 @@ export const TeacherEditAssignment: React.FC = () => {
           dueDate: detail.closeAt ? formatToLocalDateTimeInput(detail.closeAt) : formatToLocalDateTimeInput(addDays(new Date(), 7)),
           durationMinutes: 60,
           allowLate: true,
-          status: detail.status === 'PUBLISHED' ? 'active' : detail.status === 'CLOSED' ? 'closed' : 'draft',
+          status: detail.status === 'PUBLISHED' ? 'active' : 'draft',
           targetAudience: 'all',
           notifyStudents: true,
           maxSubmissions: detail.maxSubmissions ?? 1,
@@ -372,7 +398,7 @@ export const TeacherEditAssignment: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, isVi, reloadKey]);
+  }, [id, isVi, reloadKey, navigate, showToast]);
 
   // Add a new module
   const handleAddModule = (skill: AssignmentSkill) => {
@@ -560,7 +586,7 @@ export const TeacherEditAssignment: React.FC = () => {
         }
       } else if (mod.skill === 'listening') {
         const c = mod.config as ListeningConfig;
-        if (!c.audioFile && !c.audioUrl?.trim()) {
+        if (!c.audioFile && !c.audioUrl?.trim() && !c.audioPreviewUrl?.trim()) {
           setActiveModuleIndex(i);
           showToast(isVi ? `${modLabel}: Vui lòng chọn tệp âm thanh cho bài nghe!` : `${modLabel}: Please select an audio file!`);
           return;

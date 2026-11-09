@@ -29,7 +29,6 @@ import {
 } from '../utils/studentQuiz.utils';
 import '../styles/student-exam.css';
 
-const MCQ_OPTION_LABELS = ['A', 'B', 'C', 'D'];
 const NAVIGATION_DELAY_MS = 1200;
 const PENDING_MESSAGE = 'Đáp án của bạn đã được lưu, nhưng hệ thống chưa xác nhận hoàn tất bài thi. Vui lòng thử nộp lại.';
 const UNCONFIRMED_MESSAGE = 'Chưa thể xác nhận trạng thái nộp bài. Vui lòng tải lại trang để kiểm tra trước khi thử lại.';
@@ -601,7 +600,7 @@ const StudentAssignmentReading: React.FC = () => {
                               {isSelected && <div className="exam-radio-dot" />}
                             </div>
                             <div className="exam-option-content">
-                              <strong className="exam-option-key">{MCQ_OPTION_LABELS[optIdx]}.</strong> {option.content}
+                              <strong className="exam-option-key">{String.fromCharCode(65 + optIdx)}.</strong> {option.content}
                             </div>
                           </label>
                         );

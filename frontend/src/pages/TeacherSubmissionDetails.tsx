@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
-  XCircle, Plus, Trash2, Download
+  XCircle, Plus, Trash2, Download, BookOpen, Headphones, Mic, Eye, Edit3, HelpCircle
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -29,6 +29,7 @@ import {
 } from '../api/services/answer-annotation.service';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService } from '../api/services/module.service';
+import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { classService } from '../api/services/class.service';
 import { resolveAudioUrl } from '../utils/audioUrl.utils';
 import { extractTranscriptText, extractAnnotationSnippet } from '../utils/annotationSnippet.utils';
@@ -116,12 +117,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const deleteRequestsRef = useRef(new Map<number, AnnotationRequestContext>());
   const gradeRequestRef = useRef<AnnotationRequestContext | null>(null);
   const annotationItemsRef = useRef<GradingAnnotation[]>([]);
+  const submissionRef = useRef<SubmissionDetail | null>(null);
+  const moduleDetailRef = useRef<SubmissionModuleDetailResponse | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioRequestRef = useRef(0);
   const audioFallbackUsedRef = useRef(false);
   const pendingAudioTimeRef = useRef<number | null>(null);
   const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
   useEffect(() => { annotationItemsRef.current = annotations; }, [annotations]);
+  useEffect(() => { submissionRef.current = submission; }, [submission]);
+  useEffect(() => { moduleDetailRef.current = moduleDetail; }, [moduleDetail]);
 
   const isCurrentAction = useCallback((context: AnnotationRequestContext) => {
     const current = annotationRequestRef.current;
@@ -162,6 +167,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // Form State
   const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
+  const [feedbackTab, setFeedbackTab] = useState<'edit' | 'preview'>('edit');
+  const [listeningAudioUrl, setListeningAudioUrl] = useState<string | null>(null);
+  const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
 
@@ -231,6 +239,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setReviewingAnnotationIds({});
     setFinalScoreInput('');
     setFeedbackText('');
+    setFeedbackTab('edit');
+    setListeningAudioUrl(null);
+    setQuestionFilter('all');
     setGradingSummary(null);
     setGradingDetail(null);
     setAiSuggestion(null);
@@ -242,7 +253,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
       annotationRequestRef.current.generation === generation &&
       annotationRequestRef.current.moduleId === targetModuleId;
 
-    let currentModDetail: SubmissionModuleDetailResponse | null = null;
+    const prevModDetail = moduleDetailRef.current?.id === targetModuleId ? moduleDetailRef.current : null;
+    let currentModDetail: SubmissionModuleDetailResponse | null = prevModDetail;
     let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
 
     try {
@@ -251,10 +263,46 @@ export const TeacherSubmissionDetails: React.FC = () => {
       setModuleDetail(modDetailRes);
       currentModDetail = modDetailRes;
 
+      const isQuiz = modDetailRes.skill === 'READING' || modDetailRes.skill === 'LISTENING';
+      if (isQuiz && (!modDetailRes.questions || modDetailRes.questions.length === 0) && modDetailRes.moduleId) {
+        try {
+          const qRes = await questionService.listQuestions(modDetailRes.moduleId);
+          const qRecord = qRes as unknown as Record<string, unknown>;
+          const qList = qRes.questions || (Array.isArray(qRecord.data) ? (qRecord.data as typeof qRes.questions) : []) || [];
+          if (qList.length > 0 && isCurrentModuleLoad()) {
+            modDetailRes.questions = qList;
+            setModuleDetail({ ...modDetailRes });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       if (modDetailRes.moduleId && typeof moduleService?.getModule === 'function') {
-        void moduleService.getModule(modDetailRes.moduleId).then((mRes) => {
-          if (isCurrentModuleLoad() && mRes?.instructions) {
+        void moduleService.getModule(modDetailRes.moduleId).then(async (mRes) => {
+          if (!isCurrentModuleLoad()) return;
+          if (mRes?.instructions) {
             setModuleInstructions(mRes.instructions);
+          }
+          if (modDetailRes.skill === 'LISTENING') {
+            const mRecord = mRes as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof mRecord?.audioDownloadUrl === 'string' ? mRecord.audioDownloadUrl : '';
+            let audio = mRes?.sourceAudioDownloadUrl || extraAudio || '';
+            if (!audio && mRes?.sourceAudioStorageKey) {
+              if (mRes.sourceAudioStorageKey.startsWith('http')) {
+                audio = mRes.sourceAudioStorageKey;
+              } else {
+                try {
+                  const audioRes = await moduleService.getAudioDownloadUrl(modDetailRes.moduleId!);
+                  audio = audioRes.downloadUrl || '';
+                } catch {
+                  // ignore
+                }
+              }
+            }
+            if (isCurrentModuleLoad() && audio) {
+              setListeningAudioUrl(audio);
+            }
           }
         }).catch(() => {
           // ignore
@@ -262,7 +310,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     } catch {
       if (!isCurrentModuleLoad()) return;
-      setModuleDetail(null);
+      if (!prevModDetail) {
+        setModuleDetail(null);
+      }
     }
 
     let resolvedGradingId: number | null = null;
@@ -332,20 +382,26 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     }
 
-    try {
-      const aiRes = await gradingService.getAiSuggestion(targetModuleId);
-      if (!isCurrentModuleLoad()) return;
-      setAiSuggestion(aiRes);
-      currentAiSuggestion = aiRes;
-      if (aiRes.aiFeedback) {
-        setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
+    const targetSkill =
+      currentModDetail?.skill ||
+      submissionRef.current?.modules?.find((m) => m.id === targetModuleId)?.skill;
+    const isSubjective = targetSkill === 'WRITING' || targetSkill === 'SPEAKING';
+    if (isSubjective) {
+      try {
+        const aiRes = await gradingService.getAiSuggestion(targetModuleId);
+        if (!isCurrentModuleLoad()) return;
+        setAiSuggestion(aiRes);
+        currentAiSuggestion = aiRes;
+        if (aiRes.aiFeedback) {
+          setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
+        }
+        if (aiRes.suggestedScore != null) {
+          setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
+        }
+      } catch {
+        if (!isCurrentModuleLoad()) return;
+        setAiSuggestion(null);
       }
-      if (aiRes.suggestedScore != null) {
-        setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
-      }
-    } catch {
-      if (!isCurrentModuleLoad()) return;
-      setAiSuggestion(null);
     }
 
     // Fetch Annotations for current module answer
@@ -1149,15 +1205,218 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [currentAnnotations]);
 
   const transcriptText = useMemo(() => {
-    const rawTranscript =
-      aiSuggestion?.transcript ??
-      gradingDetail?.aiTranscript ??
-      (gradingSummary as { aiTranscript?: unknown })?.aiTranscript ??
-      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript ??
-      (activeModule?.grading as { aiTranscript?: unknown })?.aiTranscript;
-    const text = extractTranscriptText(rawTranscript);
-    return text.length > 0 ? text : null;
-  }, [aiSuggestion, gradingDetail, gradingSummary, moduleDetail, activeModule]);
+    const candidates = [
+      gradingDetail?.aiTranscript,
+      aiSuggestion?.transcript,
+      (gradingSummary as { aiTranscript?: unknown })?.aiTranscript,
+      (moduleDetail?.grading as { aiTranscript?: unknown })?.aiTranscript,
+      (activeModule?.grading as { aiTranscript?: unknown })?.aiTranscript,
+    ];
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null) continue;
+      const text = extractTranscriptText(candidate);
+      if (text && text.trim().length > 0) {
+        return text.trim();
+      }
+    }
+    return null;
+  }, [gradingDetail, aiSuggestion, gradingSummary, moduleDetail, activeModule]);
+
+  const parsedInstructions = useMemo(() => {
+    if (!moduleInstructions) {
+      return { minWords: null, diagramUrl: null, cleanInstructions: '', readingTitle: '', readingBody: '' };
+    }
+    const minWordsMatch = moduleInstructions.match(/<!--\s*minWords:\s*(\d+)\s*-->/i);
+    const minWords = minWordsMatch ? Number(minWordsMatch[1]) : null;
+    const imgMatch = moduleInstructions.match(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/i);
+    const diagramUrl = imgMatch ? imgMatch[1] : null;
+    const cleanInstructions = moduleInstructions
+      .replace(/<!--\s*minWords:\s*\d+\s*-->/gi, '')
+      .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
+      .trim();
+
+    let readingTitle = '';
+    let readingBody = cleanInstructions || moduleInstructions;
+    if (activeModule?.skill === 'READING' && readingBody.includes('\n\n')) {
+      const firstDoubleNewline = readingBody.indexOf('\n\n');
+      const candidateTitle = readingBody.slice(0, firstDoubleNewline).trim();
+      const isInstructionLike =
+        candidateTitle.toLowerCase().startsWith('hãy đọc') ||
+        candidateTitle.toLowerCase().startsWith('read the') ||
+        candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+        candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+      if (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 120) {
+        readingTitle = candidateTitle;
+        readingBody = readingBody.slice(firstDoubleNewline + 2).trim();
+      }
+    }
+
+    return { minWords, diagramUrl, cleanInstructions, readingTitle, readingBody };
+  }, [moduleInstructions, activeModule?.skill]);
+
+  const questionsList = useMemo(() => {
+    if (!moduleDetail?.questions || moduleDetail.questions.length === 0) return [];
+    return moduleDetail.questions.map((q, idx) => {
+      const studentAnsItem = moduleDetail.answers?.find((a) => a.questionId === q.id);
+      const isMcq = q.questionType === 'MULTIPLE_CHOICE';
+
+      let mcq = {
+        options: [] as string[],
+        correctOptionContent: '',
+        correctOptionIndex: 0,
+      };
+      let shortAns = '';
+
+      if (isMcq) {
+        mcq = extractMcqOptions(q.correctAnswer as Record<string, unknown> | null);
+      } else {
+        shortAns = extractShortAnswerText(q.correctAnswer as Record<string, unknown> | null);
+      }
+
+      const displayOptions = isMcq
+        ? mcq.options.map((optText, optIdx) => ({
+            key: String.fromCharCode(65 + optIdx),
+            text: optText,
+          }))
+        : [];
+
+      const correctOptLetter = String.fromCharCode(65 + mcq.correctOptionIndex);
+      const cAnsText = isMcq
+        ? `${correctOptLetter}. ${mcq.correctOptionContent}`
+        : (shortAns || '--');
+
+      let sAnsText = '--';
+      let studentSelectedOptId: number | null = null;
+      let isAnswerCorrect: boolean | undefined = undefined;
+
+      if (studentAnsItem) {
+        if (typeof studentAnsItem.content === 'string') {
+          sAnsText = studentAnsItem.content;
+        } else if (studentAnsItem.content && typeof studentAnsItem.content === 'object') {
+          const obj = studentAnsItem.content as Record<string, unknown>;
+
+          if (typeof obj.isCorrect === 'boolean') {
+            isAnswerCorrect = obj.isCorrect;
+          } else if (typeof obj.is_correct === 'boolean') {
+            isAnswerCorrect = obj.is_correct;
+          }
+
+          if (isMcq) {
+            const selIds = obj.selectedOptionIds;
+            if (Array.isArray(selIds) && selIds.length > 0 && typeof selIds[0] === 'number') {
+              studentSelectedOptId = selIds[0];
+            } else if (typeof obj.selectedOptionId === 'number') {
+              studentSelectedOptId = obj.selectedOptionId;
+            } else if (typeof obj.selectedOption === 'string') {
+              const upper = obj.selectedOption.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            } else if (typeof obj.answer === 'string') {
+              const upper = obj.answer.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
+              }
+            }
+
+            if (studentSelectedOptId !== null && studentSelectedOptId >= 1 && studentSelectedOptId <= mcq.options.length) {
+              const sLetter = String.fromCharCode(65 + studentSelectedOptId - 1);
+              const sText = mcq.options[studentSelectedOptId - 1] || '';
+              sAnsText = `${sLetter}. ${sText}`;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            } else if (typeof obj.selectedOption === 'string') {
+              sAnsText = obj.selectedOption;
+            }
+          } else {
+            if (typeof obj.text === 'string') {
+              sAnsText = obj.text;
+            } else if (typeof obj.answer === 'string') {
+              sAnsText = obj.answer;
+            }
+          }
+        }
+      }
+
+      if (isAnswerCorrect === undefined) {
+        if (studentAnsItem && sAnsText !== '--') {
+          if (isMcq) {
+            if (studentSelectedOptId !== null) {
+              isAnswerCorrect = (studentSelectedOptId - 1) === mcq.correctOptionIndex;
+            }
+          } else if (shortAns) {
+            isAnswerCorrect = sAnsText.trim().toLowerCase() === shortAns.trim().toLowerCase();
+          }
+        } else {
+          isAnswerCorrect = false;
+        }
+      }
+
+      return {
+        id: q.id,
+        questionNumber: q.orderIndex || idx + 1,
+        prompt: q.content,
+        questionType: q.questionType,
+        options: displayOptions,
+        studentAnswer: sAnsText,
+        correctAnswer: cAnsText,
+        isCorrect: isAnswerCorrect,
+      };
+    });
+  }, [moduleDetail]);
+
+  const filteredQuestions = useMemo(() => {
+    if (questionFilter === 'correct') return questionsList.filter((q) => q.isCorrect === true);
+    if (questionFilter === 'incorrect') return questionsList.filter((q) => q.isCorrect === false);
+    return questionsList;
+  }, [questionsList, questionFilter]);
+
+  const renderFeedbackEditor = (rows: number = 6) => {
+    return (
+      <div className="tsd-feedback-wrap">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <label className="tsd-card-label m-0">
+            {t('submissionDetails.feedbackTitle')}
+          </label>
+          <div className="tsd-feedback-tab-bar">
+            <button
+              type="button"
+              className={`tsd-feedback-tab-btn ${feedbackTab === 'edit' ? 'active' : ''}`}
+              onClick={() => setFeedbackTab('edit')}
+            >
+              <Edit3 size={13} />
+              <span>{isVi ? 'Soạn thảo' : 'Edit'}</span>
+            </button>
+            <button
+              type="button"
+              className={`tsd-feedback-tab-btn ${feedbackTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setFeedbackTab('preview')}
+            >
+              <Eye size={13} />
+              <span>{isVi ? 'Xem trước (MD)' : 'Preview (MD)'}</span>
+            </button>
+          </div>
+        </div>
+
+        {feedbackTab === 'edit' ? (
+          <textarea
+            className="tsd-feedback-textarea"
+            placeholder={t('submissionDetails.feedbackPlaceholder')}
+            rows={rows}
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+          />
+        ) : (
+          <div className="tsd-feedback-preview-box">
+            <MarkdownView
+              content={feedbackText}
+              fallbackText={isVi ? 'Chưa có nhận xét để xem trước. Hãy nhập nội dung ở tab "Soạn thảo".' : 'No feedback content to preview.'}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const extractSnippet = (start?: number, end?: number): string | null => {
     const baseText = transcriptText || (studentAnswerText.trim().length > 0 ? studentAnswerText : null);
@@ -1630,13 +1889,15 @@ export const TeacherSubmissionDetails: React.FC = () => {
       {/* Metrics Row (Only for non-speaking modules) */}
       {!isSpeaking && (
         <div className="tsd-metrics-grid">
-          <MetricCard
-            title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
-            value={aiSuggestion?.suggestedScore != null
-              ? String(aiSuggestion.suggestedScore)
-              : (gradingDetail?.aiFeedback || isAnalyzingAi ? (isVi ? 'Đang phân tích' : 'Analyzing') : '--')}
-            suffix="/ 10"
-          />
+          {activeModule?.skill === 'WRITING' && (
+            <MetricCard
+              title={isVi ? 'Điểm AI đề xuất' : 'AI Suggested Score'}
+              value={aiSuggestion?.suggestedScore != null
+                ? String(aiSuggestion.suggestedScore)
+                : (gradingDetail?.aiFeedback || isAnalyzingAi ? (isVi ? 'Đang phân tích' : 'Analyzing') : '--')}
+              suffix="/ 10"
+            />
+          )}
           {gradingDetail?.finalScore != null && (
             <MetricCard
               title={isVi ? 'Điểm giáo viên đã chấm' : 'Teacher Score'}
@@ -1653,8 +1914,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
           {/* Top Section: Audio Hero Card */}
           <div className="tsd-speaking-hero-card">
             <div className="tsd-speaking-hero-header">
-              <h3 className="tsd-speaking-hero-title">
-                {isVi ? 'Bài nói của học viên' : 'Student Speaking Submission'}
+              <h3 className="tsd-speaking-hero-title flex items-center gap-2">
+                <Mic size={18} className="text-primary" />
+                <span>{isVi ? 'Bài nói của học viên' : 'Student Speaking Submission'}</span>
               </h3>
             </div>
 
@@ -1663,9 +1925,21 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
               {moduleInstructions && (
-                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed whitespace-pre-line">
-                  <strong>{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
-                  <div className="mt-1">{moduleInstructions}</div>
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <strong className="text-slate-800">{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                    {parsedInstructions.minWords && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-200">
+                        {isVi ? `Tối thiểu ${parsedInstructions.minWords} từ` : `Min ${parsedInstructions.minWords} words`}
+                      </span>
+                    )}
+                  </div>
+                  {parsedInstructions.diagramUrl && (
+                    <div className="mb-2 p-2 bg-white rounded-lg border border-slate-200 max-w-md">
+                      <img src={parsedInstructions.diagramUrl} alt="Diagram" className="max-h-60 object-contain rounded" />
+                    </div>
+                  )}
+                  <MarkdownView content={parsedInstructions.cleanInstructions || moduleInstructions} />
                 </div>
               )}
 
@@ -1818,22 +2092,221 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
 
               <div className="tsd-speaking-feedback-wrap">
-                <label className="tsd-card-label mb-2">
-                  {t('submissionDetails.feedbackTitle')}
-                </label>
-                <textarea
-                  className="tsd-feedback-textarea"
-                  placeholder={t('submissionDetails.feedbackPlaceholder')}
-                  rows={9}
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                />
+                {renderFeedbackEditor(9)}
               </div>
             </div>
           </div>
         </div>
+      ) : activeModule?.skill === 'READING' || activeModule?.skill === 'LISTENING' ? (
+        /* Reading and Listening Layout: Passage/Audio + Question & Answer Review */
+        <div className="tsd-grading-grid">
+          {/* Left Column: Questions, Passage and Student Answers */}
+          <div className="tsd-answer-card">
+            <div className="tsd-answer-header">
+              <div className="tsd-answer-title">
+                {activeModule?.skill === 'READING' ? (
+                  <BookOpen size={18} className="text-primary" />
+                ) : (
+                  <Headphones size={18} className="text-primary" />
+                )}
+                <span>
+                  {activeModule?.skill === 'READING'
+                    ? (isVi ? 'Bài đọc & Kết quả làm bài' : 'Reading Passage & Results')
+                    : (isVi ? 'Bài nghe & Kết quả làm bài' : 'Listening Track & Results')}
+                </span>
+              </div>
+              <div className="tsd-answer-wordcount">
+                {questionsList.length} {isVi ? 'câu hỏi' : 'questions'}
+              </div>
+            </div>
+
+            <div className="tsd-answer-box">
+              {/* Listening Track Player */}
+              {activeModule?.skill === 'LISTENING' && (
+                <div className="tsd-listening-audio-box">
+                  <div className="flex items-center gap-2 mb-2 font-semibold text-sm text-slate-800">
+                    <Headphones size={16} className="text-primary" />
+                    <span>{isVi ? 'Tệp âm thanh bài nghe (Đề bài)' : 'Listening Audio Track'}</span>
+                  </div>
+                  {listeningAudioUrl ? (
+                    <audio controls className="w-full mt-1" src={listeningAudioUrl} preload="metadata">
+                      {isVi ? 'Trình duyệt không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                    </audio>
+                  ) : (
+                    <div className="text-xs text-muted italic py-1">
+                      {isVi ? 'Chưa tải được tệp âm thanh bài nghe của đề bài.' : 'Listening audio track is not available.'}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Reading Passage if available */}
+              {activeModule?.skill === 'READING' && (parsedInstructions.readingBody || parsedInstructions.cleanInstructions) && (
+                <div className="tsd-passage-card">
+                  {parsedInstructions.readingTitle ? (
+                    <div className="tsd-passage-title">
+                      {parsedInstructions.readingTitle}
+                    </div>
+                  ) : (
+                    <div className="tsd-prompt-label mb-2">
+                      {isVi ? 'BÀI ĐỌC (READING PASSAGE)' : 'READING PASSAGE'}
+                    </div>
+                  )}
+                  <div className="tsd-passage-body">
+                    {parsedInstructions.readingBody || parsedInstructions.cleanInstructions}
+                  </div>
+                </div>
+              )}
+
+              {/* Questions & Student Answers Section */}
+              <div className="result-card p-4 rounded-xl border border-border/60 bg-white">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div className="result-mcq-header-title">
+                    <HelpCircle size={18} className="text-primary" />
+                    <h3 className="result-mcq-title-h3 text-sm">
+                      {isVi ? 'Chi tiết câu hỏi & đáp án' : 'Questions & Answers'} ({questionsList.length} {isVi ? 'câu' : 'questions'})
+                    </h3>
+                  </div>
+
+                  {questionsList.length > 0 && (
+                    <div className="result-mcq-filter-group">
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('all')}
+                      >
+                        {isVi ? 'Tất cả' : 'All'} ({questionsList.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'correct' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('correct')}
+                      >
+                        {isVi ? 'Đúng' : 'Correct'} ({questionsList.filter((q) => q.isCorrect === true).length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`annotation-filter-btn ${questionFilter === 'incorrect' ? 'active' : ''}`}
+                        onClick={() => setQuestionFilter('incorrect')}
+                      >
+                        {isVi ? 'Sai' : 'Incorrect'} ({questionsList.filter((q) => q.isCorrect === false).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {questionsList.length === 0 ? (
+                  <div className="result-empty-tab-content py-8 text-center text-muted">
+                    <HelpCircle size={28} className="mx-auto mb-2 text-slate-400" />
+                    <p className="text-sm">{isVi ? 'Không tìm thấy danh sách câu hỏi trong phần này.' : 'No questions found for this module.'}</p>
+                  </div>
+                ) : (
+                  <div className="result-mcq-list">
+                    {filteredQuestions.map((q) => (
+                      <div
+                        key={q.id}
+                        className={`result-mcq-card ${q.isCorrect === true ? 'is-correct' : q.isCorrect === false ? 'is-incorrect' : ''}`}
+                      >
+                        <div className="result-mcq-card-top">
+                          <span className="result-mcq-card-num">
+                            {isVi ? 'Câu' : 'Question'} {q.questionNumber}: {q.prompt}
+                          </span>
+                          {q.isCorrect !== undefined && (
+                            <span className={`result-mcq-status-badge ${q.isCorrect ? 'is-correct' : 'is-incorrect'}`}>
+                              {q.isCorrect ? (isVi ? 'ĐÚNG' : 'CORRECT') : (isVi ? 'SAI' : 'INCORRECT')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="result-mcq-meta">
+                          <div>
+                            <span className="text-on-surface-variant">{isVi ? 'Học viên chọn' : 'Student answer'}: </span>
+                            <strong className={q.isCorrect === true ? 'result-mcq-answer-correct' : q.isCorrect === false ? 'result-mcq-answer-incorrect' : ''}>
+                              {q.studentAnswer}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-on-surface-variant">{isVi ? 'Đáp án đúng' : 'Correct answer'}: </span>
+                            <strong className="result-mcq-answer-correct">{q.correctAnswer}</strong>
+                          </div>
+                        </div>
+
+                        {q.options && q.options.length > 0 && (
+                          <div className="result-mcq-options-grid">
+                            {q.options.map((opt) => {
+                              const isStudentPick = q.studentAnswer.startsWith(opt.key);
+                              const isCorrectOption = q.correctAnswer.startsWith(opt.key);
+                              return (
+                                <div
+                                  key={opt.key}
+                                  className={`result-mcq-opt-item ${isCorrectOption ? 'is-correct' : isStudentPick && !q.isCorrect ? 'is-student-wrong' : ''}`}
+                                >
+                                  <span className={`result-mcq-opt-key ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                    {opt.key}
+                                  </span>
+                                  <span className={`result-mcq-opt-text ${isCorrectOption ? 'is-correct' : isStudentPick ? 'is-student-wrong' : ''}`}>
+                                    {opt.text}
+                                  </span>
+                                  {isCorrectOption && (
+                                    <span className="result-mcq-tag-correct inline-flex items-center gap-1">
+                                      <CheckCircle2 size={12} />
+                                      <span>{isVi ? 'Đáp án đúng' : 'Correct'}</span>
+                                    </span>
+                                  )}
+                                  {isStudentPick && !isCorrectOption && (
+                                    <span className="result-mcq-tag-wrong inline-flex items-center gap-1">
+                                      <XCircle size={12} />
+                                      <span>{isVi ? 'Học viên chọn' : 'Student pick'}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Score & Feedback Studio (No AI clutter) */}
+          <div className="tsd-sidebar">
+            {/* Teacher Score Input */}
+            <div className="tsd-score-card">
+              <label className="tsd-card-label">
+                {isVi ? 'Điểm chấm chính thức' : 'Official Score'}
+              </label>
+              <div className="tsd-score-input-wrap">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="10"
+                  placeholder="0.0"
+                  value={finalScoreInput}
+                  onChange={(e) => setFinalScoreInput(e.target.value)}
+                  className="tsd-score-input"
+                />
+                <span className="tsd-score-scale">/ 10</span>
+              </div>
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
+            </div>
+
+            {/* Feedback Editor with Markdown preview */}
+            <div className="tsd-feedback-card">
+              {renderFeedbackEditor(7)}
+            </div>
+          </div>
+        </div>
       ) : (
-        /* Standard Two-Column Layout for Writing / Reading / Listening */
+        /* Standard Two-Column Layout for Writing */
         <div className="tsd-grading-grid">
           {/* Left Column: Student Answer Viewer */}
           <div className="tsd-answer-card">
@@ -1856,9 +2329,25 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {assignment?.title || (isVi ? 'ĐỀ BÀI' : 'TASK PROMPT')}
               </div>
               {moduleInstructions && (
-                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed whitespace-pre-line">
-                  <strong>{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
-                  <div className="mt-1">{moduleInstructions}</div>
+                <div className="tsd-prompt-instruction text-xs text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 mt-2 mb-3 leading-relaxed">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <strong className="text-slate-800">{isVi ? 'Đề bài / Hướng dẫn:' : 'Task Prompt / Instructions:'}</strong>
+                    {parsedInstructions.minWords && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                        {isVi ? `Yêu cầu tối thiểu: ${parsedInstructions.minWords} từ` : `Min words: ${parsedInstructions.minWords}`}
+                      </span>
+                    )}
+                  </div>
+                  {parsedInstructions.diagramUrl && (
+                    <div className="mb-3 p-3 bg-white rounded-xl border border-slate-200 max-w-xl">
+                      <img
+                        src={parsedInstructions.diagramUrl}
+                        alt="Task Diagram"
+                        className="w-full max-h-80 object-contain rounded-lg"
+                      />
+                    </div>
+                  )}
+                  <MarkdownView content={parsedInstructions.cleanInstructions || moduleInstructions} />
                 </div>
               )}
 
@@ -1976,20 +2465,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
               {renderAnnotationsSection()}
             </div>
 
-            {/* Feedback Editor */}
+            {/* Feedback Editor with Markdown preview */}
             <div className="tsd-feedback-card">
-              <h3 className="tsd-card-title">
-                {t('submissionDetails.feedbackTitle')}
-              </h3>
-
-              <textarea
-                className="tsd-feedback-textarea"
-                placeholder={t('submissionDetails.feedbackPlaceholder')}
-                rows={5}
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-              />
-
+              {renderFeedbackEditor(5)}
             </div>
           </div>
         </div>

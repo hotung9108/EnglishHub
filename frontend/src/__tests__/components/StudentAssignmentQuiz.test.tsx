@@ -240,7 +240,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     { name: 'empty', value: [] }, { name: 'not an array', value: {} },
     { name: 'string', value: 'options' }, { name: 'number', value: 4 },
     { name: '[null]', value: [null] },
-    ...[1, 2, 3, 5].map(count => ({ name: `${count} choices`, value: Array.from({ length: count }, (_, i) => ({ id: i + 1, content: 'Option' })) })),
+    ...[1].map(count => ({ name: `${count} choices`, value: Array.from({ length: count }, (_, i) => ({ id: i + 1, content: 'Option' })) })),
     { name: 'null element', value: [null, ...options().slice(1)] },
     { name: 'string element', value: ['invalid', ...options().slice(1)] },
     { name: 'array element', value: [[], ...options().slice(1)] },
@@ -258,6 +258,14 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     expect(screen.queryByText(/Lựa chọn [ABCD]/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
     expectNotSubmitted();
+  });
+
+  it.each([2, 3, 5])('renders valid options with %i choices without error', async (count) => {
+    const value = Array.from({ length: count }, (_, i) => ({ id: i + 101, content: `Option ${i + 1}` }));
+    mockQuestions([mcq({ options: value })]);
+    await setup();
+    expect(screen.queryByText('Câu 1 có dữ liệu không hợp lệ.')).not.toBeInTheDocument();
+    expect(optionElements()).toHaveLength(count);
   });
 
   it('lists every invalid position, counts only valid questions and blocks submitting valid answers too', async () => {

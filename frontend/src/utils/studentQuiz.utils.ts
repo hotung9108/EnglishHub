@@ -6,8 +6,8 @@ import type {
 import type { SubmitModuleAnswerPayload } from '../api/services/submission.service';
 import type { SubmissionDetail, SubmissionModuleDetail, SubmissionSkill } from '../api/services/submission.service';
 
-// REST contract: MultipleChoiceCorrectAnswer.options has @Size(min = 4, max = 4).
-const REQUIRED_MCQ_OPTION_COUNT = 4;
+// REST contract: MultipleChoiceCorrectAnswer.options has @Size(min = 2).
+const MIN_MCQ_OPTION_COUNT = 2;
 
 export type StudentQuizQuestion = Pick<QuestionResponse, 'id' | 'content' | 'questionType' | 'options'>;
 
@@ -77,7 +77,7 @@ function readQuestionType(value: unknown): QuestionType | null {
 
 function validateOptions(value: unknown): OptionResult {
   if (!Array.isArray(value)) return { options: null, reason: 'OPTIONS_NOT_ARRAY' };
-  if (value.length !== REQUIRED_MCQ_OPTION_COUNT) {
+  if (value.length < MIN_MCQ_OPTION_COUNT) {
     return { options: null, reason: 'OPTIONS_COUNT_INVALID' };
   }
 
