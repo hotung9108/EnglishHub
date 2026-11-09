@@ -16,6 +16,7 @@ import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.assignment.application.command.CreateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
+import com.english_hub.core.modules.assignment.application.page.AssignmentPageRequest;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService.AssignmentListResult;
 import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
@@ -33,12 +34,16 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -153,16 +158,125 @@ class AssignmentServiceTest {
 		assertThat(result.assignmentPage().total()).isEqualTo(7);
 	}
 
-	@Test
-	void studentCanListAssignmentsForAClassTheyAttend() {
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = {" ", "   "})
+	void studentCanListAssignmentsForAClassTheyAttend(String status) {
 		givenCaller(user(41L, UserRole.STUDENT));
 		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
-		when(assignmentRepository.findPage(eq(3L), eq(null), any()))
-				.thenReturn(new AssignmentPage(List.of(), 1, 20, 0));
+		AssignmentPage page = new AssignmentPage(List.of(
+				assignment(6L, 3L, AssignmentStatus.PUBLISHED),
+				assignment(5L, 3L, AssignmentStatus.CLOSED)), 2, 2, 3);
+		when(assignmentRepository.findPageExcludingDraft(eq(3L), any())).thenReturn(page);
+		Map<Long, List<ModuleSkill>> skills = Map.of(
+				6L, List.of(ModuleSkill.READING),
+				5L, List.of(ModuleSkill.LISTENING));
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(6L, 5L))).thenReturn(skills);
 
-		assignmentService.listAssignments(null, 3L, 1, 20);
+		AssignmentListResult result = assignmentService.listAssignments(status, 3L, 2, 2);
 
-		verify(assignmentRepository).findPage(eq(3L), eq(null), any());
+		assertThat(result.assignmentPage()).isSameAs(page);
+		assertThat(result.skillsByAssignmentId()).isEqualTo(skills);
+		var pageCaptor = org.mockito.ArgumentCaptor.forClass(AssignmentPageRequest.class);
+		verify(assignmentRepository).findPageExcludingDraft(eq(3L), pageCaptor.capture());
+		assertThat(pageCaptor.getValue().page()).isEqualTo(2);
+		assertThat(pageCaptor.getValue().limit()).isEqualTo(2);
+		verify(assignmentRepository, never()).findPage(any(), any(), any());
+		verify(assignmentRepository, times(1)).findSkillsByAssignmentIds(List.of(6L, 5L));
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"DRAFT", "draft", " Draft ", " draft "})
+	void studentCannotFilterDraftAssignments(String status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.listAssignments(status, 3L, 1, 20),
+				"Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(assignmentRepository);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentCanFilterPublishedAndClosedAssignments(AssignmentStatus status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
+		AssignmentPage page = new AssignmentPage(List.of(assignment(5L, 3L, status)), 1, 20, 1);
+		when(assignmentRepository.findPage(eq(3L), eq(status), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L))).thenReturn(Map.of());
+
+		AssignmentListResult result = assignmentService.listAssignments(status.name(), 3L, 1, 20);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		verify(assignmentRepository).findPage(eq(3L), eq(status), any());
+		verify(assignmentRepository, never()).findPageExcludingDraft(any(), any());
+	}
+
+	@ParameterizedTest
+	@MethodSource("listValidationCases")
+	void listValidationOrderIsPreserved(UserRole role, String status, int page, int limit, String message) {
+		long callerId = role == UserRole.STUDENT ? 41L : 10L;
+		givenCaller(user(callerId, role));
+		when(classRepository.findAccess(3L, callerId))
+				.thenReturn(Optional.of(new ClassAccess(3L, 10L, role == UserRole.STUDENT)));
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.listAssignments(status, 3L, page, limit), message);
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		verifyNoInteractions(assignmentRepository);
+	}
+
+	@ParameterizedTest
+	@CsvSource({"true, DRAFT", "true, OPEN", "false, DRAFT", "false, OPEN"})
+	void classAccessPrecedesListValidation(boolean classExists, String status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		Optional<ClassAccess> access = classExists
+				? Optional.of(new ClassAccess(3L, 10L, false))
+				: Optional.empty();
+		when(classRepository.findAccess(3L, 41L)).thenReturn(access);
+		String message = classExists ? "Bạn không có quyền thực hiện thao tác này." : "Không tìm thấy lớp học.";
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.listAssignments(status, 3L, 0, 0), message);
+
+		assertThat(exception.getStatus()).isEqualTo(classExists ? HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND);
+		verifyNoInteractions(assignmentRepository);
+	}
+
+	@Test
+	void teacherCanFilterDraftAssignments() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		AssignmentPage page = new AssignmentPage(List.of(assignment(5L, 3L, AssignmentStatus.DRAFT)), 1, 20, 1);
+		when(assignmentRepository.findPage(eq(3L), eq(AssignmentStatus.DRAFT), any())).thenReturn(page);
+		when(assignmentRepository.findSkillsByAssignmentIds(List.of(5L))).thenReturn(Map.of());
+
+		AssignmentListResult result = assignmentService.listAssignments("DRAFT", 3L, 1, 20);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		verify(assignmentRepository).findPage(eq(3L), eq(AssignmentStatus.DRAFT), any());
+		verify(assignmentRepository, never()).findPageExcludingDraft(any(), any());
+	}
+
+	@Test
+	void emptyStudentPageDoesNotLoadSkills() {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
+		AssignmentPage page = new AssignmentPage(List.of(), 1, 20, 0);
+		when(assignmentRepository.findPageExcludingDraft(eq(3L), any())).thenReturn(page);
+
+		AssignmentListResult result = assignmentService.listAssignments(null, 3L, 1, 20);
+
+		assertThat(result.assignmentPage()).isSameAs(page);
+		assertThat(result.skillsByAssignmentId()).isEmpty();
+		verify(assignmentRepository, never()).findSkillsByAssignmentIds(any());
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+		verify(assignmentRepository, never()).findPage(any(), any(), any());
 	}
 
 	@Test
@@ -357,11 +471,12 @@ class AssignmentServiceTest {
 				"Dữ liệu thời gian hoặc số lần nộp không hợp lệ.");
 	}
 
-	@Test
-	void teacherCanReadAssignmentDetailWithModuleSummaries() {
+	@ParameterizedTest
+	@EnumSource(AssignmentStatus.class)
+	void teacherCanReadAssignmentDetailWithModuleSummaries(AssignmentStatus status) {
 		givenCaller(user(10L, UserRole.TEACHER));
 		when(assignmentRepository.findById(5L))
-				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
+				.thenReturn(Optional.of(assignment(5L, 3L, status)));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.findModuleSummaries(5L))
 				.thenReturn(List.of(new AssignmentModuleSummary(9L, "READING")));
@@ -372,15 +487,52 @@ class AssignmentServiceTest {
 		assertThat(result.modules()).containsExactly(new AssignmentModuleSummary(9L, "READING"));
 	}
 
-	@Test
-	void studentCanReadAssignmentDetailWhenTheyAreAClassMember() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentCanReadAssignmentDetailWhenTheyAreAClassMember(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
 		when(assignmentRepository.findById(5L))
-				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
+				.thenReturn(Optional.of(assignment(5L, 3L, status)));
 		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
 		when(assignmentRepository.findModuleSummaries(5L)).thenReturn(List.of());
 
 		assertThat(assignmentService.getAssignmentDetail(5L).modules()).isEmpty();
+	}
+
+	@Test
+	void studentCannotReadDraftAssignmentDetail() {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
+		when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, true)));
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.getAssignmentDetail(5L), "Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"MISSING", "DELETED", "OUTSIDE_CLASS"})
+	void assignmentDetailLookupErrorsArePreserved(String scenario) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		boolean outsideClass = "OUTSIDE_CLASS".equals(scenario);
+		if (outsideClass) {
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
+			when(classRepository.findAccess(3L, 41L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+		} else {
+			// The repository port returns empty for both absent and soft-deleted assignments.
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.empty());
+		}
+		String message = outsideClass ? "Bạn không có quyền thực hiện thao tác này." : "Không tìm thấy bài tập.";
+
+		ApiException exception = assertApiException(() -> assignmentService.getAssignmentDetail(5L), message);
+
+		assertThat(exception.getStatus()).isEqualTo(outsideClass ? HttpStatus.FORBIDDEN : HttpStatus.NOT_FOUND);
+		verify(assignmentRepository, never()).findModuleSummaries(any());
+		if (!outsideClass) {
+			verifyNoInteractions(classRepository);
+		}
 	}
 
 	@Test
@@ -600,6 +752,27 @@ class AssignmentServiceTest {
 		assertApiException(
 				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("OPEN")),
 				"Không thể chuyển sang trạng thái này.");
+	}
+
+	private static Stream<Arguments> listValidationCases() {
+		String invalidData = "Dữ liệu không hợp lệ.";
+		String invalidStatus = "status không hợp lệ.";
+		return Stream.of(
+				Arguments.of(UserRole.STUDENT, "DRAFT", 0, 20, invalidData),
+				Arguments.of(UserRole.STUDENT, "DRAFT", 1, 0, invalidData),
+				Arguments.of(UserRole.STUDENT, "DRAFT", 1, 101, invalidData),
+				Arguments.of(UserRole.STUDENT, "OPEN", 1, 20, invalidStatus),
+				Arguments.of(UserRole.STUDENT, "OPEN", 0, 20, invalidStatus),
+				Arguments.of(UserRole.STUDENT, "OPEN", 1, 0, invalidStatus),
+				Arguments.of(UserRole.STUDENT, "OPEN", 0, 0, invalidStatus),
+				Arguments.of(UserRole.TEACHER, "OPEN", 0, 0, invalidStatus),
+				Arguments.of(UserRole.ADMIN, "OPEN", 0, 0, invalidStatus),
+				Arguments.of(UserRole.STUDENT, null, 0, 20, invalidData),
+				Arguments.of(UserRole.STUDENT, null, 1, 0, invalidData),
+				Arguments.of(UserRole.STUDENT, "", 0, 20, invalidData),
+				Arguments.of(UserRole.STUDENT, "", 1, 0, invalidData),
+				Arguments.of(UserRole.STUDENT, "   ", 0, 20, invalidData),
+				Arguments.of(UserRole.STUDENT, "   ", 1, 0, invalidData));
 	}
 
 	private void givenCaller(User user) {

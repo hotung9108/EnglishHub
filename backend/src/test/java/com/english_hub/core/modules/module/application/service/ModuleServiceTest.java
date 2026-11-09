@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
@@ -38,12 +39,20 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class ModuleServiceTest {
@@ -94,10 +103,11 @@ class ModuleServiceTest {
 		assertThat(moduleService.listModules(5L)).containsExactly(first, second);
 	}
 
-	@Test
-	void studentMemberCanListModules() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanListModules(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
-		givenAssignmentAndClass(5L, 3L, 10L);
+		givenAssignmentAndClass(5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 		when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(List.of());
 
@@ -227,12 +237,13 @@ class ModuleServiceTest {
 		assertThat(moduleService.getModule(9L)).isEqualTo(module);
 	}
 
-	@Test
-	void studentMemberCanReadModuleDetail() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanReadModuleDetail(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
 		Module module = module(9L, 5L, ModuleSkill.READING, 1);
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
-		givenAssignmentAndClass(5L, 3L, 10L);
+		givenAssignmentAndClass(5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 
 		assertThat(moduleService.getModule(9L)).isEqualTo(module);
@@ -454,12 +465,13 @@ class ModuleServiceTest {
 				"Bạn không có quyền thực hiện thao tác này.");
 	}
 
-	@Test
-	void studentMemberCanStreamListeningAudio() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanStreamListeningAudio(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
 		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
 		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
-		givenAssignmentAndClass(5L, 3L, 10L);
+		givenAssignmentAndClass(5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 		when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
 		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-11-06T15:00:00Z");
@@ -575,6 +587,227 @@ class ModuleServiceTest {
 		moduleService.deleteModule(9L);
 
 		verify(moduleRepository).deleteById(9L);
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {true, false})
+	void studentCannotListDraftModules(boolean emptyList) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		List<Module> modules = emptyList ? List.of() : List.of(module(9L, 5L, ModuleSkill.READING, 1));
+		lenient().when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(modules);
+
+		assertThatThrownBy(() -> moduleService.listModules(5L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(moduleRepository, storageService);
+	}
+
+	@Test
+	void studentCannotReadDraftModuleDetail() {
+		givenCaller(user(41L, UserRole.STUDENT));
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module(9L, 5L, ModuleSkill.READING, 1)));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> moduleService.getModule(9L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+	}
+
+	@ParameterizedTest
+	@NullSource
+	@EnumSource(value = ModuleUploadStatus.class, names = {"READY", "UPLOADING"})
+	void draftAudioIsForbiddenBeforeStorage(ModuleUploadStatus uploadStatus) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		String storageKey = uploadStatus == null ? null : "modules/9/audio/new.mp3";
+		Module module = new Module(
+				9L, 5L, ModuleSkill.LISTENING, ModuleTaskType.QUIZ, 2, "Instructions", BigDecimal.TEN,
+				storageKey, null, "audio/mpeg", uploadStatus, null);
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		givenAssignmentAndClass(5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> moduleService.generateAudioDownloadUrl(9L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(storageService);
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleReadLookupCases")
+	void moduleReadLookupErrorsArePreserved(String resource, String scenario) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		boolean missingModule = scenario.startsWith("MODULE_");
+		if (!"LIST".equals(resource)) {
+			Optional<Module> module = missingModule
+					? Optional.empty()
+					: Optional.of(module(9L, 5L, ModuleSkill.LISTENING, 2));
+			when(moduleRepository.findById(9L)).thenReturn(module);
+		}
+		if (!missingModule) {
+			// The assignment port hides both missing and soft-deleted assignments.
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.empty());
+		}
+		String message = missingModule ? "Không tìm thấy module." : "Không tìm thấy bài tập.";
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(exception).hasMessage(message);
+				});
+
+		verifyNoInteractions(classRepository, classMemberRepository, storageService);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		if (missingModule) {
+			verifyNoInteractions(assignmentRepository);
+		}
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleResourceStatusCases")
+	void studentOutsideClassCannotReadModuleResources(String resource, AssignmentStatus status) {
+		givenCaller(user(42L, UserRole.STUDENT));
+		if (!"LIST".equals(resource)) {
+			when(moduleRepository.findById(9L)).thenReturn(Optional.of(moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3")));
+		}
+		givenAssignmentAndClass(5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 42L)).thenReturn(false);
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verify(classMemberRepository).existsByClassIdAndStudentId(3L, 42L);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		verifyNoInteractions(storageService);
+	}
+
+	@ParameterizedTest
+	@MethodSource("nonStudentModuleReadCases")
+	void nonStudentModuleReadAccessIsPreserved(String resource, AssignmentStatus status, UserRole role) {
+		givenCaller(user(11L, role));
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		if (!"LIST".equals(resource)) {
+			when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		}
+		if (role == UserRole.ADMIN) {
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment(5L, 3L, status)));
+		} else {
+			givenAssignmentAndClass(5L, 3L, 10L, status);
+		}
+
+		assertThatThrownBy(() -> readModuleResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(storageService, classMemberRepository);
+		verify(moduleRepository, never()).findByAssignmentIdOrderByOrderIndexAsc(anyLong());
+		if (role == UserRole.ADMIN) {
+			verifyNoInteractions(classRepository);
+		}
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleResourceStatusCases")
+	void owningTeacherModuleReadAccessIsPreserved(String resource, AssignmentStatus status) {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenAssignmentAndClass(5L, 3L, 10L, status);
+		Module module = moduleWithAudio(9L, 5L, "modules/9/audio/new.mp3");
+		if ("LIST".equals(resource)) {
+			when(moduleRepository.findByAssignmentIdOrderByOrderIndexAsc(5L)).thenReturn(List.of(module));
+			assertThat(moduleService.listModules(5L)).containsExactly(module);
+			verifyNoInteractions(classMemberRepository, storageService);
+			return;
+		}
+		when(moduleRepository.findById(9L)).thenReturn(Optional.of(module));
+		if ("DETAIL".equals(resource)) {
+			assertThat(moduleService.getModule(9L)).isEqualTo(module);
+		} else {
+			when(storageService.objectExists("modules/9/audio/new.mp3")).thenReturn(true);
+			when(storageService.generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull()))
+					.thenReturn(new StorageService.PresignedDownload(
+							"https://storage.example.com/audio.mp3", "modules/9/audio/new.mp3", EXPIRES_AT));
+			assertThat(moduleService.generateAudioDownloadUrl(9L).downloadUrl())
+					.isEqualTo("https://storage.example.com/audio.mp3");
+			verify(storageService).objectExists("modules/9/audio/new.mp3");
+			verify(storageService).generatePresignedDownload(eq("modules/9/audio/new.mp3"), any(), isNull());
+		}
+		verifyNoInteractions(classMemberRepository);
+	}
+
+	private static Stream<Arguments> moduleReadLookupCases() {
+		return Stream.of(
+				Arguments.of("LIST", "ASSIGNMENT_MISSING"),
+				Arguments.of("LIST", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "ASSIGNMENT_MISSING"),
+				Arguments.of("DETAIL", "ASSIGNMENT_DELETED"),
+				Arguments.of("AUDIO", "ASSIGNMENT_MISSING"),
+				Arguments.of("AUDIO", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "MODULE_MISSING"),
+				Arguments.of("DETAIL", "MODULE_DELETED"),
+				Arguments.of("AUDIO", "MODULE_MISSING"),
+				Arguments.of("AUDIO", "MODULE_DELETED"));
+	}
+
+	private static Stream<Arguments> moduleResourceStatusCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL", "AUDIO")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status));
+			}
+		}
+		return cases.build();
+	}
+
+	private static Stream<Arguments> nonStudentModuleReadCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL", "AUDIO")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status, UserRole.TEACHER));
+				cases.add(Arguments.of(resource, status, UserRole.ADMIN));
+			}
+		}
+		return cases.build();
+	}
+
+	private void readModuleResource(String resource) {
+		if ("LIST".equals(resource)) {
+			moduleService.listModules(5L);
+		} else if ("DETAIL".equals(resource)) {
+			moduleService.getModule(9L);
+		} else {
+			moduleService.generateAudioDownloadUrl(9L);
+		}
+	}
+
+	private void givenAssignmentAndClass(Long assignmentId, Long classId, Long teacherId, AssignmentStatus status) {
+		when(assignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment(assignmentId, classId, status)));
+		when(classRepository.findById(classId)).thenReturn(Optional.of(englishClass(classId, teacherId)));
+	}
+
+	private Assignment assignment(Long assignmentId, Long classId, AssignmentStatus status) {
+		Assignment value = assignment(assignmentId, classId);
+		if (status != AssignmentStatus.DRAFT) {
+			value.changeStatus(AssignmentStatus.PUBLISHED);
+		}
+		if (status == AssignmentStatus.CLOSED) {
+			value.changeStatus(AssignmentStatus.CLOSED);
+		}
+		return value;
 	}
 
 	private void givenListeningModule() {

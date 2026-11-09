@@ -53,10 +53,16 @@ import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -262,7 +268,8 @@ class ModuleApiIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/assignments/{id}/modules", assignmentId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
-				.andExpect(status().isOk());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 
 		mockMvc.perform(get("/api/v1/assignments/{id}/modules", assignmentId)
 					.header("Authorization", bearer(otherTeacherId, UserRole.TEACHER)))
@@ -380,7 +387,8 @@ class ModuleApiIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/modules/{id}", readingModuleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
-				.andExpect(status().isOk());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 
 		mockMvc.perform(get("/api/v1/modules/{id}", readingModuleId)
 					.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
@@ -534,6 +542,8 @@ class ModuleApiIntegrationTest {
 				.andExpect(jsonPath("$.storageKey").value(storageKey))
 				.andExpect(jsonPath("$.mimeType").value("audio/mpeg"));
 
+		updateAssignmentFixture(AssignmentStatus.PUBLISHED, false);
+
 		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isOk())
@@ -619,6 +629,8 @@ class ModuleApiIntegrationTest {
 				"audio/mpeg", UploadStatus.READY);
 		moduleRepository.flush();
 
+		updateAssignmentFixture(AssignmentStatus.PUBLISHED, false);
+
 		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isNotFound())
@@ -659,6 +671,127 @@ class ModuleApiIntegrationTest {
 		} finally {
 			deleteCommittedFixtures();
 		}
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentCanReadPublishedAndClosedModules(AssignmentStatus assignmentStatus) throws Exception {
+		updateAssignmentFixture(assignmentStatus, false);
+
+		mockMvc.perform(get("/api/v1/assignments/{id}/modules", assignmentId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(2)))
+				.andExpect(jsonPath("$.data[0].id").value(readingModuleId))
+				.andExpect(jsonPath("$.data[1].id").value(listeningModuleId));
+
+		mockMvc.perform(get("/api/v1/modules/{id}", readingModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(readingModuleId))
+				.andExpect(jsonPath("$.skill").value("READING"));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Module chưa có file audio."));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"NONE", "UPLOADING", "READY"})
+	void draftAudioDownloadUrlIsForbiddenWithoutUpload(String audioState) throws Exception {
+		if (!"NONE".equals(audioState)) {
+			AssignmentModule listeningModule = moduleRepository.findById(listeningModuleId).orElseThrow();
+			listeningModule.updateAudioMetadata("modules/" + listeningModuleId + "/audio/gone.mp3", null,
+					"audio/mpeg", UploadStatus.valueOf(audioState));
+			moduleRepository.flush();
+			entityManager.clear();
+		}
+
+		mockMvc.perform(get("/api/v1/modules/{id}/audio-download-url", listeningModuleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void studentCannotListDraftModulesWhenEmpty() throws Exception {
+		moduleRepository.deleteById(readingModuleId);
+		moduleRepository.deleteById(listeningModuleId);
+		moduleRepository.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/assignments/{id}/modules", assignmentId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"LIST", "DETAIL", "AUDIO"})
+	void moduleReadRoutesRequireAuthentication(String resource) throws Exception {
+		Long id = "LIST".equals(resource) ? assignmentId : listeningModuleId;
+
+		mockMvc.perform(get(moduleReadPath(resource), id))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error").value("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
+	}
+
+	@ParameterizedTest
+	@MethodSource("moduleReadNotFoundCases")
+	void moduleReadRoutesPreserveNotFound(String resource, String scenario) throws Exception {
+		Long id = "LIST".equals(resource) ? assignmentId : listeningModuleId;
+		String message;
+		if ("ASSIGNMENT_DELETED".equals(scenario)) {
+			updateAssignmentFixture(AssignmentStatus.DRAFT, true);
+			message = "Không tìm thấy bài tập.";
+		} else if ("MODULE_DELETED".equals(scenario)) {
+			moduleRepository.deleteById(id);
+			moduleRepository.flush();
+			entityManager.clear();
+			assertThat(moduleRepository.findById(id)).isEmpty();
+			message = "Không tìm thấy module.";
+		} else {
+			id = 999_999_999L;
+			message = "LIST".equals(resource) ? "Không tìm thấy bài tập." : "Không tìm thấy module.";
+		}
+
+		mockMvc.perform(get(moduleReadPath(resource), id)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value(message));
+	}
+
+	private static Stream<Arguments> moduleReadNotFoundCases() {
+		return Stream.of(
+				Arguments.of("LIST", "ASSIGNMENT_MISSING"),
+				Arguments.of("LIST", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "ASSIGNMENT_DELETED"),
+				Arguments.of("AUDIO", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "MODULE_MISSING"),
+				Arguments.of("DETAIL", "MODULE_DELETED"),
+				Arguments.of("AUDIO", "MODULE_MISSING"),
+				Arguments.of("AUDIO", "MODULE_DELETED"));
+	}
+
+	private String moduleReadPath(String resource) {
+		if ("LIST".equals(resource)) {
+			return "/api/v1/assignments/{id}/modules";
+		}
+		if ("DETAIL".equals(resource)) {
+			return "/api/v1/modules/{id}";
+		}
+		return "/api/v1/modules/{id}/audio-download-url";
+	}
+
+	private void updateAssignmentFixture(AssignmentStatus assignmentStatus, boolean deleted) {
+		Assignment assignment = assignmentRepository.findById(assignmentId).orElseThrow();
+		assignment.updateFrom(
+				assignment.getClassId(), assignment.getTitle(), assignment.getDescription(),
+				assignment.getOpenAt(), assignment.getCloseAt(), assignment.getMaxSubmissions(),
+				deleted, assignmentStatus);
+		assignmentRepository.flush();
+		entityManager.clear();
 	}
 
 	private record UploadUrl(String storageKey, String uploadUrl) {

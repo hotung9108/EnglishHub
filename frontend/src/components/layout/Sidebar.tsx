@@ -13,7 +13,6 @@ import {
   CheckCircle,
   TrendingUp,
   History,
-  Shield,
   Globe,
   ShieldCheck,
   ChevronsUpDown,
@@ -137,7 +136,6 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
         title: t('sectionManagement'),
         items: [
           { path: '/admin/accounts', label: t('menuAccounts'), icon: Users },
-          { path: '/admin/roles', label: language === 'vi' ? 'Phân quyền' : 'Roles', icon: Shield },
           { path: '/admin/classes', label: t('menuClasses'), icon: GraduationCap },
           { path: '/admin/teachers', label: t('menuTeachers'), icon: UserIcon },
           { path: '/admin/students', label: t('menuStudents'), icon: Users },

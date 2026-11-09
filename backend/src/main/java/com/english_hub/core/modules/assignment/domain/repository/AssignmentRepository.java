@@ -17,6 +17,8 @@ public interface AssignmentRepository extends IRepository<Assignment, Long> {
 
 	AssignmentPage findPage(Long classId, AssignmentStatus status, AssignmentPageRequest pageRequest);
 
+	AssignmentPage findPageExcludingDraft(Long classId, AssignmentPageRequest pageRequest);
+
 	Map<Long, List<ModuleSkill>> findSkillsByAssignmentIds(List<Long> assignmentIds);
 
 	List<AssignmentModuleSummary> findModuleSummaries(Long assignmentId);

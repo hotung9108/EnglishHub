@@ -104,6 +104,20 @@ public class AssignmentJpaAdapter implements com.english_hub.core.modules.assign
 						classId,
 						com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus.valueOf(status.name()),
 						pageable);
+		return toAssignmentPage(rows, pageRequest);
+	}
+
+	@Override
+	public AssignmentPage findPageExcludingDraft(Long classId, AssignmentPageRequest pageRequest) {
+		Pageable pageable = PageRequest.of(pageRequest.page() - 1, pageRequest.limit());
+		List<Object[]> rows = jpaRepository.findPageExcludingStatusWithTotalElements(
+				classId,
+				com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus.DRAFT,
+				pageable);
+		return toAssignmentPage(rows, pageRequest);
+	}
+
+	private AssignmentPage toAssignmentPage(List<Object[]> rows, AssignmentPageRequest pageRequest) {
 		if (rows.isEmpty()) {
 			return new AssignmentPage(List.of(), pageRequest.page(), pageRequest.limit(), 0);
 		}
