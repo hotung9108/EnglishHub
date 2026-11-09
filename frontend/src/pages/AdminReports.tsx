@@ -268,112 +268,117 @@ export const AdminReports: React.FC = () => {
       </div>
 
       {/* Modern Filter Toolbar */}
-      <div className="eh-card p-5 mb-6 border border-border shadow-sm rounded-xl">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2 pb-3 border-b border-border-light">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <Filter size={16} />
+      <div className="eh-card p-6 mb-6 border border-border shadow-xs rounded-xl bg-surface">
+        {/* Top Header Row: Title & Active Count on Left, Quick Presets & Reset on Right */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 mb-5 border-b border-border-light">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+              <Filter size={18} />
             </div>
             <div>
-              <div className="text-sm font-bold text-text-primary flex items-center gap-2">
-                <span>{isVi ? 'Bộ Lọc Phân Tích & Thời Gian' : 'Analytical Filters & Date Range'}</span>
+              <div className="text-base font-bold text-text-primary flex items-center gap-2.5">
+                <span>{isVi ? 'Bộ lọc dữ liệu báo cáo' : 'Report Analytics Filters'}</span>
                 {activeFilterCount > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/15 text-primary">
+                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-primary/15 text-primary">
                     {activeFilterCount} {isVi ? 'đang áp dụng' : 'active'}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-text-muted">
-                {isVi ? 'Tùy chỉnh khoảng thời gian, giảng viên hoặc lớp học để tổng hợp chỉ số' : 'Filter telemetry metrics by date interval, instructor or class cohort'}
+              <p className="text-xs text-text-muted mt-0.5">
+                {isVi ? 'Tùy chỉnh khoảng thời gian, giảng viên hoặc lớp học' : 'Filter telemetry metrics by date interval, instructor or class cohort'}
               </p>
             </div>
           </div>
-          {activeFilterCount > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RotateCcw size={14} />}
-              onClick={handleResetFilters}
-            >
-              {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
-            </Button>
-          )}
+
+          {/* Quick Date Presets & Reset Button */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-text-secondary flex items-center gap-1.5 mr-1">
+              <Clock size={14} className="text-primary" />
+              {isVi ? 'Mốc nhanh:' : 'Quick Range:'}
+            </span>
+            <div className="inline-flex items-center gap-1 bg-surface-variant/30 p-1 rounded-lg border border-border-light">
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  !fromDate && !toDate
+                    ? 'bg-primary text-white shadow-xs font-semibold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+                onClick={() => handleApplyPreset('all')}
+              >
+                {isVi ? 'Toàn thời gian' : 'All time'}
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  fromDate === getPresetDates('today').from && toDate === getPresetDates('today').to
+                    ? 'bg-primary text-white shadow-xs font-semibold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+                onClick={() => handleApplyPreset('today')}
+              >
+                {isVi ? 'Hôm nay' : 'Today'}
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  fromDate === getPresetDates('7days').from && toDate === getPresetDates('7days').to
+                    ? 'bg-primary text-white shadow-xs font-semibold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+                onClick={() => handleApplyPreset('7days')}
+              >
+                {isVi ? '7 ngày qua' : 'Last 7 days'}
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  fromDate === getPresetDates('30days').from && toDate === getPresetDates('30days').to
+                    ? 'bg-primary text-white shadow-xs font-semibold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+                onClick={() => handleApplyPreset('30days')}
+              >
+                {isVi ? '30 ngày qua' : 'Last 30 days'}
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  fromDate === getPresetDates('thisMonth').from && toDate === getPresetDates('thisMonth').to
+                    ? 'bg-primary text-white shadow-xs font-semibold'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface'
+                }`}
+                onClick={() => handleApplyPreset('thisMonth')}
+              >
+                {isVi ? 'Tháng này' : 'This month'}
+              </button>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RotateCcw size={14} />}
+                onClick={handleResetFilters}
+                className="h-8 text-xs font-medium px-3 ml-1"
+              >
+                {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Quick Date Presets */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs font-medium text-text-muted flex items-center gap-1.5 mr-1">
-            <Clock size={13} className="text-primary" />
-            {isVi ? 'Chọn nhanh:' : 'Quick Presets:'}
-          </span>
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              !fromDate && !toDate
-                ? 'bg-primary text-white shadow-xs font-semibold'
-                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
-            }`}
-            onClick={() => handleApplyPreset('all')}
-          >
-            {isVi ? 'Toàn thời gian' : 'All time'}
-          </button>
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              fromDate === getPresetDates('today').from && toDate === getPresetDates('today').to
-                ? 'bg-primary text-white shadow-xs font-semibold'
-                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
-            }`}
-            onClick={() => handleApplyPreset('today')}
-          >
-            {isVi ? 'Hôm nay' : 'Today'}
-          </button>
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              fromDate === getPresetDates('7days').from && toDate === getPresetDates('7days').to
-                ? 'bg-primary text-white shadow-xs font-semibold'
-                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
-            }`}
-            onClick={() => handleApplyPreset('7days')}
-          >
-            {isVi ? '7 ngày qua' : 'Last 7 days'}
-          </button>
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              fromDate === getPresetDates('30days').from && toDate === getPresetDates('30days').to
-                ? 'bg-primary text-white shadow-xs font-semibold'
-                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
-            }`}
-            onClick={() => handleApplyPreset('30days')}
-          >
-            {isVi ? '30 ngày qua' : 'Last 30 days'}
-          </button>
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-              fromDate === getPresetDates('thisMonth').from && toDate === getPresetDates('thisMonth').to
-                ? 'bg-primary text-white shadow-xs font-semibold'
-                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
-            }`}
-            onClick={() => handleApplyPreset('thisMonth')}
-          >
-            {isVi ? 'Tháng này' : 'This month'}
-          </button>
-        </div>
-
-        {/* Filter Input Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Filter Input Grid - Roomy, clearly labeled, standard readable typography */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* From Date */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <Calendar size={13} className="text-primary" />
+              <Calendar size={15} className="text-primary" />
               <span>{isVi ? 'Từ ngày' : 'From Date'}</span>
             </label>
             <div className="adm-filter-control-wrap">
               <span className="adm-filter-control-icon">
-                <Calendar size={15} />
+                <Calendar size={16} />
               </span>
               <input 
                 type="date" 
@@ -387,12 +392,12 @@ export const AdminReports: React.FC = () => {
           {/* To Date */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <Calendar size={13} className="text-primary" />
+              <Calendar size={15} className="text-primary" />
               <span>{isVi ? 'Đến ngày' : 'To Date'}</span>
             </label>
             <div className="adm-filter-control-wrap">
               <span className="adm-filter-control-icon">
-                <Calendar size={15} />
+                <Calendar size={16} />
               </span>
               <input 
                 type="date" 
@@ -406,12 +411,12 @@ export const AdminReports: React.FC = () => {
           {/* Teacher Filter */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <User size={13} className="text-primary" />
+              <User size={15} className="text-primary" />
               <span>{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</span>
             </label>
             <div className="adm-filter-control-wrap">
               <span className="adm-filter-control-icon">
-                <User size={15} />
+                <User size={16} />
               </span>
               <select
                 className={`adm-filter-select ${selectedTeacherId !== undefined ? 'has-value' : ''}`}
@@ -426,7 +431,7 @@ export const AdminReports: React.FC = () => {
                 ))}
               </select>
               <span className="adm-filter-control-arrow">
-                <ChevronDown size={14} />
+                <ChevronDown size={15} />
               </span>
             </div>
           </div>
@@ -434,12 +439,12 @@ export const AdminReports: React.FC = () => {
           {/* Class Filter */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
-              <BookOpen size={13} className="text-primary" />
+              <BookOpen size={15} className="text-primary" />
               <span>{isVi ? 'Lớp học' : 'Class Cohort'}</span>
             </label>
             <div className="adm-filter-control-wrap">
               <span className="adm-filter-control-icon">
-                <BookOpen size={15} />
+                <BookOpen size={16} />
               </span>
               <select
                 className={`adm-filter-select ${selectedClassId !== undefined ? 'has-value' : ''}`}
@@ -454,7 +459,7 @@ export const AdminReports: React.FC = () => {
                 ))}
               </select>
               <span className="adm-filter-control-arrow">
-                <ChevronDown size={14} />
+                <ChevronDown size={15} />
               </span>
             </div>
           </div>
