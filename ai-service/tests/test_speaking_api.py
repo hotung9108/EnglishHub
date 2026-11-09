@@ -372,3 +372,97 @@ def test_speaking_prompt_enforces_vietnamese_and_context():
     assert "LANGUAGE ENFORCEMENT RULE (BẮT BUỘC - 100% TIẾNG VIỆT)" in SPEAKING_SYSTEM_PROMPT
     assert '"context"' in SPEAKING_SYSTEM_PROMPT
     assert "MUST BE WRITTEN STRICTLY IN VIETNAMESE" in SPEAKING_SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize("provider,openrouter_key,gemini_key", [
+    ("auto", "", ""),
+    ("openrouter", "", "be76-test-key"),
+    ("gemini", "be76-test-key", ""),
+    ("unknown-provider", "be76-test-key", "be76-test-key"),
+], ids=["auto-no-keys", "openrouter-missing-key", "gemini-missing-key", "unknown-provider"])
+@patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"audio")
+@patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"wav")
+def test_analyze_speaking_missing_provider_configuration_returns_503(
+    converter: AsyncMock, downloader: AsyncMock, monkeypatch: pytest.MonkeyPatch,
+    provider: str, openrouter_key: str, gemini_key: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", False)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", openrouter_key)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", gemini_key)
+    openrouter, gemini = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(GeminiService, "_call_openrouter", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct", gemini)
+
+    response = client.post("/api/v1/analyze/speaking", json={
+        "submissionModuleId": 14, "audioUrl": "https://storage.example/audio.wav", "aiProvider": provider,
+    })
+    downloader.assert_awaited_once()
+    converter.assert_awaited_once()
+    openrouter.assert_not_awaited()
+    gemini.assert_not_awaited()
+    body = response.json()
+    assert response.status_code == 503, f"Thực tế {response.status_code}, providerUsed={body.get('providerUsed')}"
+    assert body["success"] is False
+    assert body["code"] == "HTTP_ERROR"
+    assert body["detail"] == body["message"] == "Dịch vụ AI chưa sẵn sàng: nhà cung cấp chưa được cấu hình hợp lệ."
+
+
+@pytest.mark.parametrize("provider", ["openrouter", "gemini"])
+@patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"audio")
+@patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"wav")
+def test_analyze_speaking_configured_provider_is_called(
+    converter: AsyncMock, downloader: AsyncMock, monkeypatch: pytest.MonkeyPatch, provider: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", False)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "be76-test-key" if provider == "openrouter" else "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "be76-test-key" if provider == "gemini" else "")
+    result = GeminiService._build_response_from_json(
+        14, {}, 9.0, model_used="be76-test-model", provider_used=provider,
+    )
+    openrouter, gemini = AsyncMock(return_value=result), AsyncMock(return_value=result)
+    monkeypatch.setattr(GeminiService, "_call_openrouter", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct", gemini)
+
+    response = client.post("/api/v1/analyze/speaking", json={
+        "submissionModuleId": 14, "audioUrl": "https://storage.example/audio.wav", "aiProvider": provider,
+    })
+    downloader.assert_awaited_once()
+    converter.assert_awaited_once()
+    assert response.status_code == 200
+    if provider == "openrouter":
+        openrouter.assert_awaited_once()
+        gemini.assert_not_awaited()
+    else:
+        gemini.assert_awaited_once()
+        openrouter.assert_not_awaited()
+
+
+@pytest.mark.parametrize("mock_mode,provider,provider_used", [
+    (True, "auto", "auto-mock"),
+    (False, "mock", "mock"),
+], ids=["mock-mode", "explicit-mock"])
+@patch.object(AudioProcessor, "_download_audio", new_callable=AsyncMock, return_value=b"audio")
+@patch.object(AudioProcessor, "convert_to_wav", new_callable=AsyncMock, return_value=b"wav")
+def test_analyze_speaking_mock_mode_preserves_benchmark(
+    converter: AsyncMock, downloader: AsyncMock, monkeypatch: pytest.MonkeyPatch,
+    mock_mode: bool, provider: str, provider_used: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", mock_mode)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    openrouter, gemini = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(GeminiService, "_call_openrouter", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct", gemini)
+
+    response = client.post("/api/v1/analyze/speaking", json={
+        "submissionModuleId": 14, "audioUrl": "https://storage.example/audio.wav", "aiProvider": provider,
+    })
+    downloader.assert_awaited_once()
+    converter.assert_awaited_once()
+    assert response.status_code == 200
+    assert response.json()["providerUsed"] == provider_used
+    openrouter.assert_not_awaited()
+    gemini.assert_not_awaited()

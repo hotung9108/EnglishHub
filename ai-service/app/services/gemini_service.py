@@ -130,6 +130,12 @@ class GeminiService:
         target_gemini_model = cleaned_model or settings.GEMINI_MODEL
 
         if settings.MOCK_MODE or (not use_openrouter and not use_gemini):
+            if not settings.MOCK_MODE and provider != "mock":
+                raise HTTPException(
+                    status_code=503,
+                    detail="Dịch vụ AI chưa sẵn sàng: nhà cung cấp chưa được cấu hình hợp lệ."
+                )
+
             logger.info(
                 "Running in QA-21 Benchmark / Mock Mode for submissionModuleId: %s (model: %s, provider: %s)",
                 submission_module_id,
@@ -849,6 +855,12 @@ class GeminiService:
         target_gemini_model = cleaned_model or settings.GEMINI_MODEL
 
         if settings.MOCK_MODE or (not use_openrouter and not use_gemini):
+            if not settings.MOCK_MODE and provider != "mock":
+                raise HTTPException(
+                    status_code=503,
+                    detail="Dịch vụ AI chưa sẵn sàng: nhà cung cấp chưa được cấu hình hợp lệ."
+                )
+
             logger.info(
                 "Running in QA-21 Writing Benchmark / Mock Mode for submissionModuleId: %s (model: %s, provider: %s)",
                 submission_module_id,

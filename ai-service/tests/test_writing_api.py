@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.main import app
+from app.services.gemini_service import GeminiService
 
 os.environ.setdefault("INTERNAL_SECRET", "test-internal-secret")
 settings.MOCK_MODE = True
@@ -140,4 +141,84 @@ def test_analyze_writing_presigned_url(mock_download: AsyncMock):
     assert res["overallScore"] == 6.5
     assert res["criteriaScores"]["taskResponse"] == 7.0
     assert len(res["annotations"]) == 3
+
+
+@pytest.mark.parametrize("provider,openrouter_key,gemini_key", [
+    ("auto", "", ""),
+    ("openrouter", "", "be76-test-key"),
+    ("gemini", "be76-test-key", ""),
+    ("unknown-provider", "be76-test-key", "be76-test-key"),
+], ids=["auto-no-keys", "openrouter-missing-key", "gemini-missing-key", "unknown-provider"])
+def test_analyze_writing_missing_provider_configuration_returns_503(
+    monkeypatch: pytest.MonkeyPatch, provider: str, openrouter_key: str, gemini_key: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", False)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", openrouter_key)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", gemini_key)
+    openrouter, gemini = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(GeminiService, "_call_openrouter_writing", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct_writing", gemini)
+
+    response = client.post("/api/v1/analyze/writing", json={
+        "submissionModuleId": 15, "content": QA21_ESSAY, "aiProvider": provider,
+    })
+    openrouter.assert_not_awaited()
+    gemini.assert_not_awaited()
+    body = response.json()
+    assert response.status_code == 503, f"Thực tế {response.status_code}, providerUsed={body.get('providerUsed')}"
+    assert body["success"] is False
+    assert body["code"] == "HTTP_ERROR"
+    assert body["detail"] == body["message"] == "Dịch vụ AI chưa sẵn sàng: nhà cung cấp chưa được cấu hình hợp lệ."
+
+
+@pytest.mark.parametrize("provider", ["openrouter", "gemini"])
+def test_analyze_writing_configured_provider_is_called(
+    monkeypatch: pytest.MonkeyPatch, provider: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", False)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "be76-test-key" if provider == "openrouter" else "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "be76-test-key" if provider == "gemini" else "")
+    result = GeminiService._build_writing_response_from_json(
+        15, QA21_ESSAY, {}, 9.0, model_used="be76-test-model", provider_used=provider,
+    )
+    openrouter, gemini = AsyncMock(return_value=result), AsyncMock(return_value=result)
+    monkeypatch.setattr(GeminiService, "_call_openrouter_writing", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct_writing", gemini)
+
+    response = client.post("/api/v1/analyze/writing", json={
+        "submissionModuleId": 15, "content": QA21_ESSAY, "aiProvider": provider,
+    })
+    assert response.status_code == 200
+    if provider == "openrouter":
+        openrouter.assert_awaited_once()
+        gemini.assert_not_awaited()
+    else:
+        gemini.assert_awaited_once()
+        openrouter.assert_not_awaited()
+
+
+@pytest.mark.parametrize("mock_mode,provider,provider_used", [
+    (True, "auto", "auto-mock"),
+    (False, "mock", "mock"),
+], ids=["mock-mode", "explicit-mock"])
+def test_analyze_writing_mock_mode_preserves_benchmark(
+    monkeypatch: pytest.MonkeyPatch, mock_mode: bool, provider: str, provider_used: str,
+) -> None:
+    monkeypatch.setattr(settings, "MOCK_MODE", mock_mode)
+    monkeypatch.setattr(settings, "AI_PROVIDER", "auto")
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    openrouter, gemini = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(GeminiService, "_call_openrouter_writing", openrouter)
+    monkeypatch.setattr(GeminiService, "_call_gemini_direct_writing", gemini)
+
+    response = client.post("/api/v1/analyze/writing", json={
+        "submissionModuleId": 15, "content": QA21_ESSAY, "aiProvider": provider,
+    })
+    assert response.status_code == 200
+    assert response.json()["providerUsed"] == provider_used
+    openrouter.assert_not_awaited()
+    gemini.assert_not_awaited()
 
