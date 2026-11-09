@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
@@ -35,11 +37,18 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
 class QuestionServiceTest {
@@ -92,10 +101,11 @@ class QuestionServiceTest {
 		assertThat(result.includeCorrectAnswer()).isTrue();
 	}
 
-	@Test
-	void studentMemberCanListQuestionsWithoutCorrectAnswer() {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentMemberCanListQuestionsWithoutCorrectAnswer(AssignmentStatus status) {
 		givenCaller(user(41L, UserRole.STUDENT));
-		givenModuleAndOwner(9L, 5L, 3L, 10L);
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
 		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
 		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(9L)).thenReturn(List.of());
 
@@ -324,6 +334,248 @@ class QuestionServiceTest {
 				() -> questionService.deleteQuestion(21L),
 				"Không thể xoá câu hỏi đã có câu trả lời.");
 		verify(questionRepository, never()).deleteById(21L);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentCanReadVisibleQuestionDetailWithoutCorrectAnswer(AssignmentStatus status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		Question question = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		when(questionRepository.findById(21L)).thenReturn(Optional.of(question));
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		QuestionService.QuestionResult result = questionService.getQuestion(21L);
+
+		assertThat(result.question()).isEqualTo(question);
+		assertThat(result.includeCorrectAnswer()).isFalse();
+		verify(moduleRepository).findById(9L);
+		verify(assignmentRepository).findById(5L);
+		verifyNoMoreInteractions(moduleRepository, assignmentRepository);
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentVisibleQuestionListUsesSingleParentLookup(AssignmentStatus status) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		Question first = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		Question second = question(22L, 9L, QuestionType.SHORT_ANSWER, 2);
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(9L)).thenReturn(List.of(first, second));
+
+		QuestionService.QuestionListResult result = questionService.listQuestions(9L);
+
+		assertThat(result.questions()).containsExactly(first, second);
+		assertThat(result.includeCorrectAnswer()).isFalse();
+		verify(moduleRepository).findById(9L);
+		verify(assignmentRepository).findById(5L);
+		verifyNoMoreInteractions(moduleRepository, assignmentRepository);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"LIST", "DETAIL"})
+	void studentCannotReadDraftQuestions(String resource) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		if ("DETAIL".equals(resource)) {
+			when(questionRepository.findById(21L)).thenReturn(Optional.of(question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1)));
+		}
+		givenModuleAndOwner(9L, 5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+
+		assertThatThrownBy(() -> readQuestionResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verify(questionRepository, never()).findByModuleIdOrderByOrderIndexAsc(9L);
+	}
+
+	@Test
+	void emptyDraftQuestionListIsStillForbidden() {
+		givenCaller(user(41L, UserRole.STUDENT));
+		givenModuleAndOwner(9L, 5L, 3L, 10L);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 41L)).thenReturn(true);
+		lenient().when(questionRepository.findByModuleIdOrderByOrderIndexAsc(9L)).thenReturn(List.of());
+
+		assertThatThrownBy(() -> questionService.listQuestions(9L))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verifyNoInteractions(questionRepository);
+	}
+
+	@ParameterizedTest
+	@MethodSource("questionReadLookupCases")
+	void questionReadLookupErrorsArePreserved(String resource, String scenario) {
+		givenCaller(user(41L, UserRole.STUDENT));
+		boolean missingQuestion = scenario.startsWith("QUESTION_");
+		boolean missingModule = scenario.startsWith("MODULE_");
+		if ("DETAIL".equals(resource)) {
+			Optional<Question> question = missingQuestion
+					? Optional.empty()
+					: Optional.of(question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1));
+			when(questionRepository.findById(21L)).thenReturn(question);
+		}
+		if (!missingQuestion) {
+			Optional<Module> module = missingModule ? Optional.empty() : Optional.of(module(9L, 5L));
+			when(moduleRepository.findById(9L)).thenReturn(module);
+		}
+		if (!missingQuestion && !missingModule) {
+			// The assignment port returns empty for missing and soft-deleted rows.
+			when(assignmentRepository.findById(5L)).thenReturn(Optional.empty());
+		}
+		String message;
+		if (missingQuestion) {
+			message = "Không tìm thấy câu hỏi.";
+		} else if (missingModule) {
+			message = "Không tìm thấy module.";
+		} else {
+			message = "Không tìm thấy bài tập.";
+		}
+
+		assertThatThrownBy(() -> readQuestionResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(exception).hasMessage(message);
+				});
+
+		verifyNoInteractions(classRepository, classMemberRepository);
+		verify(questionRepository, never()).findByModuleIdOrderByOrderIndexAsc(9L);
+		if (missingQuestion) {
+			verifyNoInteractions(moduleRepository, assignmentRepository);
+		} else if (missingModule) {
+			verifyNoInteractions(assignmentRepository);
+		}
+	}
+
+	@ParameterizedTest
+	@MethodSource("questionResourceStatusCases")
+	void studentOutsideClassCannotReadQuestions(String resource, AssignmentStatus status) {
+		givenCaller(user(42L, UserRole.STUDENT));
+		if ("DETAIL".equals(resource)) {
+			when(questionRepository.findById(21L)).thenReturn(Optional.of(question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1)));
+		}
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+		when(classMemberRepository.existsByClassIdAndStudentId(3L, 42L)).thenReturn(false);
+
+		assertThatThrownBy(() -> readQuestionResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verify(classMemberRepository).existsByClassIdAndStudentId(3L, 42L);
+		verify(questionRepository, never()).findByModuleIdOrderByOrderIndexAsc(9L);
+	}
+
+	@ParameterizedTest
+	@EnumSource(AssignmentStatus.class)
+	void teacherOwnerCanReadDraftQuestionDetail(AssignmentStatus status) {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Question question = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		when(questionRepository.findById(21L)).thenReturn(Optional.of(question));
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+
+		QuestionService.QuestionResult result = questionService.getQuestion(21L);
+
+		assertThat(result.question()).isEqualTo(question);
+		assertThat(result.includeCorrectAnswer()).isTrue();
+		verifyNoInteractions(classMemberRepository);
+	}
+
+	@ParameterizedTest
+	@EnumSource(AssignmentStatus.class)
+	void teacherOwnerCanListQuestionsWithAllStatuses(AssignmentStatus status) {
+		givenCaller(user(10L, UserRole.TEACHER));
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+		Question question = question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1);
+		when(questionRepository.findByModuleIdOrderByOrderIndexAsc(9L)).thenReturn(List.of(question));
+
+		QuestionService.QuestionListResult result = questionService.listQuestions(9L);
+
+		assertThat(result.questions()).containsExactly(question);
+		assertThat(result.includeCorrectAnswer()).isTrue();
+		verifyNoInteractions(classMemberRepository);
+	}
+
+	@ParameterizedTest
+	@MethodSource("blockedQuestionReadCases")
+	void adminAndOtherTeacherRemainForbidden(String resource, AssignmentStatus status, UserRole role) {
+		givenCaller(user(11L, role));
+		if ("DETAIL".equals(resource)) {
+			when(questionRepository.findById(21L)).thenReturn(Optional.of(question(21L, 9L, QuestionType.MULTIPLE_CHOICE, 1)));
+		}
+		givenModuleAndOwner(9L, 5L, 3L, 10L, status);
+
+		assertThatThrownBy(() -> readQuestionResource(resource))
+				.isInstanceOfSatisfying(ApiException.class, exception -> {
+					assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+					assertThat(exception).hasMessage("Bạn không có quyền thực hiện thao tác này.");
+				});
+
+		verify(classRepository).findById(3L);
+		verifyNoInteractions(classMemberRepository);
+		verify(questionRepository, never()).findByModuleIdOrderByOrderIndexAsc(9L);
+	}
+
+	private static Stream<Arguments> questionReadLookupCases() {
+		return Stream.of(
+				Arguments.of("LIST", "MODULE_MISSING"),
+				Arguments.of("LIST", "MODULE_DELETED"),
+				Arguments.of("LIST", "ASSIGNMENT_MISSING"),
+				Arguments.of("LIST", "ASSIGNMENT_DELETED"),
+				Arguments.of("DETAIL", "QUESTION_MISSING"),
+				Arguments.of("DETAIL", "QUESTION_DELETED"),
+				Arguments.of("DETAIL", "MODULE_MISSING"),
+				Arguments.of("DETAIL", "MODULE_DELETED"),
+				Arguments.of("DETAIL", "ASSIGNMENT_MISSING"),
+				Arguments.of("DETAIL", "ASSIGNMENT_DELETED"));
+	}
+
+	private static Stream<Arguments> questionResourceStatusCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status));
+			}
+		}
+		return cases.build();
+	}
+
+	private static Stream<Arguments> blockedQuestionReadCases() {
+		Stream.Builder<Arguments> cases = Stream.builder();
+		for (String resource : List.of("LIST", "DETAIL")) {
+			for (AssignmentStatus status : AssignmentStatus.values()) {
+				cases.add(Arguments.of(resource, status, UserRole.ADMIN));
+				cases.add(Arguments.of(resource, status, UserRole.TEACHER));
+			}
+		}
+		return cases.build();
+	}
+
+	private void readQuestionResource(String resource) {
+		if ("LIST".equals(resource)) {
+			questionService.listQuestions(9L);
+		} else {
+			questionService.getQuestion(21L);
+		}
+	}
+
+	private void givenModuleAndOwner(Long moduleId, Long assignmentId, Long classId, Long teacherId, AssignmentStatus status) {
+		Assignment assignment = assignment(assignmentId, classId);
+		if (status != AssignmentStatus.DRAFT) {
+			assignment.changeStatus(AssignmentStatus.PUBLISHED);
+		}
+		if (status == AssignmentStatus.CLOSED) {
+			assignment.changeStatus(AssignmentStatus.CLOSED);
+		}
+		when(moduleRepository.findById(moduleId)).thenReturn(Optional.of(module(moduleId, assignmentId)));
+		when(assignmentRepository.findById(assignmentId)).thenReturn(Optional.of(assignment));
+		when(classRepository.findById(classId)).thenReturn(Optional.of(englishClass(classId, teacherId)));
 	}
 
 	private void givenModuleAndOwner(Long moduleId, Long assignmentId, Long classId, Long teacherId) {

@@ -31,8 +31,14 @@ import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -135,7 +141,8 @@ class AssignmentApiIntegrationTest {
 		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data", hasSize(1)));
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
 
 		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
 					.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
@@ -314,7 +321,8 @@ class AssignmentApiIntegrationTest {
 				.andExpect(jsonPath("$.modules").isArray());
 		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
-				.andExpect(status().isOk());
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
 		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
 					.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
 				.andExpect(status().isForbidden());
@@ -446,6 +454,205 @@ class AssignmentApiIntegrationTest {
 		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void studentListFiltersDraftBeforePaginationAndCount() throws Exception {
+		Assignment firstPublished = saveAssignmentFromFixture(classId, AssignmentStatus.PUBLISHED, false);
+		saveAssignmentFromFixture(classId, AssignmentStatus.PUBLISHED, true);
+		Assignment closed = saveAssignmentFromFixture(classId, AssignmentStatus.CLOSED, false);
+		saveAssignmentFromFixture(classId, AssignmentStatus.DRAFT, false);
+		Assignment lastPublished = saveAssignmentFromFixture(classId, AssignmentStatus.PUBLISHED, false);
+		Long otherClassId = createStudentClass();
+		saveAssignmentFromFixture(otherClassId, AssignmentStatus.PUBLISHED, false);
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT))
+					.param("page", "1").param("limit", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(2)))
+				.andExpect(jsonPath("$.data[0].id").value(lastPublished.getId()))
+				.andExpect(jsonPath("$.data[0].status").value("PUBLISHED"))
+				.andExpect(jsonPath("$.data[1].id").value(closed.getId()))
+				.andExpect(jsonPath("$.data[1].status").value("CLOSED"))
+				.andExpect(jsonPath("$.pagination.page").value(1))
+				.andExpect(jsonPath("$.pagination.limit").value(2))
+				.andExpect(jsonPath("$.pagination.total").value(3));
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT))
+					.param("page", "2").param("limit", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].id").value(firstPublished.getId()))
+				.andExpect(jsonPath("$.data[0].status").value("PUBLISHED"))
+				.andExpect(jsonPath("$.pagination.page").value(2))
+				.andExpect(jsonPath("$.pagination.limit").value(2))
+				.andExpect(jsonPath("$.pagination.total").value(3));
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentCanFilterVisibleAssignmentStatuses(AssignmentStatus assignmentStatus) throws Exception {
+		Assignment visible = saveAssignmentFromFixture(classId, assignmentStatus, false);
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT))
+					.param("status", assignmentStatus.name()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].id").value(visible.getId()))
+				.andExpect(jsonPath("$.data[0].status").value(assignmentStatus.name()))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"DRAFT", "draft", " Draft "})
+	void studentDraftFiltersReturnForbidden(String statusValue) throws Exception {
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT))
+					.param("status", statusValue))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void studentVisibleAssignmentDetailRemainsReadable(AssignmentStatus assignmentStatus) throws Exception {
+		Assignment visible = saveAssignmentFromFixture(classId, assignmentStatus, false);
+
+		mockMvc.perform(get("/api/v1/assignments/{id}", visible.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(visible.getId()))
+				.andExpect(jsonPath("$.status").value(assignmentStatus.name()))
+				.andExpect(jsonPath("$.modules").isArray());
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {true, false})
+	void studentEmptyAndDraftOnlyClassesReturnEmptyPage(boolean draftOnly) throws Exception {
+		Long targetClassId = draftOnly ? classId : createStudentClass();
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", targetClassId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+	}
+
+	@ParameterizedTest
+	@MethodSource("assignmentListValidationCases")
+	void assignmentListValidationPrecedenceIsPreserved(
+			String statusValue, String page, String limit, String scope, int expectedStatus, String message)
+			throws Exception {
+		Long targetClassId = "MISSING_CLASS".equals(scope) ? 999_999_999L : classId;
+		Long callerId = "OUTSIDE_CLASS".equals(scope) ? otherStudentId : studentId;
+		var request = get("/api/v1/classes/{id}/assignments", targetClassId)
+				.header("Authorization", bearer(callerId, UserRole.STUDENT))
+				.param("page", page).param("limit", limit);
+		if (statusValue != null) {
+			request.param("status", statusValue);
+		}
+
+		mockMvc.perform(request)
+				.andExpect(status().is(expectedStatus))
+				.andExpect(jsonPath("$.error").value(message));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"LIST", "DETAIL"})
+	void assignmentReadRoutesRequireAuthentication(String route) throws Exception {
+		String path = "LIST".equals(route) ? "/api/v1/classes/{id}/assignments" : "/api/v1/assignments/{id}";
+		Long id = "LIST".equals(route) ? classId : assignmentId;
+
+		mockMvc.perform(get(path, id))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error").value("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
+	}
+
+	@Test
+	void deletedAssignmentDetailRemainsNotFound() throws Exception {
+		Assignment deleted = saveAssignmentFromFixture(classId, AssignmentStatus.DRAFT, true);
+		entityManager.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/assignments/{id}", deleted.getId())
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Không tìm thấy bài tập."));
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = UserRole.class, names = {"ADMIN", "TEACHER"})
+	void adminAndOwnerCanStillFilterDraftAssignments(UserRole role) throws Exception {
+		Long callerId = role == UserRole.ADMIN ? adminId : teacherId;
+
+		mockMvc.perform(get("/api/v1/classes/{id}/assignments", classId)
+					.header("Authorization", bearer(callerId, role))
+					.param("status", "DRAFT"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(1)))
+				.andExpect(jsonPath("$.data[0].id").value(assignmentId))
+				.andExpect(jsonPath("$.data[0].status").value("DRAFT"))
+				.andExpect(jsonPath("$.pagination.total").value(1));
+	}
+
+	private static Stream<Arguments> assignmentListValidationCases() {
+		String invalidData = "Dữ liệu không hợp lệ.";
+		String invalidStatus = "status không hợp lệ.";
+		return Stream.of(
+				Arguments.of("DRAFT", "0", "20", "MEMBER", 400, invalidData),
+				Arguments.of("DRAFT", "1", "0", "MEMBER", 400, invalidData),
+				Arguments.of("DRAFT", "1", "101", "MEMBER", 400, invalidData),
+				Arguments.of("OPEN", "0", "20", "MEMBER", 400, invalidStatus),
+				Arguments.of("OPEN", "1", "0", "MEMBER", 400, invalidStatus),
+				Arguments.of("OPEN", "1", "101", "MEMBER", 400, invalidStatus),
+				Arguments.of("OPEN", "0", "0", "MEMBER", 400, invalidStatus),
+				Arguments.of(null, "0", "20", "MEMBER", 400, invalidData),
+				Arguments.of(null, "1", "0", "MEMBER", 400, invalidData),
+				Arguments.of(null, "1", "101", "MEMBER", 400, invalidData),
+				Arguments.of("", "0", "20", "MEMBER", 400, invalidData),
+				Arguments.of("", "1", "0", "MEMBER", 400, invalidData),
+				Arguments.of("", "1", "101", "MEMBER", 400, invalidData),
+				Arguments.of("   ", "0", "20", "MEMBER", 400, invalidData),
+				Arguments.of("   ", "1", "0", "MEMBER", 400, invalidData),
+				Arguments.of("   ", "1", "101", "MEMBER", 400, invalidData),
+				Arguments.of("DRAFT", "0", "0", "OUTSIDE_CLASS", 403, "Bạn không có quyền thực hiện thao tác này."),
+				Arguments.of("OPEN", "0", "0", "OUTSIDE_CLASS", 403, "Bạn không có quyền thực hiện thao tác này."),
+				Arguments.of("DRAFT", "0", "0", "MISSING_CLASS", 404, "Không tìm thấy lớp học."),
+				Arguments.of("OPEN", "0", "0", "MISSING_CLASS", 404, "Không tìm thấy lớp học."),
+				Arguments.of("DRAFT", "abc", "20", "MEMBER", 400, invalidData),
+				Arguments.of("DRAFT", "1", "abc", "MEMBER", 400, invalidData));
+	}
+
+	private Assignment saveAssignmentFromFixture(Long targetClassId, AssignmentStatus assignmentStatus, boolean deleted) {
+		Assignment fixture = assignmentRepository.findById(assignmentId).orElseThrow();
+		return assignmentRepository.save(new Assignment(
+				targetClassId,
+				fixture.getTitle(),
+				fixture.getDescription(),
+				fixture.getOpenAt(),
+				fixture.getCloseAt(),
+				fixture.getMaxSubmissions(),
+				deleted,
+				assignmentStatus));
+	}
+
+	private Long createStudentClass() {
+		ClassEntity fixture = classRepository.findById(classId).orElseThrow();
+		ClassEntity emptyClass = classRepository.save(new ClassEntity(
+				fixture.getName() + " " + uniqueSuffix(),
+				fixture.getLevel(),
+				fixture.getDescription(),
+				fixture.getStartDate(),
+				fixture.getEndDate(),
+				fixture.getStatus(),
+				fixture.getTeacherId()));
+		classMemberRepository.save(new ClassMemberEntity(emptyClass.getId(), studentId));
+		return emptyClass.getId();
 	}
 
 	private Long createUser(UserRole role, String name) {

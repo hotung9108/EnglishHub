@@ -51,9 +51,13 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -217,13 +221,16 @@ class QuestionApiIntegrationTest {
 		questionId = question.getId();
 	}
 
-	@Test
-	void ownerGetsCamelCaseAnswerAndStudentDoesNotGetAnswer() throws Exception {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void ownerGetsCamelCaseAnswerAndStudentDoesNotGetAnswer(AssignmentStatus studentStatus) throws Exception {
 		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data", hasSize(1)))
 				.andExpect(jsonPath("$.data[0].correctAnswer.options[0].isCorrect").value(true));
+
+		updateAssignmentFixture(studentStatus, false);
 
 		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
 					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
@@ -669,10 +676,14 @@ class QuestionApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không thể xoá câu hỏi đã có câu trả lời."));
 	}
 
-	@Test
-	void publicOptionsAreAvailableToBothRolesWithoutChangingStoredAnswer() throws Exception {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void publicOptionsAreAvailableToBothRolesWithoutChangingStoredAnswer(AssignmentStatus studentStatus) throws Exception {
 		String storedAnswer = questionRepository.findById(questionId).orElseThrow().getCorrectAnswer();
 		for (UserRole role : List.of(UserRole.TEACHER, UserRole.STUDENT)) {
+			if (role == UserRole.STUDENT) {
+				updateAssignmentFixture(studentStatus, false);
+			}
 			Long userId = role == UserRole.TEACHER ? teacherId : studentId;
 			var listResult = mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
 					.header("Authorization", bearer(userId, role)))
@@ -696,8 +707,9 @@ class QuestionApiIntegrationTest {
 		assertThat(storedAnswer).contains("is_correct").doesNotContain("isCorrect");
 	}
 
-	@Test
-	void shortAnswerOptionsAreOmittedInJsonForBothRoles() throws Exception {
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"PUBLISHED", "CLOSED"})
+	void shortAnswerOptionsAreOmittedInJsonForBothRoles(AssignmentStatus studentStatus) throws Exception {
 		Question shortAnswer = questionRepository.save(new Question(
 				moduleId,
 				"What should you show at an airport before an international flight?",
@@ -706,16 +718,23 @@ class QuestionApiIntegrationTest {
 				BigDecimal.ONE,
 				2));
 		for (UserRole role : List.of(UserRole.TEACHER, UserRole.STUDENT)) {
+			if (role == UserRole.STUDENT) {
+				updateAssignmentFixture(studentStatus, false);
+			}
 			Long userId = role == UserRole.TEACHER ? teacherId : studentId;
-			mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+			var listResult = mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
 					.header("Authorization", bearer(userId, role)))
 					.andExpect(status().isOk())
 					.andExpect(jsonPath("$.data", hasSize(2)))
 					.andExpect(jsonPath("$.data[1].options").doesNotExist());
-			mockMvc.perform(get("/api/v1/questions/{id}", shortAnswer.getId())
+			var detailResult = mockMvc.perform(get("/api/v1/questions/{id}", shortAnswer.getId())
 					.header("Authorization", bearer(userId, role)))
 					.andExpect(status().isOk())
 					.andExpect(jsonPath("$.options").doesNotExist());
+			if (role == UserRole.STUDENT) {
+				listResult.andExpect(jsonPath("$.data[1].correctAnswer").doesNotExist());
+				detailResult.andExpect(jsonPath("$.correctAnswer").doesNotExist());
+			}
 		}
 	}
 
@@ -727,6 +746,111 @@ class QuestionApiIntegrationTest {
 		mockMvc.perform(get("/api/v1/questions/{id}", questionId)
 				.header("Authorization", bearer(otherStudentId, UserRole.STUDENT)))
 				.andExpect(status().isForbidden());
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"LIST", "DETAIL"})
+	void studentCannotReadEitherDraftQuestionEndpoint(String resource) throws Exception {
+		Long id = "LIST".equals(resource) ? moduleId : questionId;
+
+		mockMvc.perform(get(questionReadPath(resource), id)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	@Test
+	void draftModuleWithoutQuestionsIsStillForbidden() throws Exception {
+		questionRepository.deleteById(questionId);
+		questionRepository.flush();
+		entityManager.clear();
+
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"LIST", "DETAIL"})
+	void questionReadRoutesRequireAuthentication(String resource) throws Exception {
+		Long id = "LIST".equals(resource) ? moduleId : questionId;
+
+		mockMvc.perform(get(questionReadPath(resource), id))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error").value("Chưa đăng nhập hoặc phiên đăng nhập đã hết hạn."));
+	}
+
+	@ParameterizedTest
+	@MethodSource("questionReadNotFoundCases")
+	void questionReadRoutesPreserveNotFound(String resource, String scenario, String message) throws Exception {
+		Long id = "LIST".equals(resource) ? moduleId : questionId;
+		if ("ASSIGNMENT_DELETED".equals(scenario)) {
+			updateAssignmentFixture(AssignmentStatus.DRAFT, true);
+		} else if ("MODULE_DELETED".equals(scenario)) {
+			moduleRepository.deleteById(moduleId);
+			moduleRepository.flush();
+			entityManager.clear();
+			assertThat(moduleRepository.findById(moduleId)).isEmpty();
+		} else if ("QUESTION_DELETED".equals(scenario)) {
+			questionRepository.deleteById(questionId);
+			questionRepository.flush();
+			entityManager.clear();
+			assertThat(questionRepository.findById(questionId)).isEmpty();
+		} else {
+			id = 999_999_999L;
+		}
+
+		mockMvc.perform(get(questionReadPath(resource), id)
+					.header("Authorization", bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value(message));
+	}
+
+	@ParameterizedTest
+	@EnumSource(AssignmentStatus.class)
+	void adminRemainsForbiddenOnQuestionReadRoutes(AssignmentStatus assignmentStatus) throws Exception {
+		Long adminId = createUser(UserRole.ADMIN, "Question admin");
+		updateAssignmentFixture(assignmentStatus, false);
+
+		mockMvc.perform(get("/api/v1/modules/{id}/questions", moduleId)
+					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+		mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value("Bạn không có quyền thực hiện thao tác này."));
+	}
+
+	private static Stream<Arguments> questionReadNotFoundCases() {
+		return Stream.of(
+				Arguments.of("LIST", "MODULE_MISSING", "Không tìm thấy module."),
+				Arguments.of("LIST", "MODULE_DELETED", "Không tìm thấy module."),
+				Arguments.of("LIST", "ASSIGNMENT_DELETED", "Không tìm thấy bài tập."),
+				Arguments.of("DETAIL", "QUESTION_MISSING", "Không tìm thấy câu hỏi."),
+				Arguments.of("DETAIL", "QUESTION_DELETED", "Không tìm thấy câu hỏi."),
+				Arguments.of("DETAIL", "MODULE_DELETED", "Không tìm thấy câu hỏi."),
+				Arguments.of("DETAIL", "ASSIGNMENT_DELETED", "Không tìm thấy bài tập."));
+	}
+
+	private String questionReadPath(String resource) {
+		return "LIST".equals(resource) ? "/api/v1/modules/{id}/questions" : "/api/v1/questions/{id}";
+	}
+
+	private void updateAssignmentFixture(AssignmentStatus assignmentStatus, boolean deleted) {
+		Assignment assignment = assignmentRepository.findById(assignmentId).orElseThrow();
+		assignment.updateFrom(
+				assignment.getClassId(), assignment.getTitle(), assignment.getDescription(),
+				assignment.getOpenAt(), assignment.getCloseAt(), assignment.getMaxSubmissions(),
+				deleted, assignmentStatus);
+		assignmentRepository.flush();
+		entityManager.clear();
 	}
 
 	private MultipleChoiceCorrectAnswer correctAnswerWithNullOption(int nullIndex) {

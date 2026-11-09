@@ -65,7 +65,15 @@ public class AssignmentService {
 		if (!pageRequest.isValid()) {
 			throw ApiException.badRequest(INVALID_DATA_MESSAGE);
 		}
-		AssignmentPage assignmentPage = assignmentRepository.findPage(classId, status, pageRequest);
+		if (caller.role() == UserRole.STUDENT && status == AssignmentStatus.DRAFT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
+		AssignmentPage assignmentPage;
+		if (caller.role() == UserRole.STUDENT && status == null) {
+			assignmentPage = assignmentRepository.findPageExcludingDraft(classId, pageRequest);
+		} else {
+			assignmentPage = assignmentRepository.findPage(classId, status, pageRequest);
+		}
 		if (assignmentPage.assignments().isEmpty()) {
 			return new AssignmentListResult(assignmentPage, Map.of());
 		}
@@ -102,6 +110,9 @@ public class AssignmentService {
 		User caller = currentUserProvider.requireActiveUser();
 		Assignment assignment = findAssignmentOrThrow(assignmentId);
 		requireClassAccess(assignment.classId(), caller);
+		if (caller.role() == UserRole.STUDENT && assignment.status() == AssignmentStatus.DRAFT) {
+			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+		}
 		return new AssignmentDetailResult(
 				assignment,
 				assignmentRepository.findModuleSummaries(assignment.id()));
