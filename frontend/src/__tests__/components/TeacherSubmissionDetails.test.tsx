@@ -1647,6 +1647,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 101,
       orderIndex: 1,
+      score: 1,
       content: 'What is the main idea?',
       questionType: 'MULTIPLE_CHOICE',
       correctAnswer: { options: ['Cats', 'Dogs', 'Birds'], correctOptionIndex: 0, correctOptionContent: 'Cats' },
@@ -1654,6 +1655,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 102,
       orderIndex: 2,
+      score: 1,
       content: 'Where did they go?',
       questionType: 'MULTIPLE_CHOICE',
       correctAnswer: { options: ['Park', 'Zoo'], correctOptionIndex: 1, correctOptionContent: 'Zoo' },
@@ -1661,6 +1663,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 103,
       orderIndex: 3,
+      score: 1,
       content: 'Fill in the blank',
       questionType: 'SHORT_ANSWER',
       correctAnswer: { text: 'Happiness' },
@@ -1668,6 +1671,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 104,
       orderIndex: 4,
+      score: 1,
       content: 'Question 4',
       questionType: 'MULTIPLE_CHOICE',
       correctAnswer: { options: ['Apple', 'Banana'], correctOptionIndex: 1, correctOptionContent: 'Banana' },
@@ -1675,6 +1679,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 105,
       orderIndex: 5,
+      score: 1,
       content: 'Question 5',
       questionType: 'MULTIPLE_CHOICE',
       correctAnswer: { options: ['Red', 'Blue'], correctOptionIndex: 0, correctOptionContent: 'Red' },
@@ -1682,6 +1687,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 106,
       orderIndex: 6,
+      score: 1,
       content: 'Question 6',
       questionType: 'SHORT_ANSWER',
       correctAnswer: { text: 'Correct' },
@@ -1689,6 +1695,7 @@ it('renders READING quiz module with questions, options, student answers, and fi
     {
       id: 107,
       orderIndex: 7,
+      score: 1,
       content: 'Question 7',
       questionType: 'SHORT_ANSWER',
       correctAnswer: null,
@@ -1715,6 +1722,10 @@ it('renders READING quiz module with questions, options, student answers, and fi
   });
   vi.mocked(moduleService.getModule).mockResolvedValue({
     id: 30,
+    skill: 'READING',
+    taskType: 'QUIZ',
+    orderIndex: 1,
+    maxScore: 10,
     instructions: '<!-- minWords: 120 -->\n![Diagram](https://example.com/chart.png)\nPassage Title\n\nThis is the reading body text.',
   });
 
@@ -1758,6 +1769,10 @@ it('renders LISTENING quiz module with audio track and empty questions state', a
   });
   vi.mocked(moduleService.getModule).mockResolvedValue({
     id: 30,
+    skill: 'LISTENING',
+    taskType: 'QUIZ',
+    orderIndex: 1,
+    maxScore: 10,
     instructions: 'Listen to the audio track',
     sourceAudioDownloadUrl: 'https://example.com/audio.mp3',
   });
