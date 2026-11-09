@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Download, X } from 'lucide-react';
+import { Download, Loader2, X } from 'lucide-react';
 
 interface FileItemProps {
   name: string;
@@ -10,6 +10,7 @@ interface FileItemProps {
   onRemove?: () => void;
   onView?: () => void;
   primaryAction?: ReactNode;
+  isDownloading?: boolean;
 }
 
 export const FileItem = ({
@@ -20,7 +21,8 @@ export const FileItem = ({
   onDownload,
   onRemove,
   onView,
-  primaryAction
+  primaryAction,
+  isDownloading
 }: FileItemProps) => {
   const isPdf = extension.toLowerCase() === 'pdf';
   const isDocx = extension.toLowerCase() === 'docx';
@@ -55,8 +57,25 @@ export const FileItem = ({
         )}
         
         {onDownload && (
-          <button onClick={onDownload} style={{ padding: '6px 10px', fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)', backgroundColor: 'var(--surface)', border: '1px solid var(--outline-variant)', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Download size={14} /> Tải xuống
+          <button
+            onClick={onDownload}
+            disabled={isDownloading}
+            style={{
+              padding: '6px 10px',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: 'var(--on-surface-variant)',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--outline-variant)',
+              borderRadius: '6px',
+              cursor: isDownloading ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: isDownloading ? 0.7 : 1,
+            }}
+          >
+            {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {isDownloading ? 'Đang tải...' : 'Tải xuống'}
           </button>
         )}
         

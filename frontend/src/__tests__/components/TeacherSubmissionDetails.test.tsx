@@ -25,7 +25,7 @@ vi.mock('../../components/common/Button', async original => {
 });
 
 vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { getAssignment: vi.fn(), listAssignments: vi.fn() } }));
-vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn() } }));
+vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getDocumentDownloadUrl: vi.fn(), getAudioDownloadUrl: vi.fn() } }));
 vi.mock('../../api/services/grading.service', () => ({ gradingService: { getBySubmissionModuleId: vi.fn(), getAiSuggestion: vi.fn(), submitGrade: vi.fn(), requestAiAnalysis: vi.fn(), getById: vi.fn() } }));
 vi.mock('../../api/services/class.service', () => ({ classService: { list: vi.fn(), listMembers: vi.fn() } }));
 vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn().mockResolvedValue({ id: 30, instructions: 'Sample module instructions' }) } }));
@@ -58,6 +58,22 @@ beforeEach(() => {
   vi.mocked(gradingService.submitGrade).mockResolvedValue({ message: 'Saved' });
   vi.mocked(gradingService.requestAiAnalysis).mockResolvedValue({ message: 'Queued' });
   vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({ data: [] });
+  vi.mocked(submissionService.getDocumentDownloadUrl).mockResolvedValue({
+    submissionModuleId: 50,
+    downloadUrl: 'https://s3.example.com/essay.docx',
+    storageKey: 'submissions/50/essay.docx',
+    fileName: 'essay.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    expiresAt: '2026-11-09T10:00:00Z',
+  });
+  vi.mocked(submissionService.getAudioDownloadUrl).mockResolvedValue({
+    submissionModuleId: 50,
+    downloadUrl: 'https://s3.example.com/audio.webm',
+    storageKey: 'submissions/50/audio.webm',
+    fileName: 'audio.webm',
+    mimeType: 'audio/webm',
+    expiresAt: '2026-11-09T10:00:00Z',
+  });
 });
 
 async function setup(studentId = 5) {
@@ -134,8 +150,72 @@ describe('TeacherSubmissionDetails', () => {
     const downloads = screen.getAllByRole('button', { name: 'Tải xuống' });
     await user.click(downloads[0]);
     expect(screen.getByText('Đang tạo liên kết tải tài liệu...')).toBeVisible();
+    expect(submissionService.getDocumentDownloadUrl).toHaveBeenCalledWith(50, 'download');
     await user.click(screen.getByRole('button', { name: 'Quay lại' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/teacher/assignments/12');
+  });
+
+  it('calls getDocumentDownloadUrl and shows error toast when document download fails', async () => {
+    vi.mocked(submissionService.getDocumentDownloadUrl).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+      ...moduleDetail,
+      answers: [{ id: 60, questionId: 1, content: '', docStorageKey: 'essay.docx', docMimeType: null }],
+    });
+    const { user } = await setup();
+    const downloads = screen.getAllByRole('button', { name: 'Tải xuống' });
+    await user.click(downloads[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Không thể tải tệp bài làm. Vui lòng thử lại sau.')).toBeVisible();
+    });
+  });
+
+  it('calls getAudioDownloadUrl with download mode when teacher clicks download audio button', async () => {
+    vi.mocked(submissionService.getSubmission).mockResolvedValue({
+      ...submission,
+      modules: [{ ...submission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' }],
+    });
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+      ...moduleDetail,
+      skill: 'SPEAKING',
+      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm' }],
+    });
+    renderPage(
+      <TeacherSubmissionDetails />,
+      '/teacher/assignments/:id/submissions/:studentId',
+      '/teacher/assignments/12/submissions/5'
+    );
+    await screen.findByRole('spinbutton');
+    const user = userEvent.setup();
+    const downloadAudioBtn = screen.getByRole('button', { name: 'Tải bản ghi âm' });
+    expect(downloadAudioBtn).toBeVisible();
+    await user.click(downloadAudioBtn);
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50, 'download');
+    expect(screen.getByText('Đang tạo liên kết tải bản ghi âm...')).toBeVisible();
+  });
+
+  it('shows error toast when audio download URL fails', async () => {
+    vi.mocked(submissionService.getAudioDownloadUrl).mockRejectedValueOnce(new Error('Audio URL failed'));
+    vi.mocked(submissionService.getSubmission).mockResolvedValue({
+      ...submission,
+      modules: [{ ...submission.modules[0], skill: 'SPEAKING', taskType: 'RECORDING' }],
+    });
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+      ...moduleDetail,
+      skill: 'SPEAKING',
+      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm' }],
+    });
+    renderPage(
+      <TeacherSubmissionDetails />,
+      '/teacher/assignments/:id/submissions/:studentId',
+      '/teacher/assignments/12/submissions/5'
+    );
+    await screen.findByRole('spinbutton');
+    const user = userEvent.setup();
+    const downloadAudioBtn = screen.getByRole('button', { name: 'Tải bản ghi âm' });
+    await user.click(downloadAudioBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Không thể tải bản ghi âm. Vui lòng thử lại sau.')).toBeVisible();
+    });
   });
   it.each(['0.0', '7.5', '10.0'])('accepts typed score %s and saves the exact feedback payload', async (value) => {
     const { user, score } = await setup();
@@ -1322,6 +1402,7 @@ for (const operation of ['create', 'delete'] as const) {
 
   it(`R3 ${operation} double callback sends one valid request`, async () => {
     await remediationSetup();
+    await act(async () => {});
     const pending = controlledRequest<{ id: number; message: string }>();
     vi.mocked(answerAnnotationService.createAnnotation).mockReturnValue(pending.promise);
     vi.mocked(answerAnnotationService.deleteAnnotation).mockReturnValue(pending.promise);

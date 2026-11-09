@@ -565,6 +565,11 @@ test('SubmissionService - audio and document download URLs', async () => {
   assert.strictEqual(http.calls[0].method, 'GET');
   assert.strictEqual(audioResult.downloadUrl, '/s3-upload/englishhub-dev/submissions/1/audio.webm');
 
+  const audioDownloadModeResult = await new SubmissionService(http).getAudioDownloadUrl(44, 'download');
+  assert.strictEqual(http.calls[1].url, '/submission-modules/44/audio-download-url?mode=download');
+  assert.strictEqual(http.calls[1].method, 'GET');
+  assert.strictEqual(audioDownloadModeResult.downloadUrl, '/s3-upload/englishhub-dev/submissions/1/audio.webm');
+
   const docDownloadRes = {
     submissionModuleId: 44,
     downloadUrl: 'https://s3.example.com/submissions/1/essay.pdf',
@@ -576,9 +581,14 @@ test('SubmissionService - audio and document download URLs', async () => {
   http.mockResponse = docDownloadRes;
 
   const docResult = await new SubmissionService(http).getDocumentDownloadUrl(44, 'preview');
-  assert.strictEqual(http.calls[1].url, '/submission-modules/44/document-download-url?mode=preview');
-  assert.strictEqual(http.calls[1].method, 'GET');
+  assert.strictEqual(http.calls[2].url, '/submission-modules/44/document-download-url?mode=preview');
+  assert.strictEqual(http.calls[2].method, 'GET');
   assert.strictEqual(docResult.downloadUrl, 'https://s3.example.com/submissions/1/essay.pdf');
+
+  const docDownloadModeResult = await new SubmissionService(http).getDocumentDownloadUrl(44, 'download');
+  assert.strictEqual(http.calls[3].url, '/submission-modules/44/document-download-url?mode=download');
+  assert.strictEqual(http.calls[3].method, 'GET');
+  assert.strictEqual(docDownloadModeResult.downloadUrl, 'https://s3.example.com/submissions/1/essay.pdf');
 });
 
 test('SubmissionService - getAudioFileBlob and getDocumentFileBlob (consolidated 2-in-1)', async () => {

@@ -443,11 +443,15 @@ export class SubmissionService {
    */
   async getAudioDownloadUrl(
     submissionModuleId: number,
+    modeOrOptions?: string | ApiRequestOptions,
     options?: ApiRequestOptions
   ): Promise<SubmissionFileDownloadUrlResponse> {
+    const mode = typeof modeOrOptions === 'string' ? modeOrOptions : undefined;
+    const requestOptions = typeof modeOrOptions === 'object' ? modeOrOptions : options;
+    const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
     const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
-      `/submission-modules/${submissionModuleId}/audio-download-url`,
-      options
+      `/submission-modules/${submissionModuleId}/audio-download-url${query}`,
+      requestOptions
     );
     return {
       ...res,
@@ -460,13 +464,15 @@ export class SubmissionService {
    */
   async getDocumentDownloadUrl(
     submissionModuleId: number,
-    mode?: string,
+    modeOrOptions?: string | ApiRequestOptions,
     options?: ApiRequestOptions
   ): Promise<SubmissionFileDownloadUrlResponse> {
+    const mode = typeof modeOrOptions === 'string' ? modeOrOptions : undefined;
+    const requestOptions = typeof modeOrOptions === 'object' ? modeOrOptions : options;
     const query = mode ? `?mode=${encodeURIComponent(mode)}` : '';
     const res = await this.http.get<SubmissionFileDownloadUrlResponse>(
       `/submission-modules/${submissionModuleId}/document-download-url${query}`,
-      options
+      requestOptions
     );
     return {
       ...res,
