@@ -75,14 +75,6 @@ beforeEach(() => {
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     expiresAt: '2026-11-09T10:00:00Z',
   });
-  vi.mocked(submissionService.getAudioDownloadUrl).mockResolvedValue({
-    submissionModuleId: 50,
-    downloadUrl: 'https://s3.example.com/audio.webm',
-    storageKey: 'submissions/50/audio.webm',
-    fileName: 'audio.webm',
-    mimeType: 'audio/webm',
-    expiresAt: '2026-11-09T10:00:00Z',
-  });
   vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
   vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
   vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
@@ -231,7 +223,7 @@ describe('TeacherSubmissionDetails', () => {
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
       ...moduleDetail,
       skill: 'SPEAKING',
-      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm' }],
+      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm', audioDownloadUrl: 'https://storage.example.test/audio.webm' }],
     });
     renderPage(
       <TeacherSubmissionDetails />,
@@ -256,7 +248,7 @@ describe('TeacherSubmissionDetails', () => {
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
       ...moduleDetail,
       skill: 'SPEAKING',
-      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm' }],
+      answers: [{ id: 60, questionId: 1, content: null, audioStorageKey: 'recordings/audio.webm', audioDownloadUrl: 'https://storage.example.test/audio.webm' }],
     });
     renderPage(
       <TeacherSubmissionDetails />,

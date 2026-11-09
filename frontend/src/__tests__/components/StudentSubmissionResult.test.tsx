@@ -251,14 +251,6 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       expiresAt: '2026-11-09T10:00:00Z',
     });
-    vi.mocked(submissionService.getAudioDownloadUrl).mockResolvedValue({
-      submissionModuleId: 50,
-      downloadUrl: 'https://s3.example.com/audio.webm',
-      storageKey: 'submissions/50/audio.webm',
-      fileName: 'audio.webm',
-      mimeType: 'audio/webm',
-      expiresAt: '2026-11-09T10:00:00Z',
-    });
     vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
     vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);

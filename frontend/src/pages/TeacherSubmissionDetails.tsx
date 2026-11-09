@@ -742,6 +742,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const audioAnswer = currentModuleDetail?.answers?.find((answer) =>
     Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
   );
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
   const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
   const currentAudioContext = targetModuleId && audioAnswer
     ? { moduleId: targetModuleId, answerId: audioAnswer.id }

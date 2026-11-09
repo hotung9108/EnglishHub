@@ -128,7 +128,6 @@ export const StudentSubmissionResult: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | StudentAnnotationCategory>('all');
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<number | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
-  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -807,10 +806,12 @@ export const StudentSubmissionResult: React.FC = () => {
     moduleDetail?.answers?.some(a => !!a.docStorageKey)
   );
 
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
+
   const hasAudioToDownload = Boolean(
     audioStorageKey ||
     audioUrl ||
-    moduleDetail?.answers?.some(a => !!a.audioStorageKey)
+    moduleDetail?.answers?.some(a => !!a.audioStorageKey || !!a.audioDownloadUrl)
   );
 
   const handleDownloadDoc = async () => {
