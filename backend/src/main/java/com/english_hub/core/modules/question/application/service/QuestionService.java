@@ -3,6 +3,7 @@ package com.english_hub.core.modules.question.application.service;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.assignment.domain.model.Assignment;
+import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.repository.ClassMemberRepository;
@@ -189,6 +190,9 @@ public class QuestionService {
 		}
 		if (caller.role() == UserRole.STUDENT
 				&& classMemberRepository.existsByClassIdAndStudentId(assignment.classId(), caller.id())) {
+			if (assignment.status() == AssignmentStatus.DRAFT) {
+				throw ApiException.forbidden(FORBIDDEN_MESSAGE);
+			}
 			return false;
 		}
 		throw ApiException.forbidden(FORBIDDEN_MESSAGE);

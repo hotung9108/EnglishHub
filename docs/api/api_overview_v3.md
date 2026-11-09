@@ -102,6 +102,30 @@
 | 35 | PUT /questions/{id} | Sửa câu hỏi — sửa/thêm/xoá option = gửi lại toàn bộ `correctAnswer` |
 | 36 | DELETE /questions/{id} | Xoá câu hỏi |
 
+### Quyền truy cập bài tập nháp (BE-77)
+
+Với học viên (`STUDENT`) thuộc lớp, quyền đọc dữ liệu của bài tập `DRAFT` được áp dụng
+cho 7 endpoint sau (cùng tiền tố `/api/v1`):
+
+| Method + Endpoint | Chính sách với học viên |
+|---|---|
+| GET /classes/{id}/assignments | Không truyền `status` (kể cả chuỗi rỗng hoặc chỉ có khoảng trắng): chỉ trả `PUBLISHED`/`CLOSED`, `pagination.total` không tính `DRAFT`. Lọc `status=DRAFT` (kể cả `draft`, ` Draft `) trả **403**. |
+| GET /assignments/{id} | Trả **403** nếu bài tập là `DRAFT`. |
+| GET /assignments/{id}/modules | Trả **403** nếu bài tập là `DRAFT`, kể cả danh sách module rỗng. |
+| GET /modules/{id} | Trả **403** nếu bài tập cha là `DRAFT`. |
+| GET /modules/{id}/audio-download-url | Trả **403** nếu bài tập cha là `DRAFT`, trước khi kiểm tra audio hoặc tạo URL tải. |
+| GET /modules/{id}/questions | Trả **403** nếu bài tập cha là `DRAFT`, kể cả module không có câu hỏi. |
+| GET /questions/{id} | Trả **403** nếu bài tập cha là `DRAFT`. |
+
+Các phản hồi **403** trên có body:
+
+```json
+{"error":"Bạn không có quyền thực hiện thao tác này."}
+```
+
+Quyền hiện có của giáo viên phụ trách lớp và Admin được giữ nguyên. Học viên vẫn đọc
+được dữ liệu `PUBLISHED`/`CLOSED` theo quyền hiện có; các route câu hỏi vẫn ẩn `correctAnswer`.
+
 ### Hợp đồng response câu hỏi (GET #32, #34 — module question)
 
 GET `/modules/{id}/questions` trả `{ "data": [QuestionResponse, ...] }`; GET

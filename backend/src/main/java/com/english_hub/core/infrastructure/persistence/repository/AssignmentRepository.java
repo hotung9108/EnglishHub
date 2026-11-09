@@ -59,4 +59,17 @@ public interface AssignmentRepository
 			@Param("classId") Long classId,
 			@Param("status") AssignmentStatus status,
 			Pageable pageable);
+
+	@Query("""
+			select assignment, count(*) over ()
+			from Assignment assignment
+			where assignment.classId = :classId
+			  and assignment.deleted = false
+			  and assignment.status <> :excludedStatus
+			order by assignment.id desc
+			""")
+	List<Object[]> findPageExcludingStatusWithTotalElements(
+			@Param("classId") Long classId,
+			@Param("excludedStatus") AssignmentStatus excludedStatus,
+			Pageable pageable);
 }
