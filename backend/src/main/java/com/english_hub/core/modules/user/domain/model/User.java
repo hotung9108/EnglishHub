@@ -130,6 +130,12 @@ public class User extends BaseEntity<Long> {
 		return role == UserRole.ADMIN;
 	}
 
+	public void changeRole(UserRole newRole) {
+		if (newRole != null) {
+			this.role = newRole;
+		}
+	}
+
 	public void updateFullName(String fullName) {
 		this.fullName = fullName;
 	}

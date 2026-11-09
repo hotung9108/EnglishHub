@@ -138,6 +138,18 @@ public class AdminUserService {
 			target.updatePhone(emptyToNull(request.phone()));
 			changed = true;
 		}
+		if (request.role() != null && hasText(request.role())) {
+			UserRole newRole;
+			try {
+				newRole = UserRole.fromApiValue(request.role());
+			} catch (IllegalArgumentException e) {
+				throw ApiException.badRequest("Vai trò không hợp lệ: " + request.role());
+			}
+			if (newRole != target.role()) {
+				target.changeRole(newRole);
+				changed = true;
+			}
+		}
 
 		boolean hasProfileUpdate = target.role() == UserRole.TEACHER
 				? request.specialization() != null

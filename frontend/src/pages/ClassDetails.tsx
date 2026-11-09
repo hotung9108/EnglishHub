@@ -75,11 +75,13 @@ export const ClassDetails: React.FC = () => {
         if (detailRes.status === 'fulfilled') {
           const det = detailRes.value;
           setClassDetail(det);
+          const parsedCapacity = det.description ? det.description.match(/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*(\d+)/i) : null;
+          const dynamicCapacity = parsedCapacity ? parseInt(parsedCapacity[1], 10) : 25;
           setSettingsForm({
             name: det.name || '',
             level: det.level || '',
             description: det.description || '',
-            maxCapacity: 25
+            maxCapacity: dynamicCapacity
           });
         } else {
           setError(isVi ? 'Không thể tải thông tin chi tiết lớp học.' : 'Failed to load class details.');
@@ -136,11 +138,25 @@ export const ClassDetails: React.FC = () => {
     try {
       setSavingSettings(true);
       setSettingsError(null);
+
+      let updatedDesc = settingsForm.description || '';
+      if (/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*\d+/i.test(updatedDesc)) {
+        updatedDesc = updatedDesc.replace(/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*\d+/i, `Sĩ số: ${settingsForm.maxCapacity}`);
+      } else {
+        updatedDesc = `Sĩ số: ${settingsForm.maxCapacity}${updatedDesc ? ` • ${updatedDesc}` : ''}`;
+      }
+
       await classService.update(classNumericId, {
         name: settingsForm.name,
         level: settingsForm.level,
-        description: settingsForm.description
+        description: updatedDesc
       });
+
+      setSettingsForm(prev => ({ ...prev, description: updatedDesc }));
+      if (classDetail) {
+        setClassDetail({ ...classDetail, name: settingsForm.name, level: settingsForm.level, description: updatedDesc });
+      }
+
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err: unknown) {
@@ -600,6 +616,17 @@ export const ClassDetails: React.FC = () => {
                   />
                 </div>
                 <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Sĩ số tối đa (Học viên)' : 'Maximum Capacity (Students)'}</label>
+                  <input 
+                    type="number" 
+                    min={1}
+                    max={150}
+                    className="input" 
+                    value={settingsForm.maxCapacity} 
+                    onChange={(e) => setSettingsForm({ ...settingsForm, maxCapacity: Math.max(1, parseInt(e.target.value) || 25) })}
+                  />
+                </div>
+                <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Mô tả / Lịch học' : 'Description / Schedule'}</label>
                   <input 
                     type="text" 
@@ -629,6 +656,8 @@ export const ClassDetails: React.FC = () => {
           onClose={() => setShowSelectStudentsModal(false)}
           classId={classNumericId}
           classNameTitle={classDetail?.name}
+          maxCapacity={maxCapacity}
+          enrolledCount={enrolledCount}
           enrolledStudentIds={studentsRoster.map(s => s.studentId)}
           onSuccess={async () => {
             if (classNumericId === null) return;
