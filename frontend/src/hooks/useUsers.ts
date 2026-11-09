@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseApiError, type ApiClientError } from '@/api/core/errors';
 import { userService } from '@/api/services/user.service';
@@ -54,6 +55,14 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersResult {
     controller.current?.abort();
   }, []);
   const changeQuery = useCallback((next: UsersQuery) => {
+    if (
+      next.page === query.current.page &&
+      next.limit === query.current.limit &&
+      next.q === query.current.q &&
+      next.role === query.current.role
+    ) {
+      return;
+    }
     invalidate();
     query.current = next;
     setParams(next);
@@ -95,6 +104,9 @@ export function useUsers(options: UseUsersOptions = {}): UseUsersResult {
         }));
         return result;
       } catch (cause) {
+        if (axios.isCancel(cause) || (cause && typeof cause === 'object' && 'name' in cause && (cause as { name?: string }).name === 'CanceledError')) {
+          return null;
+        }
         if (mounted.current && enabledRef.current && id === requestId.current) {
           setList(state => ({ ...state, isLoading: false, isSuccess: false, isError: true, error: parseApiError(cause) }));
         }

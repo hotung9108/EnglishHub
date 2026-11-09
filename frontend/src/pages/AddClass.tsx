@@ -8,6 +8,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
+import { TeacherPicker } from '../components/classes/TeacherPicker';
+import { ScheduleBuilder } from '../components/classes/ScheduleBuilder';
 
 export const AddClass: React.FC = () => {
   const navigate = useNavigate();
@@ -94,10 +96,12 @@ export const AddClass: React.FC = () => {
       setSubmitting(true);
       setSubmitError(null);
 
+      const description = `Sĩ số: ${formData.maxStudents || 25} • ${formData.schedule}${formData.room ? ` • ${formData.room}` : ''}${formData.notes ? ` • ${formData.notes}` : ''}`;
+
       await classService.create({
         name: formData.name.trim(),
         level: formData.level,
-        description: formData.notes ? `${formData.schedule} • ${formData.room} • ${formData.notes}` : `${formData.schedule} • ${formData.room}`,
+        description,
         startDate: formData.startDate,
         endDate: formData.endDate || undefined,
         teacherId: formData.teacherId ? Number(formData.teacherId) : undefined
@@ -296,48 +300,28 @@ export const AddClass: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Giáo viên phụ trách chính' : 'Primary Instructor'}</label>
-                  {loadingTeachers ? (
-                    <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-                      {isVi ? 'Đang tải danh sách giảng viên...' : 'Loading teachers...'}
-                    </div>
-                  ) : teachers.length === 0 ? (
-                    <div style={{ fontSize: '13px', color: 'var(--on-surface-variant)' }}>
-                      {isVi ? 'Chưa có giảng viên nào trong hệ thống.' : 'No teachers registered in system.'}
-                    </div>
-                  ) : (
-                    <select 
-                      className="input"
-                      value={formData.teacherId}
-                      onChange={(e) => {
-                        const tc = teachers.find(t => String(t.id) === e.target.value);
-                        setFormData({
-                          ...formData,
-                          teacherId: e.target.value,
-                          teacherName: tc ? tc.fullName : ''
-                        });
-                      }}
-                    >
-                      <option value="">{isVi ? '-- Chọn giảng viên --' : '-- Select Instructor --'}</option>
-                      {teachers.map(tc => (
-                        <option key={tc.id} value={tc.id}>
-                          {tc.fullName} ({tc.email})
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                  <TeacherPicker
+                    teachers={teachers}
+                    selectedTeacherId={formData.teacherId}
+                    loading={loadingTeachers}
+                    isVi={isVi}
+                    onSelectTeacher={(tc) => {
+                      setFormData({
+                        ...formData,
+                        teacherId: tc ? String(tc.id) : '',
+                        teacherName: tc ? tc.fullName : ''
+                      });
+                    }}
+                  />
                 </div>
 
                 <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Thời khóa biểu' : 'Class Schedule'} *</label>
-                  <select 
-                    className="input"
+                  <ScheduleBuilder
                     value={formData.schedule}
-                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-                  >
-                    <option value="T2 - T4 - T6 (18:00 - 20:00)">Thứ 2 - Thứ 4 - Thứ 6 (18:00 - 20:00)</option>
-                    <option value="T3 - T5 - T7 (19:30 - 21:00)">Thứ 3 - Thứ 5 - Thứ 7 (19:30 - 21:00)</option>
-                    <option value="T7 - CN (09:00 - 11:30)">Thứ 7 - Chủ Nhật (09:00 - 11:30)</option>
-                  </select>
+                    onChange={(newSchedule) => setFormData({ ...formData, schedule: newSchedule })}
+                    isVi={isVi}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '14px' }}>

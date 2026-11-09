@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
-  TrendingDown, User, ChevronDown
+  TrendingDown, User, ChevronDown, Clock
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { reportService } from '../api/services/report.service';
@@ -65,6 +65,54 @@ export const AdminReports: React.FC = () => {
     setClassProgress(null);
     setCurrentPage(1);
   };
+
+  // Quick date presets helper
+  const getPresetDates = (preset: 'today' | '7days' | '30days' | 'thisMonth') => {
+    const today = new Date();
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const toStr = formatDate(today);
+    let fromStr = '';
+
+    if (preset === 'today') {
+      fromStr = toStr;
+    } else if (preset === '7days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      fromStr = formatDate(d);
+    } else if (preset === '30days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      fromStr = formatDate(d);
+    } else if (preset === 'thisMonth') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromStr = formatDate(d);
+    }
+    return { from: fromStr, to: toStr };
+  };
+
+  const handleApplyPreset = (preset: 'today' | '7days' | '30days' | 'thisMonth' | 'all') => {
+    if (preset === 'all') {
+      setFromDate('');
+      setToDate('');
+    } else {
+      const { from, to } = getPresetDates(preset);
+      setFromDate(from);
+      setToDate(to);
+    }
+    setCurrentPage(1);
+  };
+
+  const activeFilterCount = 
+    (fromDate ? 1 : 0) + 
+    (toDate ? 1 : 0) + 
+    (selectedTeacherId !== undefined ? 1 : 0) + 
+    (selectedClassId !== undefined ? 1 : 0);
 
   // Report Data
   const [overview, setOverview] = useState<ReportOverviewResponse | null>(null);
@@ -219,14 +267,28 @@ export const AdminReports: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="eh-card p-4 mb-6">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Filter size={16} className="text-primary" />
-            <span>{isVi ? 'Bộ Lọc Phân Tích & Thời Gian' : 'Analytical Filters & Date Range'}</span>
+      {/* Modern Filter Toolbar */}
+      <div className="eh-card p-5 mb-6 border border-border shadow-sm rounded-xl">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2 pb-3 border-b border-border-light">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Filter size={16} />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <span>{isVi ? 'Bộ Lọc Phân Tích & Thời Gian' : 'Analytical Filters & Date Range'}</span>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/15 text-primary">
+                    {activeFilterCount} {isVi ? 'đang áp dụng' : 'active'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-text-muted">
+                {isVi ? 'Tùy chỉnh khoảng thời gian, giảng viên hoặc lớp học để tổng hợp chỉ số' : 'Filter telemetry metrics by date interval, instructor or class cohort'}
+              </p>
+            </div>
           </div>
-          {(fromDate || toDate || selectedTeacherId !== undefined || selectedClassId !== undefined) && (
+          {activeFilterCount > 0 && (
             <Button
               variant="secondary"
               size="sm"
@@ -238,7 +300,71 @@ export const AdminReports: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Quick Date Presets */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-xs font-medium text-text-muted flex items-center gap-1.5 mr-1">
+            <Clock size={13} className="text-primary" />
+            {isVi ? 'Chọn nhanh:' : 'Quick Presets:'}
+          </span>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              !fromDate && !toDate
+                ? 'bg-primary text-white shadow-xs font-semibold'
+                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
+            }`}
+            onClick={() => handleApplyPreset('all')}
+          >
+            {isVi ? 'Toàn thời gian' : 'All time'}
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              fromDate === getPresetDates('today').from && toDate === getPresetDates('today').to
+                ? 'bg-primary text-white shadow-xs font-semibold'
+                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
+            }`}
+            onClick={() => handleApplyPreset('today')}
+          >
+            {isVi ? 'Hôm nay' : 'Today'}
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              fromDate === getPresetDates('7days').from && toDate === getPresetDates('7days').to
+                ? 'bg-primary text-white shadow-xs font-semibold'
+                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
+            }`}
+            onClick={() => handleApplyPreset('7days')}
+          >
+            {isVi ? '7 ngày qua' : 'Last 7 days'}
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              fromDate === getPresetDates('30days').from && toDate === getPresetDates('30days').to
+                ? 'bg-primary text-white shadow-xs font-semibold'
+                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
+            }`}
+            onClick={() => handleApplyPreset('30days')}
+          >
+            {isVi ? '30 ngày qua' : 'Last 30 days'}
+          </button>
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+              fromDate === getPresetDates('thisMonth').from && toDate === getPresetDates('thisMonth').to
+                ? 'bg-primary text-white shadow-xs font-semibold'
+                : 'bg-surface-variant/40 text-on-surface-variant hover:bg-surface-variant border border-outline-variant/50'
+            }`}
+            onClick={() => handleApplyPreset('thisMonth')}
+          >
+            {isVi ? 'Tháng này' : 'This month'}
+          </button>
+        </div>
+
+        {/* Filter Input Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* From Date */}
           <div className="adm-filter-group">
             <label className="adm-filter-label">
