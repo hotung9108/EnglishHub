@@ -168,10 +168,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
   const [feedbackTab, setFeedbackTab] = useState<'edit' | 'preview'>('edit');
+  const [showFeedbackGuide, setShowFeedbackGuide] = useState<boolean>(false);
   const [listeningAudioUrl, setListeningAudioUrl] = useState<string | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
+  const [moduleMaxScore, setModuleMaxScore] = useState<number | null>(null);
+
+  // In-Memory & LocalStorage Draft State per Module
+  const moduleDraftsRef = useRef<Record<number, { score: string; feedback: string; updatedAt: string }>>({});
+  const [draftModuleIds, setDraftModuleIds] = useState<Record<number, boolean>>({});
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -201,8 +207,21 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
+    const handleBeforeUnload = () => {
+      try {
+        Object.entries(moduleDraftsRef.current).forEach(([modId, draft]) => {
+          if (draft && (draft.score || draft.feedback)) {
+            localStorage.setItem(`eh_draft_grading_${modId}`, JSON.stringify(draft));
+          }
+        });
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       isMountedRef.current = false;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       moduleLoadGenerationRef.current += 1;
       annotationRequestRef.current = {
         generation: moduleLoadGenerationRef.current,
@@ -246,6 +265,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setGradingDetail(null);
     setAiSuggestion(null);
     setModuleInstructions('');
+    setModuleMaxScore(null);
 
     const isCurrentModuleLoad = () =>
       isMountedRef.current &&
@@ -270,8 +290,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
           const qRecord = qRes as unknown as Record<string, unknown>;
           const qList = qRes.questions || (Array.isArray(qRecord.data) ? (qRecord.data as typeof qRes.questions) : []) || [];
           if (qList.length > 0 && isCurrentModuleLoad()) {
-            modDetailRes.questions = qList;
-            setModuleDetail({ ...modDetailRes });
+            setModuleDetail({ ...modDetailRes, questions: qList });
           }
         } catch {
           // ignore
@@ -283,6 +302,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
           if (!isCurrentModuleLoad()) return;
           if (mRes?.instructions) {
             setModuleInstructions(mRes.instructions);
+          }
+          if (mRes?.maxScore != null) {
+            setModuleMaxScore(mRes.maxScore);
           }
           if (modDetailRes.skill === 'LISTENING') {
             const mRecord = mRes as unknown as Record<string, unknown> | null;
@@ -358,27 +380,51 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
 
     if (gradingStatus === 'COMPLETED') {
+      delete moduleDraftsRef.current[targetModuleId];
       try {
         localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
       } catch {
         // ignore
       }
+      setDraftModuleIds((prev) => {
+        if (!prev[targetModuleId]) return prev;
+        const next = { ...prev };
+        delete next[targetModuleId];
+        return next;
+      });
     } else {
-      try {
-        const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
-        if (localDraft) {
-          const parsed = JSON.parse(localDraft);
-          if (parsed && typeof parsed === 'object') {
-            if (parsed.score != null && parsed.score !== '') {
-              setFinalScoreInput(String(parsed.score));
-            }
-            if (parsed.feedback != null && parsed.feedback !== '') {
-              setFeedbackText(String(parsed.feedback));
+      let draftScore: string | null = null;
+      let draftFeedback: string | null = null;
+      const memDraft = moduleDraftsRef.current[targetModuleId];
+      if (memDraft) {
+        draftScore = memDraft.score;
+        draftFeedback = memDraft.feedback;
+      } else {
+        try {
+          const localDraft = localStorage.getItem(`eh_draft_grading_${targetModuleId}`);
+          if (localDraft) {
+            const parsed = JSON.parse(localDraft);
+            if (parsed && typeof parsed === 'object') {
+              draftScore = parsed.score != null ? String(parsed.score) : null;
+              draftFeedback = parsed.feedback != null ? String(parsed.feedback) : null;
+              moduleDraftsRef.current[targetModuleId] = {
+                score: draftScore || '',
+                feedback: draftFeedback || '',
+                updatedAt: parsed.updatedAt || new Date().toISOString(),
+              };
+              setDraftModuleIds((prev) => ({ ...prev, [targetModuleId]: true }));
             }
           }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
+      }
+
+      if (draftScore != null && draftScore !== '') {
+        setFinalScoreInput(draftScore);
+      }
+      if (draftFeedback != null && draftFeedback !== '') {
+        setFeedbackText(draftFeedback);
       }
     }
 
@@ -393,10 +439,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
         setAiSuggestion(aiRes);
         currentAiSuggestion = aiRes;
         if (aiRes.aiFeedback) {
-          setFeedbackText((prev) => prev || aiRes.aiFeedback || '');
+          const fb = aiRes.aiFeedback;
+          setFeedbackText((prev) => (!prev || prev === fb || aiRequestRef.current !== null ? fb : prev));
         }
         if (aiRes.suggestedScore != null) {
-          setFinalScoreInput((prev) => (!prev ? String(aiRes.suggestedScore) : prev));
+          setFinalScoreInput((prev) => (!prev || aiRequestRef.current !== null ? String(aiRes.suggestedScore) : prev));
         }
       } catch {
         if (!isCurrentModuleLoad()) return;
@@ -472,6 +519,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
   }, [cancelContextActions]);
 
   const handleSelectModule = (modId: number) => {
+    const currentActiveId = selectedModuleId;
+    if (currentActiveId && currentActiveId !== modId) {
+      const hasContent = finalScoreInput.trim() !== '' || feedbackText.trim() !== '';
+      if (hasContent) {
+        const draft = {
+          score: finalScoreInput,
+          feedback: feedbackText,
+          updatedAt: new Date().toISOString(),
+        };
+        moduleDraftsRef.current[currentActiveId] = draft;
+        setDraftModuleIds((prev) => ({ ...prev, [currentActiveId]: true }));
+      }
+    }
     setSelectedModuleId(modId);
     setSearchParams({ moduleId: String(modId) }, { replace: true });
     loadModuleData(modId);
@@ -650,6 +710,44 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return speakingMod || submission.modules[0];
   }, [submission, selectedModuleId]);
 
+  const dynamicMaxScore =
+    gradingDetail?.maxScoreSnapshot ??
+    activeModule?.grading?.maxScoreSnapshot ??
+    moduleMaxScore ??
+    10;
+
+  const remainingUnfinishedModules = (submission?.modules || []).filter(
+    (m) => m.id !== activeModule?.id && !isModuleGraded(m)
+  );
+
+  const handleScoreChange = (val: string) => {
+    setFinalScoreInput(val);
+    const targetModId = selectedModuleId || activeModule?.id;
+    if (targetModId) {
+      const draft = {
+        score: val,
+        feedback: feedbackText,
+        updatedAt: new Date().toISOString(),
+      };
+      moduleDraftsRef.current[targetModId] = draft;
+      setDraftModuleIds((prev) => ({ ...prev, [targetModId]: true }));
+    }
+  };
+
+  const handleFeedbackChange = (val: string) => {
+    setFeedbackText(val);
+    const targetModId = selectedModuleId || activeModule?.id;
+    if (targetModId) {
+      const draft = {
+        score: finalScoreInput,
+        feedback: val,
+        updatedAt: new Date().toISOString(),
+      };
+      moduleDraftsRef.current[targetModId] = draft;
+      setDraftModuleIds((prev) => ({ ...prev, [targetModId]: true }));
+    }
+  };
+
   // Navigate to prev/next student
   const currentIndex = useMemo(() => {
     if (!studentId || classSubmissions.length === 0) return 0;
@@ -698,7 +796,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
           if (!isCurrentAction(pollContext)) return;
           console.error('Error refreshing grading after AI:', pollErr);
         } finally {
-          if (isCurrentAction(pollContext)) setIsAnalyzingAi(false);
+          if (isCurrentAction(pollContext)) {
+            aiRequestRef.current = null;
+            setIsAnalyzingAi(false);
+          }
         }
       }, 3500);
     } catch (err) {
@@ -712,7 +813,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   // Submit Grade
-  const handleSaveGrade = async (isFinalize: boolean) => {
+  const handleSaveGrade = async (isFinalize: boolean, autoNavigateNext: boolean = false) => {
     const context = { ...annotationRequestRef.current };
     const gradingId = gradingSummary?.id;
     if (!gradingId) {
@@ -724,27 +825,29 @@ export const TeacherSubmissionDetails: React.FC = () => {
     if (!isCurrentAction(context) || context.moduleId !== activeModule?.id || gradeRequestRef.current) return;
     const normalizedScoreStr = finalScoreInput.trim().replace(',', '.');
     const scoreNum = parseFloat(normalizedScoreStr);
-    if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
-      showToast(isVi ? 'Điểm số không hợp lệ (thang 0.0 - 10.0)!' : 'Invalid score (range 0.0 - 10.0)!');
+    if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > dynamicMaxScore) {
+      const formattedMax = Number(dynamicMaxScore).toFixed(1);
+      showToast(isVi ? `Điểm số không hợp lệ (thang 0.0 - ${formattedMax})!` : `Invalid score (range 0.0 - ${formattedMax})!`);
       return;
     }
 
+    const targetModuleId = activeModule?.id;
+
     // 1. If saving draft: persist locally and do NOT call submitGrade to avoid premature finalization
     if (!isFinalize) {
-      const targetModuleId = activeModule?.id;
       if (targetModuleId) {
+        const draft = {
+          score: normalizedScoreStr,
+          feedback: feedbackText,
+          updatedAt: new Date().toISOString(),
+        };
+        moduleDraftsRef.current[targetModuleId] = draft;
         try {
-          localStorage.setItem(
-            `eh_draft_grading_${targetModuleId}`,
-            JSON.stringify({
-              score: normalizedScoreStr,
-              feedback: feedbackText,
-              updatedAt: new Date().toISOString(),
-            })
-          );
+          localStorage.setItem(`eh_draft_grading_${targetModuleId}`, JSON.stringify(draft));
         } catch (e) {
           console.warn('Failed to save grading draft to localStorage', e);
         }
+        setDraftModuleIds((prev) => ({ ...prev, [targetModuleId]: true }));
       }
       showToast(isVi ? 'Đã lưu bản nháp nhận xét!' : 'Grading draft saved!');
       return;
@@ -761,18 +864,33 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentAction(context)) return;
 
       // Clear local draft upon successful publication
-      const targetModuleId = activeModule?.id;
       if (targetModuleId) {
+        delete moduleDraftsRef.current[targetModuleId];
         try {
           localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
         } catch {
           // ignore
         }
+        setDraftModuleIds((prev) => {
+          if (!prev[targetModuleId]) return prev;
+          const next = { ...prev };
+          delete next[targetModuleId];
+          return next;
+        });
       }
 
       showToast(isVi
         ? 'Đã lưu điểm và trả bài cho học viên thành công!'
         : 'Grade finalized and published to student!');
+
+      if (autoNavigateNext) {
+        const otherModules = (submission?.modules || []).filter((m) => m.id !== targetModuleId);
+        const nextPending = otherModules.find((m) => !isModuleGraded(m));
+        if (nextPending) {
+          handleSelectModule(nextPending.id);
+          return;
+        }
+      }
 
       if (isFinalize) {
         gradeNavigationTimerRef.current = setTimeout(() => {
@@ -1371,6 +1489,40 @@ export const TeacherSubmissionDetails: React.FC = () => {
     return questionsList;
   }, [questionsList, questionFilter]);
 
+  const FEEDBACK_TEMPLATE_VI = `### 1. Điểm mạnh (Strengths)
+- Phát âm tương đối rõ ràng, tự tin, diễn đạt ý tương đối trôi chảy.
+- Vận dụng được một số từ vựng và cấu trúc câu phù hợp chủ đề bài học.
+
+### 2. Điểm cần khắc phục (Areas for Improvement)
+- Chú ý các lỗi ngữ pháp / phát âm đã được đánh dấu chú thích trong bài.
+- Cần phát triển thêm ý mở rộng và liên kết các câu mạch lạc hơn.
+
+### 3. Đề xuất luyện tập (Actionable Advice)
+- Luyện nói lại theo transcript và sửa các lỗi gạch chân.
+- Ôn tập lại cấu trúc ngữ pháp và từ vựng trọng tâm.`;
+
+  const FEEDBACK_TEMPLATE_EN = `### 1. Strengths
+- Clear pronunciation, confident delivery, and natural pacing.
+- Good application of topic-specific vocabulary and sentence patterns.
+
+### 2. Areas for Improvement
+- Pay close attention to grammar and pronunciation annotations highlighted in the transcript.
+- Expand explanations and use cohesive transition devices.
+
+### 3. Actionable Advice
+- Re-practice recording using the AI transcript as a reference.
+- Review key grammatical rules and practice vocabulary drills.`;
+
+  const handleInsertFeedbackTemplate = () => {
+    const template = isVi ? FEEDBACK_TEMPLATE_VI : FEEDBACK_TEMPLATE_EN;
+    if (!feedbackText.trim()) {
+      handleFeedbackChange(template);
+    } else {
+      handleFeedbackChange(`${feedbackText.trim()}\n\n${template}`);
+    }
+    showToast(isVi ? 'Đã chèn mẫu nhận xét chuẩn sư phạm!' : 'Pedagogical feedback template inserted!');
+  };
+
   const renderFeedbackEditor = (rows: number = 6) => {
     return (
       <div className="tsd-feedback-wrap">
@@ -1378,25 +1530,89 @@ export const TeacherSubmissionDetails: React.FC = () => {
           <label className="tsd-card-label m-0">
             {t('submissionDetails.feedbackTitle')}
           </label>
-          <div className="tsd-feedback-tab-bar">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               type="button"
-              className={`tsd-feedback-tab-btn ${feedbackTab === 'edit' ? 'active' : ''}`}
-              onClick={() => setFeedbackTab('edit')}
+              className={`tsd-feedback-guide-toggle-btn ${showFeedbackGuide ? 'active' : ''}`}
+              onClick={() => setShowFeedbackGuide((prev) => !prev)}
+              title={isVi ? 'Xem cấu trúc nhận xét gợi ý' : 'Toggle feedback guidelines'}
             >
-              <Edit3 size={13} />
-              <span>{isVi ? 'Soạn thảo' : 'Edit'}</span>
+              <HelpCircle size={13} />
+              <span>{isVi ? 'Hướng dẫn nhận xét' : 'Guide'}</span>
             </button>
             <button
               type="button"
-              className={`tsd-feedback-tab-btn ${feedbackTab === 'preview' ? 'active' : ''}`}
-              onClick={() => setFeedbackTab('preview')}
+              className="tsd-feedback-insert-template-btn"
+              onClick={handleInsertFeedbackTemplate}
+              title={isVi ? 'Chèn mẫu cấu trúc nhận xét chuẩn' : 'Insert feedback template'}
             >
-              <Eye size={13} />
-              <span>{isVi ? 'Xem trước (MD)' : 'Preview (MD)'}</span>
+              <Sparkles size={13} />
+              <span>{isVi ? 'Chèn mẫu' : 'Template'}</span>
             </button>
+            <div className="tsd-feedback-tab-bar">
+              <button
+                type="button"
+                className={`tsd-feedback-tab-btn ${feedbackTab === 'edit' ? 'active' : ''}`}
+                onClick={() => setFeedbackTab('edit')}
+              >
+                <Edit3 size={13} />
+                <span>{isVi ? 'Soạn thảo' : 'Edit'}</span>
+              </button>
+              <button
+                type="button"
+                className={`tsd-feedback-tab-btn ${feedbackTab === 'preview' ? 'active' : ''}`}
+                onClick={() => setFeedbackTab('preview')}
+              >
+                <Eye size={13} />
+                <span>{isVi ? 'Xem trước (MD)' : 'Preview (MD)'}</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {showFeedbackGuide && (
+          <div className="tsd-feedback-guide-panel">
+            <div className="tsd-feedback-guide-title">
+              <BookOpen size={14} className="text-primary" />
+              <strong>{isVi ? 'Cấu trúc nhận xét chuẩn sư phạm gợi ý:' : 'Recommended Pedagogical Structure:'}</strong>
+            </div>
+            <div className="tsd-feedback-guide-grid">
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">1</span>
+                <div>
+                  <strong>{isVi ? 'Khen ngợi & Điểm mạnh:' : 'Strengths:'}</strong>
+                  <p>{isVi ? 'Ghi nhận nỗ lực, phát âm rõ ràng, từ vựng phong phú hoặc ý tưởng sáng tạo.' : 'Highlight effort, clear pronunciation, rich vocabulary, or good ideas.'}</p>
+                </div>
+              </div>
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">2</span>
+                <div>
+                  <strong>{isVi ? 'Điểm cần khắc phục:' : 'Areas for Improvement:'}</strong>
+                  <p>{isVi ? 'Chỉ rõ các lỗi ngữ pháp, phát âm (dựa trên transcript và chú thích AI).' : 'Specify grammar, pronunciation issues based on transcript & annotations.'}</p>
+                </div>
+              </div>
+              <div className="tsd-feedback-guide-card">
+                <span className="tsd-feedback-guide-num">3</span>
+                <div>
+                  <strong>{isVi ? 'Đề xuất luyện tập:' : 'Actionable Advice:'}</strong>
+                  <p>{isVi ? 'Đưa ra bài tập, tài liệu hoặc phương pháp cụ thể để học viên tiến bộ.' : 'Provide actionable tips, materials, or exercises for next time.'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="tsd-feedback-guide-footer">
+              <span className="text-xs text-muted">
+                {isVi ? 'Hỗ trợ Markdown: **in đậm**, *in nghiêng*, - danh sách, > trích dẫn.' : 'Markdown supported: **bold**, *italic*, - list, > quote.'}
+              </span>
+              <button
+                type="button"
+                className="tsd-guide-apply-btn"
+                onClick={handleInsertFeedbackTemplate}
+              >
+                {isVi ? 'Áp dụng mẫu ngay' : 'Apply template now'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {feedbackTab === 'edit' ? (
           <textarea
@@ -1404,7 +1620,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
             placeholder={t('submissionDetails.feedbackPlaceholder')}
             rows={rows}
             value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
+            onChange={(e) => handleFeedbackChange(e.target.value)}
           />
         ) : (
           <div className="tsd-feedback-preview-box">
@@ -1868,18 +2084,25 @@ export const TeacherSubmissionDetails: React.FC = () => {
             const isSelected = m.id === (activeModule?.id || selectedModuleId);
             const label = m.skill || (isVi ? `Phần ${m.id}` : `Module ${m.id}`);
             const isDone = isModuleGraded(m);
+            const maxSc = m.grading?.maxScoreSnapshot ?? (m.id === activeModule?.id ? dynamicMaxScore : 10);
             const scoreDisplay = m.grading?.finalScore != null
-              ? ` (${m.grading.finalScore}/${m.grading.maxScoreSnapshot || 10})`
+              ? ` (${m.grading.finalScore}/${maxSc})`
               : '';
+            const hasDraft = Boolean(draftModuleIds[m.id]) && !isDone;
             return (
               <button
                 key={m.id}
                 type="button"
-                className={`tsd-module-tab ${isSelected ? 'active' : ''} ${isDone ? 'done' : ''}`}
+                className={`tsd-module-tab ${isSelected ? 'active' : ''} ${isDone ? 'done' : ''} ${hasDraft ? 'has-draft' : ''}`}
                 onClick={() => handleSelectModule(m.id)}
                 title={isDone ? (isVi ? 'Phần này đã có điểm' : 'Module graded') : (isVi ? 'Chưa chấm điểm' : 'Pending grading')}
               >
                 {label}{scoreDisplay} {isDone ? '✓' : ''}
+                {hasDraft && (
+                  <span className="tsd-module-tab-draft-badge" aria-hidden="true">
+                    {isVi ? 'Nháp' : 'Draft'}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1895,14 +2118,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
               value={aiSuggestion?.suggestedScore != null
                 ? String(aiSuggestion.suggestedScore)
                 : (gradingDetail?.aiFeedback || isAnalyzingAi ? (isVi ? 'Đang phân tích' : 'Analyzing') : '--')}
-              suffix="/ 10"
+              suffix={`/ ${dynamicMaxScore}`}
             />
           )}
           {gradingDetail?.finalScore != null && (
             <MetricCard
               title={isVi ? 'Điểm giáo viên đã chấm' : 'Teacher Score'}
               value={String(gradingDetail.finalScore)}
-              suffix={`/ ${gradingDetail.maxScoreSnapshot || activeModule?.grading?.maxScoreSnapshot || 10}`}
+              suffix={`/ ${dynamicMaxScore}`}
             />
           )}
         </div>
@@ -2047,7 +2270,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 {aiSuggestion?.suggestedScore != null ? (
                   <span className="tsd-speaking-ai-score">
                     {isVi ? 'Điểm AI đề xuất: ' : 'AI Suggested: '}
-                    <strong>{String(aiSuggestion.suggestedScore)}</strong> / 10
+                    <strong>{String(aiSuggestion.suggestedScore)}</strong> / {dynamicMaxScore}
                   </span>
                 ) : null}
               </div>
@@ -2081,13 +2304,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
                     type="number"
                     step="any"
                     min="0"
-                    max="10"
+                    max={String(dynamicMaxScore)}
                     placeholder="0.0"
                     value={finalScoreInput}
-                    onChange={(e) => setFinalScoreInput(e.target.value)}
+                    onChange={(e) => handleScoreChange(e.target.value)}
                     className="tsd-score-input"
                   />
-                  <span className="tsd-score-scale">/ 10</span>
+                  <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
                 </div>
               </div>
 
@@ -2284,13 +2507,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   type="number"
                   step="any"
                   min="0"
-                  max="10"
+                  max={String(dynamicMaxScore)}
                   placeholder="0.0"
                   value={finalScoreInput}
-                  onChange={(e) => setFinalScoreInput(e.target.value)}
+                  onChange={(e) => handleScoreChange(e.target.value)}
                   className="tsd-score-input"
                 />
-                <span className="tsd-score-scale">/ 10</span>
+                <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
               </div>
             </div>
 
@@ -2418,13 +2641,13 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   type="number"
                   step="any"
                   min="0"
-                  max="10"
+                  max={String(dynamicMaxScore)}
                   placeholder="0.0"
                   value={finalScoreInput}
-                  onChange={(e) => setFinalScoreInput(e.target.value)}
+                  onChange={(e) => handleScoreChange(e.target.value)}
                   className="tsd-score-input"
                 />
-                <span className="tsd-score-scale">/ 10</span>
+                <span className="tsd-score-scale">/ {dynamicMaxScore}</span>
               </div>
             </div>
 
@@ -2493,14 +2716,26 @@ export const TeacherSubmissionDetails: React.FC = () => {
           </>
         }
         rightActions={
-          <Button
-            variant="primary"
-            disabled={isSubmittingGrade}
-            onClick={() => handleSaveGrade(true)}
-            icon={isSubmittingGrade ? RefreshCw : Send}
-          >
-            {isSubmittingGrade ? (isVi ? 'Đang lưu...' : 'Submitting...') : t('submissionDetails.btnSend')}
-          </Button>
+          <>
+            {remainingUnfinishedModules.length > 0 && (
+              <Button
+                variant="secondary"
+                disabled={isSubmittingGrade}
+                onClick={() => handleSaveGrade(true, true)}
+                icon={ChevronRight}
+              >
+                {isVi ? 'Lưu & Chuyển phần tiếp' : 'Save & Grade Next'}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              disabled={isSubmittingGrade}
+              onClick={() => handleSaveGrade(true, false)}
+              icon={isSubmittingGrade ? RefreshCw : Send}
+            >
+              {isSubmittingGrade ? (isVi ? 'Đang lưu...' : 'Submitting...') : t('submissionDetails.btnSend')}
+            </Button>
+          </>
         }
       />
     </div>
