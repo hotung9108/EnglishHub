@@ -63,6 +63,19 @@ class QuestionResponseTest {
 	}
 
 	@Test
+	void preservesDynamicOptionCounts() {
+		for (int count : List.of(2, 3, 5)) {
+			List<Map<String, Object>> dynamicOptions = new ArrayList<>();
+			for (int i = 1; i <= count; i++) {
+				dynamicOptions.add(new LinkedHashMap<>(Map.of("id", i, "content", "Option " + i)));
+			}
+			QuestionResponse response = QuestionResponse.from(question(
+					QuestionType.MULTIPLE_CHOICE, Map.of("options", dynamicOptions)), false);
+			assertThat(response.options()).hasSize(count);
+		}
+	}
+
+	@Test
 	void preservesNumericIdsAndContentWithoutCoercionOrTrimming() {
 		List<Map<String, Object>> options = options();
 		options.getFirst().put("id", new BigDecimal("1.50"));
@@ -131,15 +144,12 @@ class QuestionResponseTest {
 		nonMap.set(2, "not a map");
 		List<Object> nullItem = new ArrayList<>(options());
 		nullItem.set(2, null);
-		List<Map<String, Object>> five = options();
-		five.add(new LinkedHashMap<>(five.getFirst()));
 		return Stream.of(
 				Arguments.of("null options", null, "options_not_list"),
 				Arguments.of("object options", Map.of(), "options_not_list"),
 				Arguments.of("string options", "options", "options_not_list"),
-				Arguments.of("empty options", List.of(), "option_count_not_four"),
-				Arguments.of("three options", options().subList(0, 3), "option_count_not_four"),
-				Arguments.of("five options", five, "option_count_not_four"),
+				Arguments.of("empty options", List.of(), "option_count_less_than_two"),
+				Arguments.of("one option", options().subList(0, 1), "option_count_less_than_two"),
 				Arguments.of("non-map item", nonMap, "option_not_map"),
 				Arguments.of("null item", nullItem, "option_not_map"),
 				Arguments.of("missing id", withoutField("id"), "id_missing_or_not_number"),

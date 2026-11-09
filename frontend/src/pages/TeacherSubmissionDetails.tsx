@@ -262,7 +262,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (isQuiz && (!modDetailRes.questions || modDetailRes.questions.length === 0) && modDetailRes.moduleId) {
         try {
           const qRes = await questionService.listQuestions(modDetailRes.moduleId);
-          const qList = qRes.questions || (qRes as any).data || [];
+          const qRecord = qRes as unknown as Record<string, unknown>;
+          const qList = qRes.questions || (Array.isArray(qRecord.data) ? (qRecord.data as typeof qRes.questions) : []) || [];
           if (qList.length > 0 && isCurrentModuleLoad()) {
             modDetailRes.questions = qList;
             setModuleDetail({ ...modDetailRes });
@@ -279,7 +280,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
             setModuleInstructions(mRes.instructions);
           }
           if (modDetailRes.skill === 'LISTENING') {
-            let audio = mRes?.sourceAudioDownloadUrl || (mRes as any)?.audioDownloadUrl || '';
+            const mRecord = mRes as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof mRecord?.audioDownloadUrl === 'string' ? mRecord.audioDownloadUrl : '';
+            let audio = mRes?.sourceAudioDownloadUrl || extraAudio || '';
             if (!audio && mRes?.sourceAudioStorageKey) {
               if (mRes.sourceAudioStorageKey.startsWith('http')) {
                 audio = mRes.sourceAudioStorageKey;
@@ -1295,14 +1298,14 @@ export const TeacherSubmissionDetails: React.FC = () => {
             } else if (typeof obj.selectedOptionId === 'number') {
               studentSelectedOptId = obj.selectedOptionId;
             } else if (typeof obj.selectedOption === 'string') {
-              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.selectedOption.toUpperCase());
-              if (letterIdx !== -1) {
-                studentSelectedOptId = letterIdx + 1;
+              const upper = obj.selectedOption.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
               }
             } else if (typeof obj.answer === 'string') {
-              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.answer.toUpperCase());
-              if (letterIdx !== -1) {
-                studentSelectedOptId = letterIdx + 1;
+              const upper = obj.answer.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
               }
             }
 

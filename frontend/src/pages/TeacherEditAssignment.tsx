@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
@@ -116,11 +116,11 @@ export const TeacherEditAssignment: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     toastWarning(msg);
     setTimeout(() => setToastMessage(null), 3500);
-  };
+  }, [toastWarning]);
 
   useEffect(() => {
     let isMounted = true;
@@ -221,7 +221,9 @@ export const TeacherEditAssignment: React.FC = () => {
             ]);
 
             const modDetail = mDetailRes.status === 'fulfilled' ? mDetailRes.value : null;
-            let audioDownloadUrl = modDetail?.sourceAudioDownloadUrl || (modDetail as any)?.audioDownloadUrl || '';
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            let audioDownloadUrl = modDetail?.sourceAudioDownloadUrl || extraAudio || '';
             if (sKey === 'listening' && !audioDownloadUrl && modDetail?.sourceAudioStorageKey) {
               try {
                 const audioRes = await moduleService.getAudioDownloadUrl(mod.id);
@@ -333,7 +335,9 @@ export const TeacherEditAssignment: React.FC = () => {
                 points: Number(q.score) || 1,
               };
             });
-            const finalAudioUrl = item.audioDownloadUrl || modDetail?.sourceAudioDownloadUrl || (modDetail as any)?.audioDownloadUrl || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : '');
+            const modRecord = modDetail as unknown as Record<string, unknown> | null;
+            const extraAudio = typeof modRecord?.audioDownloadUrl === 'string' ? modRecord.audioDownloadUrl : '';
+            const finalAudioUrl = item.audioDownloadUrl || modDetail?.sourceAudioDownloadUrl || extraAudio || (modDetail?.sourceAudioStorageKey?.startsWith('http') ? modDetail.sourceAudioStorageKey : '');
             const storageFileName = modDetail?.sourceAudioStorageKey ? modDetail.sourceAudioStorageKey.split('/').pop() : '';
             modConfig = {
               ...createDefaultListeningConfig(),
@@ -394,7 +398,7 @@ export const TeacherEditAssignment: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, isVi, reloadKey]);
+  }, [id, isVi, reloadKey, navigate, showToast]);
 
   // Add a new module
   const handleAddModule = (skill: AssignmentSkill) => {

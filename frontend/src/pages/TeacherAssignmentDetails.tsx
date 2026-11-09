@@ -188,7 +188,8 @@ export const TeacherAssignmentDetails: React.FC = () => {
             let audio = '';
             if (mDetailRes.status === 'fulfilled') {
               const detailVal = mDetailRes.value;
-              audio = detailVal.sourceAudioDownloadUrl || (detailVal as any).audioDownloadUrl || '';
+              const detailRecord = detailVal as unknown as Record<string, unknown>;
+              audio = detailVal.sourceAudioDownloadUrl || (typeof detailRecord.audioDownloadUrl === 'string' ? detailRecord.audioDownloadUrl : '') || '';
               if (!audio && detailVal.sourceAudioStorageKey) {
                 if (detailVal.sourceAudioStorageKey.startsWith('http')) {
                   audio = detailVal.sourceAudioStorageKey;

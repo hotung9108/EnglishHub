@@ -539,8 +539,8 @@ public class AssignmentMockDataSeeder implements CommandLineRunner {
 			}
 			if (questionType == QuestionType.MULTIPLE_CHOICE) {
 				JsonNode options = root.get("options");
-				if (options == null || !options.isArray() || options.size() != 4) {
-					throw new IllegalStateException("MULTIPLE_CHOICE correct_answer must contain four options");
+				if (options == null || !options.isArray() || options.size() < 2) {
+					throw new IllegalStateException("MULTIPLE_CHOICE correct_answer must contain at least two options");
 				}
 				int correctCount = 0;
 				for (JsonNode option : options) {

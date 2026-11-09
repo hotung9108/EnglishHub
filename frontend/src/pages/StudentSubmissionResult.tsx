@@ -606,14 +606,14 @@ export const StudentSubmissionResult: React.FC = () => {
             } else if (typeof obj.selectedOptionId === 'number') {
               studentSelectedOptId = obj.selectedOptionId;
             } else if (typeof obj.selectedOption === 'string') {
-              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.selectedOption.toUpperCase());
-              if (letterIdx !== -1) {
-                studentSelectedOptId = letterIdx + 1;
+              const upper = obj.selectedOption.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
               }
             } else if (typeof obj.answer === 'string') {
-              const letterIdx = ['A', 'B', 'C', 'D'].indexOf(obj.answer.toUpperCase());
-              if (letterIdx !== -1) {
-                studentSelectedOptId = letterIdx + 1;
+              const upper = obj.answer.trim().toUpperCase();
+              if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
+                studentSelectedOptId = upper.charCodeAt(0) - 64;
               }
             }
 

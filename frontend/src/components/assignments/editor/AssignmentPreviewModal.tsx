@@ -271,7 +271,8 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                                 checked={activeAnswers[q.id] === opt}
                                 onChange={() => handleSelectAnswer(q.id, opt)}
                               />
-                              {opt}
+                              <strong style={{ minWidth: '16px' }}>{String.fromCharCode(65 + i)}.</strong>
+                              <span>{opt}</span>
                             </label>
                           ))}
                         </div>
@@ -340,7 +341,8 @@ export const AssignmentPreviewModal: React.FC<AssignmentPreviewModalProps> = ({ 
                               checked={activeAnswers[q.id] === opt}
                               onChange={() => handleSelectAnswer(q.id, opt)}
                             />
-                            {opt}
+                            <strong style={{ minWidth: '16px' }}>{String.fromCharCode(65 + i)}.</strong>
+                            <span>{opt}</span>
                           </label>
                         ))}
                       </div>

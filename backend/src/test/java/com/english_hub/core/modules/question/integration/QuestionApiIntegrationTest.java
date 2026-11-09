@@ -418,12 +418,11 @@ class QuestionApiIntegrationTest {
 				.content("""
 						{"content":"Pick one","questionType":"MULTIPLE_CHOICE",
 						"correctAnswer":{"options":[
-						  {"id":1,"content":"A","isCorrect":true},
-						  {"id":2,"content":"B","isCorrect":false}
+						  {"id":1,"content":"A","isCorrect":true}
 						]},"orderIndex":2}
 						"""))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("options phải có đúng 4 lựa chọn."));
+				.andExpect(jsonPath("$.error").value("options phải có ít nhất 2 lựa chọn."));
 
 		mockMvc.perform(post("/api/v1/modules/{id}/questions", moduleId)
 				.header("Authorization", bearer(teacherId, UserRole.TEACHER))
