@@ -85,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 async function setup(studentId = 5) {
@@ -1781,3 +1782,64 @@ it('renders LISTENING quiz module with audio track and empty questions state', a
   expect(screen.getByText('Tệp âm thanh bài nghe (Đề bài)')).toBeVisible();
   expect(screen.getByText('Không tìm thấy danh sách câu hỏi trong phần này.')).toBeVisible();
 });
+
+it('toggles pedagogical feedback guide panel and inserts template', async () => {
+  const { container } = await setup();
+  const guideBtn = screen.getByRole('button', { name: /Hướng dẫn nhận xét/ });
+  expect(guideBtn).toBeVisible();
+
+  // Initially guide panel is hidden
+  expect(screen.queryByText('Cấu trúc nhận xét chuẩn sư phạm gợi ý:')).not.toBeInTheDocument();
+
+  // Toggle guide open
+  await act(async () => {
+    fireEvent.click(guideBtn);
+  });
+  expect(screen.getByText('Cấu trúc nhận xét chuẩn sư phạm gợi ý:')).toBeVisible();
+  expect(screen.getByText('Khen ngợi & Điểm mạnh:')).toBeVisible();
+  expect(screen.getByText('Điểm cần khắc phục:')).toBeVisible();
+  expect(screen.getByText('Đề xuất luyện tập:')).toBeVisible();
+
+  // Insert template via header button
+  const insertBtn = screen.getByRole('button', { name: /Chèn mẫu/ });
+  await act(async () => {
+    fireEvent.click(insertBtn);
+  });
+
+  // Guide panel button to insert
+  const applyBtn = screen.getByRole('button', { name: /Áp dụng mẫu ngay/ });
+  await act(async () => {
+    fireEvent.click(applyBtn);
+  });
+
+  // Check that textarea contains the template
+  const textarea = container.querySelector('textarea');
+  expect(textarea).not.toBeNull();
+  expect(textarea?.value).toContain('### 1. Điểm mạnh');
+
+  // Toggle guide closed
+  await act(async () => {
+    fireEvent.click(guideBtn);
+  });
+  expect(screen.queryByText('Cấu trúc nhận xét chuẩn sư phạm gợi ý:')).not.toBeInTheDocument();
+});
+
+it('supports Save and Grade Next to transition to the next unfinished module', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue(twoModules);
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockImplementation(async (moduleId) =>
+    moduleId === 50 ? makeModuleDetail(50, 60, 'WRITING') : makeModuleDetail(51, 61, 'SPEAKING')
+  );
+  vi.mocked(gradingService.getBySubmissionModuleId).mockResolvedValue({ id: 80, method: 'TEACHER_MANUAL', status: 'PENDING', finalScore: 7 });
+
+  await setup();
+  const nextBtn = screen.getByRole('button', { name: /Lưu & Chuyển phần tiếp/ });
+  expect(nextBtn).toBeVisible();
+
+  await act(async () => {
+    fireEvent.click(nextBtn);
+  });
+  expect(gradingService.submitGrade).toHaveBeenCalledWith(80, expect.objectContaining({
+    finalScore: 7,
+  }));
+});
+

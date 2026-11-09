@@ -28,7 +28,7 @@ vi.mock('../../api/services/submission.service', () => ({ submissionService: {
 
 const ASSIGNMENT_ID = 4;
 const SUBMISSION_ID = 325;
-const SUBMIT_LABEL = 'Hoàn thành & Nộp bài';
+const SUBMIT_LABEL = /Hoàn thành & Nộp/;
 const BLANK_MESSAGE = 'Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.';
 const PENDING_MESSAGE = 'Đáp án của bạn đã được lưu, nhưng hệ thống chưa xác nhận hoàn tất bài thi. Vui lòng thử nộp lại.';
 const UNCONFIRMED_MESSAGE = 'Chưa thể xác nhận trạng thái nộp bài. Vui lòng tải lại trang để kiểm tra trước khi thử lại.';

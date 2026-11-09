@@ -634,15 +634,20 @@ const StudentAssignmentReading: React.FC = () => {
               </Button>
             </div>
 
-            <Button 
-              variant="primary"
-              size="md"
-              loading={isSubmitting}
-              disabled={!canSubmitModule || isSubmitting}
-              onClick={handleSubmit}
-            >
-              Hoàn thành & Nộp bài
-            </Button>
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Button 
+                variant="primary"
+                size="md"
+                loading={isSubmitting}
+                disabled={!canSubmitModule || isSubmitting}
+                onClick={handleSubmit}
+              >
+                Hoàn thành & Nộp phần Đọc (Submit Reading)
+              </Button>
+              <span className="text-[11px] text-muted text-center">
+                Lưu ý: Nộp bài cho riêng phần thi Đọc này (không nộp toàn bộ bài tập).
+              </span>
+            </div>
           </div>
         </div>
       </div>
