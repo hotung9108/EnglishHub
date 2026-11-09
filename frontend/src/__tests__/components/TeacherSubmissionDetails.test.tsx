@@ -9,6 +9,7 @@ import { assignmentService } from '../../api/services/assignment.service';
 import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../../api/services/submission.service';
 import { gradingService, type AiGradingSuggestionResponse } from '../../api/services/grading.service';
 import { classService } from '../../api/services/class.service';
+import { moduleService } from '../../api/services/module.service';
 import { answerAnnotationService, type GradingAnnotation } from '../../api/services/answer-annotation.service';
 import { renderPage } from './renderPage';
 import { deferred } from '../deferred';
@@ -28,6 +29,7 @@ vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { g
 vi.mock('../../api/services/submission.service', async original => ({ ...await original<typeof import('../../api/services/submission.service')>(), submissionService: { listSubmissions: vi.fn(), getSubmission: vi.fn(), getSubmissionModuleDetail: vi.fn(), getDocumentDownloadUrl: vi.fn(), getAudioDownloadUrl: vi.fn() } }));
 vi.mock('../../api/services/grading.service', () => ({ gradingService: { getBySubmissionModuleId: vi.fn(), getAiSuggestion: vi.fn(), submitGrade: vi.fn(), requestAiAnalysis: vi.fn(), getById: vi.fn() } }));
 vi.mock('../../api/services/class.service', () => ({ classService: { list: vi.fn(), listMembers: vi.fn() } }));
+vi.mock('../../api/services/question.service', async original => ({ ...await original<typeof import('../../api/services/question.service')>(), questionService: { listQuestions: vi.fn().mockResolvedValue({ questions: [], data: [] }), getQuestion: vi.fn() } }));
 vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn().mockResolvedValue({ id: 30, instructions: 'Sample module instructions' }) } }));
 vi.mock('../../api/services/answer-annotation.service', () => ({ answerAnnotationService: { listAnnotations: vi.fn(), createAnnotation: vi.fn(), reviewAnnotation: vi.fn(), deleteAnnotation: vi.fn() } }));
 
@@ -650,6 +652,7 @@ describe('TeacherSubmissionDetails speaking audio URLs', () => {
       51: [{ id: 61, questionId: 1, content: null, audioDownloadUrl: 'https://storage.example.test/51/audio.webm' }],
     }, modules);
     const { container } = await renderSpeaking();
+    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/50/audio.webm'));
     let audio = container.querySelector('audio')!;
     fireEvent.error(audio);
     await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', SIGNED_AUDIO_URL));
@@ -1637,4 +1640,129 @@ it.each([undefined, null])('R3 Create callback rejects missing answerId %s', asy
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'WRITING' })); });
   await act(async () => { create(); });
   expect(answerAnnotationService.createAnnotation).not.toHaveBeenCalled();
+});
+
+it('renders READING quiz module with questions, options, student answers, and filters', async () => {
+  const quizQuestions = [
+    {
+      id: 101,
+      orderIndex: 1,
+      content: 'What is the main idea?',
+      questionType: 'MULTIPLE_CHOICE',
+      correctAnswer: { options: ['Cats', 'Dogs', 'Birds'], correctOptionIndex: 0, correctOptionContent: 'Cats' },
+    },
+    {
+      id: 102,
+      orderIndex: 2,
+      content: 'Where did they go?',
+      questionType: 'MULTIPLE_CHOICE',
+      correctAnswer: { options: ['Park', 'Zoo'], correctOptionIndex: 1, correctOptionContent: 'Zoo' },
+    },
+    {
+      id: 103,
+      orderIndex: 3,
+      content: 'Fill in the blank',
+      questionType: 'SHORT_ANSWER',
+      correctAnswer: { text: 'Happiness' },
+    },
+    {
+      id: 104,
+      orderIndex: 4,
+      content: 'Question 4',
+      questionType: 'MULTIPLE_CHOICE',
+      correctAnswer: { options: ['Apple', 'Banana'], correctOptionIndex: 1, correctOptionContent: 'Banana' },
+    },
+    {
+      id: 105,
+      orderIndex: 5,
+      content: 'Question 5',
+      questionType: 'MULTIPLE_CHOICE',
+      correctAnswer: { options: ['Red', 'Blue'], correctOptionIndex: 0, correctOptionContent: 'Red' },
+    },
+    {
+      id: 106,
+      orderIndex: 6,
+      content: 'Question 6',
+      questionType: 'SHORT_ANSWER',
+      correctAnswer: { text: 'Correct' },
+    },
+    {
+      id: 107,
+      orderIndex: 7,
+      content: 'Question 7',
+      questionType: 'SHORT_ANSWER',
+      correctAnswer: null,
+    },
+  ];
+
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...submission,
+    modules: [{ ...submission.modules[0], id: 55, skill: 'READING', taskType: 'QUIZ' }],
+  });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+    ...moduleDetail,
+    id: 55,
+    skill: 'READING',
+    questions: quizQuestions,
+    answers: [
+      { id: 201, questionId: 101, content: { selectedOptionIds: [1], isCorrect: true } },
+      { id: 202, questionId: 102, content: { selectedOption: 'A', isCorrect: false } },
+      { id: 203, questionId: 103, content: { text: 'happiness' } },
+      { id: 204, questionId: 104, content: { selectedOptionId: 2, is_correct: true } },
+      { id: 205, questionId: 105, content: { answer: 'A' } },
+      { id: 206, questionId: 106, content: { answer: 'Wrong' } },
+    ],
+  });
+  vi.mocked(moduleService.getModule).mockResolvedValue({
+    id: 30,
+    instructions: '<!-- minWords: 120 -->\n![Diagram](https://example.com/chart.png)\nPassage Title\n\nThis is the reading body text.',
+  });
+
+  const { user } = await setup();
+  expect(screen.getByText('Passage Title')).toBeVisible();
+  expect(screen.getByText('This is the reading body text.')).toBeVisible();
+  expect(screen.getByText(/Chi tiết câu hỏi & đáp án/)).toBeVisible();
+  expect(screen.getByText('Câu 1: What is the main idea?')).toBeVisible();
+  expect(screen.getByText('Câu 2: Where did they go?')).toBeVisible();
+  expect(screen.getByText('Câu 3: Fill in the blank')).toBeVisible();
+
+  // Test filter buttons
+  await user.click(screen.getByRole('button', { name: /Đúng/ }));
+  expect(screen.getByText('Câu 1: What is the main idea?')).toBeVisible();
+  expect(screen.queryByText('Câu 2: Where did they go?')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /Sai/ }));
+  expect(screen.getByText('Câu 2: Where did they go?')).toBeVisible();
+  expect(screen.queryByText('Câu 1: What is the main idea?')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /Tất cả/ }));
+  expect(screen.getByText('Câu 1: What is the main idea?')).toBeVisible();
+
+  // Test feedback preview toggle
+  await user.click(screen.getByRole('button', { name: /Xem trước/ }));
+  expect(screen.getByRole('button', { name: /Soạn thảo/ })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: /Soạn thảo/ }));
+});
+
+it('renders LISTENING quiz module with audio track and empty questions state', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({
+    ...submission,
+    modules: [{ ...submission.modules[0], id: 56, skill: 'LISTENING', taskType: 'QUIZ' }],
+  });
+  vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+    ...moduleDetail,
+    id: 56,
+    skill: 'LISTENING',
+    questions: [],
+    answers: [],
+  });
+  vi.mocked(moduleService.getModule).mockResolvedValue({
+    id: 30,
+    instructions: 'Listen to the audio track',
+    sourceAudioDownloadUrl: 'https://example.com/audio.mp3',
+  });
+
+  await setup();
+  expect(screen.getByText('Tệp âm thanh bài nghe (Đề bài)')).toBeVisible();
+  expect(screen.getByText('Không tìm thấy danh sách câu hỏi trong phần này.')).toBeVisible();
 });

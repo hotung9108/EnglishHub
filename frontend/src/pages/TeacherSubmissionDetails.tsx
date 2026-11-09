@@ -117,12 +117,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const deleteRequestsRef = useRef(new Map<number, AnnotationRequestContext>());
   const gradeRequestRef = useRef<AnnotationRequestContext | null>(null);
   const annotationItemsRef = useRef<GradingAnnotation[]>([]);
+  const submissionRef = useRef<SubmissionDetail | null>(null);
+  const moduleDetailRef = useRef<SubmissionModuleDetailResponse | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioRequestRef = useRef(0);
   const audioFallbackUsedRef = useRef(false);
   const pendingAudioTimeRef = useRef<number | null>(null);
   const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
   useEffect(() => { annotationItemsRef.current = annotations; }, [annotations]);
+  useEffect(() => { submissionRef.current = submission; }, [submission]);
+  useEffect(() => { moduleDetailRef.current = moduleDetail; }, [moduleDetail]);
 
   const isCurrentAction = useCallback((context: AnnotationRequestContext) => {
     const current = annotationRequestRef.current;
@@ -249,7 +253,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
       annotationRequestRef.current.generation === generation &&
       annotationRequestRef.current.moduleId === targetModuleId;
 
-    let currentModDetail: SubmissionModuleDetailResponse | null = null;
+    const prevModDetail = moduleDetailRef.current?.id === targetModuleId ? moduleDetailRef.current : null;
+    let currentModDetail: SubmissionModuleDetailResponse | null = prevModDetail;
     let currentAiSuggestion: AiGradingSuggestionResponse | null = null;
 
     try {
@@ -305,7 +310,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     } catch {
       if (!isCurrentModuleLoad()) return;
-      setModuleDetail(null);
+      if (!prevModDetail) {
+        setModuleDetail(null);
+      }
     }
 
     let resolvedGradingId: number | null = null;
@@ -375,7 +382,10 @@ export const TeacherSubmissionDetails: React.FC = () => {
       }
     }
 
-    const isSubjective = currentModDetail?.skill === 'WRITING' || currentModDetail?.skill === 'SPEAKING';
+    const targetSkill =
+      currentModDetail?.skill ||
+      submissionRef.current?.modules?.find((m) => m.id === targetModuleId)?.skill;
+    const isSubjective = targetSkill === 'WRITING' || targetSkill === 'SPEAKING';
     if (isSubjective) {
       try {
         const aiRes = await gradingService.getAiSuggestion(targetModuleId);
@@ -2282,6 +2292,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 />
                 <span className="tsd-score-scale">/ 10</span>
               </div>
+            </div>
+
+            {/* AI Segment Annotations Card */}
+            <div className="tsd-ai-annotations-card">
+              {renderAnnotationsSection()}
             </div>
 
             {/* Feedback Editor with Markdown preview */}
