@@ -22,7 +22,7 @@ public record QuestionResponse(
 		@JsonInclude(JsonInclude.Include.NON_NULL) Map<String, Object> correctAnswer) {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(QuestionResponse.class);
-	private static final int OPTION_COUNT = 4;
+	private static final int MIN_OPTION_COUNT = 2;
 
 	public static QuestionResponse from(Question question, boolean includeCorrectAnswer) {
 		List<QuestionOptionResponse> options = publicOptions(question);
@@ -59,8 +59,8 @@ public record QuestionResponse(
 		if (!(rawOptions instanceof List<?> options)) {
 			return "options_not_list";
 		}
-		if (options.size() != OPTION_COUNT) {
-			return "option_count_not_four";
+		if (options.size() < MIN_OPTION_COUNT) {
+			return "option_count_less_than_two";
 		}
 		Set<BigDecimal> ids = new HashSet<>();
 		for (Object item : options) {

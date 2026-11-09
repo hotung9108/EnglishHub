@@ -185,7 +185,24 @@ export const TeacherAssignmentDetails: React.FC = () => {
               needQuestions ? questionService.listQuestions(m.id) : Promise.reject('No questions needed')
             ]);
             const inst = mDetailRes.status === 'fulfilled' ? (mDetailRes.value.instructions || '') : '';
-            const audio = mDetailRes.status === 'fulfilled' ? (mDetailRes.value.sourceAudioStorageKey || '') : '';
+            let audio = '';
+            if (mDetailRes.status === 'fulfilled') {
+              const detailVal = mDetailRes.value;
+              const detailRecord = detailVal as unknown as Record<string, unknown>;
+              audio = detailVal.sourceAudioDownloadUrl || (typeof detailRecord.audioDownloadUrl === 'string' ? detailRecord.audioDownloadUrl : '') || '';
+              if (!audio && detailVal.sourceAudioStorageKey) {
+                if (detailVal.sourceAudioStorageKey.startsWith('http')) {
+                  audio = detailVal.sourceAudioStorageKey;
+                } else if (m.skill === 'LISTENING') {
+                  try {
+                    const audioRes = await moduleService.getAudioDownloadUrl(m.id);
+                    audio = audioRes.downloadUrl || '';
+                  } catch {
+                    // Ignore fallback error
+                  }
+                }
+              }
+            }
             const modQuestions = qRes.status === 'fulfilled' ? (qRes.value.questions || qRes.value.data || []) : [];
             return {
               id: m.id,
@@ -452,7 +469,7 @@ export const TeacherAssignmentDetails: React.FC = () => {
               {metrics.pendingCount > 0 ? ` (${metrics.pendingCount} ${isVi ? 'chờ chấm' : 'pending'})` : ''}
             </Button>
 
-            {isOwner && (
+            {isOwner && assignment.status !== 'CLOSED' && (
               <Button 
                 variant="secondary"
                 size="sm"
@@ -587,6 +604,23 @@ export const TeacherAssignmentDetails: React.FC = () => {
           .replace(/!\[(?:Diagram|Chart|Biểu đồ)?\]\((https?:\/\/[^\s)]+|data:image\/[^)]+)\)/gi, '')
           .trim();
 
+        // For Reading modules, separate passageTitle and passageBody if present
+        let readingTitle = '';
+        let readingBody = cleanInst || activeInst;
+        if (activeMod?.skill === 'READING' && readingBody.includes('\n\n')) {
+          const firstDoubleNewline = readingBody.indexOf('\n\n');
+          const candidateTitle = readingBody.slice(0, firstDoubleNewline).trim();
+          const isInstructionLike =
+            candidateTitle.toLowerCase().startsWith('hãy đọc') ||
+            candidateTitle.toLowerCase().startsWith('read the') ||
+            candidateTitle.toLowerCase().includes('trả lời câu hỏi') ||
+            candidateTitle.toLowerCase().includes('khả năng hiểu nội dung');
+          if (!isInstructionLike && candidateTitle.length > 0 && candidateTitle.length <= 120) {
+            readingTitle = candidateTitle;
+            readingBody = readingBody.slice(firstDoubleNewline + 2).trim();
+          }
+        }
+
         return (
           <div className="eh-card p-6 mb-6">
             <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
@@ -613,8 +647,15 @@ export const TeacherAssignmentDetails: React.FC = () => {
               </div>
             )}
 
-            <div className="text-main/90 text-sm leading-relaxed whitespace-pre-line font-normal bg-surface-variant/40 p-4 rounded-xl border border-border/50 max-h-96 overflow-y-auto">
-              {cleanInst || activeInst}
+            <div className="bg-surface-variant/40 p-4 rounded-xl border border-border/50 max-h-96 overflow-y-auto">
+              {readingTitle && (
+                <div className="text-base font-bold text-main mb-2.5 pb-2 border-b border-border/60">
+                  {readingTitle}
+                </div>
+              )}
+              <div className="text-main/90 text-sm leading-relaxed whitespace-pre-line font-normal">
+                {readingBody}
+              </div>
             </div>
           </div>
         );
@@ -650,14 +691,16 @@ export const TeacherAssignmentDetails: React.FC = () => {
                 </div>
               </div>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Edit2}
-                onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
-              >
-                {isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}
-              </Button>
+              {isOwner && assignment.status !== 'CLOSED' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Edit2}
+                  onClick={() => navigate(`/teacher/assignments/${id}/edit`)}
+                >
+                  {isVi ? 'Chỉnh sửa bộ câu hỏi' : 'Edit Questions'}
+                </Button>
+              )}
             </div>
 
             {currentQuestionsList.length === 0 ? (

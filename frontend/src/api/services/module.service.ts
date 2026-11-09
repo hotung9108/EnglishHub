@@ -32,6 +32,7 @@ export interface ModuleDetailResponse {
   sourceAudioMimeType?: string;
   sourceAudioUploadStatus?: string;
   audioDownloadUrl?: string;
+  sourceAudioDownloadUrl?: string;
 }
 
 export interface ModuleListResponse {

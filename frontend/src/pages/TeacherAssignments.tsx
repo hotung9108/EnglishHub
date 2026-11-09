@@ -589,18 +589,20 @@ export const TeacherAssignments: React.FC = () => {
                   </div>
 
                   <div className="teacher-assignment-card-actions">
-                    <button
-                      type="button"
-                      className="teacher-assignment-btn-edit"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/teacher/assignments/${item.id}/edit`);
-                      }}
-                      title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
-                    >
-                      <Edit2 size={13} />
-                      <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
-                    </button>
+                    {item.status !== 'closed' && (
+                      <button
+                        type="button"
+                        className="teacher-assignment-btn-edit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/teacher/assignments/${item.id}/edit`);
+                        }}
+                        title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
+                      >
+                        <Edit2 size={13} />
+                        <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
+                      </button>
+                    )}
 
                     <button
                       type="button"

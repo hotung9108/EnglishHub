@@ -107,6 +107,36 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
     updateField('questions', reordered);
   };
 
+  const handleAddOption = (qIdx: number) => {
+    const q = config.questions[qIdx];
+    const currentOpts = q.options && q.options.length > 0 ? q.options : ['', ''];
+    const newOpts = [...currentOpts, ''];
+    handleUpdateQuestion(qIdx, 'options', newOpts);
+  };
+
+  const handleRemoveOption = (qIdx: number, oIdx: number) => {
+    const q = config.questions[qIdx];
+    const currentOpts = q.options && q.options.length > 0 ? q.options : ['', ''];
+    if (currentOpts.length <= 2) return;
+
+    const removingOpt = currentOpts[oIdx];
+    const removingLetter = String.fromCharCode(65 + oIdx);
+    const wasCorrect = q.correctAnswer === removingLetter || (removingOpt.trim() !== '' && q.correctAnswer === removingOpt);
+
+    const newOpts = currentOpts.filter((_, idx) => idx !== oIdx);
+    const updated = [...config.questions];
+    let nextCorrectAnswer = q.correctAnswer;
+    if (wasCorrect) {
+      nextCorrectAnswer = newOpts[0].trim() || 'A';
+    }
+    updated[qIdx] = {
+      ...updated[qIdx],
+      options: newOpts,
+      correctAnswer: nextCorrectAnswer,
+    };
+    updateField('questions', updated);
+  };
+
   return (
     <div className="flex flex-col gap-5">
       {/* SECTION 1: Reading Passage */}
@@ -187,25 +217,6 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
               onClick={() => handleAddQuestion('short_answer')}
             >
               <Plus size={13} /> {isVi ? 'Điền từ / Ngắn' : 'Short Answer'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              onClick={() => {
-                const newOrder = config.questions.length + 1;
-                const newQuestion: ReadingQuestionItem = {
-                  id: `rq-${Date.now()}`,
-                  order: newOrder,
-                  type: 'short_answer',
-                  prompt: isVi ? `Ô trống [${newOrder}]: Nhập từ/cụm từ điền vào vị trí [${newOrder}]` : `Blank [${newOrder}]: Word/phrase to fill in blank [${newOrder}]`,
-                  correctAnswer: '',
-                  points: 1
-                };
-                updateField('questions', [...config.questions, newQuestion]);
-              }}
-              title={isVi ? 'Thêm ô trống điền từ riêng biệt cho Diagram / Đề bài' : 'Add separate blank for diagram/passage'}
-            >
-              <Plus size={13} /> {isVi ? 'Ô trống Diagram' : 'Diagram Blank'}
             </button>
           </div>
         </div>
@@ -305,7 +316,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                         {isVi ? 'Các lựa chọn (Tích chọn radio vào đáp án đúng):' : 'Options (Select correct radio):'}
                       </label>
                       <div className="question-options-list">
-                        {(q.options || ['', '', '', '']).map((opt, oIdx) => {
+                        {(q.options && q.options.length > 0 ? q.options : ['', '', '', '']).map((opt, oIdx, arr) => {
                           const letter = String.fromCharCode(65 + oIdx);
                           const isCorrect = q.correctAnswer === letter || (opt.trim() !== '' && q.correctAnswer === opt);
                           return (
@@ -319,11 +330,11 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                               <span className="question-option-letter">{letter}.</span>
                               <input
                                 type="text"
-                                className="edit-form-input bg-white py-1 px-3"
+                                className="edit-form-input bg-white py-1 px-3 flex-1"
                                 value={opt}
                                 placeholder={isVi ? `Lựa chọn ${letter} (nhập đáp án...)` : `Option ${letter} (enter text...)`}
                                 onChange={(e) => {
-                                  const newOpts = [...(q.options || ['', '', '', ''])];
+                                  const newOpts = [...arr];
                                   newOpts[oIdx] = e.target.value;
                                   handleUpdateQuestion(qIdx, 'options', newOpts);
                                   if (isCorrect) {
@@ -331,9 +342,29 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                                   }
                                 }}
                               />
+                              {arr.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOption(qIdx, oIdx)}
+                                  className="text-slate-400 hover:text-danger p-1 rounded transition-colors cursor-pointer"
+                                  title={isVi ? 'Xóa lựa chọn này' : 'Remove option'}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </div>
                           );
                         })}
+                        <div className="flex items-center mt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddOption(qIdx)}
+                            className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 rounded-md border border-dashed border-slate-300 dark:border-slate-700 hover:border-primary transition-all cursor-pointer"
+                          >
+                            <Plus size={13} />
+                            <span>{isVi ? 'Thêm lựa chọn' : 'Add option'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -363,14 +394,14 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Trắc nghiệm' : '+ MCQ'}
+                        <Plus size={11} /> {isVi ? 'Trắc nghiệm' : 'MCQ'}
                       </button>
                       <button
                         type="button"
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Điền từ' : '+ Blank'}
+                        <Plus size={11} /> {isVi ? 'Điền từ' : 'Blank'}
                       </button>
                     </div>
                   </div>

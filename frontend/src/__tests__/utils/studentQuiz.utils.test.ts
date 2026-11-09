@@ -163,9 +163,14 @@ describe('validateStudentQuizQuestions', () => {
     expect(validateStudentQuizQuestions([mcq({ options: value })]).questions[0].reason).toBe('OPTIONS_NOT_ARRAY');
   });
 
-  it.each([0, 1, 2, 3, 5])('rejects %i options instead of filtering/padding', count => {
+  it.each([0, 1])('rejects %i options (less than 2)', count => {
     const value = Array.from({ length: count }, (_, i) => ({ id: i + 1, content: 'Failing' }));
     expect(validateStudentQuizQuestions([mcq({ options: value })]).questions[0].reason).toBe('OPTIONS_COUNT_INVALID');
+  });
+
+  it.each([2, 3, 4, 5])('accepts %i options with valid structure', count => {
+    const value = Array.from({ length: count }, (_, i) => ({ id: i + 1, content: `Option ${i + 1}` }));
+    expect(validateStudentQuizQuestions([mcq({ options: value })]).questions[0].reason).toBeNull();
   });
 
   it('reports [null] safely as a wrong option count', () => {

@@ -59,7 +59,7 @@ export interface CreatedQuestionResponse extends MessageResponse {
 
 /**
  * Helper to build a valid MULTIPLE_CHOICE payload according to backend validation rules:
- * - Exactly 4 options with id (1..4), non-blank content, isCorrect boolean.
+ * - At least 2 options with positive id (1..N), non-blank content, isCorrect boolean.
  * - Exactly one option has isCorrect: true.
  * - Score defaults to 1, orderIndex > 0.
  */
@@ -74,19 +74,20 @@ export function buildMcqPayload(params: {
   const content = rawContent || `Câu hỏi ${params.orderIndex}`;
   const rawOptions = (params.options || []).map((o) => (o || '').trim());
 
-  // Ensure exactly 4 options
-  const defaultLabels = ['A', 'B', 'C', 'D'];
+  // Determine dynamic options (minimum 2 options)
+  const optionCount = Math.max(rawOptions.length, 2);
   const fixedOptions: string[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < optionCount; i++) {
     const val = rawOptions[i];
-    fixedOptions.push(val && val.length > 0 ? val : `Lựa chọn ${defaultLabels[i]}`);
+    const letter = String.fromCharCode(65 + i);
+    fixedOptions.push(val && val.length > 0 ? val : `Lựa chọn ${letter}`);
   }
 
-  // Determine correct option index (0..3)
+  // Determine correct option index (0..fixedOptions.length - 1)
   let correctIdx = 0;
   const target = params.correctOptionIndexOrText;
 
-  if (typeof target === 'number' && target >= 0 && target < 4) {
+  if (typeof target === 'number' && target >= 0 && target < fixedOptions.length) {
     correctIdx = target;
   } else if (typeof target === 'string') {
     const trimmedTarget = target.trim();
@@ -95,14 +96,16 @@ export function buildMcqPayload(params: {
     if (foundByText !== -1) {
       correctIdx = foundByText;
     } else {
-      // Check if target is 'A', 'B', 'C', 'D' or '1', '2', '3', '4'
+      // Check if target is a letter ('A', 'B', 'C', ...) or 1-based number string
       const upperTarget = trimmedTarget.toUpperCase();
-      const letterIdx = ['A', 'B', 'C', 'D'].indexOf(upperTarget);
-      if (letterIdx !== -1) {
-        correctIdx = letterIdx;
+      if (upperTarget.length === 1 && upperTarget >= 'A' && upperTarget <= 'Z') {
+        const letterIdx = upperTarget.charCodeAt(0) - 65;
+        if (letterIdx >= 0 && letterIdx < fixedOptions.length) {
+          correctIdx = letterIdx;
+        }
       } else {
         const numIdx = parseInt(trimmedTarget, 10);
-        if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= 4) {
+        if (!isNaN(numIdx) && numIdx >= 1 && numIdx <= fixedOptions.length) {
           correctIdx = numIdx - 1;
         }
       }
@@ -168,7 +171,7 @@ export function extractMcqOptions(correctAnswer?: Record<string, unknown> | null
   correctOptionIndex: number;
 } {
   const defaultResult = {
-    options: ['Option A', 'Option B', 'Option C', 'Option D'],
+    options: ['Option A', 'Option B'],
     correctOptionContent: 'Option A',
     correctOptionIndex: 0,
   };
@@ -197,18 +200,13 @@ export function extractMcqOptions(correctAnswer?: Record<string, unknown> | null
     }
   }
 
-  // Ensure 4 items
-  while (options.length < 4) {
-    options.push(`Option ${String.fromCharCode(65 + options.length)}`);
-  }
-
   if (!correctOptionContent && options.length > 0) {
     correctOptionContent = options[0];
     correctOptionIndex = 0;
   }
 
   return {
-    options: options.slice(0, 4),
+    options,
     correctOptionContent,
     correctOptionIndex,
   };

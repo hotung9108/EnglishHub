@@ -37,23 +37,33 @@ test('buildMcqPayload - generates exactly 4 options with positive IDs and single
   assert.strictEqual(opts[3].isCorrect, false);
 });
 
-test('buildMcqPayload - pads missing options and matches correct option by letter or index', () => {
-  const payload = buildMcqPayload({
-    content: 'Question with few options',
+test('buildMcqPayload - supports dynamic option counts (e.g. 2 or 5 options) and matches correct option by letter or index', () => {
+  const payload2 = buildMcqPayload({
+    content: 'Question with two options',
     options: ['Choice 1', 'Choice 2'],
     correctOptionIndexOrText: 'B', // should match second option
     score: 1,
     orderIndex: 3,
   });
 
-  const opts = (payload.correctAnswer as { options: MultipleChoiceOptionDto[] }).options;
-  assert.strictEqual(opts.length, 4);
-  assert.strictEqual(opts[0].content, 'Choice 1');
-  assert.strictEqual(opts[1].content, 'Choice 2');
-  assert.strictEqual(opts[1].isCorrect, true);
-  assert.strictEqual(opts[0].isCorrect, false);
-  assert.strictEqual(opts[2].isCorrect, false);
-  assert.strictEqual(opts[3].isCorrect, false);
+  const opts2 = (payload2.correctAnswer as { options: MultipleChoiceOptionDto[] }).options;
+  assert.strictEqual(opts2.length, 2);
+  assert.strictEqual(opts2[0].content, 'Choice 1');
+  assert.strictEqual(opts2[1].content, 'Choice 2');
+  assert.strictEqual(opts2[1].isCorrect, true);
+  assert.strictEqual(opts2[0].isCorrect, false);
+
+  const payload5 = buildMcqPayload({
+    content: 'Question with five options',
+    options: ['Opt A', 'Opt B', 'Opt C', 'Opt D', 'Opt E'],
+    correctOptionIndexOrText: 'E',
+    score: 1,
+    orderIndex: 4,
+  });
+  const opts5 = (payload5.correctAnswer as { options: MultipleChoiceOptionDto[] }).options;
+  assert.strictEqual(opts5.length, 5);
+  assert.strictEqual(opts5[4].content, 'Opt E');
+  assert.strictEqual(opts5[4].isCorrect, true);
 });
 
 test('buildShortAnswerPayload - builds valid payload with trimmed answer and score', () => {
