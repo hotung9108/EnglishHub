@@ -85,7 +85,8 @@ public class AdminUserController {
 				request == null ? null : request.specialization(),
 				request == null ? null : request.studentCode(),
 				request == null ? null : request.dateOfBirth(),
-				request == null ? null : request.parentPhone()));
+				request == null ? null : request.parentPhone(),
+				request == null ? null : request.role()));
 		return ResponseEntity.ok(new MessageResponse("Cập nhật người dùng thành công."));
 	}
 

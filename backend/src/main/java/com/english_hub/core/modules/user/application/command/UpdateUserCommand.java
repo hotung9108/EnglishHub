@@ -8,5 +8,16 @@ public record UpdateUserCommand(
 		String specialization,
 		String studentCode,
 		LocalDate dateOfBirth,
-		String parentPhone) {
+		String parentPhone,
+		String role) {
+
+	public UpdateUserCommand(
+			String fullName,
+			String phone,
+			String specialization,
+			String studentCode,
+			LocalDate dateOfBirth,
+			String parentPhone) {
+		this(fullName, phone, specialization, studentCode, dateOfBirth, parentPhone, null);
+	}
 }

@@ -13,6 +13,8 @@ interface SelectExistingStudentsModalProps {
   classId: number;
   classNameTitle?: string;
   enrolledStudentIds: number[];
+  maxCapacity?: number;
+  enrolledCount?: number;
   onSuccess: () => Promise<void> | void;
 }
 
@@ -22,10 +24,17 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
   classId,
   classNameTitle,
   enrolledStudentIds,
+  maxCapacity = 25,
+  enrolledCount,
   onSuccess,
 }) => {
   const { language } = useLanguage();
   const isVi = language === 'vi';
+
+  const capacity = maxCapacity || 25;
+  const currentCount = typeof enrolledCount === 'number' ? enrolledCount : enrolledStudentIds.length;
+  const availableSpots = Math.max(0, capacity - currentCount);
+  const isFull = availableSpots === 0;
 
   const [students, setStudents] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,12 +98,22 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
 
   // Toggle single student selection
   const handleToggleStudent = (studentId: number, isLocked: boolean) => {
-    if (isLocked) return;
-    setSelectedIds(prev => 
-      prev.includes(studentId)
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
-    );
+    if (isLocked || isFull) return;
+    setSubmitError(null);
+    setSelectedIds(prev => {
+      if (prev.includes(studentId)) {
+        return prev.filter(id => id !== studentId);
+      }
+      if (prev.length >= availableSpots) {
+        setSubmitError(
+          isVi
+            ? `Lớp chỉ còn trống ${availableSpots} chỗ. Không thể chọn thêm học viên.`
+            : `Only ${availableSpots} vacancies left in this class.`
+        );
+        return prev;
+      }
+      return [...prev, studentId];
+    });
   };
 
   // Toggle select all active in current filtered view
@@ -105,10 +124,23 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
   const isAllSelected = activeFilteredIds.length > 0 && activeFilteredIds.every(id => selectedIds.includes(id));
 
   const handleToggleSelectAll = () => {
+    if (isFull) return;
+    setSubmitError(null);
     if (isAllSelected) {
       setSelectedIds(prev => prev.filter(id => !activeFilteredIds.includes(id)));
     } else {
-      setSelectedIds(prev => Array.from(new Set([...prev, ...activeFilteredIds])));
+      const remainingCapacity = availableSpots;
+      const candidates = activeFilteredIds.filter(id => !selectedIds.includes(id));
+      const allowedCount = Math.max(0, remainingCapacity - selectedIds.length);
+      const toAdd = candidates.slice(0, allowedCount);
+      if (candidates.length > allowedCount) {
+        setSubmitError(
+          isVi
+            ? `Đã chọn tối đa ${selectedIds.length + toAdd.length}/${capacity} học viên theo sĩ số còn trống của lớp.`
+            : `Selected up to ${selectedIds.length + toAdd.length}/${capacity} students based on vacancies.`
+        );
+      }
+      setSelectedIds(prev => [...prev, ...toAdd]);
     }
   };
 
@@ -279,6 +311,47 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
             </div>
           )}
 
+          {/* Capacity Status Banner */}
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: '10px',
+            backgroundColor: isFull ? 'rgba(239, 68, 68, 0.08)' : 'rgba(27, 77, 62, 0.06)',
+            border: isFull ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(27, 77, 62, 0.2)',
+            color: isFull ? 'var(--color-danger, #b91c1c)' : 'var(--eh-primary, #1B4D3E)',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={18} />
+              <span>
+                {isVi ? 'Sĩ số hiện tại: ' : 'Class capacity: '}
+                <strong>{currentCount}/{capacity}</strong> {isVi ? 'học viên' : 'students'}
+                {' • '}
+                <span style={{ fontWeight: 600 }}>
+                  {isFull 
+                    ? (isVi ? '⚠️ Lớp học đã đạt sĩ số tối đa. Vui lòng tăng sĩ số trong phần Cài đặt lớp.' : '⚠️ Class has reached maximum capacity.')
+                    : (isVi ? `Còn trống ${availableSpots} chỗ` : `${availableSpots} vacancies remaining`)}
+                </span>
+              </span>
+            </div>
+            {!isFull && selectedIds.length > 0 && (
+              <span style={{
+                fontSize: '12px',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                backgroundColor: 'var(--eh-primary, #1B4D3E)',
+                color: '#ffffff',
+                fontWeight: 600
+              }}>
+                {isVi ? `Đã chọn: ${selectedIds.length}/${availableSpots}` : `Selected: ${selectedIds.length}/${availableSpots}`}
+              </span>
+            )}
+          </div>
+
           {/* Search bar */}
           <div style={{ position: 'relative' }}>
             <Search 
@@ -310,7 +383,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                 ? `Tìm thấy ${filteredStudents.length} học viên khả dụng` 
                 : `${filteredStudents.length} available students found`}
             </span>
-            {activeFilteredIds.length > 0 && (
+            {activeFilteredIds.length > 0 && !isFull && (
               <button
                 type="button"
                 onClick={handleToggleSelectAll}
@@ -381,8 +454,8 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                         padding: '12px 16px',
                         borderBottom: '1px solid var(--outline-variant, #e2e8f0)',
                         backgroundColor: isSelected ? 'var(--eh-primary-subtle, #f2f6f1)' : 'var(--surface, #ffffff)',
-                        cursor: isLocked ? 'not-allowed' : 'pointer',
-                        opacity: isLocked ? 0.6 : 1,
+                        cursor: isLocked || (isFull && !isSelected) ? 'not-allowed' : 'pointer',
+                        opacity: isLocked || (isFull && !isSelected) ? 0.6 : 1,
                         transition: 'background-color 0.15s ease'
                       }}
                     >
@@ -486,7 +559,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
             <button
               type="button"
               className="btn btn-primary"
-              disabled={selectedIds.length === 0 || submitting}
+              disabled={isFull || selectedIds.length === 0 || submitting}
               onClick={handleSubmit}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >

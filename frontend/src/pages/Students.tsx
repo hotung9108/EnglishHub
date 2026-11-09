@@ -48,8 +48,13 @@ export const Students: React.FC = () => {
   });
 
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
+  const isFirstSearchEffect = React.useRef(true);
 
   useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      if (!debouncedSearchQuery.trim()) return;
+    }
     setQuery(debouncedSearchQuery.trim());
   }, [debouncedSearchQuery, setQuery]);
 

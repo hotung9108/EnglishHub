@@ -5,6 +5,7 @@ import {
   Mail, Phone, Edit3, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../hooks/useAuth';
 import { validateFullName } from '../utils/nameValidation';
 import { useUsers } from '../hooks/useUsers';
 import { useDebounce } from '../hooks/useDebounce';
@@ -17,6 +18,7 @@ export const Accounts: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
   const { success: toastSuccess, error: toastError } = useToast();
+  const { user: currentUser } = useAuth();
 
   const [roleFilter, setRoleFilter] = useState<'All' | 'STUDENT' | 'TEACHER' | 'ADMIN'>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'ACTIVE' | 'LOCKED'>('All');
@@ -43,8 +45,13 @@ export const Accounts: React.FC = () => {
   });
 
   const debouncedSearchQuery = useDebounce(searchQuery, 350);
+  const isFirstSearchEffect = React.useRef(true);
 
   useEffect(() => {
+    if (isFirstSearchEffect.current) {
+      isFirstSearchEffect.current = false;
+      if (!debouncedSearchQuery.trim()) return;
+    }
     setQuery(debouncedSearchQuery.trim());
   }, [debouncedSearchQuery, setQuery]);
 
@@ -145,9 +152,11 @@ export const Accounts: React.FC = () => {
     try {
       setActionLoading(true);
       if (editingUser) {
+        const isEditingSelf = Boolean(currentUser && editingUser.id === currentUser.id);
         await updateUser(editingUser.id, {
           fullName: cleanName,
-          phone: formData.phone || undefined
+          phone: formData.phone || undefined,
+          role: isEditingSelf ? undefined : formData.role
         });
         if (editingUser.status !== formData.status) {
           await userService.updateStatus(editingUser.id, formData.status);
@@ -510,16 +519,29 @@ export const Accounts: React.FC = () => {
                 <div className="adm-form-grid">
                   <div className="adm-form-group">
                     <label className="adm-form-label">{t('accounts.colRole')}</label>
-                    <select 
-                      className={`input ${editingUser ? 'opacity-80 cursor-not-allowed' : ''}`}
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
-                      disabled={!!editingUser}
-                    >
-                      <option value="STUDENT">Student (Học viên)</option>
-                      <option value="TEACHER">Teacher (Giáo viên)</option>
-                      <option value="ADMIN">Admin (Quản trị viên)</option>
-                    </select>
+                    {(() => {
+                      const isEditingSelf = Boolean(editingUser && currentUser && editingUser.id === currentUser.id);
+                      return (
+                        <>
+                          <select 
+                            className={`input ${isEditingSelf ? 'opacity-80 cursor-not-allowed' : ''}`}
+                            value={formData.role}
+                            onChange={(e) => setFormData({ ...formData, role: e.target.value as 'STUDENT' | 'TEACHER' | 'ADMIN' })}
+                            disabled={isEditingSelf}
+                            title={isEditingSelf ? (isVi ? 'Không thể tự thay đổi vai trò của chính mình' : 'Cannot change your own role') : undefined}
+                          >
+                            <option value="STUDENT">Student (Học viên)</option>
+                            <option value="TEACHER">Teacher (Giáo viên)</option>
+                            <option value="ADMIN">Admin (Quản trị viên)</option>
+                          </select>
+                          {isEditingSelf && (
+                            <span className="text-muted text-xs mt-1 block">
+                              {isVi ? 'Không thể tự thay đổi vai trò của chính mình' : 'Cannot change your own role'}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <div className="adm-form-group">

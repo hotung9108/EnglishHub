@@ -94,6 +94,11 @@ export function parseApiError(error: unknown): ApiClientError {
     if (axiosErr.code === 'ECONNABORTED' || (typeof axiosErr.message === 'string' && axiosErr.message.includes('timeout'))) {
       return new TimeoutError('Yêu cầu vượt quá thời gian phản hồi.', axiosErr);
     }
+    // Canceled / Aborted requests should never be treated as NetworkError
+    if (axios.isCancel(error) || axiosErr.code === 'ERR_CANCELED' || axiosErr.name === 'CanceledError') {
+      return new ApiClientError('Yêu cầu đã được hủy.', 0, axiosErr);
+    }
+
     if (!axiosErr.response) {
       return new NetworkError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra đường truyền.', axiosErr);
     }

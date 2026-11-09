@@ -49,6 +49,7 @@ export type CreatableRole = CreateUserPayload['role'];
 export interface UpdateUserPayload {
   fullName?: string;
   phone?: string;
+  role?: UserRole;
   specialization?: string;
   studentCode?: string;
   dateOfBirth?: string;
