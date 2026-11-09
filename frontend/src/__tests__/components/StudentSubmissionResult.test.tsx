@@ -29,6 +29,7 @@ vi.mock('../../api/services/submission.service', async (original) => ({
     listSubmissions: vi.fn(),
     getSubmission: vi.fn(),
     getSubmissionModuleDetail: vi.fn(),
+    getDocumentDownloadUrl: vi.fn(),
     getAudioDownloadUrl: vi.fn(),
   },
 }));
@@ -241,6 +242,14 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     });
     vi.mocked(answerAnnotationService.listAnnotations).mockResolvedValue({
       data: mockAnnotations,
+    });
+    vi.mocked(submissionService.getDocumentDownloadUrl).mockResolvedValue({
+      submissionModuleId: 50,
+      downloadUrl: 'https://s3.example.com/essay.docx',
+      storageKey: 'submissions/50/essay.docx',
+      fileName: 'essay.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      expiresAt: '2026-11-09T10:00:00Z',
     });
     vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
@@ -1058,6 +1067,60 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     await act(async () => currentB.resolve({ ...publishedResult, finalFeedback: 'B finished' }));
     expect(await screen.findByText('B finished')).toBeVisible();
     expect(screen.queryByText('Đang tải nhận xét...')).not.toBeInTheDocument();
+  });
+
+  it('calls getDocumentDownloadUrl when student clicks download submission file button', async () => {
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+      ...mockModuleDetail,
+      skill: 'WRITING',
+      answers: [{ id: 60, questionId: 1, content: null, docStorageKey: 'submissions/50/essay.pdf' }],
+    });
+    renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    const downloadBtns = await screen.findAllByRole('button', { name: 'Tải tệp bài làm' });
+    expect(downloadBtns.length).toBeGreaterThan(0);
+    const user = userEvent.setup();
+    await user.click(downloadBtns[0]);
+    expect(submissionService.getDocumentDownloadUrl).toHaveBeenCalledWith(50, 'download');
+    expect(screen.getByText('Đang tạo liên kết tải tài liệu...')).toBeVisible();
+  });
+
+  it('shows error toast when student document download URL fails', async () => {
+    vi.mocked(submissionService.getDocumentDownloadUrl).mockRejectedValueOnce(new Error('Doc download error'));
+    vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({
+      ...mockModuleDetail,
+      skill: 'WRITING',
+      answers: [{ id: 60, questionId: 1, content: null, docStorageKey: 'submissions/50/essay.pdf' }],
+    });
+    renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    const downloadBtns = await screen.findAllByRole('button', { name: 'Tải tệp bài làm' });
+    const user = userEvent.setup();
+    await user.click(downloadBtns[0]);
+    await waitFor(() => {
+      expect(screen.getByText('Không thể tải tệp bài làm. Vui lòng thử lại sau.')).toBeVisible();
+    });
+  });
+
+  it('calls getAudioDownloadUrl when student clicks download audio button in speaking view', async () => {
+    arrangeSkill('SPEAKING');
+    renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    const user = userEvent.setup();
+    const downloadAudioBtn = await screen.findByRole('button', { name: 'Tải bản ghi âm' });
+    expect(downloadAudioBtn).toBeVisible();
+    await user.click(downloadAudioBtn);
+    expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50, 'download');
+    expect(screen.getByText('Đang tạo liên kết tải bản ghi âm...')).toBeVisible();
+  });
+
+  it('shows error toast when student audio download URL fails', async () => {
+    vi.mocked(submissionService.getAudioDownloadUrl).mockRejectedValueOnce(new Error('Audio download error'));
+    arrangeSkill('SPEAKING');
+    renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
+    const user = userEvent.setup();
+    const downloadAudioBtn = await screen.findByRole('button', { name: 'Tải bản ghi âm' });
+    await user.click(downloadAudioBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Không thể tải bản ghi âm. Vui lòng thử lại sau.')).toBeVisible();
+    });
   });
 
 });

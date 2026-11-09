@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
-  XCircle, Plus, Trash2
+  XCircle, Plus, Trash2, Download
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -162,7 +162,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // Form State
   const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
-
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
+  const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -174,21 +175,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
     const url = resolveStorageUrl(storageKey);
     if (!url) return;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleDownloadDocument = (storageKey: string) => {
-    const url = resolveStorageUrl(storageKey);
-    if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    const fileName = getFileNameFromKey(storageKey);
-    link.download = fileName;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
   };
 
   const showToast = (msg: string) => {
@@ -756,6 +742,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const audioAnswer = currentModuleDetail?.answers?.find((answer) =>
     Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
   );
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
   const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
   const currentAudioContext = targetModuleId && audioAnswer
     ? { moduleId: targetModuleId, answerId: audioAnswer.id }
@@ -873,6 +860,64 @@ export const TeacherSubmissionDetails: React.FC = () => {
       audio.currentTime = Math.min(Math.max(savedTime, 0), audio.duration);
     }
     pendingAudioTimeRef.current = null;
+  };
+
+  const handleDownloadDocument = async (storageKey?: string) => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
+    try {
+      setIsDownloadingDoc(true);
+      const res = await submissionService.getDocumentDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (storageKey ? getFileNameFromKey(storageKey) : 'submission-document');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.');
+    } finally {
+      setIsDownloadingDoc(false);
+    }
+  };
+
+  const handleDownloadAudio = async () => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...');
+    try {
+      setIsDownloadingAudio(true);
+      const res = await submissionService.getAudioDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (audioStorageKey ? getFileNameFromKey(audioStorageKey) : 'submission-audio.webm');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.');
+    } finally {
+      setIsDownloadingAudio(false);
+    }
   };
 
   const targetAnswer = useMemo(() => {
@@ -1667,6 +1712,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   </div>
                 )}
 
+                {(audioUrl || audioStorageKey) && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={isDownloadingAudio}
+                    onClick={handleDownloadAudio}
+                    icon={Download}
+                  >
+                    {isVi ? 'Tải bản ghi âm' : 'Download Audio'}
+                  </Button>
+                )}
+
                 <Button
                   type="button"
                   variant="primary"
@@ -1828,6 +1886,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                           details={t('submissionDetails.submittedOn')}
                           onView={() => handleViewDocument(docKey)}
                           onDownload={() => handleDownloadDocument(docKey)}
+                          isDownloading={isDownloadingDoc}
                         />
                       );
                     })}
@@ -1887,6 +1946,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <Sparkles size={14} />
                   {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
                 </span>
+
                 <Button
                   type="button"
                   variant="primary"
