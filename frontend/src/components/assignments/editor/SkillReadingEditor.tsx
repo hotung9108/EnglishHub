@@ -188,25 +188,6 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             >
               <Plus size={13} /> {isVi ? 'Điền từ / Ngắn' : 'Short Answer'}
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary bg-white btn-sm"
-              onClick={() => {
-                const newOrder = config.questions.length + 1;
-                const newQuestion: ReadingQuestionItem = {
-                  id: `rq-${Date.now()}`,
-                  order: newOrder,
-                  type: 'short_answer',
-                  prompt: isVi ? `Ô trống [${newOrder}]: Nhập từ/cụm từ điền vào vị trí [${newOrder}]` : `Blank [${newOrder}]: Word/phrase to fill in blank [${newOrder}]`,
-                  correctAnswer: '',
-                  points: 1
-                };
-                updateField('questions', [...config.questions, newQuestion]);
-              }}
-              title={isVi ? 'Thêm ô trống điền từ riêng biệt cho Diagram / Đề bài' : 'Add separate blank for diagram/passage'}
-            >
-              <Plus size={13} /> {isVi ? 'Ô trống Diagram' : 'Diagram Blank'}
-            </button>
           </div>
         </div>
 
@@ -363,14 +344,14 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Trắc nghiệm' : '+ MCQ'}
+                        <Plus size={11} /> {isVi ? 'Trắc nghiệm' : 'MCQ'}
                       </button>
                       <button
                         type="button"
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Điền từ' : '+ Blank'}
+                        <Plus size={11} /> {isVi ? 'Điền từ' : 'Blank'}
                       </button>
                     </div>
                   </div>

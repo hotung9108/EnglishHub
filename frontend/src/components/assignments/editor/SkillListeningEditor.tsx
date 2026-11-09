@@ -166,27 +166,62 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
           }}
         />
 
-        {config.audioPreviewUrl || config.audioUrl ? (
-          <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm truncate max-w-md text-main">
-                {config.audioFile?.name || config.audioUrl || (isVi ? 'Tệp bài nghe' : 'Audio track')}
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary bg-white btn-sm"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {isVi ? 'Thay đổi file' : 'Change File'}
-              </button>
+        {config.audioPreviewUrl || config.audioUrl ? (() => {
+          const getAudioDisplayName = (): string => {
+            if (config.audioFile?.name) {
+              return config.audioFile.name;
+            }
+            if (config.audioTitle) {
+              return config.audioTitle;
+            }
+            if (config.audioUrl) {
+              try {
+                if (config.audioUrl.startsWith('http://') || config.audioUrl.startsWith('https://')) {
+                  const parsed = new URL(config.audioUrl);
+                  const segment = parsed.pathname.substring(parsed.pathname.lastIndexOf('/') + 1);
+                  if (segment) {
+                    return decodeURIComponent(segment);
+                  }
+                }
+              } catch {
+                // Fallback to url
+              }
+              return config.audioUrl;
+            }
+            return isVi ? 'Tệp bài nghe' : 'Audio track';
+          };
+
+          const rawAudioDisplayName = getAudioDisplayName();
+          const truncatedAudioName =
+            rawAudioDisplayName.length > 40
+              ? `${rawAudioDisplayName.slice(0, 37)}...`
+              : rawAudioDisplayName;
+
+          return (
+            <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <span
+                  className="font-semibold text-sm block truncate min-w-0 flex-1 text-main"
+                  title={config.audioFile?.name || config.audioTitle || config.audioUrl || (isVi ? 'Tệp bài nghe' : 'Audio track')}
+                >
+                  {truncatedAudioName}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary bg-white btn-sm shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isVi ? 'Thay đổi file' : 'Change File'}
+                </button>
+              </div>
+              {(config.audioPreviewUrl || config.audioUrl) && (
+                <audio controls className="w-full h-10 mt-1" src={config.audioPreviewUrl || config.audioUrl}>
+                  {isVi ? 'Trình duyệt không hỗ trợ thẻ phát âm thanh.' : 'Your browser does not support audio element.'}
+                </audio>
+              )}
             </div>
-            {config.audioPreviewUrl && (
-              <audio controls className="w-full h-10 mt-1" src={config.audioPreviewUrl}>
-                {isVi ? 'Trình duyệt không hỗ trợ thẻ phát âm thanh.' : 'Your browser does not support audio element.'}
-              </audio>
-            )}
-          </div>
-        ) : (
+          );
+        })() : (
           <div
             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
               isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 dark:border-slate-700 hover:border-primary'
@@ -408,14 +443,14 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'multiple_choice')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Trắc nghiệm' : '+ MCQ'}
+                        <Plus size={11} /> {isVi ? 'Trắc nghiệm' : 'MCQ'}
                       </button>
                       <button
                         type="button"
                         className="btn btn-secondary bg-white btn-xs text-xs py-1 px-2.5 flex items-center gap-1 shadow-sm"
                         onClick={() => handleInsertQuestionAfter(qIdx, 'short_answer')}
                       >
-                        <Plus size={11} /> {isVi ? '+ Điền từ' : '+ Blank'}
+                        <Plus size={11} /> {isVi ? 'Điền từ' : 'Blank'}
                       </button>
                     </div>
                   </div>
