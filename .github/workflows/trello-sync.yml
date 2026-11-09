@@ -101,9 +101,11 @@ jobs:
               print(f"Failed to fetch lists for board {board_id}")
               sys.exit(0)
 
+          testing_list = next((l for l in lists if l["name"].strip().lower() == "testing"), None)
           review_list = next((l for l in lists if "review" in l["name"].lower()), None)
-          if not review_list:
-              print("Could not find a 'Review' list on the Trello board.")
+          target_qa_list = testing_list if testing_list else review_list
+          if not target_qa_list:
+              print("Could not find a 'Testing' or 'Review' list on the Trello board.")
 
           # Find cards on the board
           cards = trello_request(f"/boards/{board_id}/cards")
@@ -160,13 +162,13 @@ jobs:
               trello_request(f"/cards/{card_id}/attachments", method="POST", data={"url": pr_url, "name": f"GitHub PR #{pr_number}"})
 
           if pr_action in ("opened", "reopened", "ready_for_review"):
-              # Move to Review list if found
-              if review_list and target_card.get("idList") != review_list["id"]:
-                  print(f"Moving card to '{review_list['name']}' list...")
-                  trello_request(f"/cards/{card_id}", method="PUT", data={"idList": review_list["id"]})
+              # Move to Testing (or Review) list if found
+              if target_qa_list and target_card.get("idList") != target_qa_list["id"]:
+                  print(f"Moving card to '{target_qa_list['name']}' list...")
+                  trello_request(f"/cards/{card_id}", method="PUT", data={"idList": target_qa_list["id"]})
 
               # Post comment tagging Tester
-              comment = f"@zawntsu Developer @{pr_user} opened PR #{pr_number} ({pr_url}). Ready for QA verification!"
+              comment = f"@zawntsu Developer @{pr_user} opened PR #{pr_number} ({pr_url}). Moved to '{target_qa_list['name']}' for QA verification!"
               print("Posting notification comment to card...")
               trello_request(f"/cards/{card_id}/actions/comments", method="POST", data={"text": comment})
 

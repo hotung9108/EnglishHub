@@ -17,7 +17,9 @@ import { deferred } from '../deferred';
 const { auth } = vi.hoisted(() => ({ auth: { user: { id: 41 } } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('../../api/services/assignment.service', () => ({ assignmentService: { getAssignment: vi.fn() } }));
-vi.mock('../../api/services/module.service', () => ({ moduleService: { getModule: vi.fn(), listModules: vi.fn() } }));
+vi.mock('../../api/services/module.service', () => ({ moduleService: {
+  getModule: vi.fn(), listModules: vi.fn(), getAudioDownloadUrl: vi.fn(),
+} }));
 vi.mock('../../api/services/question.service', () => ({ questionService: { listQuestions: vi.fn() } }));
 vi.mock('../../api/services/submission.service', () => ({ submissionService: {
   getSubmission: vi.fn(), listSubmissions: vi.fn(), startAttempt: vi.fn(),
@@ -108,6 +110,11 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     vi.mocked(assignmentService.getAssignment).mockResolvedValue(assignment());
     vi.mocked(moduleService.getModule).mockImplementation(async id => ({
       id, skill, taskType: 'QUIZ', instructions: 'QA instructions', orderIndex: 1, maxScore: 10,
+    }));
+    vi.mocked(moduleService.getAudioDownloadUrl).mockImplementation(async id => ({
+      moduleId: id,
+      downloadUrl: `https://audio.example/modules/${id}.mp3`,
+      storageKey: `modules/${id}.mp3`,
     }));
     mockQuestions([mcq(), shortAnswer()]);
     serverSubmission = submission();

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
-  XCircle, Plus, Trash2
+  XCircle, Plus, Trash2, Download
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -65,7 +65,9 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmittingGrade, setIsSubmittingGrade] = useState<boolean>(false);
-  const [audioErrorUrl, setAudioErrorUrl] = useState<string | null>(null);
+  const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
+  const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
+  const [audioLoadingContext, setAudioLoadingContext] = useState<{ moduleId: number; answerId: number } | null>(null);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
@@ -114,6 +116,11 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const deleteRequestsRef = useRef(new Map<number, AnnotationRequestContext>());
   const gradeRequestRef = useRef<AnnotationRequestContext | null>(null);
   const annotationItemsRef = useRef<GradingAnnotation[]>([]);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRequestRef = useRef(0);
+  const audioFallbackUsedRef = useRef(false);
+  const pendingAudioTimeRef = useRef<number | null>(null);
+  const audioContextRef = useRef<{ moduleId: number; answerId: number } | null>(null);
   useEffect(() => { annotationItemsRef.current = annotations; }, [annotations]);
 
   const isCurrentAction = useCallback((context: AnnotationRequestContext) => {
@@ -155,7 +162,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
   // Form State
   const [finalScoreInput, setFinalScoreInput] = useState<string>('');
   const [feedbackText, setFeedbackText] = useState<string>('');
-
+  const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
+  const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
 
   const handleRetry = () => {
     setIsLoading(true);
@@ -167,21 +175,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
     const url = resolveStorageUrl(storageKey);
     if (!url) return;
     window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleDownloadDocument = (storageKey: string) => {
-    const url = resolveStorageUrl(storageKey);
-    if (!url) return;
-    const link = document.createElement('a');
-    link.href = url;
-    const fileName = getFileNameFromKey(storageKey);
-    link.download = fileName;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
   };
 
   const showToast = (msg: string) => {
@@ -744,15 +737,188 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
   };
 
-  // Check if current active module is speaking
+  const targetModuleId = activeModule?.id ?? null;
+  const currentModuleDetail = moduleDetail?.id === targetModuleId ? moduleDetail : null;
+  const audioAnswer = currentModuleDetail?.answers?.find((answer) =>
+    Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim())
+  );
+  const audioStorageKey = audioAnswer?.audioStorageKey || null;
+  const directAudioUrl = audioAnswer?.audioDownloadUrl?.trim() || null;
+  const currentAudioContext = targetModuleId && audioAnswer
+    ? { moduleId: targetModuleId, answerId: audioAnswer.id }
+    : null;
+  const currentAudioModuleId = currentAudioContext?.moduleId ?? null;
+  const currentAudioAnswerId = currentAudioContext?.answerId ?? null;
+  useLayoutEffect(() => {
+    audioContextRef.current = currentAudioModuleId !== null && currentAudioAnswerId !== null
+      ? { moduleId: currentAudioModuleId, answerId: currentAudioAnswerId }
+      : null;
+  }, [currentAudioModuleId, currentAudioAnswerId]);
+
   const isSpeaking = activeModule?.skill === 'SPEAKING' ||
-    moduleDetail?.answers?.some(a => !!a.audioStorageKey);
+    currentModuleDetail?.answers?.some((answer) => Boolean(answer.audioDownloadUrl?.trim() || answer.audioStorageKey?.trim()));
+  const audioUrl = currentAudioContext && audioUrlOverride?.moduleId === currentAudioContext.moduleId &&
+    audioUrlOverride.answerId === currentAudioContext.answerId
+    ? audioUrlOverride.url
+    : directAudioUrl;
+  const audioError = Boolean(currentAudioContext && audioErrorContext?.moduleId === currentAudioContext.moduleId &&
+    audioErrorContext.answerId === currentAudioContext.answerId);
+  const isAudioLoading = Boolean(currentAudioContext && audioLoadingContext?.moduleId === currentAudioContext.moduleId &&
+    audioLoadingContext.answerId === currentAudioContext.answerId);
 
-  const audioAnswer = moduleDetail?.answers?.find(a => !!a.audioStorageKey);
-  const audioStorageKey = audioAnswer?.audioStorageKey;
-  const audioUrl = audioStorageKey ? resolveAudioUrl(audioStorageKey) : null;
+  const loadAudioFallback = useCallback(async (
+    moduleId: number,
+    answerId: number,
+    requestId: number,
+    preserveTime: boolean,
+  ) => {
+    if (preserveTime && audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    setAudioLoadingContext({ moduleId, answerId });
+    setAudioErrorContext(null);
+    try {
+      const response = await submissionService.getAudioDownloadUrl(moduleId);
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      const downloadUrl = response.downloadUrl?.trim();
+      if (!downloadUrl) throw new Error('Audio URL is empty.');
+      setAudioUrlOverride({ moduleId, answerId, url: downloadUrl });
+    } catch {
+      if (requestId !== audioRequestRef.current ||
+        audioContextRef.current?.moduleId !== moduleId || audioContextRef.current.answerId !== answerId) return;
+      setAudioErrorContext({ moduleId, answerId });
+    } finally {
+      if (requestId === audioRequestRef.current &&
+        audioContextRef.current?.moduleId === moduleId && audioContextRef.current.answerId === answerId) {
+        setAudioLoadingContext(null);
+      }
+    }
+  }, []);
 
-  const audioError = Boolean(audioUrl && audioErrorUrl === audioUrl);
+  useEffect(() => {
+    const requestId = ++audioRequestRef.current;
+    audioFallbackUsedRef.current = false;
+    pendingAudioTimeRef.current = null;
+    const audio = audioRef.current;
+    audio?.pause();
+
+    if (currentAudioModuleId !== null && currentAudioAnswerId !== null && isSpeaking && !directAudioUrl) {
+      audioFallbackUsedRef.current = true;
+      void loadAudioFallback(currentAudioModuleId, currentAudioAnswerId, requestId, false);
+    }
+
+    return () => {
+      audioRequestRef.current += 1;
+      audio?.pause();
+    };
+  }, [
+    currentAudioModuleId,
+    currentAudioAnswerId,
+    directAudioUrl,
+    isSpeaking,
+    loadAudioFallback,
+  ]);
+
+  const handleAudioError = () => {
+    if (!currentAudioContext || isAudioLoading) return;
+    if (audioRef.current && Number.isFinite(audioRef.current.currentTime)) {
+      pendingAudioTimeRef.current = audioRef.current.currentTime;
+    }
+    audioRef.current?.pause();
+
+    if (audioFallbackUsedRef.current) {
+      setAudioErrorContext(currentAudioContext);
+      return;
+    }
+
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioRetry = () => {
+    if (!currentAudioContext) return;
+    audioFallbackUsedRef.current = true;
+    void loadAudioFallback(
+      currentAudioContext.moduleId,
+      currentAudioContext.answerId,
+      ++audioRequestRef.current,
+      true,
+    );
+  };
+
+  const handleAudioMetadata = () => {
+    const audio = audioRef.current;
+    const savedTime = pendingAudioTimeRef.current;
+    if (!audio || savedTime === null) return;
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = Math.min(Math.max(savedTime, 0), audio.duration);
+    }
+    pendingAudioTimeRef.current = null;
+  };
+
+  const handleDownloadDocument = async (storageKey?: string) => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
+    try {
+      setIsDownloadingDoc(true);
+      const res = await submissionService.getDocumentDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (storageKey ? getFileNameFromKey(storageKey) : 'submission-document');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.');
+    } finally {
+      setIsDownloadingDoc(false);
+    }
+  };
+
+  const handleDownloadAudio = async () => {
+    if (!activeModule?.id) {
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      return;
+    }
+    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...');
+    try {
+      setIsDownloadingAudio(true);
+      const res = await submissionService.getAudioDownloadUrl(activeModule.id, 'download');
+      if (!res?.downloadUrl) {
+        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      const fileName = res.fileName || (audioStorageKey ? getFileNameFromKey(audioStorageKey) : 'submission-audio.webm');
+      link.download = fileName;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.');
+    } finally {
+      setIsDownloadingAudio(false);
+    }
+  };
 
   const targetAnswer = useMemo(() => {
     return moduleDetail?.answers?.find((a) => !!a.audioStorageKey) || moduleDetail?.answers?.[0] || null;
@@ -1504,13 +1670,16 @@ export const TeacherSubmissionDetails: React.FC = () => {
               )}
 
               <div className="tsd-speaking-audio-bar">
-                {audioUrl ? (
-                  audioError ? (
+                {isAudioLoading && !audioUrl ? (
+                  <div className="tsd-audio-empty">
+                    {isVi ? 'Đang tải audio bài nộp...' : 'Loading submission audio...'}
+                  </div>
+                ) : audioError ? (
                     <div className="tsd-audio-error">
                       <div className="tsd-audio-error-msg">
                         <AlertCircle size={16} />
                         <span>
-                          {isVi ? 'Không thể tải bản ghi âm.' : 'Failed to load audio.'}
+                          {isVi ? 'Không thể tải audio bài nộp. Vui lòng thử lại.' : 'Unable to load submission audio. Please try again.'}
                         </span>
                       </div>
                       <Button
@@ -1518,27 +1687,42 @@ export const TeacherSubmissionDetails: React.FC = () => {
                         variant="secondary"
                         size="sm"
                         icon={RefreshCw}
-                        onClick={() => setAudioErrorUrl(null)}
+                        onClick={handleAudioRetry}
                       >
                         {isVi ? 'Thử lại' : 'Retry'}
                       </Button>
                     </div>
-                  ) : (
-                    <div className="tsd-speaking-audio-wrap">
-                      <audio
-                        controls
-                        src={audioUrl}
-                        className="tsd-audio-player"
-                        onError={() => setAudioErrorUrl(audioUrl)}
-                      >
-                        {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
-                      </audio>
-                    </div>
-                  )
+                ) : audioUrl ? (
+                  <div className="tsd-speaking-audio-wrap">
+                    <audio
+                      ref={audioRef}
+                      controls
+                      src={audioUrl}
+                      preload="metadata"
+                      className="tsd-audio-player"
+                      onError={handleAudioError}
+                      onLoadedMetadata={handleAudioMetadata}
+                    >
+                      {isVi ? 'Trình duyệt của bạn không hỗ trợ phát âm thanh.' : 'Your browser does not support audio playback.'}
+                    </audio>
+                  </div>
                 ) : (
                   <div className="tsd-audio-empty">
                     {isVi ? 'Chưa tìm thấy bản ghi âm của học viên.' : 'No audio recording found.'}
                   </div>
+                )}
+
+                {(audioUrl || audioStorageKey) && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={isDownloadingAudio}
+                    onClick={handleDownloadAudio}
+                    icon={Download}
+                  >
+                    {isVi ? 'Tải bản ghi âm' : 'Download Audio'}
+                  </Button>
                 )}
 
                 <Button
@@ -1702,6 +1886,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                           details={t('submissionDetails.submittedOn')}
                           onView={() => handleViewDocument(docKey)}
                           onDownload={() => handleDownloadDocument(docKey)}
+                          isDownloading={isDownloadingDoc}
                         />
                       );
                     })}
@@ -1761,6 +1946,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                   <Sparkles size={14} />
                   {isVi ? 'Nhận xét từ AI' : 'AI Feedback'}
                 </span>
+
                 <Button
                   type="button"
                   variant="primary"
