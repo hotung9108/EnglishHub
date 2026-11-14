@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { 
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
   CheckCircle2, AlertCircle, Users, Calendar, 
   Plus, Download, X, 
   ArrowUpRight, Award, FileText, Send, Eye,
-  Sparkles, RefreshCw, BarChart3
+  Sparkles, RefreshCw, BarChart3,
+  ArrowRightLeft, Trash2, UserPlus, Edit3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary, type ClassDetail, type ClassMember } from '../api/services/class.service';
@@ -14,7 +15,10 @@ import { assignmentService, type AssignmentSummary } from '../api/services/assig
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
-import { Pagination, LoadingState } from '../components/common';
+import { Pagination, LoadingState, Button, ConfirmModal } from '../components/common';
+import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
+import { TransferStudentModal } from '../components/classes/TransferStudentModal';
+import { parseApiError } from '../api';
 import type { 
   ClassSkill, 
   StudentGradeRow, 
@@ -56,6 +60,7 @@ const detectAllSkills = (a: AssignmentSummary, subs: SubmissionListItem[]): Clas
 
 export const TeacherClassProgress: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const isVi = language === 'vi';
@@ -75,13 +80,43 @@ export const TeacherClassProgress: React.FC = () => {
   const [studentsRoster, setStudentsRoster] = useState<StudentGradeRow[]>([]);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'analytics'>('roster');
+  const initialTab = searchParams.get('tab') === 'members' ? 'members' : 'roster';
+  const [activeTab, setActiveTab] = useState<'roster' | 'assignments' | 'analytics' | 'members'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'exceed' | 'ontime' | 'support'>('all');
+
+  // Member Management State (FE-87 / UC009)
+  const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: number; name: string } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+  const [studentToTransfer, setStudentToTransfer] = useState<{ studentId: number; fullName: string; studentCode?: string; currentMemberId: number } | null>(null);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberPageSize, setMemberPageSize] = useState(10);
+
+  // Grade Adjustment State with Audit Reason (FE-90 / UC030 / UC031)
+  const [studentToAdjustGrade, setStudentToAdjustGrade] = useState<StudentGradeRow | null>(null);
+  const [adjustGradeSkill, setAdjustGradeSkill] = useState<'overall' | 'writing' | 'speaking' | 'reading' | 'listening'>('overall');
+  const [newAdjustedScore, setNewAdjustedScore] = useState<string>('8.0');
+  const [auditReasonNote, setAuditReasonNote] = useState<string>('');
+  const [adjustGradeError, setAdjustGradeError] = useState<string | null>(null);
 
   // Pagination for students roster table
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+
+  const handleTabChange = (tab: 'roster' | 'assignments' | 'analytics' | 'members') => {
+    setActiveTab(tab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'members') {
+        next.set('tab', 'members');
+      } else {
+        next.delete('tab');
+      }
+      return next;
+    });
+  };
 
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
@@ -147,6 +182,110 @@ export const TeacherClassProgress: React.FC = () => {
     if (score > 0) return 'low';
     return 'none';
   };
+
+  const parsedCapacity = currentClass?.description ? currentClass.description.match(/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*(\d+)/i) : null;
+  const maxCapacity = parsedCapacity ? parseInt(parsedCapacity[1], 10) : 25;
+
+  const refreshMembers = async () => {
+    if (!currentClass?.id) return;
+    try {
+      const updated = await classService.listMembers(currentClass.id);
+      setEnrolledMembers(updated);
+    } catch {
+      // Keep existing
+    }
+  };
+
+  const executeRemoveMember = async () => {
+    if (!memberToRemove || !currentClass?.id) return;
+    try {
+      setIsRemovingMember(true);
+      await classService.removeMember(currentClass.id, memberToRemove.id);
+      setEnrolledMembers((prev) => prev.filter((m) => m.memberId !== memberToRemove.id));
+      showToast(isVi ? `Đã xóa học viên ${memberToRemove.name} khỏi lớp.` : `Removed student ${memberToRemove.name}.`);
+      setMemberToRemove(null);
+    } catch (err: unknown) {
+      const apiErr = parseApiError(err);
+      showToast(apiErr.message || (isVi ? 'Không thể xóa học viên khỏi lớp.' : 'Failed to remove member.'));
+    } finally {
+      setIsRemovingMember(false);
+    }
+  };
+
+  const handleOpenAdjustGrade = (std: StudentGradeRow) => {
+    setStudentToAdjustGrade(std);
+    setAdjustGradeSkill('overall');
+    setNewAdjustedScore(std.scores.overall > 0 ? String(std.scores.overall) : '8.0');
+    setAuditReasonNote('');
+    setAdjustGradeError(null);
+  };
+
+  const handleSaveGradeAdjustment = () => {
+    if (!studentToAdjustGrade) return;
+    const scoreNum = parseFloat(newAdjustedScore);
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
+      setAdjustGradeError(isVi ? 'Điểm số phải nằm trong khoảng từ 0 đến 10.' : 'Score must be between 0 and 10.');
+      return;
+    }
+    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
+      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC031).' : 'Please enter an audit reason note (mandatory per UC031 audit policy).');
+      return;
+    }
+
+    setStudentsRoster((prev) =>
+      prev.map((row) => {
+        if (row.id === studentToAdjustGrade.id) {
+          const updatedScores = { ...row.scores };
+          if (adjustGradeSkill === 'overall') {
+            updatedScores.overall = Math.round(scoreNum * 10) / 10;
+          } else {
+            updatedScores[adjustGradeSkill] = Math.round(scoreNum * 10) / 10;
+            const validScores = [
+              updatedScores.writing,
+              updatedScores.speaking,
+              updatedScores.reading,
+              updatedScores.listening,
+            ].filter((s) => s > 0);
+            if (validScores.length > 0) {
+              updatedScores.overall = Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10;
+            }
+          }
+          return {
+            ...row,
+            scores: updatedScores,
+          };
+        }
+        return row;
+      })
+    );
+
+    const skillLabel = adjustGradeSkill === 'overall' ? (isVi ? 'Điểm trung bình (Overall)' : 'Overall Score') : adjustGradeSkill.toUpperCase();
+    showToast(
+      isVi
+        ? `Đã điều chỉnh ${skillLabel} cho ${studentToAdjustGrade.name} thành ${scoreNum} (Lý do: ${auditReasonNote.trim()})`
+        : `Updated ${skillLabel} for ${studentToAdjustGrade.name} to ${scoreNum} (Reason: ${auditReasonNote.trim()})`
+    );
+
+    setStudentToAdjustGrade(null);
+  };
+
+  // Filtered members for Tab 4
+  const filteredEnrolledMembers = useMemo(() => {
+    if (!memberSearchQuery.trim()) return enrolledMembers;
+    const q = memberSearchQuery.toLowerCase().trim();
+    return enrolledMembers.filter((m) =>
+      m.fullName.toLowerCase().includes(q) ||
+      (m.studentCode && m.studentCode.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q))
+    );
+  }, [enrolledMembers, memberSearchQuery]);
+
+  const memberTotalPages = Math.ceil(filteredEnrolledMembers.length / memberPageSize) || 1;
+  const safeMemberPage = Math.min(memberPage, memberTotalPages);
+  const paginatedEnrolledMembers = useMemo(() => {
+    const start = (safeMemberPage - 1) * memberPageSize;
+    return filteredEnrolledMembers.slice(start, start + memberPageSize);
+  }, [filteredEnrolledMembers, safeMemberPage, memberPageSize]);
 
   // Load live class data
   useEffect(() => {
@@ -758,7 +897,7 @@ export const TeacherClassProgress: React.FC = () => {
       <div className="tcd-tabs-bar">
         <button 
           className={`tcd-tab-item ${activeTab === 'roster' ? 'active' : ''}`}
-          onClick={() => setActiveTab('roster')}
+          onClick={() => handleTabChange('roster')}
         >
           <Users size={16} />
           <span>{isVi ? 'Sổ điểm & Học viên' : 'Gradebook & Students'}</span>
@@ -767,7 +906,7 @@ export const TeacherClassProgress: React.FC = () => {
 
         <button 
           className={`tcd-tab-item ${activeTab === 'assignments' ? 'active' : ''}`}
-          onClick={() => setActiveTab('assignments')}
+          onClick={() => handleTabChange('assignments')}
         >
           <FileText size={16} />
           <span>{isVi ? 'Danh sách Bài tập' : 'Class Assignments'}</span>
@@ -776,10 +915,19 @@ export const TeacherClassProgress: React.FC = () => {
 
         <button 
           className={`tcd-tab-item ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
+          onClick={() => handleTabChange('analytics')}
         >
           <BarChart3 size={16} />
           <span>{isVi ? 'Đánh giá 4 kỹ năng' : '4-Skill Performance'}</span>
+        </button>
+
+        <button 
+          className={`tcd-tab-item ${activeTab === 'members' ? 'active' : ''}`}
+          onClick={() => handleTabChange('members')}
+        >
+          <Users size={16} />
+          <span>{isVi ? 'Quản lý thành viên' : 'Class Members'}</span>
+          <span className="tcd-tab-count">{enrolledMembers.length}</span>
         </button>
       </div>
 
@@ -916,13 +1064,22 @@ export const TeacherClassProgress: React.FC = () => {
                     </td>
 
                     <td className="text-right">
-                      <button 
-                        className="tcd-btn-action-icon"
-                        title={isVi ? 'Xem chi tiết học viên' : 'View Student'}
-                        onClick={() => handleOpenStudentDetail(std)}
-                      >
-                        <Eye size={15} />
-                      </button>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <button 
+                          className="tcd-btn-action-icon"
+                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán UC031)' : 'Adjust Grade (Audit note)'}
+                          onClick={() => handleOpenAdjustGrade(std)}
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                        <button 
+                          className="tcd-btn-action-icon"
+                          title={isVi ? 'Xem chi tiết học viên' : 'View Student'}
+                          onClick={() => handleOpenStudentDetail(std)}
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -958,8 +1115,10 @@ export const TeacherClassProgress: React.FC = () => {
         </section>
       )}
 
-      {/* 6. TAB 2: Danh sách Bài tập lớp */}
-      {activeTab === 'assignments' && (
+
+
+      {/* 6. TAB 2: Danh sách Bài tập */}
+            {activeTab === 'assignments' && (
         <section className="tcd-card-section">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -1080,8 +1239,10 @@ export const TeacherClassProgress: React.FC = () => {
         </section>
       )}
 
-      {/* 7. TAB 3: Đánh giá 4 Kỹ năng */}
-      {activeTab === 'analytics' && (
+
+
+      {/* 7. TAB 3: Đánh giá 4 kỹ năng */}
+            {activeTab === 'analytics' && (
         <section className="tcd-card-section">
           <div>
             <h2 className="text-base font-bold text-main m-0">
@@ -1133,6 +1294,162 @@ export const TeacherClassProgress: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6. TAB 4: Quản lý thành viên lớp học (FE-87 / UC009) */}
+      {activeTab === 'members' && (
+        <section className="tcd-card-section">
+          {/* Header & Capacity */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 mb-4 rounded-xl bg-surface border border-border">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                <Users size={22} />
+              </div>
+              <div>
+                <h3 className="m-0 text-base font-bold text-main">
+                  {isVi ? 'Danh sách học viên đang theo học' : 'Enrolled Class Members'}
+                </h3>
+                <p className="m-0 text-xs text-muted mt-0.5">
+                  {isVi ? 'Sĩ số hiện tại:' : 'Current roster:'}{' '}
+                  <strong>{enrolledMembers.length} / {maxCapacity}</strong>{' '}
+                  ({Math.max(0, maxCapacity - enrolledMembers.length)} {isVi ? 'chỗ trống' : 'vacancies'})
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="primary"
+              icon={UserPlus}
+              onClick={() => setShowSelectStudentsModal(true)}
+              disabled={enrolledMembers.length >= maxCapacity}
+              title={enrolledMembers.length >= maxCapacity ? (isVi ? 'Lớp đã đủ sĩ số tối đa' : 'Class is at max capacity') : undefined}
+            >
+              {isVi ? 'Thêm học viên vào lớp' : 'Add Students to Class'}
+            </Button>
+          </div>
+
+          {/* Search Toolbar */}
+          <div className="tcd-toolbar">
+            <div className="tcd-search-wrap">
+              <Search size={15} className="tcd-search-icon" />
+              <input
+                type="text"
+                className="tcd-search-input"
+                placeholder={isVi ? 'Tìm kiếm học viên theo tên, mã HV hoặc email...' : 'Search student by name, ID or email...'}
+                value={memberSearchQuery}
+                onChange={(e) => {
+                  setMemberSearchQuery(e.target.value);
+                  setMemberPage(1);
+                }}
+              />
+            </div>
+            <div className="text-xs text-muted">
+              {isVi ? 'Hiển thị' : 'Showing'} {filteredEnrolledMembers.length} {isVi ? 'học viên' : 'students'}
+            </div>
+          </div>
+
+          {/* Members Table */}
+          <div className="tcd-table-wrap">
+            <table className="tcd-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ HV' : 'STUDENT CODE'}</th>
+                  <th>{isVi ? 'HỌ VÀ TÊN' : 'FULL NAME'}</th>
+                  <th>{isVi ? 'EMAIL' : 'EMAIL'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTIONS'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedEnrolledMembers.map((m) => {
+                  const initials = m.fullName.trim().split(/\s+/).map((n) => n[0]).slice(-2).join('').toUpperCase();
+                  const code = m.studentCode || `HV-${m.studentId}`;
+
+                  return (
+                    <tr key={m.memberId}>
+                      <td className="font-mono font-semibold text-primary">{code}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--primary, #1b4d3e)',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                            }}
+                          >
+                            {initials}
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 600, color: 'var(--color-main, #1e293b)' }}>{m.fullName}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-muted">{m.email || '—'}</td>
+                      <td className="text-right">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={ArrowRightLeft}
+                            onClick={() =>
+                              setStudentToTransfer({
+                                studentId: m.studentId,
+                                fullName: m.fullName,
+                                studentCode: m.studentCode,
+                                currentMemberId: m.memberId,
+                              })
+                            }
+                            title={isVi ? 'Chuyển học viên sang lớp khác (UC009)' : 'Transfer to another class'}
+                          >
+                            {isVi ? 'Chuyển lớp' : 'Transfer'}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="text-error"
+                            icon={Trash2}
+                            onClick={() => setMemberToRemove({ id: m.memberId, name: m.fullName })}
+                            title={isVi ? 'Xóa học viên khỏi lớp' : 'Remove from class'}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filteredEnrolledMembers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center p-6 text-muted text-sm">
+                      {isVi ? 'Không tìm thấy học viên nào phù hợp.' : 'No members found.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {filteredEnrolledMembers.length > 0 && (
+              <Pagination
+                currentPage={safeMemberPage}
+                totalPages={memberTotalPages}
+                totalItems={filteredEnrolledMembers.length}
+                itemLabel={isVi ? 'thành viên' : 'members'}
+                isVi={isVi}
+                onPageChange={setMemberPage}
+                pageSize={memberPageSize}
+                onPageSizeChange={(newSize) => {
+                  setMemberPageSize(newSize);
+                  setMemberPage(1);
+                }}
+              />
+            )}
           </div>
         </section>
       )}
@@ -1285,6 +1602,161 @@ export const TeacherClassProgress: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 9. Modal Điều chỉnh điểm kèm Audit reason note (FE-90 / UC030 / UC031) */}
+      {studentToAdjustGrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <Edit3 size={18} />
+                </div>
+                <div>
+                  <h3 className="m-0 text-base font-bold text-foreground">
+                    {isVi ? 'Điều chỉnh điểm số học viên' : 'Adjust Student Grade'}
+                  </h3>
+                  <p className="m-0 text-xs text-muted-foreground mt-0.5">
+                    {studentToAdjustGrade.name} ({studentToAdjustGrade.code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStudentToAdjustGrade(null)}
+                className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {adjustGradeError && (
+                <div className="p-3 text-xs text-error bg-error/10 rounded-lg flex items-center gap-2 border border-error/20">
+                  <AlertCircle size={15} />
+                  <span>{adjustGradeError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Hạng mục điểm điều chỉnh' : 'Score Category'}
+                </label>
+                <select
+                  value={adjustGradeSkill}
+                  onChange={(e) => {
+                    const sk = e.target.value as 'overall' | 'writing' | 'speaking' | 'reading' | 'listening';
+                    setAdjustGradeSkill(sk);
+                    const currentScore = sk === 'overall' ? studentToAdjustGrade.scores.overall : studentToAdjustGrade.scores[sk];
+                    setNewAdjustedScore(currentScore > 0 ? String(currentScore) : '8.0');
+                  }}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="overall">{isVi ? 'Điểm trung bình (Overall)' : 'Overall Average'}</option>
+                  <option value="writing">Writing ({studentToAdjustGrade.scores.writing > 0 ? studentToAdjustGrade.scores.writing : '—'})</option>
+                  <option value="speaking">Speaking ({studentToAdjustGrade.scores.speaking > 0 ? studentToAdjustGrade.scores.speaking : '—'})</option>
+                  <option value="reading">Reading ({studentToAdjustGrade.scores.reading > 0 ? studentToAdjustGrade.scores.reading : '—'})</option>
+                  <option value="listening">Listening ({studentToAdjustGrade.scores.listening > 0 ? studentToAdjustGrade.scores.listening : '—'})</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Điểm số mới (Thang điểm 10)' : 'New Grade (Scale 10)'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={newAdjustedScore}
+                  onChange={(e) => setNewAdjustedScore(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-semibold text-primary"
+                  placeholder="e.g. 8.5"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo kiểm toán UC031)' : 'Audit Reason Note (Mandatory per UC031)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={auditReasonNote}
+                  onChange={(e) => setAuditReasonNote(e.target.value)}
+                  placeholder={
+                    isVi
+                      ? 'Nhập lý do điều chỉnh điểm (ví dụ: Xem xét lại phần nói do tạp âm, cộng điểm chuyên cần, phúc khảo bài tập...)'
+                      : 'Enter audit note explaining the score change...'
+                  }
+                  className="w-full p-3 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <Button
+                variant="secondary"
+                onClick={() => setStudentToAdjustGrade(null)}
+              >
+                {isVi ? 'Hủy bỏ' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveGradeAdjustment}
+                disabled={!auditReasonNote.trim()}
+              >
+                {isVi ? 'Lưu điều chỉnh điểm' : 'Save Grade Adjustment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. Modal: Chọn học viên đã có vào lớp (FE-87 / UC009) */}
+      {showSelectStudentsModal && currentClass && (
+        <SelectExistingStudentsModal
+          isOpen={showSelectStudentsModal}
+          onClose={() => setShowSelectStudentsModal(false)}
+          classId={currentClass.id}
+          classNameTitle={currentClass.name}
+          maxCapacity={maxCapacity}
+          enrolledCount={enrolledMembers.length}
+          enrolledStudentIds={enrolledMembers.map((m) => m.studentId)}
+          onSuccess={refreshMembers}
+        />
+      )}
+
+      {/* 11. Modal: Xác nhận xóa học viên khỏi lớp */}
+      <ConfirmModal
+        isOpen={Boolean(memberToRemove)}
+        title={isVi ? 'Xóa học viên khỏi lớp' : 'Remove Student from Class'}
+        message={
+          memberToRemove
+            ? isVi
+              ? `Xác nhận xóa học viên ${memberToRemove.name} khỏi lớp này?`
+              : `Confirm removing student ${memberToRemove.name} from this class?`
+            : ''
+        }
+        confirmText={isVi ? 'Xóa khỏi lớp' : 'Remove'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant="danger"
+        isLoading={isRemovingMember}
+        onConfirm={executeRemoveMember}
+        onCancel={() => setMemberToRemove(null)}
+      />
+
+      {/* 12. Modal: Điều chuyển học viên sang lớp khác (FE-87 / FE-88 / UC009) */}
+      {studentToTransfer && currentClass && (
+        <TransferStudentModal
+          isOpen={Boolean(studentToTransfer)}
+          onClose={() => setStudentToTransfer(null)}
+          currentClassId={currentClass.id}
+          currentClassName={currentClass.name}
+          student={studentToTransfer}
+          onSuccess={refreshMembers}
+        />
       )}
     </div>
   );
