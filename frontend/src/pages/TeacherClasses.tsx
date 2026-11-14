@@ -406,14 +406,23 @@ export const TeacherClasses: React.FC = () => {
               </div>
 
               {/* Actions */}
-              <div>
+              <div className="flex gap-2">
                 <Button
                   variant="primary"
                   size="sm"
-                  className="w-full"
+                  className="flex-1"
                   onClick={() => navigate(`/teacher/classes/${cls.id}/progress`)}
                 >
                   {isVi ? 'Tiến độ & Bảng điểm' : 'Class Progress'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={Users}
+                  onClick={() => navigate(`/teacher/classes/${cls.id}/progress?tab=members`)}
+                  title={isVi ? 'Quản lý thành viên lớp học' : 'Manage Class Members'}
+                >
+                  {isVi ? 'Thành viên' : 'Members'}
                 </Button>
               </div>
             </div>
