@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Users, Award, BookOpen, Plus, UserPlus,
-  Loader2, AlertCircle, Trash2,
+  Loader2, AlertCircle, Trash2, ArrowRightLeft,
   RotateCcw, ShieldAlert, ChevronRight, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,6 +10,7 @@ import { classService } from '../api/services/class.service';
 import { assignmentService } from '../api/services/assignment.service';
 import { Button, EmptyState, Pagination, StatusBadge, Skeleton, ConfirmModal, useToast } from '../components/common';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
+import { TransferStudentModal } from '../components/classes/TransferStudentModal';
 import { parseApiError } from '../api/core/errors';
 import type { ApiClientError } from '../api/core/errors';
 import type { ClassDetail, ClassMember } from '../api/services/class.service';
@@ -33,6 +34,7 @@ export const ClassDetails: React.FC = () => {
   const [assignmentsError, setAssignmentsError] = useState<ApiClientError | null>(null);
   const [showSelectStudentsModal, setShowSelectStudentsModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<{ id: number; name: string } | null>(null);
+  const [studentToTransfer, setStudentToTransfer] = useState<{ studentId: number; fullName: string; studentCode?: string; currentMemberId: number } | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
 
   // Pagination for students roster
@@ -466,6 +468,20 @@ export const ClassDetails: React.FC = () => {
                                       <Button 
                                         variant="secondary"
                                         size="sm"
+                                        icon={ArrowRightLeft}
+                                        onClick={() => setStudentToTransfer({
+                                          studentId: st.studentId,
+                                          fullName: st.fullName,
+                                          studentCode: st.studentCode,
+                                          currentMemberId: st.memberId
+                                        })}
+                                        title={isVi ? 'Điều chuyển học viên sang lớp khác' : 'Transfer to another class'}
+                                      >
+                                        {isVi ? 'Chuyển lớp' : 'Transfer'}
+                                      </Button>
+                                      <Button 
+                                        variant="secondary"
+                                        size="sm"
                                         className="text-error"
                                         icon={Trash2}
                                         onClick={() => handleRemoveMember(st.memberId, st.fullName)}
@@ -688,6 +704,25 @@ export const ClassDetails: React.FC = () => {
         onConfirm={executeRemoveMember}
         onCancel={() => setMemberToRemove(null)}
       />
+
+      {/* Modal điều chuyển học viên giữa các lớp (UC009 / FE-88) */}
+      {studentToTransfer && classNumericId !== null && (
+        <TransferStudentModal
+          isOpen={Boolean(studentToTransfer)}
+          onClose={() => setStudentToTransfer(null)}
+          currentClassId={classNumericId}
+          currentClassName={classDetail?.name || ''}
+          student={studentToTransfer}
+          onSuccess={async () => {
+            try {
+              const members = await classService.listMembers(classNumericId);
+              setStudentsRoster(members);
+            } catch {
+              // Ignore reload error
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
