@@ -50,8 +50,8 @@ const mockInProgressSub = {
   submittedAt: null,
   createdAt: '2026-11-15T08:00:00Z',
   modules: [
-    { id: 301, moduleId: 101, skill: 'READING' as const, status: 'SUBMITTED' as const },
-    { id: 302, moduleId: 102, skill: 'WRITING' as const, status: 'IN_PROGRESS' as const },
+    { id: 301, moduleId: 101, skill: 'READING' as const, taskType: 'QUIZ' as const, status: 'SUBMITTED' as const, grading: null },
+    { id: 302, moduleId: 102, skill: 'WRITING' as const, taskType: 'ESSAY' as const, status: 'IN_PROGRESS' as const, grading: null },
   ],
 };
 
@@ -64,8 +64,8 @@ const mockAllCompletedSub = {
   submittedAt: null,
   createdAt: '2026-11-15T08:00:00Z',
   modules: [
-    { id: 301, moduleId: 101, skill: 'READING' as const, status: 'SUBMITTED' as const },
-    { id: 302, moduleId: 102, skill: 'WRITING' as const, status: 'SUBMITTED' as const },
+    { id: 301, moduleId: 101, skill: 'READING' as const, taskType: 'QUIZ' as const, status: 'SUBMITTED' as const, grading: null },
+    { id: 302, moduleId: 102, skill: 'WRITING' as const, taskType: 'ESSAY' as const, status: 'SUBMITTED' as const, grading: null },
   ],
 };
 
