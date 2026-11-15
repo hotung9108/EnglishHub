@@ -49,7 +49,7 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
     return null;
   }
 
-  const allowReviewCompleted = canReviewCompleted ?? !hasActiveAttempt;
+  const allowReviewCompleted = canReviewCompleted ?? true;
 
   if (variant === 'compact') {
     return (
@@ -57,7 +57,10 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
         {steps.map((step, idx) => {
           const isCurrentSkill = step.status === 'ACTIVE';
           const isInteractive = Boolean(
-            onSelectModule && !step.isCompleted && step.isAccessible && !isCurrentSkill && !disabled
+            onSelectModule &&
+            ((step.isCompleted && allowReviewCompleted) || (!step.isCompleted && step.isAccessible)) &&
+            !isCurrentSkill &&
+            !disabled
           );
 
           const handleClick = () => {
@@ -179,7 +182,7 @@ export const ExamStepper: React.FC<ExamStepperProps> = ({
                       onClick={handleAction}
                       disabled={disabled}
                     >
-                      Xem lại
+                      {hasActiveAttempt ? 'Sửa câu trả lời' : 'Xem lại'}
                     </Button>
                   ) : (
                     <Button

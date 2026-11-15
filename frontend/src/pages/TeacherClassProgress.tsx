@@ -222,13 +222,13 @@ export const TeacherClassProgress: React.FC = () => {
 
   const handleSaveGradeAdjustment = () => {
     if (!studentToAdjustGrade) return;
-    const scoreNum = parseFloat(newAdjustedScore);
+    const scoreNum = parseFloat(newAdjustedScore.trim().replace(',', '.'));
     if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
       setAdjustGradeError(isVi ? 'Điểm số phải nằm trong khoảng từ 0 đến 10.' : 'Score must be between 0 and 10.');
       return;
     }
     if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
-      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC031).' : 'Please enter an audit reason note (mandatory per UC031 audit policy).');
+      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030).' : 'Please enter an audit reason note (mandatory per UC030 audit policy).');
       return;
     }
 
@@ -1679,7 +1679,7 @@ export const TeacherClassProgress: React.FC = () => {
 
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo kiểm toán UC031)' : 'Audit Reason Note (Mandatory per UC031)'}
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo kiểm toán UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
                 </label>
                 <textarea
                   rows={3}

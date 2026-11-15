@@ -12,7 +12,8 @@ import {
   Loader2,
   UploadCloud,
   FileAudio,
-  Trash2
+  Trash2,
+  FileCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
@@ -494,19 +495,30 @@ const StudentAssignmentSpeaking: React.FC = () => {
       />
 
       {/* Breadcrumbs & Navigation */}
-      <div className="speaking-breadcrumbs">
-        <button 
-          className="speaking-back-btn" 
-          onClick={() => navigate('/student/assignments')}
-          type="button"
-        >
-          <ArrowLeft size={14} />
-          <span>Quay lại danh sách bài tập</span>
-        </button>
-        <span className="speaking-breadcrumb-sep">/</span>
-        <span className="speaking-breadcrumb-current">
-          {assignment?.title || `Speaking Practice #${id}`}
-        </span>
+      <div className="speaking-breadcrumbs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={FileCheck}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
+            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
+          >
+            Xem lại trước khi nộp
+          </Button>
+          <button 
+            className="speaking-back-btn" 
+            onClick={() => navigate('/student/assignments')}
+            type="button"
+          >
+            <ArrowLeft size={14} />
+            <span>Quay lại danh sách bài tập</span>
+          </button>
+          <span className="speaking-breadcrumb-sep">/</span>
+          <span className="speaking-breadcrumb-current">
+            {assignment?.title || `Speaking Practice #${id}`}
+          </span>
+        </div>
         {effectiveModules.length > 1 && (
           <div className="speaking-stepper-wrapper">
             <ExamStepper
@@ -517,7 +529,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
+                if (step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

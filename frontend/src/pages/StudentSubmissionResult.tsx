@@ -565,7 +565,12 @@ export const StudentSubmissionResult: React.FC = () => {
       let shortAns = '';
 
       if (isMcq) {
-        mcq = extractMcqOptions(q.correctAnswer as Record<string, unknown> | null);
+        mcq = extractMcqOptions(
+          q.correctAnswer as Record<string, unknown> | null,
+          Array.isArray((q as unknown as { options?: unknown[] }).options)
+            ? (q as unknown as { options?: unknown[] }).options
+            : undefined
+        );
       } else {
         shortAns = extractShortAnswerText(q.correctAnswer as Record<string, unknown> | null);
       }
