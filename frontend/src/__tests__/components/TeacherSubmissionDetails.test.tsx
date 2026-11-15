@@ -134,7 +134,7 @@ async function renderSpeaking() {
 
 describe('TeacherSubmissionDetails', () => {
   it('shows English grading controls and attachment placeholders (not real downloads)', async () => {
-    vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, status: 'GRADED', submittedAt: null });
+    vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, status: 'SUBMITTED', submittedAt: null });
     vi.mocked(submissionService.getSubmissionModuleDetail).mockResolvedValue({ ...moduleDetail, answers: [
       { id: 60, questionId: 1, content: 'word '.repeat(250), docStorageKey: 'essay.pdf', docMimeType: 'application/pdf' },
 
@@ -1841,5 +1841,150 @@ it('supports Save and Grade Next to transition to the next unfinished module', a
   expect(gradingService.submitGrade).toHaveBeenCalledWith(80, expect.objectContaining({
     finalScore: 7,
   }));
+});
+
+describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
+  beforeEach(() => {
+    vi.mocked(gradingService.getBySubmissionModuleId).mockResolvedValue({
+      id: 80,
+      method: 'TEACHER_MANUAL',
+      status: 'COMPLETED',
+      finalScore: 7,
+    });
+  });
+
+  it('requires audit reason modal when changing score of an already-graded submission (existingFinalScore !== scoreNum)', async () => {
+    const { user, score } = await setup();
+    expect(score).toHaveValue(7);
+
+    // Teacher changes score from 7.0 to 8.5
+    fireEvent.change(score, { target: { value: '8.5' } });
+
+    // Click "Lưu & Gửi điểm cho học sinh"
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    // Verify Audit Reason modal is opened
+    expect(await screen.findByText('Lý do điều chỉnh điểm số (UC030)')).toBeVisible();
+    expect(
+      screen.getByText(
+        'Bài nộp này đã có điểm trước đó (7 điểm). Bạn đang điều chỉnh thành 8.5 điểm. Vui lòng cung cấp lý do điều chỉnh để lưu vào lịch sử kiểm toán.'
+      )
+    ).toBeVisible();
+  });
+
+  it('disables "Xác nhận & Cập nhật điểm" button when reason is empty or < 3 chars, and enables when valid', async () => {
+    const { user, score } = await setup();
+    fireEvent.change(score, { target: { value: '8.5' } });
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    const confirmBtn = screen.getByRole('button', { name: 'Xác nhận & Cập nhật điểm' });
+    expect(confirmBtn).toBeDisabled();
+
+    const textarea = screen.getByPlaceholderText(
+      'Nhập lý do thay đổi điểm (ví dụ: Chấm lại theo phúc khảo, cộng điểm chuyên cần, điều chỉnh theo rubric...)'
+    );
+
+    // Type less than 3 chars
+    await user.type(textarea, 'OK');
+    expect(confirmBtn).toBeDisabled();
+
+    // Type valid reason
+    await user.clear(textarea);
+    await user.type(textarea, 'Chấm lại theo đơn phúc khảo');
+    expect(confirmBtn).not.toBeDisabled();
+  });
+
+  it('submits grade with full note field and closes modal upon valid confirmation', async () => {
+    const { user, score } = await setup();
+    fireEvent.change(score, { target: { value: '8.5' } });
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    const textarea = screen.getByPlaceholderText(
+      'Nhập lý do thay đổi điểm (ví dụ: Chấm lại theo phúc khảo, cộng điểm chuyên cần, điều chỉnh theo rubric...)'
+    );
+    await user.type(textarea, 'Chấm lại sau phúc khảo của học viên');
+
+    const confirmBtn = screen.getByRole('button', { name: 'Xác nhận & Cập nhật điểm' });
+    await user.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(gradingService.submitGrade).toHaveBeenCalledWith(80, {
+        finalScore: 8.5,
+        finalFeedback: expect.any(String),
+        note: 'Chấm lại sau phúc khảo của học viên',
+      });
+    });
+
+    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+  });
+
+  it('does not require audit modal when saving the same score without changes', async () => {
+    const { user, score } = await setup();
+    expect(score).toHaveValue(7);
+
+    // Click "Lưu & Gửi điểm cho học sinh" without changing score
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    // Audit modal must NOT appear
+    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(gradingService.submitGrade).toHaveBeenCalledWith(80, {
+      finalScore: 7,
+      finalFeedback: expect.any(String),
+      note: undefined,
+    });
+  });
+
+  it('cancels grade adjustment without submitting when clicking "Hủy bỏ"', async () => {
+    const { user, score } = await setup();
+    fireEvent.change(score, { target: { value: '8.5' } });
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    const cancelBtn = screen.getByRole('button', { name: 'Hủy bỏ' });
+    await user.click(cancelBtn);
+
+    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+  });
+
+  it('closes modal when clicking the X close button without submitting', async () => {
+    const { user, score } = await setup();
+    fireEvent.change(score, { target: { value: '8.5' } });
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    const closeBtn = screen.getByRole('button', { name: 'Đóng modal điều chỉnh điểm' });
+    await user.click(closeBtn);
+
+    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+  });
+
+  it('handles English audit modal flow with validation and submission', async () => {
+    renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, 'en');
+    const score = await screen.findByRole('spinbutton');
+    const user = userEvent.setup();
+
+    fireEvent.change(score, { target: { value: '9.0' } });
+    await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
+
+    expect(await screen.findByText('Grade Adjustment Audit Reason (UC030)')).toBeVisible();
+    expect(screen.getByText('Audit Reason Note (Mandatory per UC030)')).toBeVisible();
+
+    const textarea = screen.getByPlaceholderText('Enter audit note explaining the score change...');
+    await user.type(textarea, 'English remark for audit');
+
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm & Update Grade' });
+    await user.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(gradingService.submitGrade).toHaveBeenCalledWith(80, expect.objectContaining({
+        finalScore: 9.0,
+        note: 'English remark for audit',
+      }));
+    });
+  });
 });
 

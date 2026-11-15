@@ -5,7 +5,7 @@ import {
   UploadCloud, Send, Save, CheckCircle, 
   Bold, Italic, Underline, List, ListOrdered, 
   AlignLeft, AlignCenter, Undo, Redo, Info,
-  AlertCircle, RefreshCw, Loader2, X
+  AlertCircle, RefreshCw, Loader2, X, FileCheck
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
@@ -550,14 +550,25 @@ const StudentAssignmentWriting: React.FC = () => {
   return (
     <div className="writing-container">
       {/* Breadcrumbs */}
-      <div className="writing-breadcrumbs">
-        <span className="writing-crumb-link" onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
-        <ChevronRight size={16} />
-        <span className="writing-crumb-link" onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
-        <ChevronRight size={16} />
-        <span className="writing-crumb-active">
-          {assignment?.title || `Writing #${id}`}
-        </span>
+      <div className="writing-breadcrumbs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={FileCheck}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
+            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
+          >
+            Xem lại trước khi nộp
+          </Button>
+          <span className="writing-crumb-link" onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
+          <ChevronRight size={16} />
+          <span className="writing-crumb-link" onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
+          <ChevronRight size={16} />
+          <span className="writing-crumb-active">
+            {assignment?.title || `Writing #${id}`}
+          </span>
+        </div>
         {effectiveModules.length > 1 && (
           <div className="writing-stepper-wrapper">
             <ExamStepper
@@ -568,7 +579,7 @@ const StudentAssignmentWriting: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
+                if (step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

@@ -1,7 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '../components/common';
+import {
+  ArrowLeft,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  FileCheck,
+  Edit3,
+  BookOpen,
+  Headphones,
+  Mic,
+  FileText,
+  Play
+} from 'lucide-react';
+import { Button, ConfirmModal } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -19,7 +32,8 @@ import {
   getNextIncompleteModule,
   getSkillLabel,
   resolveEffectiveModules,
-  normalizeSkill
+  normalizeSkill,
+  isAllModulesCompleted
 } from '../utils/examStepper.utils';
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-overview.css';
@@ -38,11 +52,13 @@ interface AttemptRecord {
 const StudentAssignmentOverview: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isVi = language === 'vi';
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+  const [showFinalSubmitModal, setShowFinalSubmitModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [attempts, setAttempts] = useState<AttemptRecord[]>([]);
@@ -229,22 +245,29 @@ const StudentAssignmentOverview: React.FC = () => {
     }
   };
 
-  const handleFinalizeSubmission = async () => {
+  const handleOpenFinalSubmitModal = () => {
     if (!inProgressSub) return;
     if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể nộp toàn bộ bài tập.');
+      setError(isVi ? 'Bài tập này đã được giáo viên đóng. Không thể nộp toàn bộ bài tập.' : 'This assignment is closed.');
       return;
     }
+    setShowFinalSubmitModal(true);
+  };
+
+  const handleConfirmFinalSubmit = async () => {
+    if (!inProgressSub) return;
     setIsStarting(true);
     try {
       await submissionService.submitSubmission(inProgressSub.id);
       notifyAssignmentSubmitted();
+      setShowFinalSubmitModal(false);
       navigate(`/student/submissions/${inProgressSub.id}`);
     } catch (err: unknown) {
       console.warn('Failed to finalize submission:', err);
       const errData = err as { response?: { data?: { message?: string } }; message?: string };
-      const msg = errData?.response?.data?.message || errData?.message || 'Không thể hoàn tất nộp bài.';
+      const msg = errData?.response?.data?.message || errData?.message || (isVi ? 'Không thể hoàn tất nộp bài.' : 'Failed to finalize submission.');
       setError(msg);
+      setShowFinalSubmitModal(false);
     } finally {
       setIsStarting(false);
     }
@@ -296,10 +319,7 @@ const StudentAssignmentOverview: React.FC = () => {
   const nextSkillName = nextIncompleteModule ? getSkillLabel(nextIncompleteModule.skill) : '';
 
   const isAllSubModulesCompleted = Boolean(
-    inProgressSub &&
-    inProgressSub.modules &&
-    inProgressSub.modules.length > 0 &&
-    inProgressSub.modules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED')
+    inProgressSub && isAllModulesCompleted(effectiveModules, inProgressSub.modules)
   );
 
   const bestAttempt = attempts.find((a) => a.isBest);
@@ -427,6 +447,8 @@ const StudentAssignmentOverview: React.FC = () => {
                     if (targetSubId) {
                       navigate(`/student/submissions/${targetSubId}`);
                     }
+                  } else {
+                    void handleStartSkill(skill, step.index);
                   }
                   return;
                 }
@@ -435,6 +457,108 @@ const StudentAssignmentOverview: React.FC = () => {
               disabled={isStarting}
               isClosed={assignment?.status === 'CLOSED'}
             />
+          </div>
+        )}
+
+        {/* Pre-Submit Review Dashboard (UC020 / AD20) */}
+        {hasActiveAttempt && inProgressSub && (
+          <div className="overview-instructions-box" style={{ borderColor: 'var(--primary)', borderWidth: '1.5px', background: 'var(--surface)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'rgba(27, 77, 62, 0.1)', color: 'var(--primary)' }}>
+                  <FileCheck size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--on-surface)' }}>
+                    {isVi ? 'Kiểm tra và xem lại bài làm trước khi nộp (UC020)' : 'Review Answers Before Submission (UC020)'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {isVi
+                      ? 'Rà soát danh sách câu trả lời của các kỹ năng. Bạn có thể nhấn "Sửa câu trả lời" để chỉnh sửa trước khi nộp chính thức.'
+                      : 'Review answers across all skills. You can click "Edit answers" to adjust before final submission.'}
+                  </p>
+                </div>
+              </div>
+              <span className={`badge ${isAllSubModulesCompleted ? 'badge-primary' : 'badge-warning'}`} style={{ padding: '4px 10px', fontSize: '12px', fontWeight: 600 }}>
+                {isAllSubModulesCompleted
+                  ? (isVi ? 'Đã hoàn thành các phần thi' : 'All skills completed')
+                  : (isVi ? 'Còn phần thi chưa hoàn thành' : 'Some skills incomplete')}
+              </span>
+            </div>
+
+            {/* Incomplete Warning Banner (UC020 Dòng phụ) */}
+            {!isAllSubModulesCompleted ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderRadius: '8px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#92400e', fontSize: '13px', marginBottom: '16px' }}>
+                <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+                <span>
+                  {isVi
+                    ? 'Cảnh báo: Bạn vẫn còn phần thi chưa hoàn thành hoặc câu hỏi đang bị bỏ trống. Bạn có thể bấm "Làm bài ngay" hoặc "Sửa câu trả lời" để hoàn thiện trước khi nộp.'
+                    : 'Warning: Some skills or questions remain unanswered. You can click "Start" or "Edit answers" before final submission.'}
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontSize: '13px', marginBottom: '16px' }}>
+                <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+                <span>
+                  {isVi
+                    ? 'Bạn đã hoàn thành câu trả lời cho tất cả các phần thi. Vui lòng rà soát lại lần cuối trước khi bấm "Xác nhận nộp toàn bộ bài tập" bên dưới.'
+                    : 'All skills have been answered. Please perform a final review before clicking "Final Submit" below.'}
+                </span>
+              </div>
+            )}
+
+            {/* Module Breakdown Grid */}
+            <div className="overview-sections-grid" style={{ marginBottom: '8px' }}>
+              {effectiveModules.map((mod, idx) => {
+                const subMod = inProgressSub?.modules?.find(
+                  (sm) => sm.moduleId === mod.id || (sm.skill && normalizeSkill(sm.skill) === normalizeSkill(mod.skill))
+                );
+                const isCompleted = subMod?.status === 'SUBMITTED' || subMod?.status === 'GRADED';
+                const skillCode = normalizeSkill(mod.skill);
+
+                const SkillIcon = skillCode === 'reading' ? BookOpen : skillCode === 'listening' ? Headphones : skillCode === 'speaking' ? Mic : FileText;
+
+                return (
+                  <div key={mod.id || idx} className="overview-module-card" style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                      <div style={{ padding: '10px', borderRadius: '10px', backgroundColor: 'var(--surface-container-low)', color: 'var(--primary)' }}>
+                        <SkillIcon size={18} />
+                      </div>
+                      <div className="overview-module-info">
+                        <div className="overview-module-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>{getSkillLabel(mod.skill)}</span>
+                          {isCompleted ? (
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#166534', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                              Đã làm
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#9a3412', backgroundColor: '#ffedd5', padding: '2px 6px', borderRadius: '4px' }}>
+                              Chưa nộp
+                            </span>
+                          )}
+                        </div>
+                        <div className="overview-module-status" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {isCompleted
+                            ? (isVi ? 'Đã hoàn thành nội dung phần thi' : 'Module completed')
+                            : (isVi ? 'Đang chờ làm bài / chưa hoàn tất' : 'Pending completion')}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Button
+                        variant={isCompleted ? 'secondary' : 'primary'}
+                        size="sm"
+                        onClick={() => handleStartSkill(mod.skill, idx)}
+                        icon={isCompleted ? Edit3 : Play}
+                        disabled={isStarting}
+                      >
+                        {isCompleted ? (isVi ? 'Sửa câu trả lời' : 'Edit answers') : (isVi ? 'Làm bài ngay' : 'Start now')}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -576,25 +700,29 @@ const StudentAssignmentOverview: React.FC = () => {
                 {attempts.filter((a) => a.status !== 'in_progress').length > 0 ? 'Xem kết quả bài nộp' : 'Bài tập đã đóng (Không thể làm bài)'}
               </button>
             ) : inProgressSub ? (
-              isAllSubModulesCompleted ? (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button 
                   className="overview-cta-btn" 
-                  onClick={handleFinalizeSubmission}
+                  onClick={handleOpenFinalSubmitModal}
                   disabled={isStarting}
                   type="button"
                 >
-                  {isStarting ? 'Đang nộp toàn bộ bài tập...' : `Nộp toàn bộ bài tập (Lần ${inProgressSub.attemptNumber})`}
+                  {isStarting
+                    ? (isVi ? 'Đang nộp toàn bộ bài tập...' : 'Finalizing...')
+                    : (isVi
+                      ? `Xác nhận Nộp toàn bộ bài tập (Lần ${inProgressSub.attemptNumber})`
+                      : `Final Submit (Attempt ${inProgressSub.attemptNumber})`)}
                 </button>
-              ) : (
-                <button 
-                  className="overview-cta-btn" 
-                  onClick={handleStartAttempt}
-                  disabled={isStarting}
-                  type="button"
-                >
-                  {isStarting ? 'Đang mở bài làm...' : `Tiếp tục làm bài (Phần: ${nextSkillName || 'Kỹ năng tiếp theo'})`}
-                </button>
-              )
+                {!isAllSubModulesCompleted && (
+                  <Button 
+                    variant="secondary"
+                    onClick={handleStartAttempt}
+                    disabled={isStarting}
+                  >
+                    {isVi ? `Tiếp tục làm bài (${nextSkillName || 'Phần tiếp'})` : 'Continue Test'}
+                  </Button>
+                )}
+              </div>
             ) : isUnlimited || (remainingAttempts !== null && remainingAttempts > 0) ? (
               <button 
                 className="overview-cta-btn" 
@@ -624,6 +752,23 @@ const StudentAssignmentOverview: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Modal: Xác nhận nộp toàn bộ bài tập (UC021 / AD21) */}
+      <ConfirmModal
+        isOpen={showFinalSubmitModal}
+        title={isVi ? 'Xác nhận nộp bài tập' : 'Confirm Assignment Submission'}
+        message={
+          isVi
+            ? 'Bạn có chắc chắn muốn nộp toàn bộ bài tập? Sau khi xác nhận nộp, bạn sẽ không thể chỉnh sửa lại các câu trả lời. Hệ thống sẽ tiến hành đóng gói câu trả lời và bắt đầu quy trình đánh giá.'
+            : 'Are you sure you want to finalize your submission? Once submitted, you cannot edit your answers. The system will seal your attempt and begin evaluation.'
+        }
+        confirmText={isVi ? 'Xác nhận nộp bài' : 'Confirm Submission'}
+        cancelText={isVi ? 'Kiểm tra lại' : 'Review Again'}
+        variant="primary"
+        isLoading={isStarting}
+        onConfirm={handleConfirmFinalSubmit}
+        onCancel={() => setShowFinalSubmitModal(false)}
+      />
     </div>
   );
 };
