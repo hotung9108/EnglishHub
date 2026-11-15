@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, ChevronLeft, ChevronRight,
   User,
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
-  XCircle, Plus, Trash2, Download, BookOpen, Headphones, Mic, Eye, Edit3, HelpCircle
+  XCircle, Plus, Trash2, Download, BookOpen, Headphones, Mic, Eye, Edit3, HelpCircle, X
 } from 'lucide-react';
 import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -101,6 +101,19 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [newAnnComment, setNewAnnComment] = useState<string>('');
   const [newAnnStartOffset, setNewAnnStartOffset] = useState<string>('0');
   const [newAnnEndOffset, setNewAnnEndOffset] = useState<string>('0');
+
+  // Audit Reason Modal State when modifying an already evaluated grade (UC030 / AD30)
+  const [showAuditReasonModal, setShowAuditReasonModal] = useState(false);
+  const [auditReasonNote, setAuditReasonNote] = useState('');
+  const [pendingGradeAdjustment, setPendingGradeAdjustment] = useState<{
+    gradingId: number;
+    scoreNum: number;
+    feedbackText: string;
+    oldScore: number;
+    targetModuleId: number | undefined;
+    context: AnnotationRequestContext;
+    autoNavigateNext: boolean;
+  } | null>(null);
   const isMountedRef = useRef(false);
   const moduleLoadGenerationRef = useRef(0);
   const annotationRequestRef = useRef<AnnotationRequestContext>({
@@ -813,6 +826,100 @@ export const TeacherSubmissionDetails: React.FC = () => {
   };
 
   // Submit Grade
+  const executeSubmitGrade = async (
+    gradingId: number,
+    scoreNum: number,
+    feedback: string,
+    note: string | undefined,
+    targetModuleId: number | undefined,
+    context: AnnotationRequestContext,
+    autoNavigateNext: boolean
+  ) => {
+    gradeRequestRef.current = context;
+    setIsSubmittingGrade(true);
+    try {
+      await gradingService.submitGrade(gradingId, {
+        finalScore: scoreNum,
+        finalFeedback: feedback,
+        note: note || undefined,
+      });
+
+      if (!isCurrentAction(context)) return;
+
+      // Clear local draft upon successful publication
+      if (targetModuleId) {
+        delete moduleDraftsRef.current[targetModuleId];
+        try {
+          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
+        } catch {
+          // ignore
+        }
+        setDraftModuleIds((prev) => {
+          if (!prev[targetModuleId]) return prev;
+          const next = { ...prev };
+          delete next[targetModuleId];
+          return next;
+        });
+      }
+
+      showToast(
+        note
+          ? (isVi ? `Đã điều chỉnh điểm thành công (${scoreNum}đ - Lý do: ${note})!` : `Grade adjusted successfully (${scoreNum} - Reason: ${note})!`)
+          : (isVi ? 'Đã lưu điểm và trả bài cho học viên thành công!' : 'Grade finalized and published to student!')
+      );
+
+      // Refresh grading detail
+      try {
+        const updatedDetail = await gradingService.getById(gradingId);
+        setGradingDetail(updatedDetail);
+      } catch (err) {
+        console.warn('Failed to refresh grading detail after submit', err);
+      }
+
+      if (autoNavigateNext) {
+        const otherModules = (submission?.modules || []).filter((m) => m.id !== targetModuleId);
+        const nextPending = otherModules.find((m) => !isModuleGraded(m));
+        if (nextPending) {
+          handleSelectModule(nextPending.id);
+          return;
+        }
+      }
+
+      gradeNavigationTimerRef.current = setTimeout(() => {
+        gradeNavigationTimerRef.current = null;
+        if (isCurrentAction(context)) navigate(`/teacher/assignments/${id}`);
+      }, 1000);
+    } catch (err) {
+      if (!isCurrentAction(context)) return;
+      console.error('Failed to submit grade:', err);
+      const parsed = parseApiError(err);
+      showToast(parsed.message || (isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!'));
+    } finally {
+      if (isCurrentAction(context)) {
+        gradeRequestRef.current = null;
+        setIsSubmittingGrade(false);
+      }
+    }
+  };
+
+  const handleConfirmAuditGradeAdjustment = async () => {
+    if (!pendingGradeAdjustment) return;
+    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
+      showToast(
+        isVi
+          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030)!'
+          : 'Please enter an audit reason note (mandatory per UC030 audit policy)!'
+      );
+      return;
+    }
+
+    const { gradingId, scoreNum, feedbackText, targetModuleId, context, autoNavigateNext } = pendingGradeAdjustment;
+    const note = auditReasonNote.trim();
+    setShowAuditReasonModal(false);
+    setPendingGradeAdjustment(null);
+    await executeSubmitGrade(gradingId, scoreNum, feedbackText, note, targetModuleId, context, autoNavigateNext);
+  };
+
   const handleSaveGrade = async (isFinalize: boolean, autoNavigateNext: boolean = false) => {
     const context = { ...annotationRequestRef.current };
     const gradingId = gradingSummary?.id;
@@ -853,62 +960,38 @@ export const TeacherSubmissionDetails: React.FC = () => {
       return;
     }
 
-    gradeRequestRef.current = context;
-    setIsSubmittingGrade(true);
-    try {
-      await gradingService.submitGrade(gradingId, {
-        finalScore: scoreNum,
-        finalFeedback: feedbackText
-      });
+    // 2. Check if score is being changed for an already evaluated/completed grade (UC030 / AD30 / UC31)
+    const isAlreadyGraded = Boolean(
+      submission?.status === 'GRADED' ||
+      activeModule?.status === 'GRADED' ||
+      gradingSummary?.status === 'COMPLETED' ||
+      gradingDetail?.status === 'COMPLETED'
+    );
 
-      if (!isCurrentAction(context)) return;
-
-      // Clear local draft upon successful publication
-      if (targetModuleId) {
-        delete moduleDraftsRef.current[targetModuleId];
-        try {
-          localStorage.removeItem(`eh_draft_grading_${targetModuleId}`);
-        } catch {
-          // ignore
-        }
-        setDraftModuleIds((prev) => {
-          if (!prev[targetModuleId]) return prev;
-          const next = { ...prev };
-          delete next[targetModuleId];
-          return next;
-        });
-      }
-
-      showToast(isVi
-        ? 'Đã lưu điểm và trả bài cho học viên thành công!'
-        : 'Grade finalized and published to student!');
-
-      if (autoNavigateNext) {
-        const otherModules = (submission?.modules || []).filter((m) => m.id !== targetModuleId);
-        const nextPending = otherModules.find((m) => !isModuleGraded(m));
-        if (nextPending) {
-          handleSelectModule(nextPending.id);
-          return;
-        }
-      }
-
-      if (isFinalize) {
-        gradeNavigationTimerRef.current = setTimeout(() => {
-          gradeNavigationTimerRef.current = null;
-          if (isCurrentAction(context)) navigate(`/teacher/assignments/${id}`);
-        }, 1000);
-      }
-    } catch (err) {
-      if (!isCurrentAction(context)) return;
-      console.error('Failed to submit grade:', err);
-      const parsed = parseApiError(err);
-      showToast(parsed.message || (isVi ? 'Có lỗi xảy ra khi lưu điểm. Vui lòng thử lại!' : 'Failed to save grade. Please retry!'));
-    } finally {
-      if (isCurrentAction(context)) {
-        gradeRequestRef.current = null;
-        setIsSubmittingGrade(false);
+    let existingFinalScore: number | null = null;
+    if (isAlreadyGraded) {
+      const rawScore = gradingDetail?.finalScore ?? gradingSummary?.finalScore ?? activeModule?.grading?.finalScore;
+      if (rawScore != null) {
+        existingFinalScore = Number(rawScore);
       }
     }
+
+    if (existingFinalScore !== null && Math.abs(existingFinalScore - scoreNum) > 0.001) {
+      setPendingGradeAdjustment({
+        gradingId,
+        scoreNum,
+        feedbackText,
+        oldScore: existingFinalScore,
+        targetModuleId,
+        context,
+        autoNavigateNext,
+      });
+      setAuditReasonNote('');
+      setShowAuditReasonModal(true);
+      return;
+    }
+
+    await executeSubmitGrade(gradingId, scoreNum, feedbackText, undefined, targetModuleId, context, autoNavigateNext);
   };
 
   const targetModuleId = activeModule?.id ?? null;
@@ -2691,6 +2774,86 @@ export const TeacherSubmissionDetails: React.FC = () => {
             {/* Feedback Editor with Markdown preview */}
             <div className="tsd-feedback-card">
               {renderFeedbackEditor(5)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Bắt buộc nhập lý do điều chỉnh điểm đã chấm (UC030 / AD30) */}
+      {showAuditReasonModal && pendingGradeAdjustment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface rounded-2xl border border-border shadow-2xl max-w-lg w-full overflow-hidden animate-scale-up">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {isVi ? 'Lý do điều chỉnh điểm số (UC030)' : 'Grade Adjustment Audit Reason (UC030)'}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isVi ? 'Quy chuẩn kiểm toán điểm số yêu cầu ghi nhận lý do thay đổi điểm' : 'Audit policy requires recording the reason for changing grades'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                aria-label={isVi ? 'Đóng modal điều chỉnh điểm' : 'Close audit modal'}
+                onClick={() => {
+                  setShowAuditReasonModal(false);
+                  setPendingGradeAdjustment(null);
+                }}
+                className="p-1 rounded-lg text-muted-foreground hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                {isVi
+                  ? `Bài nộp này đã có điểm trước đó (${pendingGradeAdjustment.oldScore} điểm). Bạn đang điều chỉnh thành ${pendingGradeAdjustment.scoreNum} điểm. Vui lòng cung cấp lý do điều chỉnh để lưu vào lịch sử kiểm toán.`
+                  : `This submission was previously graded (${pendingGradeAdjustment.oldScore}). You are adjusting it to ${pendingGradeAdjustment.scoreNum}. Please provide an audit reason note.`}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={auditReasonNote}
+                  onChange={(e) => setAuditReasonNote(e.target.value)}
+                  placeholder={
+                    isVi
+                      ? 'Nhập lý do thay đổi điểm (ví dụ: Chấm lại theo phúc khảo, cộng điểm chuyên cần, điều chỉnh theo rubric...)'
+                      : 'Enter audit note explaining the score change...'
+                  }
+                  className="w-full p-3 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-slate-50/50 dark:bg-slate-800/50">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowAuditReasonModal(false);
+                  setPendingGradeAdjustment(null);
+                }}
+              >
+                {isVi ? 'Hủy bỏ' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleConfirmAuditGradeAdjustment}
+                disabled={!auditReasonNote.trim() || auditReasonNote.trim().length < 3 || isSubmittingGrade}
+                loading={isSubmittingGrade}
+              >
+                {isVi ? 'Xác nhận & Cập nhật điểm' : 'Confirm & Update Grade'}
+              </Button>
             </div>
           </div>
         </div>

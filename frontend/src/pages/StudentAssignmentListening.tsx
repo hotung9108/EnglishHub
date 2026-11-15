@@ -4,7 +4,7 @@ import {
   ArrowLeft, ChevronRight, Headphones, 
   Bookmark, ChevronLeft,
   Play, Pause, Volume2, SkipBack, SkipForward,
-  AlertCircle, RefreshCw, Lightbulb
+  AlertCircle, RefreshCw, Lightbulb, FileCheck
 } from 'lucide-react';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -559,6 +559,16 @@ const StudentAssignmentListening: React.FC = () => {
           >
             Tổng quan bài thi
           </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={FileCheck}
+            onClick={() => navigate(`/student/assignments/${id}/overview`)}
+            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
+          >
+            Xem lại trước khi nộp
+          </Button>
           
           <div className="exam-breadcrumbs">
             <span>Hệ thống</span> <ChevronRight size={14} />
@@ -579,7 +589,7 @@ const StudentAssignmentListening: React.FC = () => {
               assignmentId={numericId}
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
-                if (!step.isCompleted && step.isAccessible && step.status !== 'ACTIVE') {
+                if (step.isAccessible && step.status !== 'ACTIVE') {
                   navigate(getSkillRoute(skill, numericId, submission?.id));
                 }
               }}

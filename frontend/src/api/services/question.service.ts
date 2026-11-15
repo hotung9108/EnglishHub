@@ -165,7 +165,10 @@ export function buildShortAnswerPayload(params: {
 /**
  * Extract multiple choice options safely from a QuestionResponse's correctAnswer map.
  */
-export function extractMcqOptions(correctAnswer?: Record<string, unknown> | null): {
+export function extractMcqOptions(
+  correctAnswer?: Record<string, unknown> | null,
+  fallbackOptions?: unknown[]
+): {
   options: string[];
   correctOptionContent: string;
   correctOptionIndex: number;
@@ -176,11 +179,7 @@ export function extractMcqOptions(correctAnswer?: Record<string, unknown> | null
     correctOptionIndex: 0,
   };
 
-  if (!correctAnswer || typeof correctAnswer !== 'object') {
-    return defaultResult;
-  }
-
-  const rawList = correctAnswer.options || (correctAnswer as Record<string, unknown>).options;
+  const rawList = (correctAnswer && typeof correctAnswer === 'object' && (correctAnswer.options || (correctAnswer as Record<string, unknown>).options)) || fallbackOptions;
   if (!Array.isArray(rawList) || rawList.length === 0) {
     return defaultResult;
   }

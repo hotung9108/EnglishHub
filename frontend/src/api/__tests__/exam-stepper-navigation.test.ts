@@ -416,3 +416,53 @@ test('getExamPageRedirectRoute redirects completed submissions, completed module
     null
   );
 });
+
+test('Pre-Submit Review (UC020 / AD20) - calculateExamSteps keeps completed steps accessible for editing', () => {
+  const multiModules: ExamModuleItem[] = [
+    { id: 10, skill: 'LISTENING', orderIndex: 1 },
+    { id: 20, skill: 'READING', orderIndex: 2 },
+    { id: 30, skill: 'WRITING', orderIndex: 3 },
+    { id: 40, skill: 'SPEAKING', orderIndex: 4 }
+  ];
+
+  const subModules: SubmissionModuleItem[] = [
+    { id: 1, moduleId: 10, skill: 'LISTENING', status: 'SUBMITTED' },
+    { id: 2, moduleId: 20, skill: 'READING', status: 'SUBMITTED' },
+    { id: 3, moduleId: 30, skill: 'WRITING', status: 'IN_PROGRESS' },
+    { id: 4, moduleId: 40, skill: 'SPEAKING', status: 'IN_PROGRESS' }
+  ];
+
+  // Active attempt, current on overview (currentSkill undefined)
+  const steps = calculateExamSteps(multiModules, subModules, undefined, 42, 789, true);
+
+  // Both completed modules (LISTENING, READING) must have isCompleted: true and isAccessible: true
+  assert.strictEqual(steps[0].isCompleted, true);
+  assert.strictEqual(steps[0].isAccessible, true);
+  assert.strictEqual(steps[0].status, 'COMPLETED');
+
+  assert.strictEqual(steps[1].isCompleted, true);
+  assert.strictEqual(steps[1].isAccessible, true);
+  assert.strictEqual(steps[1].status, 'COMPLETED');
+
+  // Next incomplete module is active
+  assert.strictEqual(steps[2].isCompleted, false);
+  assert.strictEqual(steps[2].status, 'ACTIVE');
+
+  // When all 4 modules are completed during active attempt
+  const allCompletedSubModules: SubmissionModuleItem[] = [
+    { id: 1, moduleId: 10, skill: 'LISTENING', status: 'SUBMITTED' },
+    { id: 2, moduleId: 20, skill: 'READING', status: 'SUBMITTED' },
+    { id: 3, moduleId: 30, skill: 'WRITING', status: 'SUBMITTED' },
+    { id: 4, moduleId: 40, skill: 'SPEAKING', status: 'SUBMITTED' }
+  ];
+
+  assert.strictEqual(isAllModulesCompleted(multiModules, allCompletedSubModules), true);
+  assert.strictEqual(getNextIncompleteModule(multiModules, allCompletedSubModules), null);
+
+  const reviewSteps = calculateExamSteps(multiModules, allCompletedSubModules, undefined, 42, 789, true);
+  assert.strictEqual(reviewSteps.length, 4);
+  reviewSteps.forEach((step) => {
+    assert.strictEqual(step.isCompleted, true);
+    assert.strictEqual(step.isAccessible, true);
+  });
+});
