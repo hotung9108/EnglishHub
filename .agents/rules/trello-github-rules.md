@@ -27,24 +27,19 @@ Tất cả các AI Agent (`@pm`, `@be-primary`, `@be-secondary`, `@fe-primary`, 
 ---
 
 ## 2. Quy tắc Nghiệm thu & Hoàn thành Nhiệm vụ (Strict Completion Protocol)
-- **DEV KHÔNG ĐƯỢC TỰ Ý KÉO THẺ SANG DONE**:
+- **DEV KHÔNG ĐƯỢC TỰ Ý KÉO THẺ SANG TESTING HOẶC DONE**:
   - Khi Developer hoàn thành code, chỉ được phép di chuyển thẻ từ `Ongoing` sang cột **`Review`**.
   - **Cơ chế Tự Động Hóa Zero-MCP**:
-    - Đối với các thành viên không cài đặt Trello MCP, chỉ cần mở GitHub Pull Request với tiêu đề chuẩn `feat(ROLE-NUM): mô tả`.
-    - GitHub Actions (`.github/workflows/trello-sync.yml`) sẽ tự động tìm thẻ `[ROLE-NUM]`, chuyển sang `Review`, đính kèm link PR và tag `@zawntsu`.
-  - Nếu thao tác thủ công, comment trên card Trello cú pháp:
-    ```markdown
-    @Zawn-Tsu Đã hoàn thành nhiệm vụ, mời tester test lại!
-    - PR: [Link Pull Request trên GitHub]
-    - Branch: [Tên branch]
-    - Hướng dẫn test nhanh: [Các bước kiểm tra và dữ liệu mẫu]
-    ```
-  - Gán thêm thành viên **`Zawn-Tsu`** vào thẻ.
+    - Đối với các thành viên không cài đặt Trello MCP, chỉ cần mở GitHub Pull Request trỏ vào `develop` với tiêu đề chuẩn `feat(ROLE-NUM): mô tả`.
+    - GitHub Actions (`.github/workflows/trello-sync.yml`) sẽ tự động tìm thẻ `[ROLE-NUM]`, chuyển sang `Review`, đính kèm link PR để Lead (`@hotung9108`) duyệt code.
+  - Khi PR được merge vào `develop`, thẻ **vẫn ở lại cột `Review`** chờ Lead duyệt promote lên Staging.
+- **CHUYỂN SANG TESTING KHI ĐÃ DEPLOY LÊN STAGING**:
+  - Sau khi code được merge vào nhánh `staging` và hệ thống CI/CD deploy thành công lên server Staging, thẻ mới được chuyển sang cột **`Testing`** và gọi Tester (`@Zawn-Tsu` / `@zawntsu`) vào nghiệm thu.
 - **CHỈ TESTER MỚI ĐƯỢC ĐÓNG TASK**:
-  - Chỉ Agent `@tester` (hoặc thành viên `Zawn-Tsu`) sau khi kiểm thử thực tế và xác nhận ĐẠT mới được:
-    1. Approve Pull Request trên GitHub.
-    2. Comment xác nhận nghiệm thu thành công trên card Trello.
-    3. Di chuyển thẻ sang cột **`Done (Sprint X)`** (ví dụ `Done (Sprint 8)`).
+  - Chỉ Agent `@tester` (hoặc thành viên `Zawn-Tsu`) sau khi kiểm thử thực tế trên Staging và xác nhận ĐẠT mới được:
+    1. Comment xác nhận nghiệm thu thành công trên card Trello.
+    2. Di chuyển thẻ sang cột **`Done (Sprint X)`** (ví dụ `Done (Sprint 9)`).
+  - Nếu kiểm thử không đạt, Tester kéo thẻ về `Ongoing` hoặc `Blocked`, gắn nhãn `Bug` kèm log/hình ảnh lỗi.
 
 ---
 
