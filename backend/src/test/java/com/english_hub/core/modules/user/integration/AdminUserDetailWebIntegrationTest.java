@@ -12,6 +12,7 @@ import com.english_hub.core.infrastructure.security.JwtTokenService;
 import com.english_hub.core.infrastructure.security.SecurityConfig;
 import com.english_hub.core.modules.user.application.command.UpdateUserCommand;
 import com.english_hub.core.modules.user.application.page.UserPageRequest;
+import com.english_hub.core.modules.user.application.port.PasswordGenerator;
 import com.english_hub.core.modules.user.application.service.AdminUserService;
 import com.english_hub.core.modules.user.application.service.UserProfileService;
 import com.english_hub.core.modules.user.domain.model.User;
@@ -82,7 +83,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		ApiAuthenticationEntryPoint.class, ApiAccessDeniedHandler.class, GlobalExceptionHandler.class,
 		AdminUserService.class, UserProfileService.class, AuthenticatedUserProvider.class,
 		UserSnapshotCache.class, CacheConfig.class, AdminUserDetailWebIntegrationTest.JsonConfiguration.class})
-@MockitoBean(types = UserRepository.class)
+@MockitoBean(types = {UserRepository.class, PasswordGenerator.class})
 @MockitoSpyBean(types = AdminUserService.class)
 class AdminUserDetailWebIntegrationTest {
 
