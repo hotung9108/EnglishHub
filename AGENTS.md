@@ -18,7 +18,7 @@ We use a shared `production_artifacts/` directory and Spec-Driven Development (S
 - **@pm** creates requirement specs (`docs/features/*.md`), creates cards on Trello (`Product Backlog` -> `Sprint Backlog`), and drops summarized tasks into `production_artifacts/pm_to_dev/`.
 - **@be-primary** and **@be-secondary** read from `production_artifacts/pm_to_dev/`, implement APIs following DDD (`convention-be.md`), develop/integrate AI capabilities following `convention-ai.md`, run Project Doctor (`/doctor`), and place backend testing instructions in `production_artifacts/be_to_tester/`.
 - **@fe-primary** and **@fe-secondary** implement UI/UX and integrate APIs following `convention-fe.md`, run Project Doctor, and drop build/test instructions in `production_artifacts/fe_to_tester/`.
-- **@tester** reads from `be_to_tester` and `fe_to_tester`, verifies against requirements, writes test reports in `production_artifacts/test_reports/`. **Only @tester has the authority to approve PRs and move Trello cards to `Done (Sprint X)`**.
+- **@tester** reads from `be_to_tester` and `fe_to_tester`, verifies features on the Staging environment once deployed (card in `Testing`), and writes test reports in `production_artifacts/test_reports/`. **Only @tester has the authority to verify on Staging and move Trello cards to `Done (Sprint X)`**.
 - **@devops-primary** and **@devops-secondary** manage staging/production environments, GitHub Rulesets (`IMMUTABLE-CORE-BRANCHES`), and CI/CD quality gates.
 
 Tasks and backlogs are managed exclusively on Trello board `Project1` and GitHub PRs. Member mapping is defined in [.agents/rules/git-user-mapping.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/rules/git-user-mapping.md).
@@ -40,8 +40,9 @@ A task is ONLY considered Done when:
 - Unit tests are written and passing (Code coverage > 80%).
 - Code has been linted and formatted.
 - Pull Request targeting `develop` is opened and linked to the Trello card.
-- Trello card is moved to `Review` (automatically via GitHub Actions or manually) with a comment calling `@Zawn-Tsu` to test.
-- **Tester (`@Zawn-Tsu`) has re-tested, confirmed pass, approved the PR, and moved the Trello card to `Done (Sprint X)`**.
+- Trello card is moved to `Review` (automatically via GitHub Actions or manually) for Lead (`@hotung9108`) code review and merge approval.
+- Code is merged to `staging` and deployed; card is moved to `Testing`.
+- **Tester (`@Zawn-Tsu`) has re-tested on Staging, confirmed pass, and moved the Trello card to `Done (Sprint X)`**.
 - Relevant documentation (`docs/`) is updated.
 - Necessary artifacts are placed in `production_artifacts/` for the next agent.
 - Strictly follow [.agents/private/rules/no-auto-commit-push.md](file:///D:/Codin/utc-code/HK4_1/Project1/EnglishHub/.agents/private/rules/no-auto-commit-push.md): NEVER commit or push without explicit user command.

@@ -109,34 +109,47 @@ Ngay bên trong thẻ Trello, người tạo hoặc người thực hiện phả
 
 ## 3. Quy Trình Hoàn Thành Nhiệm Vụ & Nghiệm Thu (Strict Completion & QA Protocol)
 
-Để bảo đảm chất lượng phần mềm, dự án áp dụng quy tắc nghiệm thu nghiêm ngặt: **Lập trình viên KHÔNG ĐƯỢC tự ý kéo thẻ sang `Done`**.
+Để bảo đảm chất lượng phần mềm, dự án áp dụng quy trình nghiệm thu 2 tầng nghiêm ngặt: **Lập trình viên KHÔNG ĐƯỢC tự ý kéo thẻ sang `Done`**.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as Developer (FE / BE / OPS)
+    actor Dev as Developer (FE / BE)
     participant Trello as Trello Board
-    participant GitHub as GitHub (PR & Issue)
+    participant GitHubDev as GitHub PR (target: develop)
+    actor Lead as Lead / PM (@hotung9108)
+    participant GitHubStaging as GitHub (target: staging)
+    actor CD as Staging CD & Server
     actor QA as Tester (@Zawn-Tsu)
 
-    Dev->>GitHub: Đẩy code lên nhánh fix/ hoặc feat/
-    Dev->>GitHub: Mở Pull Request trỏ vào 'develop'
-    Dev->>Trello: Tích đủ Checklist DoD kỹ thuật
-    Dev->>Trello: Chuyển thẻ sang cột 'Review'
-    Dev->>Trello: Comment gọi: "@Zawn-Tsu Đã hoàn thành nhiệm vụ, mời tester test lại..."
-    
-    QA->>GitHub: Kiểm tra PR, checkout code / staging
-    QA->>QA: Chạy test thực tế & kiểm chứng bug fix
-    
+    Note over Dev,Trello: 1. Hoàn thành code (DoD passed)
+    Dev->>GitHubDev: Mở PR trỏ vào 'develop'
+    GitHubDev->>Trello: Bot trello-sync tự động đưa card vào cột "Review"
+    GitHubDev->>Trello: Bot comment thông báo Lead (@hotung9108) vào review
+
+    Note over Lead,GitHubDev: 2. Review & Merge vào develop
+    Lead->>GitHubDev: Review code, Approve PR & Merge vào 'develop'
+    Note over Trello: Card VẪN Ở CỘT "Review" (Chưa deploy lên Staging)
+    GitHubDev->>Trello: Bot comment: Đã merge vào develop, chờ promote lên Staging
+
+    Note over Lead,GitHubStaging: 3. Promote develop lên Staging
+    Lead->>GitHubStaging: Mở PR hoặc merge develop -> staging
+    GitHubStaging->>CD: Kích hoạt CD Staging (Frontend & Backend deploy)
+    CD-->>Lead: Deploy hoàn tất thành công trên Staging
+
+    Note over Lead,Trello: 4. Bàn giao sang Testing cho Tester
+    Lead->>Trello: Chuyển card từ "Review" sang "Testing" (hoặc bot auto khi merge PR staging)
+    Lead->>Trello: Comment tag @zawntsu: Code đã deploy lên Staging, mời Tester test!
+
+    Note over QA,Trello: 5. Nghiệm thu thực tế trên Staging
     alt Kiểm thử KHÔNG ĐẠT (Fail)
         QA->>Trello: Gắn nhãn 'Bug', comment chi tiết lỗi (kèm ảnh/log)
         QA->>Trello: Kéo thẻ về 'Ongoing' (nếu lỗi nhỏ) hoặc 'Blocked' (nếu nghiêm trọng)
-        QA->>GitHub: Thêm review comment yêu cầu sửa
+        QA->>GitHubDev: Thêm review / issue comment yêu cầu dev sửa
         Note over Dev,QA: Dev sửa tiếp và lặp lại từ bước 1
     else Kiểm thử ĐẠT (Pass)
-        QA->>GitHub: Approve Pull Request & Merge vào 'develop'
-        QA->>Trello: Comment: "Nghiệm thu ĐẠT. Đóng task."
-        QA->>Trello: Tự tay kéo thẻ sang 'Done (Sprint X)' / 'Sprint 8'
+        QA->>Trello: Comment: "Nghiệm thu ĐẠT trên Staging. Đóng task."
+        QA->>Trello: Tự tay kéo thẻ sang 'Done (Sprint X)'
         Note over Dev,QA: Nhiệm vụ chính thức hoàn thành!
     end
 ```
@@ -145,11 +158,18 @@ sequenceDiagram
 1. Chạy **Project Doctor** (`/doctor`) đảm bảo 100% Quality Gates đạt trạng thái `READY FOR PULL REQUEST`.
 2. Tích hoàn tất các mục trong Checklist DoD trên thẻ.
 3. Mở Pull Request trên GitHub trỏ vào `develop` theo đúng cú pháp tiêu đề `feat(ROLE-NUM): mô tả` (ví dụ `feat(FE-84): implement audio player studio`).
-4. **Cơ chế Tự động hóa Zero-MCP**: GitHub Actions (`.github/workflows/trello-sync.yml`) sẽ tự động phát hiện mã thẻ `[FE-84]`, di chuyển thẻ sang cột **`Review`**, đính kèm link PR và tự động gắn thẻ `@zawntsu`. (Nếu thực hiện thủ công, dev vẫn có thể tự tay chuyển thẻ và comment gọi Tester).
+4. **Cơ chế Tự động hóa Zero-MCP**: GitHub Actions (`.github/workflows/trello-sync.yml`) sẽ tự động phát hiện mã thẻ `[FE-84]`, di chuyển thẻ sang cột **`Review`** và đính kèm link PR để Lead (@hotung9108) duyệt code.
 5. Bàn giao kịch bản kiểm thử vào `production_artifacts/fe_to_tester/` hoặc `production_artifacts/be_to_tester/`.
 
-### 3.2. Quyền hạn và Trách nhiệm của Tester (`@Zawn-Tsu`):
-- Tester là **người duy nhất** có quyền xác nhận một task đã hoàn thành và kéo thẻ sang cột **`Done (Sprint X)`** hoặc **`Srpint 8`**.
+### 3.2. Hành động của Lead / PM (`@hotung9108`):
+1. Theo dõi các thẻ nằm trong cột **`Review`**.
+2. Kiểm tra code trên PR GitHub, duyệt (Approve) và merge vào nhánh `develop`.
+3. Khi PR merge vào `develop`, thẻ **vẫn giữ nguyên ở cột `Review`** vì mã nguồn chưa lên Staging.
+4. Lead promote `develop` lên `staging` (kích hoạt CD deploy server). Sau khi deploy thành công, thẻ được chuyển sang cột **`Testing`** và thông báo cho Tester.
+
+### 3.3. Quyền hạn và Trách nhiệm của Tester (`@Zawn-Tsu`):
+- Tester chỉ tiến hành kiểm thử khi thẻ đã nằm trong cột **`Testing`** (nghĩa là mã nguồn đã được deploy thành công trên server Staging).
+- Tester là **người duy nhất** có quyền xác nhận một task đã hoàn thành và kéo thẻ sang cột **`Done (Sprint X)`**.
 - Nếu phát hiện lỗi: Tester comment rõ lỗi kèm hình ảnh/log, gắn nhãn màu cam `Bug`, và kéo thẻ về `Ongoing` hoặc `Blocked`.
 
 ---
@@ -192,9 +212,10 @@ Bảng Trello `Project1` được cấu trúc thành các nhóm cột logic theo
 | **Kế hoạch** | `Sprint Backlog` | Toàn bộ các task đã được duyệt cho Sprint hiện tại (đã đủ điều kiện DoR). |
 | **Trở ngại** | `Blocked` | Chứa các task bị nghẽn (chờ PM chốt spec, chờ API backend, lỗi hạ tầng). Bắt buộc comment rõ lý do blocked. |
 | **Thực hiện** | `Ongoing` | Các task đang được dev code trực tiếp (tuân thủ WIP Limit $\le 2$). |
-| **Kiểm thử** | `Review` | Code đã xong, PR đã mở, đang chờ Tester (`@Zawn-Tsu`) nghiệm thu. |
-| **Hoàn thành** | `Srpint 8` *(hoặc Sprint hiện tại)* | Các task đã được Tester nghiệm thu ĐẠT trong Sprint 8. |
-| **Lưu trữ** | `Sprint 7`, `Done (Sprint 6)` $\dots$ `Done (Sprint 1)` | Lưu trữ các task đã hoàn thành ở các Sprint trước đó để phục vụ báo cáo. |
+| **Phê duyệt** | `Review` | Code đã xong, PR đã mở trỏ vào `develop`, hoặc đã merge vào `develop` chờ Lead (`@hotung9108`) duyệt code và promote lên `staging`. |
+| **Kiểm thử** | `Testing` | Code **đã được deploy thành công lên Staging**. Tester (`@Zawn-Tsu`) tiến hành kiểm thử thực tế trên server Staging. |
+| **Hoàn thành** | `Done (Sprint 9)` *(hoặc Sprint hiện tại)* | Các task đã được Tester nghiệm thu ĐẠT trên Staging trong Sprint 9. |
+| **Lưu trữ** | `Done (Sprint 8)` $\dots$ `Done (Sprint 1)` | Lưu trữ các task đã hoàn thành ở các Sprint trước đó để phục vụ báo cáo. |
 | **Milestones** | `00. PI`, `01. SRS`, `02. PP`, `03. TP` | Các giai đoạn đồ án lớn (Khởi động, Đặc tả yêu cầu, Kế hoạch dự án, Kế hoạch kiểm thử). |
 
 ---

@@ -1,4 +1,4 @@
-import { buildListParams } from '@/hooks/useUsers.utils';
+import { buildListParams } from '../../hooks/useUsers.utils';
 import { httpClient } from '../core/client';
 import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
-  TrendingDown, User, ChevronDown, Clock
+  TrendingDown, User, ChevronDown, Clock, Download
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { reportService } from '../api/services/report.service';
@@ -256,14 +256,89 @@ export const AdminReports: React.FC = () => {
     setClassProgress(null);
   };
 
+  const handleExportCSV = () => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `bao_cao_thong_ke_${timestamp}.csv`;
+
+    const headers = [
+      isVi ? 'Mã lớp' : 'Class ID',
+      isVi ? 'Tên lớp học' : 'Class Name',
+      isVi ? 'Trạng thái' : 'Status',
+      isVi ? 'Bài tập đã giao' : 'Assignments Assigned',
+      isVi ? 'Tỷ lệ hoàn thành (%)' : 'Completion Rate (%)',
+      isVi ? 'Điểm trung bình (%)' : 'Average Score (%)',
+    ];
+
+    const escapeCsv = (str: string | number) => {
+      const s = String(str);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const rows: string[][] = [
+      [isVi ? 'BÁO CÁO THỐNG KÊ HỆ THỐNG ENGLIS开放' : 'SYSTEM REPORTS EXPORT'],
+      [isVi ? 'Thời gian xuất' : 'Exported At', new Date().toLocaleString()],
+      [isVi ? 'Khoảng thời gian' : 'Time Interval', `${fromDate || (isVi ? 'Tất cả' : 'All')} - ${toDate || (isVi ? 'Hiện tại' : 'Now')}`],
+      [],
+      [isVi ? 'TỔNG QUAN HỆ THỐNG' : 'SYSTEM OVERVIEW'],
+      [isVi ? 'Tổng số lớp' : 'Total Classes', String(overview?.classCount ?? 0)],
+      [isVi ? 'Tổng bài tập đã giao' : 'Total Assignments Assigned', String(overview?.assignedAssignmentCount ?? 0)],
+      [isVi ? 'Tỷ lệ hoàn thành trung bình' : 'Avg Completion Rate', `${overview?.completionRatePercent ?? 0}%`],
+      [isVi ? 'Điểm trung bình toàn hệ thống' : 'Avg System Score', `${overview?.averageScorePercent ?? 0}%`],
+      [isVi ? 'Bài tập chờ chấm' : 'Pending Grading', String(overview?.pendingGradingCount ?? 0)],
+      [],
+      [isVi ? 'CHI TIẾT CÁC LỚP HỌC' : 'CLASS COHORTS BREAKDOWN'],
+      headers,
+    ];
+
+    for (const cls of filteredClasses) {
+      const statusLabel = cls.status === 'ACTIVE'
+        ? (isVi ? 'Đang hoạt động' : 'Active')
+        : (isVi ? 'Đã hoàn thành' : 'Completed');
+
+      rows.push([
+        String(cls.classId),
+        cls.className,
+        statusLabel,
+        String(cls.assignedAssignmentCount),
+        `${cls.completionRatePercent}%`,
+        `${cls.averageScorePercent}%`,
+      ]);
+    }
+
+    const csvContent = '\uFEFF' + rows.map((r) => r.map(escapeCsv).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="adm-container">
       {/* Header */}
-      <div className="adm-header mb-6">
+      <div className="adm-header mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="adm-title-group">
           <h1 className="adm-title">
             <span>{t('adminReports.title')}</span>
           </h1>
+        </div>
+        <div>
+          <Button
+            variant="secondary"
+            icon={Download}
+            onClick={handleExportCSV}
+            disabled={loading || filteredClasses.length === 0}
+            title={isVi ? 'Xuất toàn bộ dữ liệu báo cáo ra định dạng CSV (Excel)' : 'Export analytics data to CSV'}
+          >
+            {isVi ? 'Xuất báo cáo (CSV)' : 'Export CSV Report'}
+          </Button>
         </div>
       </div>
 

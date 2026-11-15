@@ -9,7 +9,10 @@ import {
   MicOff, 
   AlertCircle,
   RefreshCw,
-  Loader2
+  Loader2,
+  UploadCloud,
+  FileAudio,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
@@ -62,6 +65,54 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
+
+  // Audio Input Mode (Mic vs Upload - UC017 / FE-91)
+  const [audioInputMode, setAudioInputMode] = useState<'mic' | 'upload'>('mic');
+  const [uploadedAudioFile, setUploadedAudioFile] = useState<File | null>(null);
+  const [uploadedAudioUrl, setUploadedAudioUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
+    if (file.size > MAX_AUDIO_SIZE) {
+      setError('Dung lượng tệp âm thanh không được vượt quá 25MB.');
+      return;
+    }
+
+    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/webm', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'];
+    const isExtensionValid = /\.(mp3|wav|m4a|webm|mp4)$/i.test(file.name);
+    if (!validTypes.includes(file.type) && !isExtensionValid) {
+      setError('Định dạng tệp âm thanh không được hỗ trợ. Vui lòng tải lên tệp .mp3, .wav, .m4a hoặc .webm.');
+      return;
+    }
+
+    setError(null);
+    if (uploadedAudioUrl) {
+      URL.revokeObjectURL(uploadedAudioUrl);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setUploadedAudioFile(file);
+    setUploadedAudioUrl(objectUrl);
+  };
+
+  const handleRemoveUploadedAudio = () => {
+    if (uploadedAudioUrl) {
+      URL.revokeObjectURL(uploadedAudioUrl);
+    }
+    setUploadedAudioFile(null);
+    setUploadedAudioUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+  };
 
 
   const numericId = useMemo(() => {
@@ -232,9 +283,15 @@ const StudentAssignmentSpeaking: React.FC = () => {
     };
   }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
 
-  // Handle Play/Pause for recorded audio
+  // Handle Play/Pause for recorded audio or uploaded audio
+  const effectiveAudioUrl = audioInputMode === 'mic' ? audioUrl : uploadedAudioUrl;
+  const effectiveBlobOrFile: Blob | File | null = audioInputMode === 'mic' ? audioBlob : uploadedAudioFile;
+  const effectiveMimeType = audioInputMode === 'mic' 
+    ? backendMimeType 
+    : (uploadedAudioFile?.type || 'audio/mpeg');
+
   const togglePlay = () => {
-    if (!audioPlayerRef.current || !audioUrl) return;
+    if (!audioPlayerRef.current || !effectiveAudioUrl) return;
 
     if (isPlaying) {
       audioPlayerRef.current.pause();
@@ -307,16 +364,16 @@ const StudentAssignmentSpeaking: React.FC = () => {
       return;
     }
 
-    // Kịch bản học viên chưa ghi âm bài nói -> hiển thị Modal cảnh báo xác nhận nộp rỗng
-    if (!audioBlob) {
+    // Kịch bản học viên chưa ghi âm bài nói và chưa tải tệp -> hiển thị Modal cảnh báo xác nhận nộp rỗng
+    if (!effectiveBlobOrFile) {
       setShowEmptyConfirmModal(true);
       return;
     }
 
-    await doSubmitAssignment(audioBlob);
+    await doSubmitAssignment(effectiveBlobOrFile, effectiveMimeType);
   };
 
-  const doSubmitAssignment = async (blobToSubmit: Blob | null) => {
+  const doSubmitAssignment = async (blobToSubmit: Blob | File | null, mimeTypeToUse?: string) => {
     setIsSubmitting(true);
     setError(null);
     setShowEmptyConfirmModal(false);
@@ -341,9 +398,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
       let uploadedAudioStorageKey: string | undefined = undefined;
 
-      // Step 1: Upload audio using consolidated 2-in-1 helper if student recorded
+      // Step 1: Upload audio using consolidated 2-in-1 helper if student recorded or uploaded
       if (blobToSubmit) {
-        const uploadRes = await submissionService.uploadAudio(subModuleId, blobToSubmit, backendMimeType);
+        const uploadRes = await submissionService.uploadAudio(subModuleId, blobToSubmit, mimeTypeToUse || backendMimeType);
         uploadedAudioStorageKey = uploadRes.storageKey;
       }
 
@@ -412,7 +469,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const recordedAudioReady = Boolean(audioBlob && audioUrl);
+  const recordedAudioReady = Boolean(
+    audioInputMode === 'mic' ? (audioBlob && audioUrl) : (uploadedAudioFile && uploadedAudioUrl)
+  );
   const activeError = permissionError || error;
 
   return (
@@ -420,7 +479,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
       {/* Hidden audio element for previewing the recorded sound */}
       <audio
         ref={audioPlayerRef}
-        src={audioUrl || undefined}
+        src={effectiveAudioUrl || undefined}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => {
@@ -519,82 +578,198 @@ const StudentAssignmentSpeaking: React.FC = () => {
             </div>
           </section>
 
-          {/* Card 2: Voice Studio / Recorder */}
+          {/* Card 2: Voice Studio / Recorder & File Upload (UC017 / FE-91) */}
           <section className="speaking-card">
-            <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                Ghi âm
-              </h2>
+            <div className="speaking-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="speaking-card-title m-0">
+                  {audioInputMode === 'mic' ? 'Ghi âm trực tiếp' : 'Tải tệp âm thanh'}
+                </h2>
+                <div className="inline-flex rounded-lg border border-border p-0.5 bg-surface-variant/30 text-xs">
+                  <button
+                    type="button"
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+                      audioInputMode === 'mic' ? 'bg-primary text-white shadow-xs' : 'text-muted hover:text-foreground'
+                    }`}
+                    onClick={() => {
+                      if (isPlaying && audioPlayerRef.current) {
+                        audioPlayerRef.current.pause();
+                        setIsPlaying(false);
+                      }
+                      setAudioInputMode('mic');
+                    }}
+                  >
+                    <Mic size={13} />
+                    <span>Microphone</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 ${
+                      audioInputMode === 'upload' ? 'bg-primary text-white shadow-xs' : 'text-muted hover:text-foreground'
+                    }`}
+                    onClick={() => {
+                      if (isRecording) {
+                        stopRecording();
+                      }
+                      if (isPlaying && audioPlayerRef.current) {
+                        audioPlayerRef.current.pause();
+                        setIsPlaying(false);
+                      }
+                      setAudioInputMode('upload');
+                    }}
+                  >
+                    <UploadCloud size={13} />
+                    <span>Tải tệp (.mp3/.wav)</span>
+                  </button>
+                </div>
+              </div>
+
               <span className={`speaking-card-timing ${isRecording ? 'recording' : ''}`}>
-                {isRecording 
-                  ? `Đang thu âm: ${formatTime(recordingDuration)}` 
-                  : recordedAudioReady 
-                    ? `Đã thu âm: ${formatTime(recordingDuration)}` 
+                {audioInputMode === 'mic'
+                  ? isRecording 
+                    ? `Đang thu âm: ${formatTime(recordingDuration)}` 
+                    : recordedAudioReady 
+                      ? `Đã thu âm: ${formatTime(recordingDuration)}` 
+                      : ''
+                  : uploadedAudioFile
+                    ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB`
                     : ''}
               </span>
             </div>
 
             <div className="speaking-card-body">
-              <div className="speaking-recorder-wrapper">
-                {/* Audio Waveform visualization */}
-                <div className="speaking-waveform">
-                  {[40, 20, 60, 90, 45, 75, 30, 85, 95, 60, 40, 70, 80, 50, 65, 35, 90, 75, 60, 45, 80, 70, 50, 40].map((h, i) => (
-                    <div 
-                      key={i} 
-                      className={`speaking-waveform-bar ${isRecording ? 'recording' : ''}`}
-                      style={{ height: isRecording ? `${h}%` : '20%' }}
-                    />
-                  ))}
+              {audioInputMode === 'mic' ? (
+                <div className="speaking-recorder-wrapper">
+                  {/* Audio Waveform visualization */}
+                  <div className="speaking-waveform">
+                    {[40, 20, 60, 90, 45, 75, 30, 85, 95, 60, 40, 70, 80, 50, 65, 35, 90, 75, 60, 45, 80, 70, 50, 40].map((h, i) => (
+                      <div 
+                        key={i} 
+                        className={`speaking-waveform-bar ${isRecording ? 'recording' : ''}`}
+                        style={{ height: isRecording ? `${h}%` : '20%' }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Recorder Controls */}
+                  <div className="speaking-recorder-controls">
+                    <button 
+                      type="button"
+                      className="speaking-btn-icon" 
+                      onClick={handleResetRecording}
+                      disabled={isRecording || !recordedAudioReady}
+                      title="Thu âm lại từ đầu"
+                    >
+                      <RotateCcw size={18} />
+                    </button>
+
+                    <button 
+                      type="button"
+                      className={`speaking-btn-record ${isRecording ? 'active' : ''}`}
+                      onClick={() => void toggleRecording()}
+                      title={isRecording ? 'Dừng thu âm' : 'Bắt đầu thu âm'}
+                    >
+                      {isRecording ? <MicOff size={28} /> : <Mic size={28} />}
+                    </button>
+
+                    <button 
+                      type="button"
+                      className="speaking-btn-icon" 
+                      onClick={togglePlay}
+                      disabled={!recordedAudioReady || isRecording}
+                      title={isPlaying ? 'Tạm dừng phát' : 'Phát lại bản ghi'}
+                    >
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    </button>
+                  </div>
+
+                  <div className="speaking-recorder-hint">
+                    {isRecording ? (
+                      <span className="speaking-status-recording">
+                        Đang ghi âm... ({formatTime(recordingDuration)})
+                      </span>
+                    ) : recordedAudioReady ? (
+                      <span className="speaking-status-ready">
+                        {isPlaying
+                          ? `Đang phát lại (${formatTime(playbackSeconds)} / ${formatTime(recordingDuration)})`
+                          : `Đã ghi âm (${formatTime(recordingDuration)}) • Bấm Play để nghe lại hoặc Nộp bài`}
+                      </span>
+                    ) : (
+                      <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
+                    )}
+                  </div>
                 </div>
+              ) : (
+                /* Mode Upload File */
+                <div className="p-4 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-center bg-surface hover:bg-surface-variant/20 transition-colors">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".mp3,.wav,.m4a,.webm,audio/*"
+                    onChange={handleAudioFileChange}
+                    className="hidden"
+                    id="speaking-audio-file-input"
+                  />
 
-                {/* Recorder Controls */}
-                <div className="speaking-recorder-controls">
-                  <button 
-                    type="button"
-                    className="speaking-btn-icon" 
-                    onClick={handleResetRecording}
-                    disabled={isRecording || !recordedAudioReady}
-                    title="Thu âm lại từ đầu"
-                  >
-                    <RotateCcw size={18} />
-                  </button>
-
-                  <button 
-                    type="button"
-                    className={`speaking-btn-record ${isRecording ? 'active' : ''}`}
-                    onClick={() => void toggleRecording()}
-                    title={isRecording ? 'Dừng thu âm' : 'Bắt đầu thu âm'}
-                  >
-                    {isRecording ? <MicOff size={28} /> : <Mic size={28} />}
-                  </button>
-
-                  <button 
-                    type="button"
-                    className="speaking-btn-icon"
-                    onClick={togglePlay}
-                    disabled={!recordedAudioReady || isRecording}
-                    title={isPlaying ? 'Tạm dừng phát' : 'Phát lại bản ghi'}
-                  >
-                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-                  </button>
-                </div>
-
-                <div className="speaking-recorder-hint">
-                  {isRecording ? (
-                    <span className="speaking-status-recording">
-                      Đang ghi âm... ({formatTime(recordingDuration)})
-                    </span>
-                  ) : recordedAudioReady ? (
-                    <span className="speaking-status-ready">
-                      {isPlaying
-                        ? `Đang phát lại (${formatTime(playbackSeconds)} / ${formatTime(recordingDuration)})`
-                        : `Đã ghi âm (${formatTime(recordingDuration)}) • Bấm Play để nghe lại hoặc Nộp bài`}
-                    </span>
+                  {!uploadedAudioFile ? (
+                    <label
+                      htmlFor="speaking-audio-file-input"
+                      className="flex flex-col items-center cursor-pointer p-4 w-full"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                        <UploadCloud size={24} />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground mb-1">
+                        Bấm để chọn hoặc kéo thả tệp âm thanh bài nói
+                      </span>
+                      <span className="text-xs text-muted">
+                        Hỗ trợ định dạng .mp3, .wav, .m4a, .webm (Dung lượng tối đa 25MB)
+                      </span>
+                    </label>
                   ) : (
-                    <span>Bấm biểu tượng micro để bắt đầu thu âm câu trả lời</span>
+                    <div className="w-full flex flex-col items-center p-2">
+                      <div className="flex items-center justify-between w-full p-3 rounded-lg bg-surface-variant/40 border border-border mb-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+                            <FileAudio size={20} />
+                          </div>
+                          <div className="text-left overflow-hidden">
+                            <div className="text-sm font-semibold text-foreground truncate max-w-[280px]">
+                              {uploadedAudioFile.name}
+                            </div>
+                            <div className="text-xs text-muted">
+                              {(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB • {uploadedAudioFile.type || 'audio file'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={togglePlay}
+                            className="p-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors"
+                            title={isPlaying ? 'Tạm dừng' : 'Nghe thử'}
+                          >
+                            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveUploadedAudio}
+                            className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+                            title="Xóa tệp này và chọn tệp khác"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <span className="text-xs text-muted">
+                        {isPlaying ? 'Đang phát âm thanh...' : 'Tệp âm thanh đã sẵn sàng. Bạn có thể nghe thử hoặc bấm nộp bài.'}
+                      </span>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
           </section>
         </div>
@@ -613,19 +788,25 @@ const StudentAssignmentSpeaking: React.FC = () => {
               {/* Audio file block */}
               <div className="submission-file-box">
                 <div className="submission-file-info">
-                  <div className="submission-file-title">
+                  <div className="submission-file-title truncate max-w-[200px]" title={audioInputMode === 'mic' ? `speaking_attempt_${numericId}.webm` : (uploadedAudioFile?.name || '')}>
                     {recordedAudioReady 
-                      ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}` 
+                      ? (audioInputMode === 'mic'
+                          ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}`
+                          : uploadedAudioFile?.name)
                       : 'chua_co_ban_ghi.webm'}
                   </div>
                   <div className="submission-file-meta">
-                    {recordedAudioReady && audioBlob
-                      ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB` 
-                      : 'Chưa có bản ghi âm'}
+                    {recordedAudioReady
+                      ? (audioInputMode === 'mic' && audioBlob
+                          ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB (Mic)`
+                          : uploadedAudioFile
+                            ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB (Tệp tải lên)`
+                            : '')
+                      : 'Chưa có bản ghi âm hoặc tệp'}
                   </div>
                 </div>
                 <span className={`submission-file-status ${recordedAudioReady ? 'ready' : 'pending'}`}>
-                  {recordedAudioReady ? 'Sẵn sàng nộp' : 'Chưa ghi âm'}
+                  {recordedAudioReady ? 'Sẵn sàng nộp' : 'Chưa có bài'}
                 </span>
               </div>
 
