@@ -1948,5 +1948,43 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
     expect(gradingService.submitGrade).not.toHaveBeenCalled();
   });
+
+  it('closes modal when clicking the X close button without submitting', async () => {
+    const { user, score } = await setup();
+    fireEvent.change(score, { target: { value: '8.5' } });
+    await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
+
+    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    const closeBtn = screen.getByRole('button', { name: 'Đóng modal điều chỉnh điểm' });
+    await user.click(closeBtn);
+
+    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(gradingService.submitGrade).not.toHaveBeenCalled();
+  });
+
+  it('handles English audit modal flow with validation and submission', async () => {
+    renderPage(<TeacherSubmissionDetails />, '/teacher/assignments/:id/submissions/:studentId', '/teacher/assignments/12/submissions/5', undefined, 'en');
+    const score = await screen.findByRole('spinbutton');
+    const user = userEvent.setup();
+
+    fireEvent.change(score, { target: { value: '9.0' } });
+    await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
+
+    expect(await screen.findByText('Grade Adjustment Audit Reason (UC030)')).toBeVisible();
+    expect(screen.getByText('Audit Reason Note (Mandatory per UC030)')).toBeVisible();
+
+    const textarea = screen.getByPlaceholderText('Enter audit note explaining the score change...');
+    await user.type(textarea, 'English remark for audit');
+
+    const confirmBtn = screen.getByRole('button', { name: 'Confirm & Update Grade' });
+    await user.click(confirmBtn);
+
+    await waitFor(() => {
+      expect(gradingService.submitGrade).toHaveBeenCalledWith(80, expect.objectContaining({
+        finalScore: 9.0,
+        note: 'English remark for audit',
+      }));
+    });
+  });
 });
 

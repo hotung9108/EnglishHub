@@ -961,25 +961,22 @@ export const TeacherSubmissionDetails: React.FC = () => {
     }
 
     // 2. Check if score is being changed for an already evaluated/completed grade (UC030 / AD30 / UC31)
-    const isAlreadyGraded =
-      gradingDetail?.status === 'COMPLETED' ||
-      (gradingSummary as { status?: string })?.status === 'COMPLETED' ||
-      activeModule?.status === 'GRADED' ||
+    const isAlreadyGraded = Boolean(
       submission?.status === 'GRADED' ||
-      isModuleGraded(activeModule);
+      activeModule?.status === 'GRADED' ||
+      gradingSummary?.status === 'COMPLETED' ||
+      gradingDetail?.status === 'COMPLETED'
+    );
 
-    const existingFinalScore = isAlreadyGraded
-      ? (gradingDetail?.finalScore != null
-          ? Number(gradingDetail.finalScore)
-          : (gradingSummary as { finalScore?: number })?.finalScore != null
-            ? Number((gradingSummary as { finalScore?: number }).finalScore)
-            : activeModule?.grading?.finalScore != null
-              ? Number(activeModule.grading.finalScore)
-              : null)
-      : null;
-    const isScoreChanged = existingFinalScore !== null && Math.abs(existingFinalScore - scoreNum) > 0.001;
+    let existingFinalScore: number | null = null;
+    if (isAlreadyGraded) {
+      const rawScore = gradingDetail?.finalScore ?? gradingSummary?.finalScore ?? activeModule?.grading?.finalScore;
+      if (rawScore != null) {
+        existingFinalScore = Number(rawScore);
+      }
+    }
 
-    if (isScoreChanged) {
+    if (existingFinalScore !== null && Math.abs(existingFinalScore - scoreNum) > 0.001) {
       setPendingGradeAdjustment({
         gradingId,
         scoreNum,
@@ -2802,6 +2799,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
               </div>
               <button
                 type="button"
+                aria-label={isVi ? 'Đóng modal điều chỉnh điểm' : 'Close audit modal'}
                 onClick={() => {
                   setShowAuditReasonModal(false);
                   setPendingGradeAdjustment(null);
