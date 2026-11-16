@@ -8,6 +8,7 @@ import com.english_hub.core.modules.user.application.service.AdminUserService;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.presentation.rest.dto.AdminUserListResponse;
+import com.english_hub.core.modules.user.presentation.rest.dto.AdminResetPasswordResponse;
 import com.english_hub.core.modules.user.presentation.rest.dto.AdminUserSummary;
 import com.english_hub.core.modules.user.presentation.rest.dto.CreateUserRequest;
 import com.english_hub.core.modules.user.presentation.rest.dto.CreatedUserResponse;
@@ -17,6 +18,7 @@ import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserRequest
 import com.english_hub.core.modules.user.presentation.rest.dto.UpdateUserStatusRequest;
 import com.english_hub.core.modules.user.presentation.rest.dto.UserResponse;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -57,6 +59,18 @@ public class AdminUserController {
 	public ResponseEntity<UserResponse> getUser(@PathVariable long id) {
 		User user = adminUserService.getUser(id);
 		return ResponseEntity.ok(UserResponse.from(user));
+	}
+
+	@PostMapping("/{id}/reset-password")
+	public ResponseEntity<AdminResetPasswordResponse> resetPassword(@PathVariable long id) {
+		AdminUserService.ResetPasswordData result = adminUserService.resetPassword(id);
+		AdminResetPasswordResponse response = new AdminResetPasswordResponse(
+				"Đặt lại mật khẩu thành công.", result.newPassword());
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CACHE_CONTROL, "no-store");
+		headers.set(HttpHeaders.PRAGMA, "no-cache");
+		headers.set(HttpHeaders.EXPIRES, "0");
+		return new ResponseEntity<>(response, headers, HttpStatus.OK);
 	}
 
 	@PostMapping

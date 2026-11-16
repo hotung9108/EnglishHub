@@ -4,6 +4,7 @@ import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
+import com.english_hub.core.modules.user.application.port.PasswordGenerator;
 import com.english_hub.core.modules.user.application.service.AdminUserService;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -39,12 +40,15 @@ class AdminUserDetailServiceTest {
 	private PasswordEncoder passwordEncoder;
 	@Mock
 	private ApplicationEventPublisher eventPublisher;
+	@Mock
+	private PasswordGenerator passwordGenerator;
 
 	private AdminUserService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new AdminUserService(userRepository, currentUserProvider, passwordEncoder, eventPublisher);
+		service = new AdminUserService(userRepository, currentUserProvider, passwordEncoder, eventPublisher,
+				passwordGenerator);
 	}
 
 	@ParameterizedTest

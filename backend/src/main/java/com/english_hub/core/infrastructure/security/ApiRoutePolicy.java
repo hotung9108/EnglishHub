@@ -22,6 +22,7 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.GET, "/api/v1/admin/users", List.of("ADMIN")),
 			new RouteRule(HttpMethod.GET, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.POST, "/api/v1/admin/users", List.of("ADMIN")),
+			new RouteRule(HttpMethod.POST, "/api/v1/admin/users/{id}/reset-password", List.of("ADMIN")),
 			new RouteRule(HttpMethod.PUT, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.DELETE, "/api/v1/admin/users/{id}", List.of("ADMIN")),
 			new RouteRule(HttpMethod.PATCH, "/api/v1/admin/users/{id}/status", List.of("ADMIN")),
