@@ -1,0 +1,198 @@
+{
+  "projectCode": "EAM",
+  "checkedLocalDate": "2026-11-17",
+  "runCount": 8,
+  "fullResultBackup": false,
+  "r6Selenium170Uploaded": false,
+  "runs": [
+    {
+      "id": 20,
+      "title": "Retest Review Column Staging 2026-11-03",
+      "status": "failed",
+      "start_time": "2026-11-03T07:05:24+00:00",
+      "end_time": "2026-11-03T14:59:35+00:00",
+      "stats": {
+        "total": 19,
+        "statuses": {
+          "passed": 17,
+          "blocked": 2
+        },
+        "untested": 0,
+        "passed": 17,
+        "failed": 0,
+        "blocked": 2,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/20"
+    },
+    {
+      "id": 22,
+      "title": "[DEMO RUN] Kiểm thử Phân hệ Tài khoản (Admin & Edge Cases)",
+      "status": "passed",
+      "start_time": "2026-11-03T17:06:52+00:00",
+      "end_time": "2026-11-03T17:07:23+00:00",
+      "stats": {
+        "total": 1,
+        "statuses": {
+          "passed": 1
+        },
+        "untested": 0,
+        "passed": 1,
+        "failed": 0,
+        "blocked": 0,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/22"
+    },
+    {
+      "id": 24,
+      "title": "Parallel E2E Run - Full Visual & UI Integrity [2026-11-04T08:14:58.711Z]",
+      "status": "failed",
+      "start_time": "2026-11-04T08:14:59+00:00",
+      "end_time": "2026-11-04T08:16:06+00:00",
+      "stats": {
+        "total": 146,
+        "statuses": {
+          "passed": 60,
+          "failed": 30,
+          "blocked": 56
+        },
+        "untested": 0,
+        "passed": 60,
+        "failed": 30,
+        "blocked": 56,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/24"
+    },
+    {
+      "id": 25,
+      "title": "Parallel E2E Run - Full Visual & UI Integrity [2026-11-04T14:25:25.125Z]",
+      "status": "failed",
+      "start_time": "2026-11-04T14:25:26+00:00",
+      "end_time": "2026-11-04T14:26:50+00:00",
+      "stats": {
+        "total": 146,
+        "statuses": {
+          "passed": 94,
+          "failed": 45,
+          "blocked": 7
+        },
+        "untested": 0,
+        "passed": 94,
+        "failed": 45,
+        "blocked": 7,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/25"
+    },
+    {
+      "id": 26,
+      "title": "Retest Review Column Staging 2026-11-04",
+      "status": "passed",
+      "start_time": "2026-11-04T14:39:12+00:00",
+      "end_time": "2026-11-04T14:40:04+00:00",
+      "stats": {
+        "total": 5,
+        "statuses": {
+          "passed": 5
+        },
+        "untested": 0,
+        "passed": 5,
+        "failed": 0,
+        "blocked": 0,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/26"
+    },
+    {
+      "id": 27,
+      "title": "Manual UI Testing Run - EnglishHub Staging (hotung9108.me)",
+      "status": "in_progress",
+      "start_time": "2026-11-08T07:32:05+00:00",
+      "end_time": null,
+      "stats": {
+        "total": 62,
+        "statuses": {
+          "untested": 8,
+          "passed": 45,
+          "failed": 8,
+          "skipped": 1
+        },
+        "untested": 8,
+        "passed": 45,
+        "failed": 8,
+        "blocked": 0,
+        "skipped": 1,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/27"
+    },
+    {
+      "id": 28,
+      "title": "[RETEST-STAGING] Nghiệm thu 27 thẻ Testing - Sprint 10 (Project1)",
+      "status": "failed",
+      "start_time": "2026-11-13T12:12:17+00:00",
+      "end_time": "2026-11-13T13:11:21+00:00",
+      "stats": {
+        "total": 50,
+        "statuses": {
+          "passed": 48,
+          "failed": 2
+        },
+        "untested": 0,
+        "passed": 48,
+        "failed": 2,
+        "blocked": 0,
+        "skipped": 0,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/28"
+    },
+    {
+      "id": 29,
+      "title": "QA-30 UI coverage revalidation — 2026-11-16",
+      "status": "in_progress",
+      "start_time": "2026-11-16T12:43:05+00:00",
+      "end_time": null,
+      "stats": {
+        "total": 28,
+        "statuses": {
+          "untested": 4,
+          "passed": 8,
+          "failed": 4,
+          "blocked": 11,
+          "skipped": 1
+        },
+        "untested": 4,
+        "passed": 8,
+        "failed": 4,
+        "blocked": 11,
+        "skipped": 1,
+        "retest": 0,
+        "in_progress": 0,
+        "invalid": 0
+      },
+      "url": "https://app.qase.io/run/EAM/dashboard/29"
+    }
+  ]
+}

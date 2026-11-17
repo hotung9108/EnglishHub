@@ -1,9 +1,15 @@
-# Selenium guide
+# Hướng dẫn Selenium
 
-Framework d?ng chung theo POM: [README](../selenium/README.md).
+Đọc [README bộ chính](../selenium/README.md) trước khi chạy. Case chia theo chức năng → UC trong [cases/](../selenium/cases/README.md); helper và runner ở `selenium/common/`.
 
-C?i dependency trong `test/selenium`, ?i?n `.env` t? `.env.example`, ch?y `npm.cmd run test:login`. Windows launcher: `test/scripts/run-selenium-login.bat`.
+Tại `test/selenium`:
 
-Page Object: `selenium/pages/{auth,teacher,student,admin}`. Test: `selenium/tests/{auth,teacher,student,admin}`. Kh?ng t?o framework ri?ng theo m? task.
+```powershell
+npm run find -- ASG_009
+npm run list
+npm run check
+```
 
-`TEST_ENV=dev` d?ng localhost khi kh?ng ??t `SELENIUM_BASE_URL`; URL trong `.env` lu?n ?u ti?n.
+Ba lệnh trên làm việc offline. `npm test -- ASG_009` chạy ca thật, có thể tạo fixture trên môi trường đã cấu hình. Dùng `.env.example` và README để cấu hình tài khoản riêng.
+
+Launcher hiện hành nằm ở [scripts/](../scripts/README.md). Hướng dẫn scaffold/POM cũ không còn mô tả đường dẫn của bộ chính.

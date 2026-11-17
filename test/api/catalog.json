@@ -1,0 +1,132 @@
+{
+  "status": "review-only",
+  "executionEnabled": false,
+  "source": "test_reborn; imported for review, not approved",
+  "suites": [
+    {
+      "id": "common-auth",
+      "title": "Authentication & Session Management",
+      "status": "NEEDS_REVIEW",
+      "role": "common",
+      "legacyRequirements": [
+        "UC01",
+        "UC02"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 35,
+      "collection": "review/common-auth/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/common/auth/collection.json"
+    },
+    {
+      "id": "common-profile",
+      "title": "User Profile Management",
+      "status": "NEEDS_REVIEW",
+      "role": "common",
+      "legacyRequirements": [
+        "UC03"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 41,
+      "collection": "review/common-profile/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/common/profile/collection.json"
+    },
+    {
+      "id": "admin-account",
+      "title": "Admin User & Role Management",
+      "status": "NEEDS_REVIEW",
+      "role": "admin",
+      "legacyRequirements": [
+        "UC04",
+        "UC05",
+        "UC06",
+        "UC07"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 36,
+      "collection": "review/admin-account/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/admin/account-management/collection.json"
+    },
+    {
+      "id": "admin-class",
+      "title": "Admin Class & Member Management",
+      "status": "NEEDS_REVIEW",
+      "role": "admin",
+      "legacyRequirements": [
+        "UC08",
+        "UC09"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 70,
+      "collection": "review/admin-class/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/admin/class-management/collection.json"
+    },
+    {
+      "id": "teacher-assignment",
+      "title": "Teacher Assignment Lifecycle",
+      "status": "NEEDS_REVIEW",
+      "role": "teacher",
+      "legacyRequirements": [
+        "UC11",
+        "UC12",
+        "UC13",
+        "UC14"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 94,
+      "collection": "review/teacher-assignment/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/teacher/assignment-lifecycle/collection.json"
+    },
+    {
+      "id": "teacher-grading",
+      "title": "Teacher Grading & AI Analysis",
+      "status": "NEEDS_REVIEW",
+      "role": "teacher",
+      "legacyRequirements": [
+        "UC24",
+        "UC25",
+        "UC26",
+        "UC27",
+        "UC31"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 125,
+      "collection": "review/teacher-grading/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/teacher/grading-ai/collection.json"
+    },
+    {
+      "id": "student-submission",
+      "title": "Student Submissions & Exam Flow",
+      "status": "NEEDS_REVIEW",
+      "role": "student",
+      "legacyRequirements": [
+        "UC15",
+        "UC16",
+        "UC17",
+        "UC18",
+        "UC19",
+        "UC20",
+        "UC21",
+        "UC22",
+        "UC23"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 92,
+      "collection": "review/student-submission/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/student/submissions/collection.json"
+    },
+    {
+      "id": "student-evaluation",
+      "title": "Student Evaluations & Progress Tracking",
+      "status": "NEEDS_REVIEW",
+      "role": "student",
+      "legacyRequirements": [
+        "UC34",
+        "UC35"
+      ],
+      "requirementsStatus": "Legacy UC mapping must be checked against Group-04 before acceptance",
+      "requestCount": 130,
+      "collection": "review/student-evaluation/collection.json",
+      "origin": "test/archive/test-reborn-20261117/black-box/api/student/evaluations/collection.json"
+    }
+  ]
+}
