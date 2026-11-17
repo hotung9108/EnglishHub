@@ -357,6 +357,45 @@ test('ClassService - member sub-resources unwrap the data envelope', async () =>
   assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members/202');
 });
 
+test('ClassService - candidate students endpoint unwraps data envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [
+      { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+    ],
+  };
+
+  const candidates = await classSvc.listCandidates(15, { q: 'Minh', limit: 50 });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/candidates');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { q: 'Minh', limit: 50 });
+  assert.deepStrictEqual(candidates, [
+    { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+  ]);
+});
+
+test('ClassService - listCandidatesPage supports pagination and returns envelope with metadata', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [
+      { id: 106, fullName: 'Linh Pham', email: 'linh@example.com', studentCode: 'HV0106', status: 'ACTIVE' },
+    ],
+    pagination: { page: 2, limit: 10, total: 106 },
+  };
+
+  const res = await classSvc.listCandidatesPage(15, { q: 'linh@example.com', page: 2, limit: 10 });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/candidates');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { q: 'linh@example.com', page: 2, limit: 10 });
+  assert.deepStrictEqual(res.pagination, { page: 2, limit: 10, total: 106 });
+  assert.strictEqual(res.data.length, 1);
+  assert.strictEqual(res.data[0].id, 106);
+});
+
 test('buildListParams passes through extra filters for non-user endpoints', () => {
   assert.deepStrictEqual(buildListParams({ page: 2, limit: 10 }, { status: 'ACTIVE' }), {
     page: 2,

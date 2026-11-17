@@ -44,6 +44,10 @@ public final class ApiRoutePolicy {
 					HttpMethod.GET,
 					"/api/v1/classes/{id}/members",
 					List.of("ADMIN", "TEACHER", "STUDENT")),
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/classes/{id}/candidates",
+					List.of("ADMIN", "TEACHER")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức
 			new RouteRule(HttpMethod.PUT, "/api/v1/classes/{id}", List.of("ADMIN")),
 			// TẠM — role theo test hiện có, cần chủ cụm Classes xác nhận lại role thật trước khi merge chính thức

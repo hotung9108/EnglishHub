@@ -40,6 +40,21 @@ export default defineConfig({
       usePolling: true, // Bắt buộc cho file change detection qua Docker volume trên Windows/WSL
     },
     proxy: {
+      '/api': {
+        target: process.env.VITE_BACKEND_PROXY_TARGET || 'https://api-staging.hotung9108.me',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          Origin: 'https://staging.hotung9108.me',
+          Referer: 'https://staging.hotung9108.me/',
+        },
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('Origin', 'https://staging.hotung9108.me');
+            proxyReq.setHeader('Referer', 'https://staging.hotung9108.me/');
+          });
+        },
+      },
       '/s3-upload': {
         target: process.env.VITE_STORAGE_PROXY_TARGET || defaultStorageTarget,
         changeOrigin: true,

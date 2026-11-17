@@ -4,10 +4,14 @@ import com.english_hub.core.modules.classroom.application.command.AddClassMember
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.AddClassMemberRequest;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.AddedClassMemberResponse;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassCandidateListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassDetailResponse;
+import java.util.List;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassMemberListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassSummaryResponse;
@@ -92,6 +96,20 @@ public class ClassController {
 	@GetMapping("/{id}/members")
 	public ResponseEntity<ClassMemberListResponse> listClassMembers(@PathVariable long id) {
 		return ResponseEntity.ok(ClassMemberListResponse.from(classService.listClassMembers(id)));
+	}
+
+	@GetMapping("/{id}/candidates")
+	public ResponseEntity<ClassCandidateListResponse> listCandidateStudents(
+			@PathVariable long id,
+			@RequestParam(required = false, defaultValue = "") String q,
+			@RequestParam(defaultValue = "1") int page,
+			@RequestParam(defaultValue = "100") int limit) {
+		ClassCandidatePage candidatesPage = classService.listCandidateStudents(id, q, page, limit);
+		return ResponseEntity.ok(ClassCandidateListResponse.of(
+				candidatesPage.candidates(),
+				candidatesPage.page(),
+				candidatesPage.limit(),
+				candidatesPage.total()));
 	}
 
 	@PostMapping("/{id}/members")

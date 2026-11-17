@@ -4,8 +4,7 @@ import {
   Check, Loader2, AlertCircle, RefreshCw 
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { userService, type UserListItem } from '../../api/services/user.service';
-import { classService } from '../../api/services/class.service';
+import { classService, type CandidateStudent } from '../../api/services/class.service';
 
 interface SelectExistingStudentsModalProps {
   isOpen: boolean;
@@ -36,15 +35,28 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
   const availableSpots = Math.max(0, capacity - currentCount);
   const isFull = availableSpots === 0;
 
-  const [students, setStudents] = useState<UserListItem[]>([]);
+  const [students, setStudents] = useState<CandidateStudent[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalCandidates, setTotalCandidates] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [reloadKey, setReloadKey] = useState(0);
+  const PAGE_SIZE = 50;
+
+  // Debounce search query changes by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,9 +66,17 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
       try {
         setLoading(true);
         setError(null);
-        const res = await userService.listUsers({ role: 'STUDENT', limit: 100 });
+        setPage(1);
+        const trimmed = debouncedSearchQuery.trim();
+        const res = await classService.listCandidatesPage(classId, {
+          q: trimmed || undefined,
+          page: 1,
+          limit: PAGE_SIZE,
+        });
         if (isMounted) {
-          setStudents(res.data || []);
+          const list = res.data || [];
+          setStudents(list);
+          setTotalCandidates(res.pagination?.total ?? list.length);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -74,7 +94,38 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
     return () => {
       isMounted = false;
     };
-  }, [isOpen, isVi, reloadKey]);
+  }, [isOpen, isVi, reloadKey, classId, debouncedSearchQuery]);
+
+  const hasMore = students.length < totalCandidates;
+
+  const handleLoadMore = async () => {
+    if (loadingMore || loading || !hasMore) return;
+    try {
+      setLoadingMore(true);
+      setError(null);
+      const nextPage = page + 1;
+      const trimmed = debouncedSearchQuery.trim();
+      const res = await classService.listCandidatesPage(classId, {
+        q: trimmed || undefined,
+        page: nextPage,
+        limit: PAGE_SIZE,
+      });
+      const incoming = res.data || [];
+      setStudents(prev => {
+        const seen = new Set(prev.map(s => s.id));
+        const added = incoming.filter(s => !seen.has(s.id));
+        return [...prev, ...added];
+      });
+      setPage(nextPage);
+      if (res.pagination?.total !== undefined) {
+        setTotalCandidates(res.pagination.total);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : isVi ? 'Không thể tải thêm học viên.' : 'Failed to load more students.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Set of already enrolled student IDs for quick lookup
   const enrolledSet = useMemo(() => new Set(enrolledStudentIds), [enrolledStudentIds]);
@@ -84,7 +135,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
     return students.filter(st => !enrolledSet.has(st.id));
   }, [students, enrolledSet]);
 
-  // Filter by search query (name, email, or id)
+  // Filter by search query (name, email, student code, or id)
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return availableStudents;
     const q = searchQuery.toLowerCase().trim();
@@ -92,6 +143,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
       st.fullName.toLowerCase().includes(q) ||
       st.email.toLowerCase().includes(q) ||
       String(st.id).includes(q) ||
+      (st.studentCode && st.studentCode.toLowerCase().includes(q)) ||
       `hv-${st.id}`.includes(q)
     );
   }, [availableStudents, searchQuery]);
@@ -364,9 +416,15 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
               placeholder={isVi ? 'Tìm kiếm học viên theo tên, email, mã HV...' : 'Search by name, email, student ID...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ paddingLeft: '38px', width: '100%' }}
-              disabled={loading}
+              style={{ paddingLeft: '38px', paddingRight: (searchQuery !== debouncedSearchQuery) ? '38px' : '12px', width: '100%' }}
             />
+            {searchQuery !== debouncedSearchQuery && (
+              <Loader2 
+                size={16} 
+                className="animate-spin" 
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--eh-primary, #1B4D3E)' }} 
+              />
+            )}
           </div>
 
           {/* Selection counter & bulk action bar */}
@@ -380,8 +438,8 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
           }}>
             <span>
               {isVi 
-                ? `Tìm thấy ${filteredStudents.length} học viên khả dụng` 
-                : `${filteredStudents.length} available students found`}
+                ? `Tìm thấy ${totalCandidates} học viên khả dụng${totalCandidates > filteredStudents.length ? ` (đang hiển thị ${filteredStudents.length})` : ''}` 
+                : `${totalCandidates} available students found${totalCandidates > filteredStudents.length ? ` (showing ${filteredStudents.length})` : ''}`}
             </span>
             {activeFilteredIds.length > 0 && !isFull && (
               <button
@@ -526,6 +584,44 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
                     </div>
                   );
                 })}
+
+                {hasMore && (
+                  <div style={{
+                    padding: '12px 16px',
+                    textAlign: 'center',
+                    borderTop: '1px solid var(--outline-variant, #e2e8f0)',
+                    backgroundColor: 'var(--surface, #ffffff)'
+                  }}>
+                    <button
+                      type="button"
+                      disabled={loadingMore}
+                      onClick={handleLoadMore}
+                      className="btn btn-secondary"
+                      style={{
+                        fontSize: '12.5px',
+                        padding: '6px 16px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        borderRadius: '8px',
+                        cursor: loadingMore ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>{isVi ? 'Đang tải thêm học viên...' : 'Loading more students...'}</span>
+                        </>
+                      ) : (
+                        <span>
+                          {isVi 
+                            ? `Tải thêm học viên (Đang hiển thị ${students.length}/${totalCandidates})` 
+                            : `Load more students (Showing ${students.length}/${totalCandidates})`}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

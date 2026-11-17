@@ -266,6 +266,68 @@ class ClassApiIntegrationTest {
 	}
 
 	@Test
+	void candidatesEndpointAllowsAdminAndTeacherOwnerButRejectsOtherTeacherAndStudent() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String teacherA = bearer(teacherAId, UserRole.TEACHER);
+		String teacherB = bearer(teacherBId, UserRole.TEACHER);
+		String otherStudent = bearer(studentOtherId, UserRole.STUDENT);
+
+		ClassFixture fixture = createClassFixture(teacherAId, studentMemberId);
+		long classId = fixture.classId();
+
+		// Admin can get candidates; enrolled studentMemberId is excluded, studentOtherId is present
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray())
+				.andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(studentMemberId)).doesNotExist())
+				.andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(studentOtherId)).exists());
+
+		// Teacher A (owner) can get candidates
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.header("Authorization", teacherA))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray())
+				.andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(studentMemberId)).doesNotExist())
+				.andExpect(jsonPath("$.data[?(@.id == %d)]".formatted(studentOtherId)).exists());
+
+		// Search query filter works
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.param("q", "nonexistent-query-string-xyz")
+				.header("Authorization", teacherA))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+
+		// Pagination metadata is present and supports page and limit
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.param("page", "1")
+				.param("limit", "10")
+				.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.page").value(1))
+				.andExpect(jsonPath("$.pagination.limit").value(10))
+				.andExpect(jsonPath("$.pagination.total").isNumber());
+
+		// Teacher B (not owner) is forbidden
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.header("Authorization", teacherB))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error").value(FORBIDDEN));
+
+		// Student is forbidden
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.header("Authorization", otherStudent))
+				.andExpect(status().isForbidden());
+
+		// Non-existent class returns 404
+		performRequest(get("/api/v1/classes/{id}/candidates", 999999L)
+				.header("Authorization", teacherA))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value(CLASS_NOT_FOUND));
+	}
+
+	@Test
 	void classListIsScopedByCallerRole() throws Exception {
 		String admin = bearer(adminId, UserRole.ADMIN);
 		String teacherA = bearer(teacherAId, UserRole.TEACHER);
