@@ -1,7 +1,9 @@
 package com.english_hub.core.modules.classroom.infrastructure.adapter;
 
+import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.config.CacheConfig;
 import com.english_hub.core.common.domain.UserRole;
+import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
 import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
@@ -14,6 +16,7 @@ import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassJpaRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassMemberJpaRepository;
+import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
 
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -36,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 /** JPA adapter for the ClassRepository domain port. */
 @Repository
 public class ClassJpaAdapter implements ClassRepository {
+
+	private static final String LOCKED_TEACHER_MESSAGE =
+			"Không thể gán giáo viên đang bị khóa tài khoản vào lớp học.";
 
 	private final ClassJpaRepository jpaRepository;
 	private final ClassMemberJpaRepository classMemberJpaRepository;
@@ -138,7 +144,20 @@ public class ClassJpaAdapter implements ClassRepository {
 
 	@Override
 	public boolean teacherExists(Long teacherId) {
-		return teacherProfileRepository.existsById(teacherId);
+		if (!teacherProfileRepository.existsById(teacherId)) {
+			return false;
+		}
+
+		Optional<User> user = userJpaRepository.findByIdAndDeletedFalse(teacherId);
+		if (user.isEmpty()) {
+			return false;
+		}
+
+		User teacher = user.get();
+		if (teacher.getStatus() == UserStatus.LOCKED) {
+			throw ApiException.badRequest(LOCKED_TEACHER_MESSAGE);
+		}
+		return teacher.getStatus() == UserStatus.ACTIVE;
 	}
 
 	@Override

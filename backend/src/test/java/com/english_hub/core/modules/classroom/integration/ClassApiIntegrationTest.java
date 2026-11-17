@@ -9,6 +9,7 @@ import com.english_hub.core.infrastructure.security.JwtTokenService;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassJpaRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassMemberJpaRepository;
+import com.english_hub.core.modules.classroom.ClassTestMessages;
 
 import jakarta.persistence.EntityManager;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
@@ -377,6 +378,198 @@ class ClassApiIntegrationTest {
 	}
 
 	@Test
+	void rejectsCreateWithLockedTeacherWithoutPersisting() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		deactivateUser(teacherBId, UserChange.LOCKED);
+		long classCountBefore = classRepository.count();
+
+		performRequest(post("/api/v1/classes")
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "%s", "startDate": "2026-09-15", "teacherId": %d }"""
+							.formatted(unique("BE83-locked-create"), teacherBId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(ClassTestMessages.LOCKED_TEACHER_MESSAGE));
+
+		assertThat(classRepository.count()).isEqualTo(classCountBefore);
+	}
+
+	@Test
+	void rejectsReassignmentToLockedTeacherWithoutMutation() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String originalName = unique("BE83-locked-reassignment");
+		long classId = createClassWithName(admin, originalName);
+		assignTeacher(classId, teacherAId);
+		deactivateUser(teacherBId, UserChange.LOCKED);
+
+		assertRejected(put("/api/v1/classes/{id}", classId)
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "teacherId": %d }"""
+						.formatted(unique("BE83-rejected-name"), teacherBId)),
+				400, ClassTestMessages.LOCKED_TEACHER_MESSAGE);
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(originalName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+	}
+
+	@Test
+	void createsAndUpdatesClassWithActiveTeacher() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String name = unique("BE83-active-teacher");
+		String createResponse = performRequest(post("/api/v1/classes")
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("""
+							{ "name": "%s", "startDate": "2026-09-15", "teacherId": %d }"""
+							.formatted(name, teacherAId)))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		long classId = extractId(createResponse);
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+
+		performRequest(put("/api/v1/classes/{id}", classId)
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{ \"teacherId\": %d }".formatted(teacherBId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Cập nhật lớp học thành công."));
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.teacher.id").value(teacherBId));
+	}
+
+	@Test
+	void rejectsSameCurrentLockedTeacherId() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String originalName = unique("BE83-same-locked-teacher");
+		long classId = createClassWithName(admin, originalName);
+		assignTeacher(classId, teacherAId);
+		deactivateUser(teacherAId, UserChange.LOCKED);
+
+		assertRejected(put("/api/v1/classes/{id}", classId)
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "teacherId": %d }"""
+						.formatted(unique("BE83-rejected-same-teacher"), teacherAId)),
+				400, ClassTestMessages.LOCKED_TEACHER_MESSAGE);
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(originalName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+	}
+
+	@Test
+	void returnsNotFoundForSoftDeletedTeacher() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String originalName = unique("BE83-soft-deleted-target");
+		long classId = createClassWithName(admin, originalName);
+		assignTeacher(classId, teacherAId);
+		deactivateUser(teacherBId, UserChange.DELETED);
+
+		long classCountBefore = classRepository.count();
+		assertRejected(post("/api/v1/classes")
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "startDate": "2026-09-15", "teacherId": %d }"""
+						.formatted(unique("BE83-deleted-create"), teacherBId)),
+				404, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
+		assertThat(classRepository.count()).isEqualTo(classCountBefore);
+
+		assertRejected(put("/api/v1/classes/{id}", classId)
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "teacherId": %d }"""
+						.formatted(unique("BE83-deleted-reassignment"), teacherBId)),
+				404, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(originalName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+	}
+
+	@Test
+	void returnsNotFoundWhenTeacherIsLockedAndSoftDeleted() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		String originalName = unique("BE83-locked-deleted-target");
+		long classId = createClassWithName(admin, originalName);
+		assignTeacher(classId, teacherAId);
+		lockAndSoftDelete(teacherBId);
+
+		assertRejected(put("/api/v1/classes/{id}", classId)
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "teacherId": %d }"""
+						.formatted(unique("BE83-rejected-locked-deleted"), teacherBId)),
+				404, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
+
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(originalName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+	}
+
+	@Test
+	void returnsNotFoundForExistingUserWithoutTeacherProfile() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		long teacherWithoutProfileId = user(UserRole.TEACHER, "Giáo viên chưa có profile", null);
+		flushAndClear();
+		assertThat(userRepository.existsById(teacherWithoutProfileId)).isTrue();
+		assertThat(teacherProfileRepository.existsById(teacherWithoutProfileId)).isFalse();
+
+		assertRejected(post("/api/v1/classes")
+				.header("Authorization", admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{ "name": "%s", "startDate": "2026-09-15", "teacherId": %d }"""
+						.formatted(unique("BE83-missing-profile"), teacherWithoutProfileId)),
+				404, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
+	}
+
+	@Test
+	void updatesClassNameWithoutResubmittingActiveOrLockedCurrentTeacher() throws Exception {
+		String admin = bearer(adminId, UserRole.ADMIN);
+		long classId = createClassWithName(admin, unique("BE83-name-only"));
+		assignTeacher(classId, teacherAId);
+		String activeTeacherName = unique("BE83-name-only-active");
+		performRequest(put("/api/v1/classes/{id}", classId)
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{ \"name\": \"%s\" }".formatted(activeTeacherName)))
+				.andExpect(status().isOk());
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(activeTeacherName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+
+		deactivateUser(teacherAId, UserChange.LOCKED);
+		String lockedTeacherName = unique("BE83-name-only-locked");
+		performRequest(put("/api/v1/classes/{id}", classId)
+					.header("Authorization", admin)
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{ \"name\": \"%s\" }".formatted(lockedTeacherName)))
+				.andExpect(status().isOk());
+		performRequest(get("/api/v1/classes/{id}", classId).header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value(lockedTeacherName))
+				.andExpect(jsonPath("$.teacher.id").value(teacherAId));
+	}
+
+	@Test
 	void statusFilterAcceptsAllFourValuesAndRejectsOthers() throws Exception {
 		String admin = bearer(adminId, UserRole.ADMIN);
 		long classId = createClass(admin, "Lớp trạng thái");
@@ -614,6 +807,9 @@ class ClassApiIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.teacher", nullValue()))
 				.andExpect(jsonPath("$.memberCount").value(0));
+
+		flushAndClear();
+		assertThat(classRepository.findById(classId).orElseThrow().getTeacherId()).isNull();
 	}
 
 	@ParameterizedTest(name = "owning teacher: {0}")
@@ -834,6 +1030,17 @@ class ClassApiIntegrationTest {
 		User stored = user(userId);
 		assertThat(stored.getStatus()).isEqualTo(change == UserChange.LOCKED ? UserStatus.LOCKED : UserStatus.ACTIVE);
 		assertThat(stored.isDeleted()).isEqualTo(change == UserChange.DELETED);
+	}
+
+	private void lockAndSoftDelete(long userId) {
+		User current = user(userId);
+		current.updateFrom(current.getFullName(), current.getEmail(), current.getPhone(), current.getAvatarUrl(),
+				current.getPasswordHash(), current.getRole(), UserStatus.LOCKED, true);
+		userRepository.save(current);
+		flushAndClear();
+		User stored = user(userId);
+		assertThat(stored.getStatus()).isEqualTo(UserStatus.LOCKED);
+		assertThat(stored.isDeleted()).isTrue();
 	}
 
 	private ClassFixture createClassFixture(Long teacherId) throws Exception {

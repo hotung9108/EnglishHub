@@ -261,6 +261,14 @@ Create a new class.
 
 **Response:** `CreatedClassResponse`
 
+**Status Codes:**
+
+| Status | Description |
+|--------|-------------|
+| `201 Created` | Class created successfully. |
+| `400 Bad Request` | `teacherId` belongs to a locked teacher. Error body: `{"error": "Không thể gán giáo viên đang bị khóa tài khoản vào lớp học."}` |
+| `404 Not Found` | `teacherId` does not exist or the teacher is soft-deleted. Error body: `{"error": "Không tìm thấy giáo viên (teacherId không tồn tại)."}` |
+
 ---
 
 ### GET `/api/v1/classes/{id}`
@@ -280,6 +288,14 @@ Update class information.
 **Request Body:** `UpdateClassRequest`
 
 **Response:** `MessageResponse`
+
+**Status Codes:**
+
+| Status | Description |
+|--------|-------------|
+| `200 OK` | Class updated successfully. |
+| `400 Bad Request` | `teacherId` belongs to a locked teacher. Error body: `{"error": "Không thể gán giáo viên đang bị khóa tài khoản vào lớp học."}` |
+| `404 Not Found` | `teacherId` does not exist or the teacher is soft-deleted. Error body: `{"error": "Không tìm thấy giáo viên (teacherId không tồn tại)."}` |
 
 ---
 

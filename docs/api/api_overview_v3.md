@@ -77,6 +77,8 @@
 | 18 | POST /classes/{id}/members | Thêm học viên vào lớp (body chỉ cần `student_id`, không còn `member_type`) |
 | 19 | DELETE /classes/{id}/members/{memberId} | Học viên rời lớp — xoá cứng |
 
+**Lưu ý cho POST/PUT `/classes`:** Nếu `teacherId` thuộc giáo viên bị khóa (`LOCKED`), API trả `400`; nếu giáo viên không tồn tại hoặc đã bị xóa mềm, API trả `404`.
+
 ---
 
 ## CỤM 4 — Cấu trúc bài tập: Assignment / Module / Question (17 endpoint)
