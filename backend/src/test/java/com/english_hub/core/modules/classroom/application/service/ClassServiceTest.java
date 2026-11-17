@@ -4,6 +4,7 @@ import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.security.ApiRoutePolicy;
+import com.english_hub.core.modules.classroom.ClassTestMessages;
 import com.english_hub.core.modules.classroom.application.command.AddClassMemberCommand;
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
@@ -248,6 +249,7 @@ class ClassServiceTest {
 		assertThat(saved.getStartDate()).isEqualTo(LocalDate.of(2026, 9, 15));
 		assertThat(saved.getStatus()).isEqualTo(ClassStatus.ACTIVE);
 		assertThat(saved.getTeacherId()).isNull();
+		verify(classRepository, never()).teacherExists(anyLong());
 	}
 
 	@Test
@@ -354,10 +356,21 @@ class ClassServiceTest {
 	void rejectsANonExistentTeacherOnCreate() {
 		when(classRepository.teacherExists(99L)).thenReturn(false);
 
-		assertThatThrownBy(() -> classService.createClass(new CreateClassCommand(
-				"Class Seven", null, null, LocalDate.of(2026, 9, 15), null, 99L)))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Không tìm thấy giáo viên (teacherId không tồn tại).");
+		assertApiError(() -> classService.createClass(new CreateClassCommand(
+				"Class Seven", null, null, LocalDate.of(2026, 9, 15), null, 99L)),
+				HttpStatus.NOT_FOUND, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
+		verify(classRepository, never()).save(any(EnglishClass.class));
+	}
+
+	@Test
+	void rejectsCreateWhenTeacherIsLockedWithoutSavingTheClass() {
+		when(classRepository.teacherExists(14L))
+				.thenThrow(ApiException.badRequest(ClassTestMessages.LOCKED_TEACHER_MESSAGE));
+
+		assertApiError(() -> classService.createClass(new CreateClassCommand(
+				"Class Seven", null, null, LocalDate.of(2026, 9, 15), null, 14L)),
+				HttpStatus.BAD_REQUEST, ClassTestMessages.LOCKED_TEACHER_MESSAGE);
+
 		verify(classRepository, never()).save(any(EnglishClass.class));
 	}
 
@@ -377,6 +390,50 @@ class ClassServiceTest {
 		assertThat(saved.getDescription()).isEqualTo("Chỉnh sửa");
 		assertThat(saved.getStatus()).isEqualTo(ClassStatus.COMPLETED);
 		assertThat(saved.getTeacherId()).isEqualTo(14L);
+	}
+
+	@Test
+	void updatesTheClassNameWithoutCheckingOrChangingItsTeacher() {
+		EnglishClass existingClass = classWithTeacher(3L);
+		when(classRepository.findById(3L)).thenReturn(Optional.of(existingClass));
+
+		classService.updateClass(3L, new UpdateClassCommand("Updated class name", null, null, null, null, null));
+
+		assertThat(existingClass.getName()).isEqualTo("Updated class name");
+		assertThat(existingClass.getTeacherId()).isEqualTo(12L);
+		verify(classRepository, never()).teacherExists(anyLong());
+		verify(classRepository).save(existingClass);
+	}
+
+	@Test
+	void rejectsUpdateToALockedTeacherBeforeChangingOrSavingTheClass() {
+		EnglishClass existingClass = classWithTeacher(3L);
+		when(classRepository.findById(3L)).thenReturn(Optional.of(existingClass));
+		when(classRepository.teacherExists(14L))
+				.thenThrow(ApiException.badRequest(ClassTestMessages.LOCKED_TEACHER_MESSAGE));
+
+		assertApiError(() -> classService.updateClass(3L,
+				new UpdateClassCommand("Updated class name", null, null, null, null, 14L)),
+				HttpStatus.BAD_REQUEST, ClassTestMessages.LOCKED_TEACHER_MESSAGE);
+
+		assertThat(existingClass.getName()).isEqualTo("IELTS 6.5 - K12");
+		assertThat(existingClass.getTeacherId()).isEqualTo(12L);
+		verify(classRepository, never()).save(any(EnglishClass.class));
+	}
+
+	@Test
+	void rejectsReassigningTheSameTeacherWhenThatTeacherIsLocked() {
+		EnglishClass existingClass = classWithTeacher(3L);
+		when(classRepository.findById(3L)).thenReturn(Optional.of(existingClass));
+		when(classRepository.teacherExists(12L))
+				.thenThrow(ApiException.badRequest(ClassTestMessages.LOCKED_TEACHER_MESSAGE));
+
+		assertApiError(() -> classService.updateClass(3L,
+				new UpdateClassCommand(null, null, null, null, null, 12L)),
+				HttpStatus.BAD_REQUEST, ClassTestMessages.LOCKED_TEACHER_MESSAGE);
+
+		assertThat(existingClass.getTeacherId()).isEqualTo(12L);
+		verify(classRepository, never()).save(any(EnglishClass.class));
 	}
 
 	@Test
@@ -427,10 +484,9 @@ class ClassServiceTest {
 		when(classRepository.findById(3L)).thenReturn(Optional.of(classWithTeacher(3L)));
 		when(classRepository.teacherExists(99L)).thenReturn(false);
 
-		assertThatThrownBy(() -> classService.updateClass(3L, new UpdateClassCommand(
-				null, null, null, null, null, 99L)))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Không tìm thấy giáo viên (teacherId không tồn tại).");
+		assertApiError(() -> classService.updateClass(3L, new UpdateClassCommand(
+				null, null, null, null, null, 99L)),
+				HttpStatus.NOT_FOUND, ClassTestMessages.TEACHER_NOT_FOUND_MESSAGE);
 		verify(classRepository, never()).save(any(EnglishClass.class));
 	}
 
