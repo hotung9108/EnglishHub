@@ -78,6 +78,20 @@ export interface AddedClassMemberResponse extends MessageResponse {
   memberId: number;
 }
 
+export interface CandidateStudent {
+  id: number;
+  fullName: string;
+  email: string;
+  studentCode?: string;
+  status: 'ACTIVE' | 'LOCKED' | 'INACTIVE';
+}
+
+export interface CandidateStudentListResponse {
+  data: CandidateStudent[];
+}
+
+export type CandidateStudentListParams = { q?: string; limit?: number };
+
 const CLASSES_ENDPOINT = '/classes';
 
 export class ClassService {
@@ -122,6 +136,25 @@ export class ClassService {
 
   async removeMember(id: ClassId, memberId: number): Promise<MessageResponse> {
     return this.http.delete<MessageResponse>(`${CLASSES_ENDPOINT}/${id}/members/${memberId}`);
+  }
+
+  async listCandidates(
+    id: ClassId,
+    params: CandidateStudentListParams = {},
+    options?: ApiRequestOptions
+  ): Promise<CandidateStudent[]> {
+    const queryParams: Record<string, string | number> = {};
+    if (params.q?.trim()) queryParams.q = params.q.trim();
+    if (typeof params.limit === 'number') queryParams.limit = params.limit;
+
+    const response = await this.http.get<CandidateStudentListResponse>(
+      `${CLASSES_ENDPOINT}/${id}/candidates`,
+      {
+        ...options,
+        params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+      }
+    );
+    return response?.data ?? [];
   }
 }
 

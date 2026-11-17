@@ -4,8 +4,7 @@ import {
   Check, Loader2, AlertCircle, RefreshCw 
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { userService, type UserListItem } from '../../api/services/user.service';
-import { classService } from '../../api/services/class.service';
+import { classService, type CandidateStudent } from '../../api/services/class.service';
 
 interface SelectExistingStudentsModalProps {
   isOpen: boolean;
@@ -36,7 +35,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
   const availableSpots = Math.max(0, capacity - currentCount);
   const isFull = availableSpots === 0;
 
-  const [students, setStudents] = useState<UserListItem[]>([]);
+  const [students, setStudents] = useState<CandidateStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,9 +53,9 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
       try {
         setLoading(true);
         setError(null);
-        const res = await userService.listUsers({ role: 'STUDENT', limit: 100 });
+        const candidates = await classService.listCandidates(classId, { limit: 100 });
         if (isMounted) {
-          setStudents(res.data || []);
+          setStudents(candidates || []);
         }
       } catch (err: unknown) {
         if (isMounted) {
@@ -74,7 +73,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
     return () => {
       isMounted = false;
     };
-  }, [isOpen, isVi, reloadKey]);
+  }, [isOpen, isVi, reloadKey, classId]);
 
   // Set of already enrolled student IDs for quick lookup
   const enrolledSet = useMemo(() => new Set(enrolledStudentIds), [enrolledStudentIds]);
@@ -84,7 +83,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
     return students.filter(st => !enrolledSet.has(st.id));
   }, [students, enrolledSet]);
 
-  // Filter by search query (name, email, or id)
+  // Filter by search query (name, email, student code, or id)
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return availableStudents;
     const q = searchQuery.toLowerCase().trim();
@@ -92,6 +91,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
       st.fullName.toLowerCase().includes(q) ||
       st.email.toLowerCase().includes(q) ||
       String(st.id).includes(q) ||
+      (st.studentCode && st.studentCode.toLowerCase().includes(q)) ||
       `hv-${st.id}`.includes(q)
     );
   }, [availableStudents, searchQuery]);

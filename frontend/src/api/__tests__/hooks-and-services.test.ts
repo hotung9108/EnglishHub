@@ -357,6 +357,25 @@ test('ClassService - member sub-resources unwrap the data envelope', async () =>
   assert.strictEqual(mockHttp.calls[2].url, '/classes/15/members/202');
 });
 
+test('ClassService - candidate students endpoint unwraps data envelope', async () => {
+  const mockHttp = new MockHttpClient();
+  const classSvc = new ClassService(mockHttp);
+
+  mockHttp.mockResponse = {
+    data: [
+      { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+    ],
+  };
+
+  const candidates = await classSvc.listCandidates(15, { q: 'Minh', limit: 50 });
+  assert.strictEqual(mockHttp.calls[0].method, 'GET');
+  assert.strictEqual(mockHttp.calls[0].url, '/classes/15/candidates');
+  assert.deepStrictEqual(mockHttp.calls[0].options?.params, { q: 'Minh', limit: 50 });
+  assert.deepStrictEqual(candidates, [
+    { id: 105, fullName: 'Minh Tran', email: 'minh@example.com', studentCode: 'HV0105', status: 'ACTIVE' },
+  ]);
+});
+
 test('buildListParams passes through extra filters for non-user endpoints', () => {
   assert.deepStrictEqual(buildListParams({ page: 2, limit: 10 }, { status: 'ACTIVE' }), {
     page: 2,

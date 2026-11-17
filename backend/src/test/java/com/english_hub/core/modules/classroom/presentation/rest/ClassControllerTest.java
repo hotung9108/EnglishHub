@@ -5,6 +5,7 @@ import com.english_hub.core.modules.classroom.application.command.CreateClassCom
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
 import com.english_hub.core.modules.classroom.application.service.ClassService.ClassDetailResult;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
@@ -12,6 +13,7 @@ import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.model.TeacherInfo;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.AddClassMemberRequest;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.AddedClassMemberResponse;
+import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassCandidateListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassDetailResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassListResponse;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.ClassMemberListResponse;
@@ -177,6 +179,23 @@ class ClassControllerTest {
 		verify(classService).removeClassMember(3L, 7L);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).isEqualTo(new MessageResponse("Đã xoá học viên khỏi lớp."));
+	}
+
+	@Test
+	void mapsCandidateStudents() {
+		when(classService.listCandidateStudents(3L, "hung", 100))
+				.thenReturn(List.of(new ClassCandidateStudent(101L, "Nguyễn Hùng", "hung@example.com", "HV0101", "ACTIVE")));
+
+		ResponseEntity<ClassCandidateListResponse> response = classController.listCandidateStudents(3L, "hung", 100);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		ClassCandidateListResponse body = response.getBody();
+		assertThat(body.data()).hasSize(1);
+		assertThat(body.data().getFirst().id()).isEqualTo(101L);
+		assertThat(body.data().getFirst().fullName()).isEqualTo("Nguyễn Hùng");
+		assertThat(body.data().getFirst().email()).isEqualTo("hung@example.com");
+		assertThat(body.data().getFirst().studentCode()).isEqualTo("HV0101");
+		assertThat(body.data().getFirst().status()).isEqualTo("ACTIVE");
 	}
 
 	private EnglishClass classWithTeacher(long id) {
