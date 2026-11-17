@@ -1,5 +1,6 @@
 package com.english_hub.core.modules.classroom.infrastructure.adapter;
 
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
 import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
@@ -17,6 +18,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -120,18 +122,26 @@ public class ClassMemberJpaAdapter implements ClassMemberRepository {
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<ClassCandidateStudent> findCandidateStudents(long classId, String query, int limit) {
+	public ClassCandidatePage findCandidateStudents(long classId, String query, int page, int limit) {
+		int normalizedPage = page <= 0 ? 1 : page;
 		int clampedLimit = limit <= 0 ? 100 : Math.min(limit, 100);
 		String normalizedQuery = query == null ? "" : query.trim();
-		List<Object[]> rows = jpaRepository.findCandidateStudentsRaw(
+		Page<Object[]> paged = jpaRepository.findCandidateStudentsRaw(
 				classId,
 				normalizedQuery,
-				PageRequest.of(0, clampedLimit));
-		return rows.stream().map(row -> new ClassCandidateStudent(
+				PageRequest.of(normalizedPage - 1, clampedLimit));
+		List<ClassCandidateStudent> candidates = paged.getContent().stream().map(row -> new ClassCandidateStudent(
 				((Number) row[0]).longValue(),
 				(String) row[1],
 				(String) row[2],
 				(String) row[3],
 				(String) row[4])).toList();
+		return new ClassCandidatePage(candidates, normalizedPage, clampedLimit, paged.getTotalElements());
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<ClassCandidateStudent> findCandidateStudents(long classId, String query, int limit) {
+		return findCandidateStudents(classId, query, 1, limit).candidates();
 	}
 }

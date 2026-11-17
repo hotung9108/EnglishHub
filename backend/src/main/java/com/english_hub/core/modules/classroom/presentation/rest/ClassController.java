@@ -4,6 +4,7 @@ import com.english_hub.core.modules.classroom.application.command.AddClassMember
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
 import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
 import com.english_hub.core.modules.classroom.presentation.rest.dto.AddClassMemberRequest;
@@ -101,9 +102,14 @@ public class ClassController {
 	public ResponseEntity<ClassCandidateListResponse> listCandidateStudents(
 			@PathVariable long id,
 			@RequestParam(required = false, defaultValue = "") String q,
+			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "100") int limit) {
-		List<ClassCandidateStudent> candidates = classService.listCandidateStudents(id, q, limit);
-		return ResponseEntity.ok(ClassCandidateListResponse.from(candidates));
+		ClassCandidatePage candidatesPage = classService.listCandidateStudents(id, q, page, limit);
+		return ResponseEntity.ok(ClassCandidateListResponse.of(
+				candidatesPage.candidates(),
+				candidatesPage.page(),
+				candidatesPage.limit(),
+				candidatesPage.total()));
 	}
 
 	@PostMapping("/{id}/members")

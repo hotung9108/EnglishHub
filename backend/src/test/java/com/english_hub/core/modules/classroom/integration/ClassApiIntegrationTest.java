@@ -295,7 +295,18 @@ class ClassApiIntegrationTest {
 				.param("q", "nonexistent-query-string-xyz")
 				.header("Authorization", teacherA))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data", hasSize(0)));
+				.andExpect(jsonPath("$.data", hasSize(0)))
+				.andExpect(jsonPath("$.pagination.total").value(0));
+
+		// Pagination metadata is present and supports page and limit
+		performRequest(get("/api/v1/classes/{id}/candidates", classId)
+				.param("page", "1")
+				.param("limit", "10")
+				.header("Authorization", admin))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.page").value(1))
+				.andExpect(jsonPath("$.pagination.limit").value(10))
+				.andExpect(jsonPath("$.pagination.total").isNumber());
 
 		// Teacher B (not owner) is forbidden
 		performRequest(get("/api/v1/classes/{id}/candidates", classId)

@@ -3,6 +3,7 @@ package com.english_hub.core.modules.classroom.infrastructure.persistence.reposi
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -25,7 +26,7 @@ public interface ClassMemberJpaRepository extends JpaRepository<ClassMemberEntit
 			FROM users u
 			LEFT JOIN student_profiles sp ON sp.user_id = u.id
 			WHERE u.role = 'STUDENT'
-			  AND u.deleted = false
+			  AND u.is_deleted = false
 			  AND u.status = 'ACTIVE'
 			  AND u.id NOT IN (
 			      SELECT cm.student_id
@@ -39,8 +40,27 @@ public interface ClassMemberJpaRepository extends JpaRepository<ClassMemberEntit
 			      LOWER(COALESCE(sp.student_code, '')) LIKE LOWER(CONCAT('%', :query, '%'))
 			  )
 			ORDER BY u.full_name ASC, u.id ASC
+			""",
+			countQuery = """
+			SELECT COUNT(u.id)
+			FROM users u
+			LEFT JOIN student_profiles sp ON sp.user_id = u.id
+			WHERE u.role = 'STUDENT'
+			  AND u.is_deleted = false
+			  AND u.status = 'ACTIVE'
+			  AND u.id NOT IN (
+			      SELECT cm.student_id
+			      FROM class_members cm
+			      WHERE cm.class_id = :classId
+			  )
+			  AND (
+			      :query IS NULL OR :query = '' OR
+			      LOWER(u.full_name) LIKE LOWER(CONCAT('%', :query, '%')) OR
+			      LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%')) OR
+			      LOWER(COALESCE(sp.student_code, '')) LIKE LOWER(CONCAT('%', :query, '%'))
+			  )
 			""", nativeQuery = true)
-	List<Object[]> findCandidateStudentsRaw(
+	Page<Object[]> findCandidateStudentsRaw(
 			@Param("classId") long classId,
 			@Param("query") String query,
 			Pageable pageable);

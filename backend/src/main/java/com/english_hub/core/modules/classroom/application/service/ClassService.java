@@ -6,6 +6,7 @@ import com.english_hub.core.modules.classroom.application.command.AddClassMember
 import com.english_hub.core.modules.classroom.application.command.CreateClassCommand;
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.page.ClassPageRequest;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
 import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
@@ -188,12 +189,17 @@ public class ClassService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<ClassCandidateStudent> listCandidateStudents(long classId, String query, int limit) {
+	public ClassCandidatePage listCandidateStudents(long classId, String query, int page, int limit) {
 		if (!classRepository.existsById(classId)) {
 			throw ApiException.notFound(CLASS_NOT_FOUND_MESSAGE);
 		}
 		requireMemberWriteAccess(classId);
-		return classMemberRepository.findCandidateStudents(classId, query, limit);
+		return classMemberRepository.findCandidateStudents(classId, query, page, limit);
+	}
+
+	@Transactional(readOnly = true)
+	public List<ClassCandidateStudent> listCandidateStudents(long classId, String query, int limit) {
+		return listCandidateStudents(classId, query, 1, limit).candidates();
 	}
 
 	@Transactional

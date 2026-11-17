@@ -5,6 +5,7 @@ import com.english_hub.core.modules.classroom.application.command.CreateClassCom
 import com.english_hub.core.modules.classroom.application.command.UpdateClassCommand;
 import com.english_hub.core.modules.classroom.application.service.ClassService;
 import com.english_hub.core.modules.classroom.application.service.ClassService.ClassDetailResult;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
 import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
 import com.english_hub.core.modules.classroom.domain.model.ClassPage;
@@ -183,10 +184,12 @@ class ClassControllerTest {
 
 	@Test
 	void mapsCandidateStudents() {
-		when(classService.listCandidateStudents(3L, "hung", 100))
-				.thenReturn(List.of(new ClassCandidateStudent(101L, "Nguyễn Hùng", "hung@example.com", "HV0101", "ACTIVE")));
+		when(classService.listCandidateStudents(3L, "hung", 1, 100))
+				.thenReturn(new ClassCandidatePage(
+						List.of(new ClassCandidateStudent(101L, "Nguyễn Hùng", "hung@example.com", "HV0101", "ACTIVE")),
+						1, 100, 1L));
 
-		ResponseEntity<ClassCandidateListResponse> response = classController.listCandidateStudents(3L, "hung", 100);
+		ResponseEntity<ClassCandidateListResponse> response = classController.listCandidateStudents(3L, "hung", 1, 100);
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		ClassCandidateListResponse body = response.getBody();
@@ -196,6 +199,10 @@ class ClassControllerTest {
 		assertThat(body.data().getFirst().email()).isEqualTo("hung@example.com");
 		assertThat(body.data().getFirst().studentCode()).isEqualTo("HV0101");
 		assertThat(body.data().getFirst().status()).isEqualTo("ACTIVE");
+		assertThat(body.pagination()).isNotNull();
+		assertThat(body.pagination().page()).isEqualTo(1);
+		assertThat(body.pagination().limit()).isEqualTo(100);
+		assertThat(body.pagination().total()).isEqualTo(1L);
 	}
 
 	private EnglishClass classWithTeacher(long id) {

@@ -1,6 +1,7 @@
 package com.english_hub.core.modules.classroom.domain.repository;
 
 import com.english_hub.core.common.persistence.repository.IRepository;
+import com.english_hub.core.modules.classroom.domain.model.ClassCandidatePage;
 import com.english_hub.core.modules.classroom.domain.model.ClassCandidateStudent;
 import com.english_hub.core.modules.classroom.domain.model.ClassMember;
 import com.english_hub.core.modules.classroom.domain.model.ClassMemberDetail;
@@ -13,7 +14,11 @@ public interface ClassMemberRepository extends IRepository<ClassMember, Long> {
 
 	List<ClassMemberDetail> findMembersWithStudentInfo(Long classId);
 
-	List<ClassCandidateStudent> findCandidateStudents(long classId, String query, int limit);
+	ClassCandidatePage findCandidateStudents(long classId, String query, int page, int limit);
+
+	default List<ClassCandidateStudent> findCandidateStudents(long classId, String query, int limit) {
+		return findCandidateStudents(classId, query, 1, limit).candidates();
+	}
 
 	long countByClassId(Long classId);
 

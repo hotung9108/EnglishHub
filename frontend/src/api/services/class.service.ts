@@ -88,9 +88,14 @@ export interface CandidateStudent {
 
 export interface CandidateStudentListResponse {
   data: CandidateStudent[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+  };
 }
 
-export type CandidateStudentListParams = { q?: string; limit?: number };
+export type CandidateStudentListParams = { q?: string; page?: number; limit?: number };
 
 const CLASSES_ENDPOINT = '/classes';
 
@@ -138,13 +143,14 @@ export class ClassService {
     return this.http.delete<MessageResponse>(`${CLASSES_ENDPOINT}/${id}/members/${memberId}`);
   }
 
-  async listCandidates(
+  async listCandidatesPage(
     id: ClassId,
     params: CandidateStudentListParams = {},
     options?: ApiRequestOptions
-  ): Promise<CandidateStudent[]> {
+  ): Promise<CandidateStudentListResponse> {
     const queryParams: Record<string, string | number> = {};
     if (params.q?.trim()) queryParams.q = params.q.trim();
+    if (typeof params.page === 'number') queryParams.page = params.page;
     if (typeof params.limit === 'number') queryParams.limit = params.limit;
 
     const response = await this.http.get<CandidateStudentListResponse>(
@@ -154,7 +160,19 @@ export class ClassService {
         params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
       }
     );
-    return response?.data ?? [];
+    return {
+      data: response?.data ?? [],
+      pagination: response?.pagination,
+    };
+  }
+
+  async listCandidates(
+    id: ClassId,
+    params: CandidateStudentListParams = {},
+    options?: ApiRequestOptions
+  ): Promise<CandidateStudent[]> {
+    const res = await this.listCandidatesPage(id, params, options);
+    return res.data;
   }
 }
 
