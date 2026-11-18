@@ -756,15 +756,22 @@ const StudentAssignmentOverview: React.FC = () => {
       {/* Modal: Xác nhận nộp toàn bộ bài tập (UC021 / AD21) */}
       <ConfirmModal
         isOpen={showFinalSubmitModal}
-        title={isVi ? 'Xác nhận nộp bài tập' : 'Confirm Assignment Submission'}
+        title={isVi ? 'Xác nhận nộp toàn bộ bài tập' : 'Confirm Assignment Submission'}
         message={
-          isVi
-            ? 'Bạn có chắc chắn muốn nộp toàn bộ bài tập? Sau khi xác nhận nộp, bạn sẽ không thể chỉnh sửa lại các câu trả lời. Hệ thống sẽ tiến hành đóng gói câu trả lời và bắt đầu quy trình đánh giá.'
-            : 'Are you sure you want to finalize your submission? Once submitted, you cannot edit your answers. The system will seal your attempt and begin evaluation.'
+          !isAllSubModulesCompleted
+            ? (isVi
+                ? `Cảnh báo: Bạn vẫn còn phần thi chưa hoàn thành (${effectiveModules.filter(m => {
+                    const sm = inProgressSub?.modules?.find(subM => subM.moduleId === m.id);
+                    return !sm || (sm.status !== 'SUBMITTED' && sm.status !== 'GRADED');
+                  }).map(m => getSkillLabel(m.skill)).join(', ')}). Nếu nộp ngay bây giờ, các phần thi chưa làm sẽ nhận 0 điểm. Bạn có chắc chắn muốn nộp toàn bộ bài tập?`
+                : 'Warning: Some skills are incomplete. Incomplete skills will receive 0 points. Are you sure you want to finalize your submission?')
+            : (isVi
+                ? 'Bạn đã hoàn thành tất cả các phần thi! Bạn có chắc chắn muốn nộp toàn bộ bài tập? Sau khi xác nhận nộp, bạn sẽ không thể chỉnh sửa lại các câu trả lời. Hệ thống sẽ tiến hành đóng gói câu trả lời và bắt đầu quy trình đánh giá.'
+                : 'Are you sure you want to finalize your submission? Once submitted, you cannot edit your answers. The system will seal your attempt and begin evaluation.')
         }
         confirmText={isVi ? 'Xác nhận nộp bài' : 'Confirm Submission'}
-        cancelText={isVi ? 'Kiểm tra lại' : 'Review Again'}
-        variant="primary"
+        cancelText={isVi ? 'Hủy / Kiểm tra lại' : 'Review Again'}
+        variant={!isAllSubModulesCompleted ? 'danger' : 'primary'}
         isLoading={isStarting}
         onConfirm={handleConfirmFinalSubmit}
         onCancel={() => setShowFinalSubmitModal(false)}

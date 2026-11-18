@@ -30,7 +30,6 @@ import {
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
-import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-speaking.css';
 
 const StudentAssignmentSpeaking: React.FC = () => {
@@ -417,44 +416,24 @@ const StudentAssignmentSpeaking: React.FC = () => {
       );
       setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
 
-      // Step 3: Check if other modules in submission are already completed
-      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
-      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+      // FE-97 (UC021): Tách biệt triệt để nộp module và nộp toàn bài.
+      // Không tự ý gọi submitSubmission. Việc hoàn tất toàn bài tập được thực hiện
+      // tại màn hình Overview với ConfirmModal xác nhận rõ ràng.
 
-      if (subId && allOthersDone) {
-        try {
-          await submissionService.submitSubmission(subId);
-        } catch {
-          // Fallback continue
-        }
-      }
-
-      if (allOthersDone) {
-        notifyAssignmentSubmitted();
-        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+      const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+      const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
+      if (nextMod) {
+        const nextSkillLabel = getSkillLabel(nextMod.skill);
+        setSuccessMessage(`Đã nộp phần thi Nói! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+        const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
         setTimeout(() => {
-          if (subId) {
-            navigate(`/student/submissions/${subId}`, { replace: true });
-          } else {
-            navigate(`/student/assignments/${id}/result`, { replace: true });
-          }
+          navigate(nextRoute, { replace: true });
         }, 1200);
       } else {
-        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
-        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
-        if (nextMod) {
-          const nextSkillLabel = getSkillLabel(nextMod.skill);
-          setSuccessMessage(`Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`);
-          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
-          setTimeout(() => {
-            navigate(nextRoute, { replace: true });
-          }, 1200);
-        } else {
-          setSuccessMessage('Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...');
-          setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`, { replace: true });
-          }, 1200);
-        }
+        setSuccessMessage('Đã nộp phần thi Nói thành công! Đang quay lại trang tổng quan bài tập...');
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
+        }, 1200);
       }
     } catch (err: unknown) {
       const apiErr = parseApiError(err);

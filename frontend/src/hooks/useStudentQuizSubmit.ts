@@ -113,7 +113,7 @@ export function useStudentQuizSubmit(scope: StudentQuizSubmitScope): UseStudentQ
     }
   }
 
-  async function advance(action: Action, read: ReadProgress): Promise<StudentQuizSubmitResult> {
+  async function advance(_action: Action, read: ReadProgress): Promise<StudentQuizSubmitResult> {
     const progress = read.progress;
     const stage = modulePhase.current === MODULE_PHASE.ACCEPTED ? STAGE.PROGRESS : STAGE.MODULE;
     if (!progress) return unconfirmed(stage, QUIZ_SUBMIT_ERROR.PROGRESS_UNAVAILABLE, read.cause);
@@ -123,7 +123,11 @@ export function useStudentQuizSubmit(scope: StudentQuizSubmitScope): UseStudentQ
     if (!current || current.status === QUIZ_STATUS.IN_PROGRESS) return unconfirmed(STAGE.PROGRESS, QUIZ_SUBMIT_ERROR.MODULE_REJECTED);
     modulePhase.current = MODULE_PHASE.ACCEPTED;
     if (progress.kind === QUIZ_PROGRESS.NEXT_SKILL) return progress;
-    return finalize(action);
+    // FE-97 (UC021): Tách biệt triệt để luồng nộp một module và nộp toàn bộ bài tập.
+    // Khi nộp xong module trắc nghiệm, trả về completed để hoàn tất phần thi này
+    // mà KHÔNG tự động gọi submitSubmission. Việc nộp toàn bộ bài tập do học viên
+    // chủ động xác nhận tại màn hình Overview.
+    return completed();
   }
 
   async function submitPrepared(action: Action, answers: readonly SubmitModuleAnswerPayload[]): Promise<StudentQuizSubmitResult> {
@@ -163,8 +167,9 @@ export function useStudentQuizSubmit(scope: StudentQuizSubmitScope): UseStudentQ
     if (!isCurrent(action)) return { kind: QUIZ_SUBMIT_STATE.IGNORED };
     if (!read.progress) return unconfirmed(STAGE.FINAL, QUIZ_SUBMIT_ERROR.PROGRESS_UNAVAILABLE, read.cause);
     if (read.progress.kind === QUIZ_PROGRESS.UNCONFIRMED) return unconfirmed(STAGE.FINAL, read.progress.reason);
+    if (read.progress.kind === QUIZ_PROGRESS.COMPLETED) return completed();
     if (read.progress.kind === QUIZ_PROGRESS.NEXT_SKILL) return { kind: QUIZ_SUBMIT_STATE.FAILED, reason: QUIZ_SUBMIT_ERROR.MODULES_INCOMPLETE };
-    return advance(action, read);
+    return finalize(action);
   }
 
   async function run(answers?: readonly SubmitModuleAnswerPayload[]): Promise<StudentQuizSubmitResult> {
