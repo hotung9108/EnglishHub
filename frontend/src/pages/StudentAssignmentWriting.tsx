@@ -27,6 +27,7 @@ import {
   resolveEffectiveModules,
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
@@ -469,27 +470,43 @@ const StudentAssignmentWriting: React.FC = () => {
       );
       setSubmission((prev) => (prev ? { ...prev, modules: currentSubModules } : prev));
 
-      // FE-97 (UC021): Tách biệt triệt để nộp module và nộp toàn bài.
-      // Không tự ý gọi submitSubmission. Việc hoàn tất toàn bài tập được thực hiện
-      // tại màn hình Overview với ConfirmModal xác nhận rõ ràng.
+      // 3. Check if all modules in this submission are now completed
+      const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
+      const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
+
+      if (subId && allOthersDone) {
+        await submissionService.submitSubmission(subId);
+      }
 
       // Clear draft
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
-      const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
-      const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
-      if (nextMod) {
-        const nextSkillLabel = getSkillLabel(nextMod.skill);
-        setSuccessMessage(`Đã nộp phần thi Viết! Đang chuyển tiếp sang ${nextSkillLabel}...`);
-        const nextRoute = getSkillRoute(nextMod.skill, numericId, subId, nextMod.id);
+      if (allOthersDone) {
+        notifyAssignmentSubmitted();
+        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
         setTimeout(() => {
-          navigate(nextRoute, { replace: true });
+          if (subId) {
+            navigate(`/student/submissions/${subId}`, { replace: true });
+          } else {
+            navigate(`/student/assignments/${id}/result`, { replace: true });
+          }
         }, 1200);
       } else {
-        setSuccessMessage('Đã nộp phần thi Viết thành công! Đang quay lại trang tổng quan bài tập...');
-        setTimeout(() => {
-          navigate(`/student/assignments/${id}/overview`, { replace: true });
-        }, 1200);
+        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
+        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
+        if (nextMod) {
+          const nextSkillLabel = getSkillLabel(nextMod.skill);
+          setSuccessMessage(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId, nextMod.id);
+          setTimeout(() => {
+            navigate(nextRoute, { replace: true });
+          }, 1200);
+        } else {
+          setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
+          setTimeout(() => {
+            navigate(`/student/assignments/${id}/overview`, { replace: true });
+          }, 1200);
+        }
       }
     } catch (err: unknown) {
       console.error('Submit writing assignment error:', err);
