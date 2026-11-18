@@ -7,25 +7,17 @@
     "node": ">=22.0.0"
   },
   "scripts": {
+    "reports:build": "node tools/build-report-index.js",
+    "reports:export": "node tools/export-report.js",
     "test": "node run.js",
-    "test:login": "node run.js --role=teacher",
-    "test:roles": "node run.js --roles",
-    "test:self": "node run.js --self-test",
-    "check": "node --test tests/framework/*.test.js",
-    "test:admin": "node run-admin.js",
-    "test:admin:watch": "node tools/watch-admin.mjs",
-    "check:admin": "node --test tests/framework/admin.test.js",
-    "test:teacher": "node run-teacher.js",
-    "test:teacher:watch": "node run-teacher.js --watch",
-    "prepare:teacher": "node support/teacher/prepare-fixtures.js",
-    "cleanup:teacher": "node support/teacher/cleanup-fixtures.js",
-    "docs:teacher": "node tools/document-teacher-cases.mjs",
-    "postman:teacher-access": "node tools/build-039-postman.mjs",
-    "test:student": "node run-student.js",
-    "test:student:watch": "node run-student.js --watch",
-    "prepare:student": "node run-student.js --prepare-only",
-    "test:student:audio": "node run-student.js --case=QA30-015 && node run-student.js --case=QA30-016",
-    "docs:student": "node tools/document-student-cases.mjs"
+    "test:all": "node common/runner/run-batches.js",
+    "test:admin": "node run.js --role=admin",
+    "test:teacher": "node run.js --role=teacher",
+    "test:student": "node run.js --role=student",
+    "list": "node run.js --list",
+    "find": "node tools/find-cases.js",
+    "check": "node --test tests/*.test.js",
+    "check:remake": "node --test tests/core.test.js tests/mapping-review.test.js tests/csv-evidence.test.js"
   },
   "dependencies": {
     "selenium-webdriver": "4.35.0"

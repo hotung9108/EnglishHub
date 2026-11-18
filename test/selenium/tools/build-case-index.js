@@ -1,0 +1,10 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {scenarios,caseFiles} from '../common/runner/registry.js';
+const catalog=JSON.parse(await readFile(new URL('../catalog/cases.json',import.meta.url),'utf8'));
+const qase=JSON.parse(await readFile(new URL('../integrations/qase/mapping.json',import.meta.url),'utf8'));
+const normalize=r=>['empty','outsider','other'].includes(r)?'student':['admin','teacher','student'].includes(r)?r:'shared';
+const rows=catalog.cases.map(c=>({id:c.id,title:c.title,requirement:c.requirement,role:normalize(scenarios[c.id]?.data?.role),sourceFile:caseFiles[c.id]||null,scope:c.scopeExclusion?'excluded':'active',qaseCaseId:qase.cases[c.id]??null}));
+await writeFile(new URL('../catalog/case-index.json',import.meta.url),JSON.stringify(Object.fromEntries(rows.map(({id,...r})=>[id,r])),null,2)+'\n');
+const fields=['id','title','requirement','role','sourceFile','scope','qaseCaseId'];const quote=v=>'"'+String(v??'').replaceAll('"','""')+'"';
+await writeFile(new URL('../catalog/case-index.csv',import.meta.url),'\uFEFF'+[fields,...rows.map(r=>fields.map(f=>r[f]))].map(r=>r.map(quote).join(',')).join('\r\n')+'\r\n');
+console.log(`Indexed ${rows.length} cases; no Qase writes.`);

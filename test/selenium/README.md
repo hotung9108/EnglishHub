@@ -1,88 +1,96 @@
-# EnglishHub Selenium Framework
+# Selenium EnglishHub — bộ chính 170 ca
 
-Framework JavaScript dùng chung cho test UI Auth, Giáo viên, Học viên và Admin. QA-28 khởi tạo nền tảng; các task sau thêm Page Object và test vào cùng cấu trúc.
-
-## Cài và chạy trên Windows
-
-Yêu cầu Node.js 22+, Chrome/Edge và mạng để tải dependency/driver lần đầu.
-
-```powershell
-cd test/selenium
-npm.cmd ci --no-audit --no-fund --cache .cache/npm
-Copy-Item .env.example .env  # Chỉ làm nếu chưa có .env
-# Điền SELENIUM_TEACHER_EMAIL và SELENIUM_TEACHER_PASSWORD trong .env
-npm.cmd run test:login
-```
-
-Hoặc mở `test/scripts/run-selenium-login.bat`. Nếu chưa có `.env`, launcher tạo file mẫu rồi dừng để bạn điền tài khoản. Không commit `.env`.
-
-| Lệnh | Phạm vi |
-| --- | --- |
-| `npm.cmd test` | Smoke form, không đăng nhập |
-| `npm.cmd run test:login` | Smoke và login Giáo viên |
-| `node run.js --role=admin` | Smoke và login Admin |
-| `node run.js --role=student` | Smoke và login Học viên |
-| `npm.cmd run test:roles` | Smoke và login ba role |
-| `npm.cmd run check` | Kiểm tra config/redaction, không mở browser |
-| `npm.cmd run test:self` | Chrome trên fixture local, không phải kết quả staging |
-| `npm.cmd run test:teacher` | QA29: 51 case Giáo viên, tự cleanup và chuẩn bị fixture staging |
-| `npm.cmd run test:teacher:watch -- --case=QA29-003` | QA29: quan sát một case |
-
-Default staging origin là `https://staging.hotung9108.me`; mở URL gốc và chờ form, không truy cập trực tiếp `/login`. Chọn đúng tab role trước khi điền tài khoản. Login kiểm tra `/{role}/dashboard`, vùng `main` và role trong `localStorage['eh_user']`. Mỗi case có session Chrome riêng và luôn đóng driver; không gọi logout.
-
-## Cấu hình
-
-Các biến nằm trong `.env.example`: `SELENIUM_BASE_URL`, `SELENIUM_BROWSER=chrome|edge`, `SELENIUM_HEADLESS=true|false`, `SELENIUM_TIMEOUT_MS` (1000–120000), tài khoản `SELENIUM_ADMIN_EMAIL/PASSWORD`, `SELENIUM_TEACHER_EMAIL/PASSWORD`, `SELENIUM_STUDENT_EMAIL/PASSWORD`.
-
-Biến môi trường tiến trình ưu tiên hơn `.env`. `TEST_ENV=dev` dùng localhost:5173 khi không đặt `SELENIUM_BASE_URL`; `SELENIUM_BASE_URL` luôn ưu tiên. Selenium Manager tải driver vào `.cache/selenium`. Có thể cấu hình `SELENIUM_BROWSER_BINARY`, `SELENIUM_DRIVER_PATH` hoặc `SELENIUM_GRID_URL`.
-
-## Cấu trúc và thêm test
+Source chia theo nhóm chức năng → UC → case, khớp cách quản lý trên Qase. Vai trò là dữ liệu fixture và bộ lọc; mã test giữ nguyên. [Mục lục UC](cases/README.md).
 
 ```text
-config/env.js              # Cấu hình và tài khoản ngoài source
-utils/browser-factory.js   # Chrome/Edge/Grid và timeout
-utils/reporter.js          # HTML/JSON, redaction
-pages/BasePage.js          # Explicit wait
-pages/auth/LoginPage.js    # Locator/thao tác login
-pages/teacher/             # Page Object của luồng Giáo viên
-pages/student/             # Page Object của luồng Học viên
-pages/admin/               # Page Object của luồng Admin
-tests/auth/login.test.js   # Các bước và kỳ vọng smoke/login
-tests/teacher/             # Case Giáo viên
-tests/student/             # Case Học viên
-tests/admin/               # Case Admin
-tests/framework/           # Kiểm tra cấu hình/reporter
-run.js                    # Session, thứ tự chạy, report và exit code
-legacy/                   # Khung cũ chưa xác minh, không chạy mặc định
+selenium/
+├── cases/              Mã test thực tế theo nhóm chức năng và UC
+│   ├── 01-auth-profile/uc001/ ... uc003/
+│   ├── 02-users-permissions/uc004/ ... uc007/
+│   ├── 03-classes-members/uc008/ ... uc010/
+│   ├── 04-assignments/uc011/ ... uc014/
+│   ├── 05-attempts-submissions/uc015/ ... uc023/
+│   ├── 06-grading-scores/uc024/ ... uc030/
+│   ├── 07-results-reports/uc031/ ... uc035/
+│   └── 08-nfr/
+├── common/             Helper dùng chung, không đặt ca kiểm thử ở đây
+│   ├── runner/         CLI, registry, batch, báo cáo, mã băm
+│   ├── ui/             Thao tác Selenium
+│   ├── fixtures/       Tạo dữ liệu, journal, cleanup
+│   └── flows/          Helper luồng lớp/chấm bài và support cho các UC
+├── catalog/            Nội dung ca và bảng tra cứu
+├── config/             Bộ nạp môi trường
+├── fixtures/           Audio và tài liệu mẫu
+├── integrations/qase/  Mapping 170 ID và cây UC đã sắp xếp trên Qase
+├── tools/              Tra cứu, kiểm chứng và xem báo cáo
+├── tests/              Kiểm thử offline của bộ chạy
+├── reports/            Kết quả runtime, không commit
+└── run.js              Launcher chính
 ```
 
-1. Thêm Page Object trong `pages/<luồng>/`, kế thừa BasePage. Giữ locator và thao tác tại Page Object, dùng explicit wait.
-2. Thêm case trong `tests/<luồng>/` theo `tests/auth/login.test.js`: `{id, title, async run(page) {...}}`.
-3. Import case vào `run.js` và gọi `execute(case)`. Runner hiện dùng LoginPage làm trang bắt đầu; trong case khởi tạo Page Object tiếp theo bằng `page.driver` và `page.config`, rồi thực hiện thao tác/kiểm tra.
-4. Thêm lệnh npm nếu cần chọn nhóm case mới. Không tạo framework riêng theo mã QA-29/QA-30.
+Một thư mục UC chứa các file `.cases.js`; khi cùng UC có nhiều vai trò, tên file nêu vai trò. `.test.js` kiểm tra chính bộ chạy, dùng offline. Registry từ chối mã ca trùng. Case liên quan nhiều UC đặt tại UC đầu tiên trong catalog và giữ đủ tham chiếu; không sao chép sang nhiều thư mục. Hai ca ngoài phạm vi chỉ có metadata, không tạo procedure giả.
 
-## Report và bằng chứng QA-28
+## Cách chạy
 
-Mỗi run tạo `reports/run-.../report.html`, `summary.json` và screenshot. Exit 0 là Passed, 1 là lỗi, 2 là thiếu tài khoản/Blocked. Reporter che credential cấu hình trong error và xóa input trước screenshot; không dump token/DOM/storage. Ảnh có thể chứa danh tính tài khoản QA.
-
-[Bằng chứng QA-28](../../production_artifacts/test_reports/QA-28/README.md): người dùng đã chạy trên staging ngày 11/10/2026 lúc 18:19, smoke/login Giáo viên đều Passed. Report đó thuộc phiên bản standalone trước khi tổ chức lại, được giữ nguyên để truy vết. Không chạy lại browser khi tích hợp theo yêu cầu người dùng. Không suy ra Admin/Học viên, mọi luồng UI, usability hoặc maintainability đã đạt.
-
-Khung Selenium cũ đã lưu trong `legacy/` vì có JSON/import/cú pháp chưa chạy được; không dùng để nghiệm thu. Project này có package/lockfile riêng, không cần cài package test cũ ở thư mục cha để chạy login.
-
-## QA29 — luồng Giáo viên
-
-[Hướng dẫn QA29](QA29-README.md) và [51 test case](QA29-TEST-CASES.md) dùng chung package, cấu hình, browser factory, BasePage và LoginPage ở đây. Case nằm trong `tests/teacher/`, Page Object trong `pages/teacher/`, API fixture/cleanup/report trong `support/teacher/`; `run-teacher.js` điều phối vòng đời riêng của bộ test Giáo viên. `npm.cmd run check` kiểm tra cả QA28 và QA29, không gọi staging hoặc mở browser.
-
-[Bàn giao QA29](../../production_artifacts/test_reports/QA-29/README.md): task đã hoàn tất kiểm thử và bàn giao issue; lượt ngày 15/10/2026 đạt 41 Passed / 7 Failed / 3 Blocked. Đây là kết quả trước khi tích hợp vào repo, không phải lần chạy mới trên develop. Mọi launcher QA29 nằm trong `test/scripts/`.
-
-## QA30 — luồng Học viên
-
-[Hướng dẫn QA30](QA30-README.md), [45 test case](QA30-TEST-CASES.md) và [bản đồ UI](QA30-UI-MAP.md) dùng cùng framework QA28/QA29. Runner `run-student.js`, Page Object `pages/student/`, case `tests/student/`, fixture/readback/preflight `support/student/`; `utils/suite-reporter.js` xuất HTML/JSON/JUnit/evidence cho cả Teacher và Student, giữ API `writeTeacherReport` tương thích QA29.
+Node.js 22+, Chrome/Edge và WebDriver tương thích. Fixture giọng nói dùng Microsoft David Desktop trên Windows. Cài dependency bằng `npm ci` tại `test/selenium`.
 
 ```powershell
-npm.cmd run check                 # Offline framework checks; no staging/browser
-..\scripts\QA30-Run-Report.cmd     # Headless suite; opens report when finished
-..\scripts\QA30-Watch-Student.cmd  # Select a case and watch visible browser
+# Chỉ tra cứu/kiểm tra, không gọi staging
+npm run list
+npm run find -- ASG_009
+npm run find -- --role=teacher --requirement=UC012
+npm run check
+
+# Thực thi trên staging: cần credential admin bootstrap qua .env hoặc biến môi trường
+npm test -- ASG_009
+npm run test:admin
+npm run test:teacher
+npm run test:student
+npm test
+
+# Chia toàn bộ thành 7 batch, tối đa 25 ca/batch
+npm run test:all
+node common/runner/run-batches.js --list
+node common/runner/run-batches.js --resume=reports/batch-session-<timestamp>
 ```
 
-Cấu hình Admin/Teacher QA trong `.env`; setup tạo Student QA riêng, tài khoản/ledger/cache/report gốc không vào Git. Full run tạo dữ liệu mới để giữ bằng chứng, không tự dọn mọi dữ liệu QA cũ. Xem [trạng thái và issue hiện hành](../../production_artifacts/test_reports/QA-30/README.md): lượt lịch sử 19/10 có 24 Pass / 18 Fail / 3 Blocked; QA30 vẫn In Progress/chờ review. PR tích hợp test không sửa các bug sản phẩm hoặc tự xác nhận Done.
+`SELENIUM_ADMIN_EMAIL`, `SELENIUM_ADMIN_PASSWORD` lấy từ môi trường local, không ghi vào Git. Dùng `SELENIUM_HEADLESS=false` để quan sát trình duyệt, `SELENIUM_BROWSER=edge` để chọn Edge. Giữ nguyên credential riêng của từng vai trò; không tự hợp nhất các `.env` cũ.
+
+`npm test` không có ID chạy đủ danh mục; không dùng nó để chỉ kiểm tra cài đặt. Lệnh chưa hỗ trợ bị từ chối trước khi tạo fixture. `test:admin/teacher/student` lọc theo vai trò fixture ban đầu; ca liên vai trò có thể đăng nhập vai trò khác trong các bước sau. Các ca chung không có fixture-role cụ thể tra trong catalog và chạy theo ID.
+
+## Tìm lại một ca
+
+- [case-index.csv](catalog/case-index.csv): mã, tên, yêu cầu, vai trò, file source, phạm vi, Qase ID.
+- [cases.json](catalog/cases.json): nội dung gốc, expected đã rà, nguồn SRS và scope exclusion.
+- `npm run find -- "tiêu đề"`: tìm theo nội dung, ID hoặc mã yêu cầu.
+- Kết quả thực thi: `reports/<run-id>/<case-id>/execution.json`, ảnh PNG và evidence JSON.
+- Index được sinh lại bằng `node tools/build-case-index.js`; không sửa CSV/JSON index bằng tay.
+- Mục lục UC sinh bằng `node tools/build-uc-navigation.js`. `catalog/source-migration.json` ghi mã ca và đường dẫn cũ → mới.
+- Các thư mục cũ `admin/teacher/student/` đã đưa khỏi khu source. Report Admin nằm trong `reports/legacy-roles/admin/`; cấu hình và fixture/trạng thái cũ nằm ở backup riêng ngoài repository. Xem [bản đồ đường dẫn](../docs/history/legacy-role-layout.md).
+
+## Tìm và trình bày báo cáo
+
+Mở [reports/index.html](reports/index.html) để chọn lượt chạy, tìm mã/tên case, lọc UC/chức năng, trạng thái và ngày theo giờ Việt Nam. Mỗi case có ảnh phóng to và đường dẫn tới dữ liệu thực thi gốc. Các số tổng luôn thuộc lượt đang chọn, không cộng dồn các lần chạy lại.
+
+`npm run reports:build` cập nhật mục lục từ dữ liệu đã có, không chạy test. Runner tự cập nhật sau khi kết thúc lượt chạy và khi tạo báo cáo tổng hợp. Các summary cũ không đúng định dạng xuất hiện ở mục bỏ qua; không bị sửa hoặc đoán kết quả.
+
+Nút **Chế độ trình bày** ẩn chi tiết kỹ thuật phụ; giữ kết quả, thời điểm và thông tin cleanup. **In / lưu PDF** in toàn bộ ca khớp bộ lọc, không chỉ 50 mục đầu. PDF là bảng kết quả, xem ảnh trực tiếp trong HTML.
+
+Để gửi một file HTML tự chứa ảnh: `npm run reports:export -- --run=full-rerun-20261116-r6`. Có thể bỏ `--run` để chọn lượt đầy đủ mặc định. File nằm trong `reports/exports/`, giữ đủ kết quả và tối đa ảnh cuối mỗi case; không kèm file API/network thô hoặc liên kết phụ thuộc thư mục gốc. Bằng chứng đầy đủ vẫn ở từng lượt chạy gốc.
+
+## Quy tắc diễn giải kết quả
+
+Giữ đủ 170 ID: 168 ca có procedure, 2 ca được loại khỏi phạm vi. FAIL có thể là lỗi sản phẩm, locator, runtime hoặc dữ liệu test; đọc minh chứng trước khi tạo bug. BLOCKED không phải PASS. Không thay expected theo hành vi đang lỗi để tăng tỷ lệ PASS.
+
+Migration chỉ đổi tổ chức source và đường dẫn, không sửa yêu cầu/test logic còn tồn đọng. Kết quả 170 ca trước migration là 116 PASS, 33 FAIL, 19 BLOCKED, 2 SKIPPED. Đây là kết quả lịch sử, không được gọi là lượt chạy mới theo mã băm sau migration.
+
+Journal/fixture cũ được giữ nguyên trong backup riêng, không gửi kèm source. Báo cáo được di chuyển nguyên thư mục để giữ ảnh và evidence tương đối; chỉ mục báo cáo được sinh lại từ vị trí mới. Không xóa tài nguyên staging chỉ vì đã chuyển file local.
+
+## Bộ cũ và Qase
+
+- [Source trước migration](../archive/selenium-before-layout-20261116/README.md).
+- [Biên bản và bản đồ đường dẫn](../../production_artifacts/test_reports/WORKSPACE_ORGANIZATION_2026-11-16/MIGRATION/README.md).
+- [Hướng dẫn workspace](../docs/WORKSPACE.md).
+- [Qase](integrations/qase/README.md): mới chuẩn bị mapping, chưa ghi ca/kết quả. ID trống chưa có nghĩa đã đồng bộ.
+
+Không đưa `.env`, backup private, node_modules hay toàn bộ reports vào Git. Giữ bản báo cáo bàn giao chọn lọc trong `production_artifacts/test_reports/`.

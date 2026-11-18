@@ -1,0 +1,666 @@
+{
+  "status": "history-only",
+  "note": "Folder name active and old OPEN status do not prove a current product defect.",
+  "bugs": [
+    {
+      "id": "BUG-205-docx",
+      "title": "Writing ESSAY: nộp DOCX trả HTTP 500; MIME dài hơn giới hạn cột doc_mime_type",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-205-docx-mime-overflow/README.md"
+    },
+    {
+      "id": "BUG-210-teacher",
+      "title": "[BUG-210] Cho phép gửi lịch đóng bài tập trước lịch mở bài",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-210-teacher-date-order/README.md"
+    },
+    {
+      "id": "BUG-ADM-003",
+      "title": "[BUG REPORT] [ADM-003] Accounts tìm tài khoản QA vừa tạo",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-003-accounts-t-m-t-i-kho-n-qa-v-a-t-o/README.md"
+    },
+    {
+      "id": "BUG-ADM-008",
+      "title": "[BUG REPORT] [ADM-008] Accounts khóa rồi mở lại tài khoản QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-008-accounts-kh-a-r-i-m-l-i-t-i-kho-n-qa/README.md"
+    },
+    {
+      "id": "BUG-ADM-011",
+      "title": "[BUG REPORT] [ADM-011] Teachers tìm và mở hồ sơ QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-011-teachers-t-m-v-m-h-s-qa/README.md"
+    },
+    {
+      "id": "BUG-ADM-014",
+      "title": "[BUG REPORT] [ADM-014] Students tìm học viên QA mới",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-014-students-t-m-h-c-vi-n-qa-m-i/README.md"
+    },
+    {
+      "id": "BUG-ADM-015",
+      "title": "[BUG REPORT] [ADM-015] Classes tìm và mở đúng lớp QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-015-classes-t-m-v-m-ng-l-p-qa/README.md"
+    },
+    {
+      "id": "BUG-ADM-017",
+      "title": "[BUG REPORT] [ADM-017] Tạo lớp chặn thiếu tên",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-017-t-o-l-p-ch-n-thi-u-t-n/README.md"
+    },
+    {
+      "id": "BUG-ADM-018",
+      "title": "[BUG REPORT] [ADM-018] Tạo lớp qua đủ các bước",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-018-t-o-l-p-qua-c-c-b-c/README.md"
+    },
+    {
+      "id": "BUG-ADM-019",
+      "title": "[BUG REPORT] [ADM-019] Danh sách học viên trong lớp đối chiếu API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-019-danh-s-ch-h-c-vi-n-trong-l-p-i-chi-u-api/README.md"
+    },
+    {
+      "id": "BUG-ADM-020",
+      "title": "[BUG REPORT] [ADM-020] Mở hồ sơ từ học viên trong lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-020-m-h-s-t-h-c-vi-n-trong-l-p/README.md"
+    },
+    {
+      "id": "BUG-ADM-021",
+      "title": "[BUG REPORT] [ADM-021] Admin xem nội dung bài tập trong lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-021-admin-xem-n-i-dung-b-i-t-p-trong-l-p/README.md"
+    },
+    {
+      "id": "BUG-ADM-022",
+      "title": "[BUG REPORT] [ADM-022] Lưu cài đặt lớp và kiểm tra bền vững",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-022-l-u-c-i-t-l-p-v-ki-m-tra-b-n-v-ng/README.md"
+    },
+    {
+      "id": "BUG-ADM-024",
+      "title": "[BUG REPORT] [ADM-024] Mở lại lớp đã hoàn thành qua UI",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-024-m-l-i-l-p-ho-n-th-nh-qua-ui/README.md"
+    },
+    {
+      "id": "BUG-ADM-026",
+      "title": "[BUG REPORT] [ADM-026] Reports lọc giáo viên QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-026-reports-l-c-gi-o-vi-n-qa/README.md"
+    },
+    {
+      "id": "BUG-ADM-028",
+      "title": "[BUG REPORT] [ADM-028] Reports xóa bộ lọc",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-028-reports-x-a-b-l-c/README.md"
+    },
+    {
+      "id": "BUG-ADM-032",
+      "title": "[BUG REPORT] [ADM-032] Settings hồ sơ Admin chỉ đọc",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-032-settings-h-s-admin-ch-c/README.md"
+    },
+    {
+      "id": "BUG-ADM-033",
+      "title": "[BUG REPORT] [ADM-033] Settings bảo mật có trường mật khẩu",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-033-settings-b-o-m-t-c-tr-ng-m-t-kh-u/README.md"
+    },
+    {
+      "id": "BUG-ADM-036",
+      "title": "[BUG REPORT] [ADM-036] Accounts tạo Admin phải lưu đúng vai trò ADMIN",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-036-accounts-t-o-admin-ph-i-l-u-ng-vai-tr-ad/README.md"
+    },
+    {
+      "id": "BUG-ADM-037",
+      "title": "[BUG REPORT] [ADM-037] Accounts tạo Teacher phải lưu đúng vai trò TEACHER",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-037-accounts-t-o-teacher-ph-i-l-u-ng-vai-tr/README.md"
+    },
+    {
+      "id": "BUG-ADM-038",
+      "title": "[BUG REPORT] [ADM-038] Accounts tạo Student phải lưu đúng vai trò STUDENT",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-038-accounts-t-o-student-ph-i-l-u-ng-vai-tr/README.md"
+    },
+    {
+      "id": "BUG-ADM-039",
+      "title": "[BUG REPORT] [ADM-039] Accounts tìm tài khoản có sẵn độc lập bước tạo",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-039-accounts-t-m-t-i-kho-n-c-s-n-c-l-p-b-c-t/README.md"
+    },
+    {
+      "id": "BUG-ADM-041",
+      "title": "[BUG REPORT] [ADM-041] Students khóa rồi mở khóa QA từ danh sách",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-041-students-kh-a-r-i-m-kh-a-qa-t-danh-s-ch/README.md"
+    },
+    {
+      "id": "BUG-ADM-042",
+      "title": "[BUG REPORT] [ADM-042] Student profile khóa rồi mở khóa đúng danh tính QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-042-student-profile-kh-a-r-i-m-kh-a-ng-danh/README.md"
+    },
+    {
+      "id": "BUG-ADM-043",
+      "title": "[BUG REPORT] [ADM-043] Reports lọc ngày có chứa bài QA đã chấm",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-043-reports-l-c-ng-y-c-ch-a-b-i-qa-ch-m/README.md"
+    },
+    {
+      "id": "BUG-ADM-044",
+      "title": "[BUG REPORT] [ADM-044] Reports lọc ngày tương lai loại bài QA hiện tại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-044-reports-l-c-ng-y-t-ng-lai-lo-i-b-i-qa-hi/README.md"
+    },
+    {
+      "id": "BUG-ADM-045",
+      "title": "[BUG REPORT] [ADM-045] Reports reset cả ngày Teacher và lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-045-reports-reset-c-ng-y-teacher-v-l-p/README.md"
+    },
+    {
+      "id": "BUG-ADM-048",
+      "title": "[BUG REPORT] [ADM-048] Admin truy cập được cấu hình hệ thống FE23",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-ADM-048-admin-truy-c-p-c-c-u-h-nh-h-th-ng-fe23/README.md"
+    },
+    {
+      "id": "BUG-STU-005",
+      "title": "[BUG REPORT] [STU-005] Tìm bài tập theo tiêu đề",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-005-t-m-b-i-t-p-theo-ti-u/README.md"
+    },
+    {
+      "id": "BUG-STU-006",
+      "title": "[BUG REPORT] [STU-006] Tìm bài không tồn tại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-006-t-m-b-i-kh-ng-t-n-t-i/README.md"
+    },
+    {
+      "id": "BUG-STU-007",
+      "title": "[BUG REPORT] [STU-007] Tổng quan bài và số lượt",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-007-t-ng-quan-b-i-v-s-l-t/README.md"
+    },
+    {
+      "id": "BUG-STU-008",
+      "title": "[BUG REPORT] [STU-008] Bắt đầu lượt Writing",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-008-b-t-u-l-t-writing/README.md"
+    },
+    {
+      "id": "BUG-STU-009",
+      "title": "[BUG REPORT] [STU-009] Validation Writing trống",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-009-validation-writing-tr-ng/README.md"
+    },
+    {
+      "id": "BUG-STU-010",
+      "title": "[BUG REPORT] [STU-010] Lưu nháp Writing và mở lại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-010-l-u-nh-p-writing-v-m-l-i/README.md"
+    },
+    {
+      "id": "BUG-STU-011",
+      "title": "[BUG REPORT] [STU-011] Writing văn bản: đối chiếu khả năng lưu nội dung",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-011-writing-v-n-b-n-i-chi-u-kh-n-ng-l-u-n-i/README.md"
+    },
+    {
+      "id": "BUG-STU-012",
+      "title": "[BUG REPORT] [STU-012] Nộp Writing đính kèm PDF",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-012-n-p-writing-nh-k-m-pdf/README.md"
+    },
+    {
+      "id": "BUG-STU-013",
+      "title": "[BUG REPORT] [STU-013] Nộp Reading đáp án đúng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-013-n-p-reading-p-n-ng/README.md"
+    },
+    {
+      "id": "BUG-STU-014",
+      "title": "[BUG REPORT] [STU-014] Nộp Reading đáp án sai",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-014-n-p-reading-p-n-sai/README.md"
+    },
+    {
+      "id": "BUG-STU-015",
+      "title": "[BUG REPORT] [STU-015] Nộp Listening câu trả lời ngắn",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-015-n-p-listening-c-u-tr-l-i-ng-n/README.md"
+    },
+    {
+      "id": "BUG-STU-016",
+      "title": "[BUG REPORT] [STU-016] Speaking: ghi âm và nộp bản ghi thật",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-016-speaking-ghi-m-v-n-p-b-n-ghi-th-t/README.md"
+    },
+    {
+      "id": "BUG-STU-017",
+      "title": "[BUG REPORT] [STU-017] Mở kết quả bài đã chấm",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-017-m-k-t-qu-b-i-ch-m/README.md"
+    },
+    {
+      "id": "BUG-STU-018",
+      "title": "[BUG REPORT] [STU-018] Điểm thô khớp thang điểm API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-018-i-m-th-kh-p-thang-i-m-api/README.md"
+    },
+    {
+      "id": "BUG-STU-019",
+      "title": "[BUG REPORT] [STU-019] Lọc Bảng điểm theo kỹ năng Reading",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-019-l-c-b-ng-i-m-theo-k-n-ng-reading/README.md"
+    },
+    {
+      "id": "BUG-STU-020",
+      "title": "[BUG REPORT] [STU-020] Xem đánh giá định kỳ đúng nội dung",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-020-xem-nh-gi-nh-k-ng-n-i-dung/README.md"
+    },
+    {
+      "id": "BUG-STU-021",
+      "title": "[BUG REPORT] [STU-021] Đánh giá định kỳ: lọc giáo viên và mở lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-021-nh-gi-nh-k-l-c-gi-o-vi-n-v-m-l-p/README.md"
+    },
+    {
+      "id": "BUG-STU-022",
+      "title": "[BUG REPORT] [STU-022] Nhận xét chấm bài chính thức",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-022-nh-n-x-t-ch-m-b-i-ch-nh-th-c/README.md"
+    },
+    {
+      "id": "BUG-STU-024",
+      "title": "[BUG REPORT] [STU-024] Lịch sử lượt nộp bài đã chấm",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-024-l-ch-s-l-t-n-p-b-i-ch-m/README.md"
+    },
+    {
+      "id": "BUG-STU-025",
+      "title": "[BUG REPORT] [STU-025] Reading MCQ: đáp án đúng, điểm 10",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-025-reading-mcq-p-n-ng-i-m-10/README.md"
+    },
+    {
+      "id": "BUG-STU-026",
+      "title": "[BUG REPORT] [STU-026] Reading MCQ: đáp án sai, điểm 0",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-026-reading-mcq-p-n-sai-i-m-0/README.md"
+    },
+    {
+      "id": "BUG-STU-027",
+      "title": "[BUG REPORT] [STU-027] Listening MCQ: đáp án đúng, điểm 10",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-027-listening-mcq-p-n-ng-i-m-10/README.md"
+    },
+    {
+      "id": "BUG-STU-030",
+      "title": "[BUG REPORT] [STU-030] Lọc bài theo lớp và trạng thái đã chấm",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-030-l-c-b-i-theo-l-p-v-tr-ng-th-i-ch-m/README.md"
+    },
+    {
+      "id": "BUG-STU-035",
+      "title": "[BUG REPORT] [STU-035] Lịch sử: mở kết quả đúng lượt",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-035-l-ch-s-m-k-t-qu-ng-l-t/README.md"
+    },
+    {
+      "id": "BUG-STU-036",
+      "title": "[BUG REPORT] [STU-036] Kết quả: tab nhận xét của giáo viên",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-036-k-t-qu-tab-nh-n-x-t-c-a-gi-o-vi-n/README.md"
+    },
+    {
+      "id": "BUG-STU-037",
+      "title": "[BUG REPORT] [STU-037] Kết quả: chuyển về Bảng điểm",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-037-k-t-qu-chuy-n-v-b-ng-i-m/README.md"
+    },
+    {
+      "id": "BUG-STU-038",
+      "title": "[BUG REPORT] [STU-038] Writing: từ chối file sai định dạng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-038-writing-t-ch-i-file-sai-nh-d-ng/README.md"
+    },
+    {
+      "id": "BUG-STU-039",
+      "title": "[BUG REPORT] [STU-039] Speaking: chưa ghi âm không được nộp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-039-speaking-ch-a-ghi-m-kh-ng-c-n-p/README.md"
+    },
+    {
+      "id": "BUG-STU-040",
+      "title": "[BUG REPORT] [STU-040] Writing: đếm từ và xóa nội dung",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-040-writing-m-t-v-x-a-n-i-dung/README.md"
+    },
+    {
+      "id": "BUG-STU-041",
+      "title": "[BUG REPORT] [STU-041] Tổng quan: nút quay về danh sách bài",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-041-t-ng-quan-n-t-quay-v-danh-s-ch-b-i/README.md"
+    },
+    {
+      "id": "BUG-STU-044",
+      "title": "[BUG REPORT] [STU-044] Reading: hủy xác nhận nộp bài trắng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-044-reading-h-y-x-c-nh-n-n-p-b-i-tr-ng/README.md"
+    },
+    {
+      "id": "BUG-STU-045",
+      "title": "[BUG REPORT] [STU-045] Hết lượt: không được bắt đầu lần mới",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-STU-045-h-t-l-t-kh-ng-c-b-t-u-l-n-m-i/README.md"
+    },
+    {
+      "id": "BUG-TEA-002",
+      "title": "[BUG REPORT] [TEA-002] Danh sách lớp: tìm kiếm đúng lớp và không có kết quả",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-002-danh-s-ch-l-p-t-m-ki-m-ng-l-p-v-kh-ng-c/README.md"
+    },
+    {
+      "id": "BUG-TEA-003",
+      "title": "[BUG REPORT] [TEA-003] Sổ điểm và báo cáo chi tiết học viên",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-003-s-i-m-v-b-o-c-o-chi-ti-t-h-c-vi-n/README.md"
+    },
+    {
+      "id": "BUG-TEA-004",
+      "title": "[BUG REPORT] [TEA-004] Mở báo cáo phân tích bốn kỹ năng của lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-004-m-b-o-c-o-ph-n-t-ch-b-n-k-n-ng-c-a-l-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-005",
+      "title": "[BUG REPORT] [TEA-005] Tìm bài tập và mở chi tiết",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-005-t-m-b-i-t-p-v-m-chi-ti-t/README.md"
+    },
+    {
+      "id": "BUG-TEA-006",
+      "title": "[BUG REPORT] [TEA-006] Giao bài: từ chối tiêu đề trống",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-006-giao-b-i-t-ch-i-ti-u-tr-ng/README.md"
+    },
+    {
+      "id": "BUG-TEA-007",
+      "title": "[BUG REPORT] [TEA-007] Giao bài Writing: lưu nháp và kiểm tra dữ liệu đã lưu",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-007-giao-b-i-writing-l-u-nh-p-v-ki-m-tra-d-l/README.md"
+    },
+    {
+      "id": "BUG-TEA-008",
+      "title": "[BUG REPORT] [TEA-008] Giao bài Writing: xuất bản và kiểm tra dữ liệu đã lưu",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-008-giao-b-i-writing-xu-t-b-n-v-ki-m-tra-d-l/README.md"
+    },
+    {
+      "id": "BUG-TEA-009",
+      "title": "[BUG REPORT] [TEA-009] Chấm bài: từ chối điểm ngoài thang",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-009-ch-m-b-i-t-ch-i-i-m-ngo-i-thang/README.md"
+    },
+    {
+      "id": "BUG-TEA-010",
+      "title": "[BUG REPORT] [TEA-010] Lưu và trả điểm/nhận xét; mở lại kiểm tra",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-010-l-u-v-tr-i-m-nh-n-x-t-m-l-i-ki-m-tra/README.md"
+    },
+    {
+      "id": "BUG-TEA-011",
+      "title": "[BUG REPORT] [TEA-011] Giao bài Speaking và đọc lại nội dung/kỹ năng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-011-giao-b-i-speaking-v-c-l-i-n-i-dung-k-n-n/README.md"
+    },
+    {
+      "id": "BUG-TEA-012",
+      "title": "[BUG REPORT] [TEA-012] Giao bài Reading và đọc lại nội dung/kỹ năng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-012-giao-b-i-reading-v-c-l-i-n-i-dung-k-n-ng/README.md"
+    },
+    {
+      "id": "BUG-TEA-013",
+      "title": "[BUG REPORT] [TEA-013] Giao bài Listening và đọc lại nội dung/kỹ năng",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-013-giao-b-i-listening-v-c-l-i-n-i-dung-k-n/README.md"
+    },
+    {
+      "id": "BUG-TEA-014",
+      "title": "[BUG REPORT] [TEA-014] Xem thử Writing, đóng và giữ nội dung editor",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-014-xem-th-writing-ng-v-gi-n-i-dung-editor/README.md"
+    },
+    {
+      "id": "BUG-TEA-015",
+      "title": "[BUG REPORT] [TEA-015] Xem thử Speaking, đóng và giữ nội dung editor",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-015-xem-th-speaking-ng-v-gi-n-i-dung-editor/README.md"
+    },
+    {
+      "id": "BUG-TEA-016",
+      "title": "[BUG REPORT] [TEA-016] Xem thử Reading, đóng và giữ nội dung editor",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-016-xem-th-reading-ng-v-gi-n-i-dung-editor/README.md"
+    },
+    {
+      "id": "BUG-TEA-017",
+      "title": "[BUG REPORT] [TEA-017] Xem thử Listening, đóng và giữ nội dung editor",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-017-xem-th-listening-ng-v-gi-n-i-dung-editor/README.md"
+    },
+    {
+      "id": "BUG-TEA-018",
+      "title": "[BUG REPORT] [TEA-018] Sửa tiêu đề/nội dung Writing và xuất bản",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-018-s-a-ti-u-n-i-dung-writing-v-xu-t-b-n/README.md"
+    },
+    {
+      "id": "BUG-TEA-019",
+      "title": "[BUG REPORT] [TEA-019] Sửa hạn nộp và đối chiếu API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-019-s-a-h-n-n-p-v-i-chi-u-api/README.md"
+    },
+    {
+      "id": "BUG-TEA-020",
+      "title": "[BUG REPORT] [TEA-020] Không tạo bài khi hạn nộp trước thời gian mở",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-020-kh-ng-t-o-b-i-khi-h-n-n-p-tr-c-th-i-gian/README.md"
+    },
+    {
+      "id": "BUG-TEA-021",
+      "title": "[BUG REPORT] [TEA-021] Đóng bài tập từ UI",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-021-ng-b-i-t-p-t-ui/README.md"
+    },
+    {
+      "id": "BUG-TEA-022",
+      "title": "[BUG REPORT] [TEA-022] Lọc danh sách bài theo kỹ năng Writing",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-022-l-c-danh-s-ch-b-i-theo-k-n-ng-writing/README.md"
+    },
+    {
+      "id": "BUG-TEA-023",
+      "title": "[BUG REPORT] [TEA-023] Lọc roster đã nộp/chưa nộp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-023-l-c-roster-n-p-ch-a-n-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-024",
+      "title": "[BUG REPORT] [TEA-024] Chấm điểm biên thấp 0 và đọc lại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-024-ch-m-i-m-bi-n-th-p-0-v-c-l-i/README.md"
+    },
+    {
+      "id": "BUG-TEA-025",
+      "title": "[BUG REPORT] [TEA-025] Chấm điểm biên cao 10 và đọc lại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-025-ch-m-i-m-bi-n-cao-10-v-c-l-i/README.md"
+    },
+    {
+      "id": "BUG-TEA-026",
+      "title": "[BUG REPORT] [TEA-026] Từ chối điểm âm và giữ dữ liệu API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-026-t-ch-i-i-m-m-v-gi-d-li-u-api/README.md"
+    },
+    {
+      "id": "BUG-TEA-027",
+      "title": "[BUG REPORT] [TEA-027] Từ chối điểm trống và giữ dữ liệu API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-027-t-ch-i-i-m-tr-ng-v-gi-d-li-u-api/README.md"
+    },
+    {
+      "id": "BUG-TEA-028",
+      "title": "[BUG REPORT] [TEA-028] Sửa điểm đã chấm thành 4.5",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-028-s-a-i-m-ch-m-th-nh-4-5/README.md"
+    },
+    {
+      "id": "BUG-TEA-029",
+      "title": "[BUG REPORT] [TEA-029] Chấm bài Reading đã nộp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-029-ch-m-b-i-reading-n-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-030",
+      "title": "[BUG REPORT] [TEA-030] Chấm bài Listening đã nộp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-030-ch-m-b-i-listening-n-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-031",
+      "title": "[BUG REPORT] [TEA-031] Chấm bài Speaking có file WAV QA",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-031-ch-m-b-i-speaking-c-file-wav-qa/README.md"
+    },
+    {
+      "id": "BUG-TEA-032",
+      "title": "[BUG REPORT] [TEA-032] Kích hoạt AI Writing và chờ gợi ý",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-032-k-ch-ho-t-ai-writing-v-ch-g-i/README.md"
+    },
+    {
+      "id": "BUG-TEA-033",
+      "title": "[BUG REPORT] [TEA-033] AI không hợp lệ cho Reading vẫn chấm thủ công được",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-033-ai-kh-ng-h-p-l-cho-reading-v-n-ch-m-th-c/README.md"
+    },
+    {
+      "id": "BUG-TEA-034",
+      "title": "[BUG REPORT] [TEA-034] Đối chiếu sổ điểm bốn kỹ năng với API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-034-i-chi-u-s-i-m-b-n-k-n-ng-v-i-api/README.md"
+    },
+    {
+      "id": "BUG-TEA-035",
+      "title": "[BUG REPORT] [TEA-035] Đối chiếu số học viên với API",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-035-i-chi-u-s-h-c-vi-n-v-i-api/README.md"
+    },
+    {
+      "id": "BUG-TEA-036",
+      "title": "[BUG REPORT] [TEA-036] Tìm học viên không tồn tại và khôi phục",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-036-t-m-h-c-vi-n-kh-ng-t-n-t-i-v-kh-i-ph-c/README.md"
+    },
+    {
+      "id": "BUG-TEA-037",
+      "title": "[BUG REPORT] [TEA-037] Xuất báo cáo lớp thành file",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-037-xu-t-b-o-c-o-l-p-th-nh-file/README.md"
+    },
+    {
+      "id": "BUG-TEA-038",
+      "title": "[BUG REPORT] [TEA-038] Xuất danh sách bài nộp thành file",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-038-xu-t-danh-s-ch-b-i-n-p-th-nh-file/README.md"
+    },
+    {
+      "id": "BUG-TEA-039",
+      "title": "[BUG REPORT] [TEA-039] Teacher không phụ trách không đọc được lớp QA ngoài quyền",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-039-teacher-kh-ng-ph-tr-ch-kh-ng-c-c-l-p-qa/README.md"
+    },
+    {
+      "id": "BUG-TEA-040",
+      "title": "[BUG REPORT] [TEA-040] Teacher không phụ trách không đọc được assignment QA ngoài quyền",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-040-teacher-kh-ng-ph-tr-ch-kh-ng-c-c-assignm/README.md"
+    },
+    {
+      "id": "BUG-TEA-041",
+      "title": "[BUG REPORT] [TEA-041] Hồ sơ đúng tài khoản QA và email chỉ đọc",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-041-h-s-ng-t-i-kho-n-qa-v-email-ch-c/README.md"
+    },
+    {
+      "id": "BUG-TEA-042",
+      "title": "[BUG REPORT] [TEA-042] Sửa số điện thoại hồ sơ, mở lại qua menu và khôi phục",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-042-s-a-s-i-n-tho-i-h-s-m-l-i-qua-menu-v-kh/README.md"
+    },
+    {
+      "id": "BUG-TEA-043",
+      "title": "[BUG REPORT] [TEA-043] Từ chối xác nhận mật khẩu không khớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-043-t-ch-i-x-c-nh-n-m-t-kh-u-kh-ng-kh-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-044",
+      "title": "[BUG REPORT] [TEA-044] Đổi mật khẩu tài khoản QA riêng và đăng nhập lại",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-044-i-m-t-kh-u-t-i-kho-n-qa-ri-ng-v-ng-nh-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-045",
+      "title": "[BUG REPORT] [TEA-045] Tùy chọn thông báo lưu qua reload",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-045-t-y-ch-n-th-ng-b-o-l-u-qua-reload/README.md"
+    },
+    {
+      "id": "BUG-TEA-046",
+      "title": "[BUG REPORT] [TEA-046] Tùy chọn giao diện lưu qua reload",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-046-t-y-ch-n-giao-di-n-l-u-qua-reload/README.md"
+    },
+    {
+      "id": "BUG-TEA-047",
+      "title": "[BUG REPORT] [TEA-047] Đăng xuất về login và xóa token frontend",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-047-ng-xu-t-v-login-v-x-a-token-frontend/README.md"
+    },
+    {
+      "id": "BUG-TEA-048",
+      "title": "[BUG REPORT] [TEA-048] Ngân hàng đề / modal giao nhanh",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-048-ng-n-h-ng-modal-giao-nhanh/README.md"
+    },
+    {
+      "id": "BUG-TEA-049",
+      "title": "[BUG REPORT] [TEA-049] Hủy tạo bài không sinh assignment",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-049-h-y-t-o-b-i-kh-ng-sinh-assignment/README.md"
+    },
+    {
+      "id": "BUG-TEA-050",
+      "title": "[BUG REPORT] [TEA-050] Mở lộ trình/buổi học của lớp",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-050-m-l-tr-nh-bu-i-h-c-c-a-l-p/README.md"
+    },
+    {
+      "id": "BUG-TEA-051",
+      "title": "[BUG REPORT] [TEA-051] Sửa điện thoại ở Cài đặt, mở lại qua menu và khôi phục",
+      "status": "HISTORICAL_NOT_REVERIFIED",
+      "origin": "test/archive/test-reborn-20261117/bugs/active/BUG-TEA-051-s-a-i-n-tho-i-c-i-t-m-l-i-qua-menu-v-kh/README.md"
+    }
+  ]
+}

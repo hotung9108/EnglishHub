@@ -42,8 +42,6 @@ test_reborn/.cache/
 test_reborn/reports/
 test/**/.cache/
 test/**/reports/
-test/selenium/student/
-test/selenium/teacher/
 test/api/history/
 test/reports/
 test/tools/
@@ -83,5 +81,9 @@ docs/AUDIT_REPORT_*.md
 production_artifacts/audit/
 production_artifacts/**/PM_SPEC_FINAL_2_DISCREPANCY_FIXES.md
 
-
-
+# Private test history and local environments; source pointer remains public.
+/test/archive/test-reborn-20261117/
+/test/archive/selenium-batch1-reports-20261117/
+/test/api/review/**/environment*.json
+/test/archive/selenium-before-layout-20261116/**
+!/test/archive/selenium-before-layout-20261116/README.md
