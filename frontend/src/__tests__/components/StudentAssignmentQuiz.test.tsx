@@ -195,6 +195,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: text } });
     expect(screen.getByText('1 / 2 đã làm')).toBeVisible();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(submissionModuleId, {
       answers: [{ questionId: mcqId, content: { selectedOptionIds: [102] } }],
     }, SIGNAL_OPTIONS);
@@ -463,10 +465,28 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await openQuestion(1);
     expect(document.querySelector('.exam-option-item.is-selected')).toBeNull();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenLastCalledWith(submissionModuleId, {
       answers: [{ questionId: shortId, content: { text: 'key' } }],
     }, SIGNAL_OPTIONS);
+  });
+
+  it('warns with unanswered question count before submission when questions are skipped (DO_010)', async () => {
+    const { user } = await setup();
+    await user.click(optionElements()[0]);
+    expect(screen.getByText('1 / 2 đã làm')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(screen.getByText(/1\s*(câu|questions)|(?:còn trống|unanswered).*1/i)).toBeVisible();
+    expect(submissionService.submitModule).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục làm bài' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(submissionService.submitModule).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    await user.click(screen.getByRole('button', { name: 'Nộp bài' }));
+    expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
   });
 
   function expectStayed() {

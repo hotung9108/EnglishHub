@@ -4,7 +4,7 @@ import {
   ArrowLeft, ChevronRight, Headphones, 
   Bookmark, ChevronLeft,
   Play, Pause, Volume2, SkipBack, SkipForward,
-  AlertCircle, RefreshCw, Lightbulb, FileCheck
+  AlertCircle, RefreshCw, Lightbulb, FileCheck, AlertTriangle
 } from 'lucide-react';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -142,6 +142,7 @@ const StudentAssignmentListening: React.FC = () => {
     assignmentId: null, submissionId: null, moduleId: null,
   });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
+  const [showUnansweredConfirm, setShowUnansweredConfirm] = useState<boolean>(false);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -519,6 +520,8 @@ const StudentAssignmentListening: React.FC = () => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const unansweredCount = validQuestionCount - answeredCount;
+
   const handleSubmit = () => {
     if (assignment?.status === 'CLOSED') {
       setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
@@ -533,6 +536,16 @@ const StudentAssignmentListening: React.FC = () => {
       setError('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
       return;
     }
+    if (unansweredCount > 0) {
+      setShowUnansweredConfirm(true);
+      return;
+    }
+    setError(null);
+    void quizSubmit.submit(quizPayload.answers);
+  };
+
+  const handleConfirmSubmitUnanswered = () => {
+    setShowUnansweredConfirm(false);
     setError(null);
     void quizSubmit.submit(quizPayload.answers);
   };
@@ -961,6 +974,45 @@ const StudentAssignmentListening: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Unanswered Questions Confirmation Modal */}
+      {showUnansweredConfirm && (
+        <div 
+          className="exam-modal-overlay tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="unanswered-modal-title"
+          onClick={() => setShowUnansweredConfirm(false)}
+        >
+          <div className="exam-modal-box tad-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 id="unanswered-modal-title" className="exam-modal-title">
+              <AlertTriangle className="text-amber-500" size={20} />
+              <span>Xác nhận nộp bài</span>
+            </h3>
+            <p className="exam-modal-desc">
+              Bạn còn {unansweredCount} câu chưa trả lời. Các câu chưa trả lời sẽ nhận 0 điểm (còn trống {unansweredCount} câu). Bạn có chắc chắn muốn nộp phần thi này không?
+            </p>
+            <div className="exam-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowUnansweredConfirm(false)}
+              >
+                Tiếp tục làm bài
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmSubmitUnanswered}
+              >
+                Nộp bài
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
