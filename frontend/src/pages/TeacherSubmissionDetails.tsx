@@ -796,25 +796,54 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentAction(context)) return;
       showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
-      aiPollTimerRef.current = setTimeout(async () => {
+      let pollCount = 0;
+      const MAX_POLLS = 8;
+      const POLL_INTERVAL_MS = 2500;
+
+      const pollAiResult = async () => {
         aiPollTimerRef.current = null;
-        if (!isCurrentAction(context)) return;
-        const loading = loadModuleData(targetModuleId);
-        const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+        if (!isMountedRef.current || !isCurrentAction(context)) {
+          aiRequestRef.current = null;
+          setIsAnalyzingAi(false);
+          return;
+        }
+
         try {
-          await loading;
-          if (!isCurrentAction(pollContext)) return;
-          showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
-        } catch (pollErr) {
-          if (!isCurrentAction(pollContext)) return;
-          console.error('Error refreshing grading after AI:', pollErr);
-        } finally {
-          if (isCurrentAction(pollContext)) {
+          const aiRes = await gradingService.getAiSuggestion(targetModuleId);
+          const hasResult = Boolean(
+            aiRes && (aiRes.suggestedScore != null || aiRes.aiFeedback || (aiRes.annotations && aiRes.annotations.length > 0))
+          );
+
+          if (hasResult || pollCount >= MAX_POLLS) {
+            await loadModuleData(targetModuleId);
+            if (!isMountedRef.current || !isCurrentAction(context)) return;
             aiRequestRef.current = null;
             setIsAnalyzingAi(false);
+            if (hasResult) {
+              showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+            } else {
+              showToast(isVi ? 'AI đang xử lý. Bạn có thể nhấn tải lại sau ít phút.' : 'AI analysis is taking longer than expected. Please refresh in a moment.');
+            }
+            return;
+          }
+
+          pollCount++;
+          aiPollTimerRef.current = setTimeout(pollAiResult, POLL_INTERVAL_MS);
+        } catch {
+          if (pollCount < MAX_POLLS) {
+            pollCount++;
+            aiPollTimerRef.current = setTimeout(pollAiResult, POLL_INTERVAL_MS);
+          } else {
+            await loadModuleData(targetModuleId);
+            if (!isMountedRef.current || !isCurrentAction(context)) return;
+            aiRequestRef.current = null;
+            setIsAnalyzingAi(false);
+            showToast(isVi ? 'Đã cập nhật dữ liệu từ hệ thống.' : 'Module data refreshed.');
           }
         }
-      }, 3500);
+      };
+
+      aiPollTimerRef.current = setTimeout(pollAiResult, POLL_INTERVAL_MS);
     } catch (err) {
       if (!isCurrentAction(context)) return;
       aiRequestRef.current = null;

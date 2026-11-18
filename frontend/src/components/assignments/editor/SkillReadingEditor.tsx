@@ -101,6 +101,15 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
     updateField('questions', updated);
   };
 
+  const handleUpdateQuestionMultiple = (
+    index: number,
+    updates: Partial<ReadingQuestionItem>
+  ) => {
+    const updated = [...config.questions];
+    updated[index] = { ...updated[index], ...updates };
+    updateField('questions', updated);
+  };
+
   const handleRemoveQuestion = (index: number) => {
     const updated = config.questions.filter((_, i) => i !== index);
     const reordered = updated.map((q, i) => ({ ...q, order: i + 1 }));
@@ -336,9 +345,13 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                                 onChange={(e) => {
                                   const newOpts = [...arr];
                                   newOpts[oIdx] = e.target.value;
-                                  handleUpdateQuestion(qIdx, 'options', newOpts);
                                   if (isCorrect) {
-                                    handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value.trim() || letter);
+                                    handleUpdateQuestionMultiple(qIdx, {
+                                      options: newOpts,
+                                      correctAnswer: e.target.value.trim() || letter,
+                                    });
+                                  } else {
+                                    handleUpdateQuestion(qIdx, 'options', newOpts);
                                   }
                                 }}
                               />
