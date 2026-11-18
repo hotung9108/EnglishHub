@@ -30,6 +30,8 @@ import {
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-writing.css';
 
+export const MIN_WRITING_WORDS = 20;
+
 const StudentAssignmentWriting: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -306,6 +308,11 @@ const StudentAssignmentWriting: React.FC = () => {
       return;
     }
 
+    if (file.size === 0) {
+      setError('Tệp tải lên không được rỗng (0 bytes). Vui lòng chọn tệp bài viết hợp lệ.');
+      return;
+    }
+
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       setError('Kích thước tệp vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.');
@@ -397,9 +404,15 @@ const StudentAssignmentWriting: React.FC = () => {
     }
 
     const trimmedText = editorText.trim();
-    if (trimmedText === '' && !uploadedFile) {
-      setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
-      return;
+    if (!uploadedFile) {
+      if (trimmedText === '') {
+        setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+        return;
+      }
+      if (wordCount < MIN_WRITING_WORDS) {
+        setError(`Bài viết chưa đạt độ dài tối thiểu (${wordCount}/${MIN_WRITING_WORDS} từ). Vui lòng viết ít nhất ${MIN_WRITING_WORDS} từ trước khi nộp.`);
+        return;
+      }
     }
     if (!submission) {
       setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
@@ -641,8 +654,17 @@ const StudentAssignmentWriting: React.FC = () => {
           <div className="writing-card">
             <div className="writing-editor-header">
               <div className="flex items-center gap-16">
-                <div className="px-12 py-4 bg-slate-100 rounded-md text-xs text-slate-700 font-medium">
-                  Đếm từ: <span className="text-primary font-bold">{wordCount}</span> / tối thiểu {parsedInstructions.minWords} từ
+                <div className={`px-12 py-4 rounded-md text-xs font-medium flex items-center gap-6 ${
+                  wordCount >= MIN_WRITING_WORDS
+                    ? 'bg-slate-100 text-slate-700'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}>
+                  <span>Đếm từ: <span className={wordCount >= MIN_WRITING_WORDS ? 'text-primary font-bold' : 'text-amber-800 font-bold'}>{wordCount}</span> / tối thiểu {parsedInstructions.minWords} từ</span>
+                  {wordCount < MIN_WRITING_WORDS && !uploadedFile && (
+                    <span className="text-[11px] text-amber-700 font-normal">
+                      (Tối thiểu hệ thống: {MIN_WRITING_WORDS} từ)
+                    </span>
+                  )}
                 </div>
                 {isDraftSaved && (
                   <div className="flex items-center gap-6 text-xs text-emerald-600 font-medium">
@@ -702,7 +724,7 @@ const StudentAssignmentWriting: React.FC = () => {
               ref={fileInputRef}
               type="file" 
               className="hidden"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain" 
               onChange={handleFileChange} 
             />
 
@@ -730,7 +752,7 @@ const StudentAssignmentWriting: React.FC = () => {
                   <div className="writing-dropzone-title">
                     Kéo thả tệp hoặc <span className="writing-dropzone-highlight">chọn từ máy tính</span>
                   </div>
-                  <div className="writing-dropzone-hint">Hỗ trợ: PDF, DOCX (Tối đa 10MB)</div>
+                  <div className="writing-dropzone-hint">Hỗ trợ: PDF, DOCX, TXT (Tối đa 10MB)</div>
                 </div>
               </div>
             ) : (
