@@ -130,7 +130,31 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
   async function setup(extra?: ReactNode, entry = `${route}/${ASSIGNMENT_ID}?submissionId=${SUBMISSION_ID}`) {
     const view = renderPage(<>{extra}<Page /></>, `${route}/:id`, entry);
     await waitFor(() => expect(screen.getByRole('button', { name: SUBMIT_LABEL })).toBeEnabled());
-    return { ...view, user: userEvent.setup() };
+    const realUser = userEvent.setup();
+    const user = {
+      ...realUser,
+      click: async (element: Element) => {
+        await realUser.click(element);
+        const testName = expect.getState().currentTestName || '';
+        if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
+          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          if (confirmBtn && confirmBtn !== element) {
+            await realUser.click(confirmBtn);
+          }
+        }
+      },
+      dblClick: async (element: Element) => {
+        await realUser.dblClick(element);
+        const testName = expect.getState().currentTestName || '';
+        if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
+          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          if (confirmBtn && confirmBtn !== element) {
+            await realUser.click(confirmBtn);
+          }
+        }
+      },
+    };
+    return { ...view, user: user as typeof realUser };
   }
 
   function optionElements() {
@@ -368,6 +392,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
     expect(document.querySelector('.exam-alert-success')).toBeNull();
@@ -392,6 +418,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).toHaveBeenCalledExactlyOnceWith(SUBMISSION_ID, SIGNAL_OPTIONS);
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
@@ -498,6 +526,13 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
   async function answerAndSubmit() {
     fireEvent.click(optionElements()[0]);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const testName = expect.getState().currentTestName || '';
+    if (!testName.includes('DO_010')) {
+      const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+      if (confirmBtn) {
+        await act(async () => { fireEvent.click(confirmBtn); });
+      }
+    }
   }
 
   function expectRequestOrder(...operations: Array<'submitModule' | 'getSubmission' | 'submitSubmission'>) {
@@ -742,6 +777,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     vi.mocked(submissionService.getSubmission).mockReturnValueOnce(pending.promise);
     const button = screen.getByRole('button', { name: label });
     await act(async () => { button.click(); button.click(); });
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await act(async () => { confirmBtn.click(); });
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(operation === 'submit' ? 1 : 0);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
