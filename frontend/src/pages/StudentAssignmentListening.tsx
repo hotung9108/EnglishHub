@@ -12,7 +12,6 @@ import { moduleService, type ModuleDetailResponse } from '../api/services/module
 import { questionService } from '../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
@@ -23,6 +22,7 @@ import {
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import { useStudentQuizSubmit, QUIZ_SUBMIT_ERROR } from '../hooks/useStudentQuizSubmit';
+import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import {
   validateStudentQuizQuestions, buildStudentQuizPayload, isStudentQuizBlank,
   classifyStudentQuizProgress, isStudentQuizPendingFinalization, isStudentQuizSubmitScopeValid,
@@ -90,8 +90,6 @@ const StudentAssignmentListening: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { language } = useLanguage();
-  const isVi = language === 'vi';
 
   const [isLoading, setIsLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
@@ -497,18 +495,16 @@ const StudentAssignmentListening: React.FC = () => {
   }
   const displayError = error || submitError || (!isLoading && canSubmitModule ? questionDataError : null);
   const successMessage = submitState.kind === 'completed'
-    ? (isVi ? 'Đã nộp phần thi Nghe thành công! Đang quay lại trang tổng quan bài tập...' : 'Listening module submitted! Returning to assignment overview...')
+    ? 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...'
     : submitState.kind === 'nextSkill'
       ? `Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${getSkillLabel(submitState.nextModule.skill)}...` : null;
 
   useEffect(() => {
     if (!scopeReady || (submitState.kind !== 'completed' && submitState.kind !== 'nextSkill')) return;
     const generation = viewGeneration.current;
-    // FE-97 (UC021): Tách biệt triệt để nộp module và nộp toàn bài.
-    // Khi hoàn thành phần thi Listening, chuyển về Overview để học viên xem lại hoặc làm tiếp kỹ năng khác.
-    const destination = submitState.kind === 'completed'
-      ? `/student/assignments/${submitScope.assignmentId}/overview`
+    const destination = submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
       : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id);
+    if (submitState.kind === 'completed') notifyAssignmentSubmitted();
     const timer = setTimeout(() => {
       if (viewGeneration.current === generation) navigate(destination, { replace: true });
     }, NAVIGATION_DELAY_MS);

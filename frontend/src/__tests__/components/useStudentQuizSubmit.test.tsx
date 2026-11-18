@@ -31,14 +31,15 @@ beforeEach(() => {
 });
 
 describe('useStudentQuizSubmit', () => {
-  it('awaits module POST and fresh GET in order without auto-finalizing', async () => {
+  it('awaits module POST, fresh GET and final POST in order, forwarding the same signal', async () => {
     const { result } = renderHook(() => useStudentQuizSubmit(scope));
     expect(await invoke(() => result.current.submit(answers))).toEqual({ kind: 'completed', submissionId: 325 });
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(1182, { answers }, { signal: expect.any(AbortSignal) });
     const signal = vi.mocked(submissionService.submitModule).mock.calls[0][2]?.signal;
     expect(submissionService.getSubmission).toHaveBeenCalledExactlyOnceWith(325, { signal });
-    expect(submissionService.submitSubmission).not.toHaveBeenCalled();
+    expect(submissionService.submitSubmission).toHaveBeenCalledExactlyOnceWith(325, { signal });
     expect(vi.mocked(submissionService.submitModule).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(submissionService.getSubmission).mock.invocationCallOrder[0]);
+    expect(vi.mocked(submissionService.getSubmission).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(submissionService.submitSubmission).mock.invocationCallOrder[0]);
     expect(result.current.state.kind).toBe('completed');
   });
 
@@ -142,7 +143,7 @@ describe('useStudentQuizSubmit', () => {
     vi.mocked(submissionService.getSubmission).mockResolvedValue(input);
     vi.mocked(submissionService.submitSubmission).mockRejectedValueOnce(new ApiClientError('failure', status));
     const { result } = renderHook(() => useStudentQuizSubmit(scope));
-    expect(await invoke(() => result.current.retryFinal())).toMatchObject({ kind: 'pendingFinalization', submission: { status: 'IN_PROGRESS' } });
+    expect(await invoke(() => result.current.submit(answers))).toMatchObject({ kind: 'pendingFinalization', submission: { status: 'IN_PROGRESS' } });
     expect(input.status).toBe('IN_PROGRESS');
     await act(() => vi.advanceTimersByTimeAsync(60_000));
     expect(submissionService.submitSubmission).toHaveBeenCalledTimes(1);
@@ -154,7 +155,7 @@ describe('useStudentQuizSubmit', () => {
     vi.mocked(submissionService.submitSubmission).mockRejectedValueOnce(new ApiClientError('lost', 0));
     vi.mocked(submissionService.getSubmission).mockResolvedValueOnce(progress()).mockResolvedValueOnce(progress({ status }));
     const { result } = renderHook(() => useStudentQuizSubmit(scope));
-    expect(await invoke(() => result.current.retryFinal())).toMatchObject({ kind: 'completed' });
+    expect(await invoke(() => result.current.submit(answers))).toMatchObject({ kind: 'completed' });
     expect(submissionService.submitSubmission).toHaveBeenCalledTimes(1);
   });
 
@@ -162,7 +163,7 @@ describe('useStudentQuizSubmit', () => {
     vi.mocked(submissionService.submitSubmission).mockRejectedValueOnce(new Error('lost'));
     vi.mocked(submissionService.getSubmission).mockResolvedValueOnce(progress()).mockRejectedValueOnce(new Error('offline'));
     const { result } = renderHook(() => useStudentQuizSubmit(scope));
-    expect(await invoke(() => result.current.retryFinal())).toMatchObject({ kind: 'unconfirmed', stage: 'final' });
+    expect(await invoke(() => result.current.submit(answers))).toMatchObject({ kind: 'unconfirmed', stage: 'final' });
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
   });
 
