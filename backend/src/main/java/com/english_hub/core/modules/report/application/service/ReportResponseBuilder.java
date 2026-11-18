@@ -75,7 +75,7 @@ public class ReportResponseBuilder {
 		for (ReportSubmissionScore best : bestAttempts) {
 			ReportStudentAttemptScore attempt = attemptsById.get(best.submissionId());
 			timeline.add(new ScoreTimeline(best.assignmentId(), attempt.assignmentTitle(), utc(best.submittedAt()),
-					calculator.averageScorePercent(List.of(best))));
+					calculator.attemptScorePercent(best, skillRows)));
 		}
 		timeline.sort(Comparator.comparing(ScoreTimeline::submittedAt,
 				Comparator.nullsFirst(Comparator.naturalOrder())));
