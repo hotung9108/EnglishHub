@@ -58,6 +58,7 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,6 +76,7 @@ public class SubmissionService {
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
 	private static final String ASSIGNMENT_CLOSED_MESSAGE = "Bài tập đã đóng";
 	private static final String CANNOT_START_MESSAGE = "Không thể bắt đầu làm bài tập này lúc này.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final String SUBMISSION_DEADLINE_PASSED_MESSAGE =
 			"Không thể nộp phần làm bài này vì đã quá hạn nộp bài.";
 	private static final String SUBMISSION_NOT_FOUND_MESSAGE = "Không tìm thấy lượt làm bài.";
@@ -144,8 +146,7 @@ public class SubmissionService {
 		if (caller.role() != UserRole.STUDENT) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
-		AssignmentWindow window = assignmentWindowRepository.findWindowById(assignmentId)
-				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		AssignmentWindow window = findAssignmentWindowForStart(assignmentId);
 		if (window.deleted()) {
 			throw ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE);
 		}
@@ -963,6 +964,15 @@ public class SubmissionService {
 				.map(byId -> byId.get(submissionModule.getModuleId()))
 				.map(ModuleInfo::orderIndex)
 				.orElse(Integer.MAX_VALUE));
+	}
+
+	private AssignmentWindow findAssignmentWindowForStart(long assignmentId) {
+		try {
+			return assignmentWindowRepository.findWindowByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private boolean isWithinWindow(AssignmentWindow window) {
