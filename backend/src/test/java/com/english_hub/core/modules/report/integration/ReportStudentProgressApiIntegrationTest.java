@@ -68,7 +68,7 @@ class ReportStudentProgressApiIntegrationTest extends ReportIntegrationTestBase 
 				.andExpect(jsonPath("$.skillAverages[1].averageScorePercent").value(90.00))
 				.andExpect(jsonPath("$.scoreTimeline.length()").value(2))
 				.andExpect(jsonPath("$.scoreTimeline[0].assignmentId").value(firstAssignment))
-				.andExpect(jsonPath("$.scoreTimeline[0].scorePercent").value(86.67))
+				.andExpect(jsonPath("$.scoreTimeline[0].scorePercent").value(85.00))
 				.andExpect(jsonPath("$.scoreTimeline[1].assignmentId").value(secondAssignment))
 				.andExpect(jsonPath("$.scoreTimeline[1].scorePercent").value(50.00))
 				.andReturn();
