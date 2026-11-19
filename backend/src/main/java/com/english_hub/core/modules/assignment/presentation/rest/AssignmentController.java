@@ -106,7 +106,7 @@ public class AssignmentController {
 			@Valid @RequestBody UpdateAssignmentStatusRequest request) {
 		AssignmentStatus status = assignmentService.updateStatus(
 				assignmentId,
-				new UpdateAssignmentStatusCommand(request.status()));
+				new UpdateAssignmentStatusCommand(request.status(), request.closeAt()));
 		return ResponseEntity.ok(new MessageResponse(statusMessage(status)));
 	}
 

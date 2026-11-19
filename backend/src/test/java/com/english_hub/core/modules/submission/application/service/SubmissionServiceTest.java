@@ -67,6 +67,7 @@ import java.util.stream.Stream;
 
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -182,7 +183,7 @@ class SubmissionServiceTest {
 	@Test
 	void createsFirstAttemptWithModulesAndGradings() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(0L);
 
@@ -229,7 +230,7 @@ class SubmissionServiceTest {
 	@Test
 	void incrementsTheAttemptNumberOnASecondAttempt() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(1L);
 
@@ -252,7 +253,7 @@ class SubmissionServiceTest {
 	@Test
 	void startAttemptLeavesSnapshotNullForNullOrNonPositiveModuleMaxScore() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(0L);
 
@@ -286,7 +287,7 @@ class SubmissionServiceTest {
 	@Test
 	void startAttemptPreservesAiInstructionSnapshotWhenConfigured() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(0L);
 
@@ -322,7 +323,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsAnAssignmentThatIsNotPublished() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L))
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
 				.thenReturn(Optional.of(new AssignmentWindow(5L, 3L, AssignmentStatus.DRAFT, open(), close(), 2, false)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 
@@ -335,7 +336,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsAnAssignmentThatIsNotOpenYet() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L))
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
 				.thenReturn(Optional.of(window(5L, OffsetDateTime.now().plusMinutes(30), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 
@@ -347,7 +348,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsAnAssignmentThatIsAlreadyClosed() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L))
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
 				.thenReturn(Optional.of(window(5L, open(), OffsetDateTime.now().minusMinutes(5), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 
@@ -359,7 +360,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsWhenTheSubmissionLimitIsReached() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 1)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 1)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(1L);
 
@@ -375,7 +376,7 @@ class SubmissionServiceTest {
 	@Test
 	void allowsUnlimitedAttemptsWhenMaxSubmissionsIsNull() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L))
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
 				.thenReturn(Optional.of(new AssignmentWindow(5L, 3L, AssignmentStatus.PUBLISHED, open(), close(), null, false)));
 		when(studentClassEnrollmentRepository.isStudentInClass(41L, 3L)).thenReturn(true);
 		when(submissionRepository.countByAssignmentIdAndStudentId(5L, 41L)).thenReturn(99L);
@@ -394,7 +395,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsAnUnknownAssignment() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(404L)).thenReturn(Optional.empty());
+		when(assignmentWindowRepository.findWindowByIdForUpdate(404L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> submissionService.startAttempt(404L))
 				.isInstanceOf(ApiException.class)
@@ -404,7 +405,7 @@ class SubmissionServiceTest {
 	@Test
 	void rejectsASoftDeletedAssignment() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
-		when(assignmentWindowRepository.findWindowById(5L))
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
 				.thenReturn(Optional.of(new AssignmentWindow(5L, 3L, AssignmentStatus.PUBLISHED, open(), close(), 2, true)));
 
 		assertThatThrownBy(() -> submissionService.startAttempt(5L))
@@ -419,13 +420,27 @@ class SubmissionServiceTest {
 		assertThatThrownBy(() -> submissionService.startAttempt(5L))
 				.isInstanceOf(ApiException.class)
 				.hasMessage("Bạn không có quyền thực hiện thao tác này.");
-		verify(assignmentWindowRepository, never()).findWindowById(org.mockito.ArgumentMatchers.anyLong());
+		verify(assignmentWindowRepository, never()).findWindowByIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+	}
+
+	@Test
+	void rejectsStartWhenAssignmentLockCannotBeAcquired() {
+		when(currentUserProvider.requireActiveUser()).thenReturn(student(42L));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L))
+				.thenThrow(new PessimisticLockingFailureException("Lock timeout"));
+
+		assertThatThrownBy(() -> submissionService.startAttempt(5L))
+				.isInstanceOfSatisfying(ApiException.class, error -> {
+					assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+					assertThat(error).hasMessage("Tài nguyên đang được cập nhật, vui lòng thử lại.");
+				});
+		verifyNoInteractions(submissionRepository);
 	}
 
 	@Test
 	void rejectsAStudentWhoIsNotInTheAssignmentsClass() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(42L));
-		when(assignmentWindowRepository.findWindowById(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentWindowRepository.findWindowByIdForUpdate(5L)).thenReturn(Optional.of(window(5L, open(), close(), 2)));
 		when(studentClassEnrollmentRepository.isStudentInClass(42L, 3L)).thenReturn(false);
 
 		assertThatThrownBy(() -> submissionService.startAttempt(5L))

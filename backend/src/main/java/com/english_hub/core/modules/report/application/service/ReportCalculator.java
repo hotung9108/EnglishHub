@@ -51,8 +51,18 @@ public class ReportCalculator {
 
 	public Map<ModuleSkill, BigDecimal> averageSkillScorePercent(
 			List<ReportStudentSkillScore> rows, List<ReportSubmissionScore> bestAttempts) {
+		Map<ModuleSkill, BigDecimal> averageRatios = averageSkillRatiosBySkill(rows, bestAttempts);
+		Map<ModuleSkill, BigDecimal> averages = new EnumMap<>(ModuleSkill.class);
+		for (Map.Entry<ModuleSkill, BigDecimal> entry : averageRatios.entrySet()) {
+			averages.put(entry.getKey(), entry.getValue().multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP));
+		}
+		return averages;
+	}
+
+	public Map<ModuleSkill, BigDecimal> averageSkillRatiosBySkill(
+			List<ReportStudentSkillScore> rows, List<ReportSubmissionScore> selectedAttempts) {
 		Set<Long> selectedSubmissions = new HashSet<>();
-		for (ReportSubmissionScore attempt : bestAttempts) {
+		for (ReportSubmissionScore attempt : selectedAttempts) {
 			selectedSubmissions.add(attempt.submissionId());
 		}
 		Map<ModuleSkill, List<BigDecimal>> ratiosBySkill = new EnumMap<>(ModuleSkill.class);
@@ -62,16 +72,33 @@ public class ReportCalculator {
 						.add(skillRatio(row));
 			}
 		}
-		Map<ModuleSkill, BigDecimal> averages = new EnumMap<>(ModuleSkill.class);
+		Map<ModuleSkill, BigDecimal> averageRatios = new EnumMap<>(ModuleSkill.class);
 		for (Map.Entry<ModuleSkill, List<BigDecimal>> entry : ratiosBySkill.entrySet()) {
 			BigDecimal total = BigDecimal.ZERO;
 			for (BigDecimal ratio : entry.getValue()) {
 				total = total.add(ratio, SCORE_CONTEXT);
 			}
-			averages.put(entry.getKey(), total.divide(BigDecimal.valueOf(entry.getValue().size()), SCORE_CONTEXT)
-					.multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP));
+			averageRatios.put(entry.getKey(), total.divide(BigDecimal.valueOf(entry.getValue().size()), SCORE_CONTEXT));
 		}
-		return averages;
+		return averageRatios;
+	}
+
+	public BigDecimal attemptScorePercent(
+			ReportSubmissionScore attempt, List<ReportStudentSkillScore> skillRows) {
+		ExactFraction meanSkillRatio = meanExactSkillRatio(skillRows, List.of(attempt));
+		if (meanSkillRatio == null) {
+			return BigDecimal.ZERO.setScale(2);
+		}
+		return meanSkillRatio.multiplyByPositiveInteger(100).roundHalfUp(2);
+	}
+
+	public BigDecimal overallScoreOnTen(
+			List<ReportStudentSkillScore> skillRows, List<ReportSubmissionScore> selectedAttempts) {
+		ExactFraction meanSkillRatio = meanExactSkillRatio(skillRows, selectedAttempts);
+		if (meanSkillRatio == null) {
+			return null;
+		}
+		return meanSkillRatio.multiplyByPositiveInteger(10).roundHalfUp(1);
 	}
 
 	public Map<Long, BigDecimal> averageScoreByStudent(List<ReportSubmissionScore> rows) {
@@ -163,6 +190,50 @@ public class ReportCalculator {
 			return BigDecimal.ZERO;
 		}
 		return row.finalTotal().divide(row.maxTotal(), SCORE_CONTEXT);
+	}
+
+	private ExactFraction meanExactSkillRatio(
+			List<ReportStudentSkillScore> rows, List<ReportSubmissionScore> selectedAttempts) {
+		Map<ModuleSkill, ExactFraction> averageRatios = averageExactSkillRatiosBySkill(rows, selectedAttempts);
+		if (averageRatios.isEmpty()) {
+			return null;
+		}
+		ExactFraction total = ExactFraction.zero();
+		for (ExactFraction ratio : averageRatios.values()) {
+			total = total.add(ratio);
+		}
+		return total.divideByPositiveInteger(averageRatios.size());
+	}
+
+	private Map<ModuleSkill, ExactFraction> averageExactSkillRatiosBySkill(
+			List<ReportStudentSkillScore> rows, List<ReportSubmissionScore> selectedAttempts) {
+		Set<Long> selectedSubmissions = new HashSet<>();
+		for (ReportSubmissionScore attempt : selectedAttempts) {
+			selectedSubmissions.add(attempt.submissionId());
+		}
+		Map<ModuleSkill, List<ExactFraction>> ratiosBySkill = new EnumMap<>(ModuleSkill.class);
+		for (ReportStudentSkillScore row : rows) {
+			if (selectedSubmissions.contains(row.submissionId())) {
+				ratiosBySkill.computeIfAbsent(row.skill(), ignored -> new ArrayList<>())
+						.add(exactSkillRatio(row));
+			}
+		}
+		Map<ModuleSkill, ExactFraction> averageRatios = new EnumMap<>(ModuleSkill.class);
+		for (Map.Entry<ModuleSkill, List<ExactFraction>> entry : ratiosBySkill.entrySet()) {
+			ExactFraction total = ExactFraction.zero();
+			for (ExactFraction ratio : entry.getValue()) {
+				total = total.add(ratio);
+			}
+			averageRatios.put(entry.getKey(), total.divideByPositiveInteger(entry.getValue().size()));
+		}
+		return averageRatios;
+	}
+
+	private ExactFraction exactSkillRatio(ReportStudentSkillScore row) {
+		if (row.maxTotal() == null || row.maxTotal().signum() == 0) {
+			return ExactFraction.zero();
+		}
+		return ExactFraction.fromDecimalRatio(row.finalTotal(), row.maxTotal());
 	}
 
 	private record StudentAssignment(Long studentId, Long assignmentId) {

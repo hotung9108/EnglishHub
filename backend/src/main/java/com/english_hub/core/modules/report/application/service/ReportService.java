@@ -2,12 +2,14 @@ package com.english_hub.core.modules.report.application.service;
 
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.domain.UserRole;
+import com.english_hub.core.infrastructure.persistence.entity.ModuleSkill;
 import com.english_hub.core.modules.report.application.model.ReportClassListResponse;
 import com.english_hub.core.modules.report.application.model.ReportClassProgressResponse;
 import com.english_hub.core.modules.report.application.model.ReportCompletionRows;
 import com.english_hub.core.modules.report.application.model.ReportDateWindow;
 import com.english_hub.core.modules.report.application.model.ReportOverviewResponse;
 import com.english_hub.core.modules.report.application.model.ReportStudentProgressResponse;
+import com.english_hub.core.modules.report.application.model.StudentOverallScoreResponse;
 import com.english_hub.core.modules.report.domain.model.ReportClassPage;
 import com.english_hub.core.modules.report.domain.model.ReportAssignmentRow;
 import com.english_hub.core.modules.report.domain.model.ReportMemberRow;
@@ -15,6 +17,7 @@ import com.english_hub.core.modules.report.domain.model.ReportPendingByStatus;
 import com.english_hub.core.modules.report.domain.model.ReportStudentCompletion;
 import com.english_hub.core.modules.report.domain.model.ReportStudentAttemptScore;
 import com.english_hub.core.modules.report.domain.model.ReportStudentIdentity;
+import com.english_hub.core.modules.report.domain.model.ReportStudentSkillScore;
 import com.english_hub.core.modules.report.domain.model.ReportSubmissionScore;
 import com.english_hub.core.modules.report.domain.repository.ReportRepository;
 import com.english_hub.core.modules.submission.domain.repository.ClassTeachingRepository;
@@ -23,6 +26,7 @@ import com.english_hub.core.modules.user.domain.model.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,6 +132,39 @@ public class ReportService {
 				? List.<com.english_hub.core.modules.report.domain.model.ReportStudentSkillScore>of()
 				: reports.findStudentSkillScores(studentId, classId, window.from(), window.to());
 		return responseBuilder.studentProgress(student, classId, bestAttempts, attemptRows, skillRows);
+	}
+
+	public StudentOverallScoreResponse overallScore(long studentId, Long classId) {
+		if (reports.findStudent(studentId) == null) {
+			throw ApiException.notFound("Không tìm thấy học viên.");
+		}
+		if (classId != null) {
+			requireClass(classId);
+		}
+		User user = currentUserProvider.requireActiveUser();
+		requireReportRole(user);
+		if (user.role() == UserRole.TEACHER && classId == null) {
+			throw ApiException.badRequest("Giáo viên phải truyền classId.");
+		}
+		checkClassAccess(user, classId);
+
+		List<ReportStudentAttemptScore> attemptRows = reports.findStudentAttemptScores(
+				studentId, classId, null, null);
+		List<ReportSubmissionScore> bestAttempts = calculator.pickBestAttempts(toSubmissionScores(attemptRows));
+		List<ReportStudentSkillScore> skillRows = bestAttempts.isEmpty()
+				? List.of()
+				: reports.findStudentSkillScores(studentId, classId, null, null);
+		Map<ModuleSkill, BigDecimal> skillRatios =
+				calculator.averageSkillRatiosBySkill(skillRows, bestAttempts);
+		BigDecimal overallScore = calculator.overallScoreOnTen(skillRows, bestAttempts);
+		List<ModuleSkill> missingSkills = new ArrayList<>();
+		for (ModuleSkill skill : ModuleSkill.values()) {
+			if (!skillRatios.containsKey(skill)) {
+				missingSkills.add(skill);
+			}
+		}
+		boolean limitedData = skillRatios.size() < ModuleSkill.values().length;
+		return new StudentOverallScoreResponse(overallScore, limitedData, skillRatios.size(), missingSkills);
 	}
 
 	private ReportCompletionRows loadCompletionRows(List<Long> classIds, ReportDateWindow window) {
