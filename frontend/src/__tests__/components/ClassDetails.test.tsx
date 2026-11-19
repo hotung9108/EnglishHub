@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import ClassDetails from '../../pages/ClassDetails';
 import { classService, type ClassDetail } from '../../api/services/class.service';
 import { assignmentService, type AssignmentListResponse } from '../../api/services/assignment.service';
+import { userService } from '../../api/services/user.service';
 import { ApiClientError, ForbiddenError, NetworkError, NotFoundError, TimeoutError } from '../../api/core/errors';
 import { deferred } from '../deferred';
 import { renderPage } from './renderPage';
@@ -19,6 +20,12 @@ vi.mock('../../api/services/class.service', () => ({
 }));
 vi.mock('../../api/services/assignment.service', () => ({
   assignmentService: { listAssignments: vi.fn() },
+}));
+vi.mock('../../api/services/user.service', () => ({
+  userService: {
+    listUsers: vi.fn(),
+    getUserById: vi.fn(),
+  },
 }));
 
 // Class, member and assignment identities come from local-dev/db-snapshot/.
@@ -47,6 +54,19 @@ beforeEach(() => {
     { memberId: 1, studentId: 80, fullName: 'Đinh Thị Anh' },
   ]);
   vi.mocked(assignmentService.listAssignments).mockResolvedValue(assignments);
+  vi.mocked(userService.listUsers).mockResolvedValue({
+    data: [
+      { id: 9, fullName: 'Nguyễn Đức Tuấn', email: 'tuan@example.com', role: 'TEACHER', status: 'ACTIVE' },
+      { id: 10, fullName: 'Phạm Thị Mai', email: 'mai@example.com', role: 'TEACHER', status: 'ACTIVE' },
+    ],
+    pagination: { page: 1, limit: 20, total: 2 },
+  });
+  vi.mocked(userService.getUserById).mockImplementation(async (id) => {
+    if (id === 9) return { id: 9, fullName: 'Nguyễn Đức Tuấn', email: 'tuan@example.com', role: 'TEACHER', status: 'ACTIVE' };
+    if (id === 10) return { id: 10, fullName: 'Phạm Thị Mai', email: 'mai@example.com', role: 'TEACHER', status: 'ACTIVE' };
+    return null;
+  });
+  vi.mocked(classService.update).mockResolvedValue({ message: 'Cập nhật lớp học thành công.' });
 });
 
 function renderClass(id = '1', language: 'vi' | 'en' = 'vi') {
@@ -212,3 +232,70 @@ it('does not log errors or warnings when an initial request settles after unmoun
   expect(errorSpy).not.toHaveBeenCalled();
   expect(warningSpy).not.toHaveBeenCalled();
 });
+
+it('opens change teacher modal from KPI card and updates teacher successfully (UC008 / Issue #344)', async () => {
+  renderClass();
+  await screen.findByRole('heading', { name: classDetail.name });
+
+  // 1. Locate the change instructor button on the KPI card
+  const changeTeacherKpiBtn = screen.getByRole('button', { name: /Đổi GV/i });
+  expect(changeTeacherKpiBtn).toBeVisible();
+
+  // 2. Open quick change modal
+  await userEvent.click(changeTeacherKpiBtn);
+  expect(screen.getByRole('heading', { name: 'Thay đổi giáo viên phụ trách' })).toBeVisible();
+
+  // 3. Open dropdown inside modal to pick another teacher
+  const changeBtnInModal = screen.getByRole('button', { name: 'Đổi giáo viên' });
+  await userEvent.click(changeBtnInModal);
+
+  // 4. Select teacher "Phạm Thị Mai" (id: 10)
+  const newTeacherOption = await screen.findByText('Phạm Thị Mai');
+  await userEvent.click(newTeacherOption);
+
+  // 5. Click Confirm Change
+  const confirmBtn = screen.getByRole('button', { name: 'Xác nhận đổi' });
+  await userEvent.click(confirmBtn);
+
+  // 6. Verify classService.update called with teacherId: 10
+  await waitFor(() => {
+    expect(classService.update).toHaveBeenCalledWith(1, { teacherId: 10 });
+  });
+
+  // 7. Verify modal closes and KPI card updates
+  await waitFor(() => {
+    expect(screen.queryByRole('heading', { name: 'Thay đổi giáo viên phụ trách' })).not.toBeInTheDocument();
+  });
+  expect(screen.getByText('Phạm Thị Mai')).toBeVisible();
+});
+
+it('updates teacher along with class settings in tab Settings (UC008 / Issue #344)', async () => {
+  renderClass();
+  await screen.findByRole('heading', { name: classDetail.name });
+
+  // 1. Switch to Settings tab
+  const settingsTabBtn = screen.getByRole('button', { name: /Cài đặt/i });
+  await userEvent.click(settingsTabBtn);
+
+  // 2. In Settings form, click change teacher
+  const changeBtnInSettings = screen.getByRole('button', { name: 'Đổi giáo viên' });
+  await userEvent.click(changeBtnInSettings);
+
+  // 3. Select teacher "Phạm Thị Mai" (id: 10)
+  const newTeacherOption = await screen.findByText('Phạm Thị Mai');
+  await userEvent.click(newTeacherOption);
+
+  // 4. Click Save Changes button
+  const saveBtn = screen.getByRole('button', { name: 'Lưu thay đổi lớp học' });
+  await userEvent.click(saveBtn);
+
+  // 5. Verify classService.update called with updated teacherId
+  await waitFor(() => {
+    expect(classService.update).toHaveBeenCalledWith(1, expect.objectContaining({
+      teacherId: 10,
+      name: classDetail.name,
+      level: classDetail.level,
+    }));
+  });
+});
+

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Users, Award, BookOpen, Plus, UserPlus,
   Loader2, AlertCircle, Trash2, ArrowRightLeft,
-  RotateCcw, ShieldAlert, ChevronRight, CheckCircle2
+  RotateCcw, ShieldAlert, ChevronRight, CheckCircle2, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
@@ -11,10 +11,12 @@ import { assignmentService } from '../api/services/assignment.service';
 import { Button, EmptyState, Pagination, StatusBadge, Skeleton, ConfirmModal, useToast } from '../components/common';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
 import { TransferStudentModal } from '../components/classes/TransferStudentModal';
+import { TeacherPicker } from '../components/classes/TeacherPicker';
 import { parseApiError } from '../api/core/errors';
 import type { ApiClientError } from '../api/core/errors';
 import type { ClassDetail, ClassMember } from '../api/services/class.service';
 import type { AssignmentSummary } from '../api/services/assignment.service';
+import type { UserListItem } from '../api/services/user.service';
 
 export const ClassDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -46,11 +48,19 @@ export const ClassDetails: React.FC = () => {
     name: '',
     level: '',
     description: '',
-    maxCapacity: 25
+    maxCapacity: 25,
+    teacherId: ''
   });
+  const [selectedSettingsTeacher, setSelectedSettingsTeacher] = useState<UserListItem | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // Quick change teacher modal state (UC008 / Issue #344)
+  const [showChangeTeacherModal, setShowChangeTeacherModal] = useState(false);
+  const [quickTeacher, setQuickTeacher] = useState<UserListItem | null>(null);
+  const [quickTeacherId, setQuickTeacherId] = useState<string>('');
+  const [savingQuickTeacher, setSavingQuickTeacher] = useState(false);
 
   const isValidId = typeof id === 'string' && /^\d+$/.test(id) && Number.isSafeInteger(Number(id)) && Number(id) > 0;
   const classNumericId = isValidId ? Number(id) : null;
@@ -79,12 +89,26 @@ export const ClassDetails: React.FC = () => {
           setClassDetail(det);
           const parsedCapacity = det.description ? det.description.match(/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*(\d+)/i) : null;
           const dynamicCapacity = parsedCapacity ? parseInt(parsedCapacity[1], 10) : 25;
+          const initialTeacherId = det.teacher?.id ? String(det.teacher.id) : (det.teacherId ? String(det.teacherId) : '');
           setSettingsForm({
             name: det.name || '',
             level: det.level || '',
             description: det.description || '',
-            maxCapacity: dynamicCapacity
+            maxCapacity: dynamicCapacity,
+            teacherId: initialTeacherId
           });
+          setQuickTeacherId(initialTeacherId);
+          if (det.teacher) {
+            const initialTeacherItem: UserListItem = {
+              id: det.teacher.id,
+              fullName: det.teacher.fullName,
+              email: '',
+              role: 'TEACHER',
+              status: 'ACTIVE'
+            };
+            setQuickTeacher(initialTeacherItem);
+            setSelectedSettingsTeacher(initialTeacherItem);
+          }
         } else {
           setError(isVi ? 'Không thể tải thông tin chi tiết lớp học.' : 'Failed to load class details.');
         }
@@ -148,23 +172,69 @@ export const ClassDetails: React.FC = () => {
         updatedDesc = `Sĩ số: ${settingsForm.maxCapacity}${updatedDesc ? ` • ${updatedDesc}` : ''}`;
       }
 
+      const targetTeacherId = settingsForm.teacherId ? Number(settingsForm.teacherId) : undefined;
       await classService.update(classNumericId, {
         name: settingsForm.name,
         level: settingsForm.level,
-        description: updatedDesc
+        description: updatedDesc,
+        teacherId: targetTeacherId
       });
 
       setSettingsForm(prev => ({ ...prev, description: updatedDesc }));
       if (classDetail) {
-        setClassDetail({ ...classDetail, name: settingsForm.name, level: settingsForm.level, description: updatedDesc });
+        const updatedTeacher = targetTeacherId && selectedSettingsTeacher
+          ? { id: selectedSettingsTeacher.id, fullName: selectedSettingsTeacher.fullName }
+          : (targetTeacherId ? classDetail.teacher : undefined);
+        setClassDetail({
+          ...classDetail,
+          name: settingsForm.name,
+          level: settingsForm.level,
+          description: updatedDesc,
+          teacherId: targetTeacherId,
+          teacher: updatedTeacher
+        });
       }
 
       setSettingsSaved(true);
+      toastSuccess(isVi ? 'Cập nhật cài đặt lớp học thành công!' : 'Class settings updated successfully!');
       setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err: unknown) {
       setSettingsError(err instanceof Error ? err.message : isVi ? 'Không thể lưu cài đặt lớp học.' : 'Failed to update class.');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleExecuteQuickChangeTeacher = async () => {
+    if (classNumericId === null || !quickTeacherId) return;
+    try {
+      setSavingQuickTeacher(true);
+      const targetId = Number(quickTeacherId);
+      await classService.update(classNumericId, {
+        teacherId: targetId
+      });
+
+      const updatedTeacher = quickTeacher
+        ? { id: quickTeacher.id, fullName: quickTeacher.fullName }
+        : classDetail?.teacher;
+
+      if (classDetail) {
+        setClassDetail({
+          ...classDetail,
+          teacherId: targetId,
+          teacher: updatedTeacher
+        });
+      }
+      setSettingsForm(prev => ({ ...prev, teacherId: String(targetId) }));
+      if (quickTeacher) {
+        setSelectedSettingsTeacher(quickTeacher);
+      }
+      toastSuccess(isVi ? 'Đã thay đổi giáo viên phụ trách thành công.' : 'Instructor updated successfully.');
+      setShowChangeTeacherModal(false);
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi giáo viên phụ trách.' : 'Failed to change instructor.');
+    } finally {
+      setSavingQuickTeacher(false);
     }
   };
 
@@ -266,8 +336,23 @@ export const ClassDetails: React.FC = () => {
                     {teacherName}
                   </div>
                 </div>
-                <div className="adm-kpi-icon adm-kpi-icon-primary">
-                  <Users size={20} />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curId = classDetail?.teacher?.id ? String(classDetail.teacher.id) : (classDetail?.teacherId ? String(classDetail.teacherId) : '');
+                      setQuickTeacherId(curId);
+                      setShowChangeTeacherModal(true);
+                    }}
+                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-outline-variant hover:bg-surface text-primary transition-colors flex items-center gap-1.5"
+                    title={isVi ? 'Đổi giáo viên phụ trách' : 'Change instructor'}
+                  >
+                    <ArrowRightLeft size={13} />
+                    <span>{isVi ? 'Đổi GV' : 'Change'}</span>
+                  </button>
+                  <div className="adm-kpi-icon adm-kpi-icon-primary">
+                    <Users size={20} />
+                  </div>
                 </div>
               </div>
               <div className="adm-kpi-footer text-on-surface-variant">
@@ -632,6 +717,20 @@ export const ClassDetails: React.FC = () => {
                   />
                 </div>
                 <div className="adm-form-group">
+                  <label className="adm-form-label">{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</label>
+                  <TeacherPicker
+                    selectedTeacherId={settingsForm.teacherId}
+                    isVi={isVi}
+                    onSelectTeacher={(tc) => {
+                      setSettingsForm(prev => ({
+                        ...prev,
+                        teacherId: tc ? String(tc.id) : ''
+                      }));
+                      setSelectedSettingsTeacher(tc);
+                    }}
+                  />
+                </div>
+                <div className="adm-form-group">
                   <label className="adm-form-label">{isVi ? 'Sĩ số tối đa (Học viên)' : 'Maximum Capacity (Students)'}</label>
                   <input 
                     type="number" 
@@ -722,6 +821,59 @@ export const ClassDetails: React.FC = () => {
             }
           }}
         />
+      )}
+
+      {/* Modal đổi giáo viên phụ trách (UC008 / Issue #344) */}
+      {showChangeTeacherModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg text-on-surface">
+                {isVi ? 'Thay đổi giáo viên phụ trách' : 'Change Instructor'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowChangeTeacherModal(false)}
+                className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-hover hover:text-on-surface transition-colors"
+                aria-label={isVi ? 'Đóng' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-on-surface-variant mb-4">
+              {isVi
+                ? `Chọn giảng viên mới để phụ trách lớp "${classDetail?.name || classCode}".`
+                : `Select a new instructor to manage class "${classDetail?.name || classCode}".`}
+            </p>
+            <div className="mb-6">
+              <TeacherPicker
+                selectedTeacherId={quickTeacherId}
+                isVi={isVi}
+                onSelectTeacher={(tc) => {
+                  setQuickTeacher(tc);
+                  setQuickTeacherId(tc ? String(tc.id) : '');
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowChangeTeacherModal(false)}
+                disabled={savingQuickTeacher}
+              >
+                {isVi ? 'Hủy bỏ' : 'Cancel'}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleExecuteQuickChangeTeacher}
+                loading={savingQuickTeacher}
+                disabled={!quickTeacherId || (Boolean(classDetail?.teacher?.id) && String(quickTeacherId) === String(classDetail?.teacher?.id))}
+              >
+                {isVi ? 'Xác nhận đổi' : 'Confirm Change'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
