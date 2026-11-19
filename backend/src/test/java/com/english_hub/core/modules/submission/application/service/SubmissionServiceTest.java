@@ -1029,7 +1029,7 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void submitModuleRejectsAnAlreadySubmittedModule() {
+	void submitModuleAllowsReSubmittingWhenParentSubmissionIsInProgress() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule closed = module(9L);
 		closed.setId(100L);
@@ -1038,11 +1038,19 @@ class SubmissionServiceTest {
 		Submission own = submission(5L, 41L, 1);
 		own.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(own));
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.READING, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findByModuleId(9L))
+				.thenReturn(List.of(new ModuleQuestion(21L, 9L, QuestionType.MULTIPLE_CHOICE, new BigDecimal("5.00"), 1)));
+		when(answerRepository.bulkCreate(eq(100L), anyList()))
+				.thenReturn(List.of(new Answer(100L, 21L, "{\"selected_option_id\":1}")));
 
-		assertThatThrownBy(() -> submissionService.submitModule(100L, List.of(
-						multipleChoice(21L, 1))))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Phần làm bài này đã được nộp.");
+		SubmitModuleResult result = submissionService.submitModule(100L, List.of(multipleChoice(21L, 1)));
+		assertThat(result.status()).isEqualTo(SubmissionStatus.SUBMITTED);
+		verify(answerRepository).bulkCreate(eq(100L), anyList());
+		verify(submissionModuleRepository).save(closed);
 	}
 
 	@Test
@@ -2513,13 +2521,16 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void getAudioUploadUrl_rejectsSubmittedModule() {
+	void getAudioUploadUrl_allowsSubmittedModuleWhenParentSubmissionIsInProgress() {
 		SubmissionModule module = ownedInProgressModule(150L, 88L, 9L);
 		module.setStatus(SubmissionStatus.SUBMITTED);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-150/audio.webm", "audio/webm"))
+				.thenReturn(presigned("https://bucket/audio.webm", "submissions/88/module-150/audio.webm"));
 
-		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm"))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Không thể upload ghi âm cho phần làm bài này.");
+		UploadUrlResult result = submissionService.getAudioUploadUrl(150L, "audio/webm");
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/audio.webm");
 	}
 
 	@Test
@@ -2618,13 +2629,16 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void getDocumentUploadUrl_rejectsSubmittedModule() {
+	void getDocumentUploadUrl_allowsSubmittedModuleWhenParentSubmissionIsInProgress() {
 		SubmissionModule module = ownedInProgressModule(151L, 88L, 10L);
 		module.setStatus(SubmissionStatus.SUBMITTED);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf"))
+				.thenReturn(presigned("https://bucket/essay.pdf", "submissions/88/module-151/essay.pdf"));
 
-		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf"))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Không thể upload tài liệu cho phần làm bài này.");
+		UploadUrlResult result = submissionService.getDocumentUploadUrl(151L, "application/pdf");
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
 	}
 
 	private SubmissionModule finalSubmitModule(long submissionModuleId, long moduleId) {

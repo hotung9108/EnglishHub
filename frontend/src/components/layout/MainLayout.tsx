@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
 
 const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+  const isExamRoute = /^\/student\/assignments\/(reading|listening|writing|speaking)\//.test(location.pathname);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -47,7 +49,7 @@ const MainLayout = () => {
         </header>
 
         <main
-          className="page-content"
+          className={`page-content ${isExamRoute ? 'page-content-exam' : ''}`}
           onClick={() => {
             if (sidebarOpen && window.innerWidth <= 768) {
               closeSidebar();

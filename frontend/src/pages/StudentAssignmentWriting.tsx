@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  ChevronRight, FileText, 
+  ArrowLeft, ChevronRight, FileText, 
   UploadCloud, Send, Save, CheckCircle, 
   Bold, Italic, Underline, List, ListOrdered, 
   AlignLeft, AlignCenter, Undo, Redo, Info,
-  AlertCircle, RefreshCw, Loader2, X, FileCheck
+  AlertCircle, RefreshCw, Loader2, X
 } from 'lucide-react';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
@@ -28,6 +28,7 @@ import {
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
+import '../styles/student-exam.css';
 import '../styles/student-writing.css';
 
 const StudentAssignmentWriting: React.FC = () => {
@@ -35,6 +36,7 @@ const StudentAssignmentWriting: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,7 +53,7 @@ const StudentAssignmentWriting: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editorText, setEditorText] = useState(() => {
-    return localStorage.getItem(`eh_draft_writing_${id}`) || '';
+    return localStorage.getItem(`eh_draft_writing_${id}`) || localStorage.getItem(`eh_last_writing_${id}`) || '';
   });
 
   const numericId = useMemo(() => {
@@ -162,7 +164,8 @@ const StudentAssignmentWriting: React.FC = () => {
               'WRITING',
               numericId,
               currentAssignment?.modules,
-              moduleId
+              moduleId,
+              isReviewMode
             );
             if (redirectRoute) {
               navigate(redirectRoute, { replace: true });
@@ -197,7 +200,8 @@ const StudentAssignmentWriting: React.FC = () => {
                 'WRITING',
                 numericId,
                 currentAssignment?.modules,
-                moduleId
+                moduleId,
+                isReviewMode
               );
               if (redirectRoute) {
                 navigate(redirectRoute, { replace: true });
@@ -233,7 +237,8 @@ const StudentAssignmentWriting: React.FC = () => {
                   'WRITING',
                   numericId,
                   currentAssignment?.modules,
-                  moduleId
+                  moduleId,
+                  isReviewMode
                 );
                 if (redirectRoute) {
                   navigate(redirectRoute, { replace: true });
@@ -419,7 +424,7 @@ const StudentAssignmentWriting: React.FC = () => {
       return;
     }
 
-    if (writingSubMod && (writingSubMod.status === 'SUBMITTED' || writingSubMod.status === 'GRADED')) {
+    if (writingSubMod && (writingSubMod.status === 'SUBMITTED' || writingSubMod.status === 'GRADED') && !isReviewMode) {
       navigate(`/student/submissions/${subId}`, { replace: true });
       return;
     }
@@ -474,22 +479,17 @@ const StudentAssignmentWriting: React.FC = () => {
       const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
-      if (subId && allOthersDone) {
-        await submissionService.submitSubmission(subId);
+      // Save submitted text so student can review or edit if returning
+      if (trimmedText) {
+        localStorage.setItem(`eh_last_writing_${id}`, trimmedText);
       }
-
       // Clear draft
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
-      if (allOthersDone) {
-        notifyAssignmentSubmitted();
-        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+      if (isReviewMode || allOthersDone) {
+        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...');
         setTimeout(() => {
-          if (subId) {
-            navigate(`/student/submissions/${subId}`, { replace: true });
-          } else {
-            navigate(`/student/assignments/${id}/result`, { replace: true });
-          }
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
       } else {
         const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
@@ -548,29 +548,40 @@ const StudentAssignmentWriting: React.FC = () => {
   const maxScore = moduleDetail?.maxScore ?? writingSubMod?.grading?.maxScoreSnapshot ?? 10;
 
   return (
-    <div className="writing-container">
-      {/* Breadcrumbs */}
-      <div className="writing-breadcrumbs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Button
+    <div className="exam-page">
+      {/* Unified Exam Header */}
+      <div className="exam-header">
+        <div className="exam-header-left">
+          <Button 
             variant="secondary"
             size="sm"
-            icon={FileCheck}
+            icon={ArrowLeft}
             onClick={() => navigate(`/student/assignments/${id}/overview`)}
-            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
           >
-            Xem lại trước khi nộp
+            Tổng quan bài thi
           </Button>
-          <span className="writing-crumb-link" onClick={() => navigate('/student/dashboard')}>Trang chủ</span>
-          <ChevronRight size={16} />
-          <span className="writing-crumb-link" onClick={() => navigate('/student/assignments')}>Danh sách bài tập</span>
-          <ChevronRight size={16} />
-          <span className="writing-crumb-active">
-            {assignment?.title || `Writing #${id}`}
-          </span>
+          
+          <div className="exam-breadcrumbs">
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/dashboard')}>
+              Trang chủ
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/assignments')}>
+              Danh sách bài tập
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-title">
+              {assignment?.title || `Writing #${id}`}
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-skill-badge exam-skill-badge-writing">
+              Kỹ năng Viết
+            </span>
+          </div>
         </div>
+
         {effectiveModules.length > 1 && (
-          <div className="writing-stepper-wrapper">
+          <div className="exam-header-right">
             <ExamStepper
               variant="compact"
               modules={effectiveModules}
@@ -580,7 +591,9 @@ const StudentAssignmentWriting: React.FC = () => {
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
                 if (step.isAccessible && step.status !== 'ACTIVE') {
-                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                  const baseRoute = getSkillRoute(skill, numericId, submission?.id, step.module.id);
+                  const targetUrl = step.isCompleted ? `${baseRoute}&mode=review` : baseRoute;
+                  navigate(targetUrl);
                 }
               }}
             />
@@ -588,32 +601,33 @@ const StudentAssignmentWriting: React.FC = () => {
         )}
       </div>
 
-      {error && (
-        <div className="analytics-error-banner">
-          <div className="flex items-center gap-10">
-            <AlertCircle size={20} />
-            <span className="text-sm">{error}</span>
+      <div className="exam-workspace-full">
+        {error && (
+          <div className="analytics-error-banner">
+            <div className="flex items-center gap-10">
+              <AlertCircle size={20} />
+              <span className="text-sm">{error}</span>
+            </div>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleRetry}
+              icon={<RefreshCw size={13} />}
+            >
+              Thử lại
+            </Button>
           </div>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleRetry}
-            icon={<RefreshCw size={13} />}
-          >
-            Thử lại
-          </Button>
-        </div>
-      )}
+        )}
 
-      {successMessage && (
-        <div className="p-16 mb-20 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-10 text-emerald-800">
-          <CheckCircle size={20} />
-          <span className="text-sm font-semibold">{successMessage}</span>
-        </div>
-      )}
+        {successMessage && (
+          <div className="p-16 mb-20 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-10 text-emerald-800">
+            <CheckCircle size={20} />
+            <span className="text-sm font-semibold">{successMessage}</span>
+          </div>
+        )}
 
-      {/* Main Layout - 2 Columns */}
-      <div className="writing-grid">
+        {/* Main Layout - 2 Columns */}
+        <div className="writing-grid">
         {/* Left Column */}
         <div className="writing-main-col">
           {/* Instructions */}
@@ -678,14 +692,10 @@ const StudentAssignmentWriting: React.FC = () => {
 
             {/* Footer Editor */}
             <div className="writing-editor-footer">
-              <div className="flex items-center gap-6 text-xs text-slate-500">
-                <Info size={14} className="text-blue-500" />
-                <span>Nội dung soạn thảo sẽ được bảo lưu khi bấm &quot;Lưu bản nháp&quot;.</span>
-              </div>
               <button 
                 type="button"
                 onClick={handleClearEditor}
-                className="bg-transparent border-none cursor-pointer text-xs font-semibold text-slate-600 underline"
+                className="bg-transparent border-none cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 underline ml-auto"
               >
                 Xóa bài viết &amp; Làm lại từ đầu
               </button>
@@ -776,11 +786,8 @@ const StudentAssignmentWriting: React.FC = () => {
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >
-                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit Writing)'}
+                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài'}
               </Button>
-              <p className="text-[11px] text-muted text-center -mt-1 mb-1">
-                Lưu ý: Nộp bài cho riêng phần thi Viết này (không nộp toàn bộ bài tập).
-              </p>
 
               <Button 
                 variant="secondary"
@@ -788,7 +795,7 @@ const StudentAssignmentWriting: React.FC = () => {
                 className="w-full"
                 icon={<Save size={18} />}
               >
-                Lưu bản nháp (Save Draft)
+                Lưu bản nháp
               </Button>
             </div>
           </div>
@@ -814,6 +821,7 @@ const StudentAssignmentWriting: React.FC = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, 
+  ChevronRight,
   Play, 
   Pause, 
   RotateCcw, 
@@ -13,7 +14,7 @@ import {
   UploadCloud,
   FileAudio,
   Trash2,
-  FileCheck
+  Headphones
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { parseApiError } from '../api';
@@ -31,13 +32,22 @@ import {
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
 import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
+import { normalizeStorageUrl } from '../utils/storage.utils';
+import '../styles/student-exam.css';
 import '../styles/student-speaking.css';
+
+export interface PreviousAudioState {
+  downloadUrl: string;
+  fileName?: string;
+  mimeType?: string;
+}
 
 const StudentAssignmentSpeaking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,6 +76,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
+
+  // Previous Audio Submission State (Review Mode or Re-editing)
+  const [previousAudio, setPreviousAudio] = useState<PreviousAudioState | null>(null);
+  const [isLoadingPrevAudio, setIsLoadingPrevAudio] = useState(false);
+  const [isPrevPlaying, setIsPrevPlaying] = useState(false);
+  const [prevPlaybackSeconds, setPrevPlaybackSeconds] = useState(0);
+  const [prevDuration, setPrevDuration] = useState(0);
+  const prevAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // Audio Input Mode (Mic vs Upload - UC017 / FE-91)
   const [audioInputMode, setAudioInputMode] = useState<'mic' | 'upload'>('mic');
@@ -176,6 +194,54 @@ const StudentAssignmentSpeaking: React.FC = () => {
         }
 
         // 3. Resolve or start submission attempt
+        const resolvePreviousAudio = async (sub: SubmissionDetail) => {
+          const urlModId = searchParams.get('moduleId');
+          const matchedSubMod = urlModId && Number.isFinite(Number(urlModId))
+            ? sub?.modules?.find((m) => m.moduleId === Number(urlModId))
+            : null;
+          const speakingSubMod = matchedSubMod || sub?.modules?.find((m) => m.skill?.toUpperCase() === 'SPEAKING') || sub?.modules?.[0];
+
+          if (speakingSubMod?.id && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED' || isReviewMode)) {
+            try {
+              setIsLoadingPrevAudio(true);
+              let downloadUrl = '';
+              let rawFileName = 'speaking_submitted.mp3';
+              let mimeType = 'audio/webm';
+
+              try {
+                const dlRes = await submissionService.getAudioDownloadUrl(speakingSubMod.id);
+                if (dlRes?.downloadUrl) {
+                  downloadUrl = normalizeStorageUrl(dlRes.downloadUrl);
+                  rawFileName = dlRes.fileName || dlRes.storageKey?.split('/').pop() || 'speaking_submitted.mp3';
+                  mimeType = dlRes.mimeType || 'audio/webm';
+                }
+              } catch {
+                const detail = await submissionService.getSubmissionModuleDetail(speakingSubMod.id);
+                const audioAns = detail.answers?.find((a) => a.audioStorageKey || a.audioDownloadUrl);
+                if (audioAns?.audioDownloadUrl) {
+                  downloadUrl = normalizeStorageUrl(audioAns.audioDownloadUrl);
+                  rawFileName = audioAns.audioStorageKey?.split('/').pop() || 'speaking_submitted.mp3';
+                  mimeType = audioAns.audioMimeType || 'audio/webm';
+                }
+              }
+
+              if (downloadUrl && isMounted) {
+                setPreviousAudio({
+                  downloadUrl,
+                  fileName: rawFileName,
+                  mimeType
+                });
+              }
+            } catch (err) {
+              console.warn('Could not load previous speaking submission details:', err);
+            } finally {
+              if (isMounted) {
+                setIsLoadingPrevAudio(false);
+              }
+            }
+          }
+        };
+
         if (urlSubmissionId && Number.isFinite(Number(urlSubmissionId))) {
           if (initialSubRes.status === 'fulfilled' && 'id' in initialSubRes.value) {
             const sub = initialSubRes.value as SubmissionDetail;
@@ -184,13 +250,15 @@ const StudentAssignmentSpeaking: React.FC = () => {
               'SPEAKING',
               numericId,
               currentAssignment?.modules,
-              moduleId
+              moduleId,
+              isReviewMode
             );
             if (redirectRoute) {
               navigate(redirectRoute, { replace: true });
               return;
             }
             setSubmission(sub);
+            void resolvePreviousAudio(sub);
           } else if (initialSubRes.status === 'rejected') {
             const apiErr = parseApiError(initialSubRes.reason);
             setError(apiErr.message || 'Không thể tải thông tin bài nộp.');
@@ -218,13 +286,15 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 'SPEAKING',
                 numericId,
                 currentAssignment?.modules,
-                moduleId
+                moduleId,
+                isReviewMode
               );
               if (redirectRoute) {
                 navigate(redirectRoute, { replace: true });
                 return;
               }
               setSubmission(sub);
+              void resolvePreviousAudio(sub);
             } else {
               const completedItem = subs.find(
                 (s) => isSubmissionGraded(s) || s.status === 'SUBMITTED'
@@ -245,13 +315,15 @@ const StudentAssignmentSpeaking: React.FC = () => {
                   'SPEAKING',
                   numericId,
                   currentAssignment?.modules,
-                  moduleId
+                  moduleId,
+                  isReviewMode
                 );
                 if (redirectRoute) {
                   navigate(redirectRoute, { replace: true });
                   return;
                 }
                 setSubmission(sub);
+                void resolvePreviousAudio(sub);
               } else if (currentAssignment?.status) {
                 if (isMounted) {
                   const statusLabel = currentAssignment.status === 'DRAFT' ? 'Nháp (DRAFT - Chưa công bố)' : currentAssignment.status;
@@ -298,6 +370,10 @@ const StudentAssignmentSpeaking: React.FC = () => {
       audioPlayerRef.current.pause();
       setIsPlaying(false);
     } else {
+      if (isPrevPlaying && prevAudioPlayerRef.current) {
+        prevAudioPlayerRef.current.pause();
+        setIsPrevPlaying(false);
+      }
       audioPlayerRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch((playErr) => {
@@ -320,6 +396,10 @@ const StudentAssignmentSpeaking: React.FC = () => {
         audioPlayerRef.current.pause();
         setIsPlaying(false);
       }
+      if (isPrevPlaying && prevAudioPlayerRef.current) {
+        prevAudioPlayerRef.current.pause();
+        setIsPrevPlaying(false);
+      }
       try {
         await startRecording();
       } catch (recErr: unknown) {
@@ -329,6 +409,68 @@ const StudentAssignmentSpeaking: React.FC = () => {
     } else {
       stopRecording();
     }
+  };
+
+  // Previous Audio Playback Handlers
+  const togglePrevPlay = () => {
+    if (!prevAudioPlayerRef.current || !previousAudio?.downloadUrl) return;
+
+    if (isPrevPlaying) {
+      prevAudioPlayerRef.current.pause();
+      setIsPrevPlaying(false);
+    } else {
+      if (isPlaying && audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        setIsPlaying(false);
+      }
+      prevAudioPlayerRef.current.play().then(() => {
+        setIsPrevPlaying(true);
+      }).catch((playErr) => {
+        console.warn('Playback error for previous audio:', playErr);
+        setIsPrevPlaying(false);
+      });
+    }
+  };
+
+  const handlePrevSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const seekTime = Number(e.target.value);
+    if (prevAudioPlayerRef.current && Number.isFinite(seekTime)) {
+      prevAudioPlayerRef.current.currentTime = seekTime;
+      setPrevPlaybackSeconds(seekTime);
+    }
+  };
+
+  const handleResetPrevPlay = () => {
+    if (prevAudioPlayerRef.current) {
+      prevAudioPlayerRef.current.pause();
+      prevAudioPlayerRef.current.currentTime = 0;
+    }
+    setIsPrevPlaying(false);
+    setPrevPlaybackSeconds(0);
+  };
+
+  const handlePrevTimeUpdate = () => {
+    if (prevAudioPlayerRef.current) {
+      setPrevPlaybackSeconds(Math.floor(prevAudioPlayerRef.current.currentTime));
+    }
+  };
+
+  const handlePrevLoadedMetadata = () => {
+    if (prevAudioPlayerRef.current && Number.isFinite(prevAudioPlayerRef.current.duration)) {
+      setPrevDuration(Math.floor(prevAudioPlayerRef.current.duration));
+    }
+  };
+
+  const handlePrevEnded = () => {
+    setIsPrevPlaying(false);
+    setPrevPlaybackSeconds(0);
+  };
+
+  const handleKeepPreviousAudio = () => {
+    if (prevAudioPlayerRef.current) {
+      prevAudioPlayerRef.current.pause();
+    }
+    navigate(`/student/assignments/${id}/overview`, { replace: true });
   };
 
   // Reset recording to re-record
@@ -392,7 +534,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
         throw new Error('Không tìm thấy thông tin phần làm bài nói trong bài nộp.');
       }
 
-      if (speakingSubMod && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED')) {
+      if (speakingSubMod && (speakingSubMod.status === 'SUBMITTED' || speakingSubMod.status === 'GRADED') && !isReviewMode) {
         navigate(`/student/submissions/${subId}`, { replace: true });
         return;
       }
@@ -421,23 +563,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
       const otherModules = submission?.modules?.filter((m) => m.id !== subModuleId) || [];
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
-      if (subId && allOthersDone) {
-        try {
-          await submissionService.submitSubmission(subId);
-        } catch {
-          // Fallback continue
-        }
-      }
-
-      if (allOthersDone) {
-        notifyAssignmentSubmitted();
-        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình kết quả...');
+      if (isReviewMode || allOthersDone) {
+        setSuccessMessage(
+          isReviewMode
+            ? 'Cập nhật phần thi Speaking thành công! Đang chuyển đến màn hình xem lại bài làm...'
+            : 'Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...'
+        );
         setTimeout(() => {
-          if (subId) {
-            navigate(`/student/submissions/${subId}`, { replace: true });
-          } else {
-            navigate(`/student/assignments/${id}/result`, { replace: true });
-          }
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
       } else {
         const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
@@ -476,7 +609,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const activeError = permissionError || error;
 
   return (
-    <div className="speaking-container">
+    <div className="exam-page">
       {/* Hidden audio element for previewing the recorded sound */}
       <audio
         ref={audioPlayerRef}
@@ -494,33 +627,39 @@ const StudentAssignmentSpeaking: React.FC = () => {
         }}
       />
 
-      {/* Breadcrumbs & Navigation */}
-      <div className="speaking-breadcrumbs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Button
+      {/* Unified Exam Header */}
+      <div className="exam-header">
+        <div className="exam-header-left">
+          <Button 
             variant="secondary"
             size="sm"
-            icon={FileCheck}
+            icon={ArrowLeft}
             onClick={() => navigate(`/student/assignments/${id}/overview`)}
-            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
           >
-            Xem lại trước khi nộp
+            Tổng quan bài thi
           </Button>
-          <button 
-            className="speaking-back-btn" 
-            onClick={() => navigate('/student/assignments')}
-            type="button"
-          >
-            <ArrowLeft size={14} />
-            <span>Quay lại danh sách bài tập</span>
-          </button>
-          <span className="speaking-breadcrumb-sep">/</span>
-          <span className="speaking-breadcrumb-current">
-            {assignment?.title || `Speaking Practice #${id}`}
-          </span>
+          
+          <div className="exam-breadcrumbs">
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/dashboard')}>
+              Trang chủ
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/assignments')}>
+              Danh sách bài tập
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-title">
+              {assignment?.title || `Speaking #${id}`}
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-skill-badge exam-skill-badge-speaking">
+              Kỹ năng Nói
+            </span>
+          </div>
         </div>
+
         {effectiveModules.length > 1 && (
-          <div className="speaking-stepper-wrapper">
+          <div className="exam-header-right">
             <ExamStepper
               variant="compact"
               modules={effectiveModules}
@@ -530,13 +669,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
                 if (step.isAccessible && step.status !== 'ACTIVE') {
-                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                  const baseRoute = getSkillRoute(skill, numericId, submission?.id, step.module.id);
+                  const targetUrl = step.isCompleted ? `${baseRoute}&mode=review` : baseRoute;
+                  navigate(targetUrl);
                 }
               }}
             />
           </div>
         )}
       </div>
+
+      <div className="exam-workspace-full">
 
       {activeError && (
         <div className="speaking-error-banner">
@@ -590,6 +733,85 @@ const StudentAssignmentSpeaking: React.FC = () => {
             </div>
           </section>
 
+          {/* Card: Previous Audio Submission (Review Mode or Re-editing) */}
+          {isLoadingPrevAudio ? (
+            <div className="speaking-card p-4 flex items-center justify-center gap-2 text-sm text-muted">
+              <Loader2 size={18} className="animate-spin text-primary" />
+              <span>Đang tải bài nói đã nộp trước đó...</span>
+            </div>
+          ) : previousAudio ? (
+            <section className="speaking-card speaking-prev-card" aria-label="Bài nói đã nộp trước đó">
+              <div className="speaking-card-header flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Headphones size={18} className="text-primary" />
+                  <h2 className="speaking-card-title m-0">Bài nói đã nộp trước đó</h2>
+                </div>
+                <span className="speaking-prev-badge">
+                  Bản ghi hiện tại
+                </span>
+              </div>
+
+              <div className="speaking-card-body">
+                <div className="speaking-prev-player">
+                  <audio
+                    ref={prevAudioPlayerRef}
+                    src={previousAudio.downloadUrl}
+                    preload="metadata"
+                    onTimeUpdate={handlePrevTimeUpdate}
+                    onLoadedMetadata={handlePrevLoadedMetadata}
+                    onEnded={handlePrevEnded}
+                  />
+
+                  <div className="speaking-prev-controls">
+                    <button
+                      type="button"
+                      className="speaking-prev-reset-btn"
+                      onClick={handleResetPrevPlay}
+                      title="Nghe lại từ đầu"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`speaking-prev-play-btn ${isPrevPlaying ? 'is-playing' : ''}`}
+                      onClick={togglePrevPlay}
+                      title={isPrevPlaying ? 'Tạm dừng' : 'Nghe bài nói đã nộp'}
+                    >
+                      {isPrevPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    </button>
+
+                    <div className="speaking-prev-timeline">
+                      <input
+                        type="range"
+                        min={0}
+                        max={prevDuration || 100}
+                        value={prevPlaybackSeconds}
+                        onChange={handlePrevSeek}
+                        className="speaking-prev-seek"
+                        aria-label="Thanh trượt thời lượng bài nói cũ"
+                      />
+                      <div className="speaking-prev-time-label">
+                        <span>{formatTime(prevPlaybackSeconds)}</span>
+                        <span>/</span>
+                        <span>{formatTime(prevDuration)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="speaking-prev-meta">
+                    <FileAudio size={15} className="text-muted shrink-0" />
+                    <span className="truncate max-w-[260px]" title={previousAudio.fileName}>
+                      {previousAudio.fileName}
+                    </span>
+                    <span className="speaking-prev-dot">•</span>
+                    <span>{previousAudio.mimeType || 'audio/mpeg'}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           {/* Card 2: Voice Studio / Recorder & File Upload (UC017 / FE-91) */}
           <section className="speaking-card">
             <div className="speaking-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -597,12 +819,10 @@ const StudentAssignmentSpeaking: React.FC = () => {
                 <h2 className="speaking-card-title m-0">
                   {audioInputMode === 'mic' ? 'Ghi âm trực tiếp' : 'Tải tệp âm thanh'}
                 </h2>
-                <div className="inline-flex rounded-lg border border-border p-0.5 bg-surface-variant/30 text-xs">
+                <div className="speaking-mode-toggle">
                   <button
                     type="button"
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-                      audioInputMode === 'mic' ? 'bg-primary text-white shadow-xs' : 'text-muted hover:text-foreground'
-                    }`}
+                    className={`speaking-mode-btn ${audioInputMode === 'mic' ? 'is-active' : ''}`}
                     onClick={() => {
                       if (isPlaying && audioPlayerRef.current) {
                         audioPlayerRef.current.pause();
@@ -611,14 +831,12 @@ const StudentAssignmentSpeaking: React.FC = () => {
                       setAudioInputMode('mic');
                     }}
                   >
-                    <Mic size={13} />
+                    <Mic size={14} />
                     <span>Microphone</span>
                   </button>
                   <button
                     type="button"
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all flex items-center gap-1.5 ${
-                      audioInputMode === 'upload' ? 'bg-primary text-white shadow-xs' : 'text-muted hover:text-foreground'
-                    }`}
+                    className={`speaking-mode-btn ${audioInputMode === 'upload' ? 'is-active' : ''}`}
                     onClick={() => {
                       if (isRecording) {
                         stopRecording();
@@ -630,8 +848,8 @@ const StudentAssignmentSpeaking: React.FC = () => {
                       setAudioInputMode('upload');
                     }}
                   >
-                    <UploadCloud size={13} />
-                    <span>Tải tệp (.mp3/.wav)</span>
+                    <UploadCloud size={14} />
+                    <span>Tải tệp âm thanh</span>
                   </button>
                 </div>
               </div>
@@ -805,88 +1023,79 @@ const StudentAssignmentSpeaking: React.FC = () => {
                       ? (audioInputMode === 'mic'
                           ? `speaking_attempt_${numericId}.${backendMimeType === 'audio/wav' ? 'wav' : 'webm'}`
                           : uploadedAudioFile?.name)
-                      : 'chua_co_ban_ghi.webm'}
+                      : previousAudio
+                        ? (previousAudio.fileName || 'speaking_submitted.mp3')
+                        : 'chua_co_ban_ghi.webm'}
                   </div>
                   <div className="submission-file-meta">
                     {recordedAudioReady
                       ? (audioInputMode === 'mic' && audioBlob
-                          ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB (Mic)`
+                          ? `${formatTime(recordingDuration)} • ${(audioBlob.size / 1024).toFixed(1)} KB (Mic mới)`
                           : uploadedAudioFile
-                            ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB (Tệp tải lên)`
+                            ? `${(uploadedAudioFile.size / (1024 * 1024)).toFixed(2)} MB (Tệp mới)`
                             : '')
-                      : 'Chưa có bản ghi âm hoặc tệp'}
+                      : previousAudio
+                        ? 'Bản ghi trước đó (Đã lưu)'
+                        : 'Chưa có bản ghi âm hoặc tệp'}
                   </div>
                 </div>
-                <span className={`submission-file-status ${recordedAudioReady ? 'ready' : 'pending'}`}>
-                  {recordedAudioReady ? 'Sẵn sàng nộp' : 'Chưa có bài'}
+                <span className={`submission-file-status ${recordedAudioReady ? 'ready' : (previousAudio ? 'saved' : 'pending')}`}>
+                  {recordedAudioReady ? 'Bản ghi mới' : (previousAudio ? 'Đã có bài' : 'Chưa có bài')}
                 </span>
               </div>
 
               {/* Submit CTA */}
-              <button 
-                className="btn-submit-speaking"
-                onClick={handleSubmitAssignment}
-                disabled={isSubmitting || !recordedAudioReady || !submission}
-                type="button"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Đang tải lên &amp; gửi bài...</span>
-                  </>
-                ) : (
-                  <span>Nộp bài Nói (Submit Speaking)</span>
-                )}
-              </button>
-              <p className="text-[11px] text-muted text-center mt-1">
-                Lưu ý: Nộp bản ghi âm cho riêng phần thi Nói này (không nộp toàn bộ bài tập).
-              </p>
-            </div>
-          </section>
-
-          {/* Card 2: Grading Scale */}
-          <section className="speaking-card">
-            <div className="speaking-card-header">
-              <h2 className="speaking-card-title">
-                Tiêu chí chấm điểm
-              </h2>
-            </div>
-
-            <div className="speaking-card-body">
-              <div className="grading-row">
-                <span className="grading-label">Tổng điểm</span>
-                <span className="grading-val-total">100</span>
-              </div>
-
-              {/* Criteria breakdown */}
-              <div className="grading-row">
-                <span className="grading-label">Phát âm</span>
-                <span className="grading-val-weight">25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">Độ trôi chảy &amp; Mạch lạc</span>
-                <span className="grading-val-weight">25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">Từ vựng</span>
-                <span className="grading-val-weight">25%</span>
-              </div>
-              <div className="grading-row">
-                <span className="grading-label">Ngữ pháp</span>
-                <span className="grading-val-weight">25%</span>
-              </div>
-
-              {/* Current Score Display */}
-              <div className="grading-current-grade">
-                <div className="speaking-eval-title">
-                  Điểm số
+              {recordedAudioReady ? (
+                <button 
+                  className="btn-submit-speaking"
+                  onClick={handleSubmitAssignment}
+                  disabled={isSubmitting || !submission}
+                  type="button"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang nộp bài...</span>
+                    </>
+                  ) : (
+                    <span>{isReviewMode ? 'Cập nhật bài nói' : 'Nộp bài'}</span>
+                  )}
+                </button>
+              ) : previousAudio ? (
+                <div className="flex flex-col gap-2 w-full mt-2">
+                  <button 
+                    className="btn-submit-speaking"
+                    onClick={handleKeepPreviousAudio}
+                    type="button"
+                  >
+                    <span>Giữ nguyên & Quay lại</span>
+                  </button>
+                  <p className="text-xs text-center text-muted m-0">
+                    Bản ghi trước đó sẽ được giữ nguyên cho bài nộp tổng.
+                  </p>
                 </div>
-                <div className="grading-score-display">-- / 100</div>
-              </div>
+              ) : (
+                <button 
+                  className="btn-submit-speaking"
+                  onClick={handleSubmitAssignment}
+                  disabled={isSubmitting || !recordedAudioReady || !submission}
+                  type="button"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang nộp bài...</span>
+                    </>
+                  ) : (
+                    <span>Nộp bài</span>
+                  )}
+                </button>
+              )}
             </div>
           </section>
         </div>
       </div>
+    </div>
 
       {/* Modal xác nhận nộp Speaking rỗng khi không có bản ghi âm */}
       {showEmptyConfirmModal && (

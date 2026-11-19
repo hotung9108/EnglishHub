@@ -28,6 +28,10 @@ public class AnswerJpaAdapter implements AnswerRepository {
 	@Override
 	@Transactional
 	public List<Answer> bulkCreate(Long submissionModuleId, List<Answer> answers) {
+		if (submissionModuleId != null) {
+			jpaRepository.deleteBySubmissionModuleId(submissionModuleId);
+			jpaRepository.flush();
+		}
 		List<com.english_hub.core.infrastructure.persistence.entity.Answer> entities =
 				answers.stream().map(mapper::toEntity).toList();
 		return jpaRepository.saveAllAndFlush(entities).stream().map(mapper::toDomain).toList();

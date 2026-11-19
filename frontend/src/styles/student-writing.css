@@ -1,9 +1,10 @@
 ﻿/* EnglishHub Student Portal: Writing Interactive Workspace Styles */
 
 .writing-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 24px 48px 24px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* Breadcrumbs */
@@ -39,11 +40,12 @@
   grid-template-columns: 1fr;
   gap: 28px;
   align-items: start;
+  width: 100%;
 }
 
 @media (min-width: 1024px) {
   .writing-grid {
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: minmax(0, 1fr) 380px;
   }
 }
 
