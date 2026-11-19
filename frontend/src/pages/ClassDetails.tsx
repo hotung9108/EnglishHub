@@ -36,6 +36,8 @@ export const ClassDetails: React.FC = () => {
   const [memberToRemove, setMemberToRemove] = useState<{ id: number; name: string } | null>(null);
   const [studentToTransfer, setStudentToTransfer] = useState<{ studentId: number; fullName: string; studentCode?: string; currentMemberId: number } | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [statusModalAction, setStatusModalAction] = useState<'close' | 'reopen' | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Pagination for students roster
   const [rosterPage, setRosterPage] = useState<number>(1);
@@ -188,6 +190,30 @@ export const ClassDetails: React.FC = () => {
     }
   };
 
+  const handleUpdateStatus = async () => {
+    if (classNumericId === null || !statusModalAction) return;
+    setIsUpdatingStatus(true);
+    const targetStatus = statusModalAction === 'close' ? 'COMPLETED' : 'ACTIVE';
+    try {
+      await classService.update(classNumericId, { status: targetStatus });
+      setClassDetail(prev => prev ? { ...prev, status: targetStatus } : null);
+      toastSuccess(
+        statusModalAction === 'close'
+          ? (isVi ? 'Đóng lớp học thành công.' : 'Class closed successfully.')
+          : (isVi ? 'Mở lại lớp học thành công.' : 'Class reopened successfully.')
+      );
+      setStatusModalAction(null);
+    } catch (err: unknown) {
+      toastError(
+        err instanceof Error
+          ? err.message
+          : (isVi ? 'Không thể cập nhật trạng thái lớp.' : 'Failed to update class status.')
+      );
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const teacherName = classDetail?.teacher?.fullName || (isVi ? 'Chưa phân công' : 'Unassigned');
   const classCode = `ENG-${classNumericId}`;
   const maxCapacity = settingsForm.maxCapacity || 25;
@@ -234,6 +260,24 @@ export const ClassDetails: React.FC = () => {
           <h1 className="adm-title">
             {classDetail?.name || (isVi ? 'Chi tiết lớp học' : 'Class Details')}
           </h1>
+        </div>
+        <div className="adm-actions flex items-center gap-3">
+          {classDetail?.status === 'ACTIVE' && (
+            <Button
+              variant="secondary"
+              onClick={() => setStatusModalAction('close')}
+            >
+              {isVi ? 'Đóng lớp' : 'Close Class'}
+            </Button>
+          )}
+          {(classDetail?.status === 'COMPLETED' || classDetail?.status === 'INACTIVE') && (
+            <Button
+              variant="primary"
+              onClick={() => setStatusModalAction('reopen')}
+            >
+              {isVi ? 'Mở lại lớp' : 'Reopen Class'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -594,72 +638,107 @@ export const ClassDetails: React.FC = () => {
 
           {/* Tab 3: Settings */}
           {activeTab === 'settings' && (
-            <div className="card adm-settings-section-card max-w-2xl">
-              <h3 className="headline-md mb-4">{t('classDetails.tabSettings')}</h3>
-              
-              {settingsSaved && (
-                <div className="adm-alert-success mb-4">
-                  <CheckCircle2 size={16} />
-                  <span>{isVi ? 'Cập nhật cài đặt lớp học thành công!' : 'Class settings updated successfully!'}</span>
-                </div>
-              )}
+            <div className="flex flex-col gap-6 max-w-2xl">
+              <div className="card adm-settings-section-card">
+                <h3 className="headline-md mb-4">{t('classDetails.tabSettings')}</h3>
+                
+                {settingsSaved && (
+                  <div className="adm-alert-success mb-4">
+                    <CheckCircle2 size={16} />
+                    <span>{isVi ? 'Cập nhật cài đặt lớp học thành công!' : 'Class settings updated successfully!'}</span>
+                  </div>
+                )}
 
-              {settingsError && (
-                <div className="adm-alert-error mb-4">
-                  <AlertCircle size={16} />
-                  <span>{settingsError}</span>
-                </div>
-              )}
+                {settingsError && (
+                  <div className="adm-alert-error mb-4">
+                    <AlertCircle size={16} />
+                    <span>{settingsError}</span>
+                  </div>
+                )}
 
-              <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Tên lớp học' : 'Class Title'}</label>
-                  <input 
-                    type="text" 
-                    className="input" 
-                    value={settingsForm.name} 
-                    onChange={(e) => setSettingsForm({ ...settingsForm, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Trình độ / Level' : 'Level'}</label>
-                  <input 
-                    type="text" 
-                    className="input" 
-                    value={settingsForm.level} 
-                    onChange={(e) => setSettingsForm({ ...settingsForm, level: e.target.value })}
-                  />
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Sĩ số tối đa (Học viên)' : 'Maximum Capacity (Students)'}</label>
-                  <input 
-                    type="number" 
-                    min={1}
-                    max={150}
-                    className="input" 
-                    value={settingsForm.maxCapacity} 
-                    onChange={(e) => setSettingsForm({ ...settingsForm, maxCapacity: Math.max(1, parseInt(e.target.value) || 25) })}
-                  />
-                </div>
-                <div className="adm-form-group">
-                  <label className="adm-form-label">{isVi ? 'Mô tả / Lịch học' : 'Description / Schedule'}</label>
-                  <input 
-                    type="text" 
-                    className="input" 
-                    value={settingsForm.description} 
-                    onChange={(e) => setSettingsForm({ ...settingsForm, description: e.target.value })}
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  variant="primary" 
-                  loading={savingSettings}
-                  className="self-start mt-2"
-                >
-                  {isVi ? 'Lưu thay đổi lớp học' : 'Save Changes'}
-                </Button>
-              </form>
+                <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Tên lớp học' : 'Class Title'}</label>
+                    <input 
+                      type="text" 
+                      className="input" 
+                      value={settingsForm.name} 
+                      onChange={(e) => setSettingsForm({ ...settingsForm, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Trình độ / Level' : 'Level'}</label>
+                    <input 
+                      type="text" 
+                      className="input" 
+                      value={settingsForm.level} 
+                      onChange={(e) => setSettingsForm({ ...settingsForm, level: e.target.value })}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Sĩ số tối đa (Học viên)' : 'Maximum Capacity (Students)'}</label>
+                    <input 
+                      type="number" 
+                      min={1}
+                      max={150}
+                      className="input" 
+                      value={settingsForm.maxCapacity} 
+                      onChange={(e) => setSettingsForm({ ...settingsForm, maxCapacity: Math.max(1, parseInt(e.target.value) || 25) })}
+                    />
+                  </div>
+                  <div className="adm-form-group">
+                    <label className="adm-form-label">{isVi ? 'Mô tả / Lịch học' : 'Description / Schedule'}</label>
+                    <input 
+                      type="text" 
+                      className="input" 
+                      value={settingsForm.description} 
+                      onChange={(e) => setSettingsForm({ ...settingsForm, description: e.target.value })}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    loading={savingSettings}
+                    className="self-start mt-2"
+                  >
+                    {isVi ? 'Lưu thay đổi lớp học' : 'Save Changes'}
+                  </Button>
+                </form>
+              </div>
+
+              {/* Status / Lifecycle card in Settings tab */}
+              <div className="card adm-lifecycle-card">
+                <h4 className="font-semibold text-base mb-2">
+                  {isVi ? 'Trạng thái hoạt động của lớp học' : 'Class Lifecycle & Status'}
+                </h4>
+                <p className="text-sm text-on-surface-variant mb-4">
+                  {classDetail?.status === 'ACTIVE'
+                    ? (isVi 
+                        ? 'Lớp học hiện đang hoạt động. Khi kết thúc khóa học, bạn có thể đóng lớp.' 
+                        : 'This class is currently active. When the course concludes, you can close the class.')
+                    : (isVi 
+                        ? 'Lớp học hiện đang kết thúc. Bạn có thể mở lại lớp khi cần tiếp tục giảng dạy.' 
+                        : 'This class is currently completed. You can reopen it if classes resume.')}
+                </p>
+                {classDetail?.status === 'ACTIVE' ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setStatusModalAction('close')}
+                  >
+                    {isVi ? 'Đóng lớp' : 'Close Class'}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => setStatusModalAction('reopen')}
+                  >
+                    {isVi ? 'Mở lại lớp' : 'Reopen Class'}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </>
@@ -723,6 +802,31 @@ export const ClassDetails: React.FC = () => {
           }}
         />
       )}
+
+      {/* Modal xác nhận Đóng / Mở lại lớp học (UC008 / Issue #367) */}
+      <ConfirmModal
+        isOpen={statusModalAction !== null}
+        title={
+          statusModalAction === 'close'
+            ? (isVi ? 'Đóng lớp học' : 'Close Class')
+            : (isVi ? 'Mở lại lớp học' : 'Reopen Class')
+        }
+        message={
+          statusModalAction === 'close'
+            ? (isVi
+                ? `Bạn có chắc chắn muốn đóng lớp học "${classDetail?.name || ''}" không? Học viên sẽ không thể nộp bài tập mới.`
+                : `Are you sure you want to close class "${classDetail?.name || ''}"? Students will not be able to submit new assignments.`)
+            : (isVi
+                ? `Bạn có chắc chắn muốn mở lại lớp học "${classDetail?.name || ''}" không?`
+                : `Are you sure you want to reopen class "${classDetail?.name || ''}"?`)
+        }
+        confirmText={isVi ? 'Xác nhận' : 'Confirm'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant={statusModalAction === 'close' ? 'warning' : 'primary'}
+        isLoading={isUpdatingStatus}
+        onConfirm={handleUpdateStatus}
+        onCancel={() => setStatusModalAction(null)}
+      />
     </div>
   );
 };

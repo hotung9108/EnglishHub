@@ -212,3 +212,57 @@ it('does not log errors or warnings when an initial request settles after unmoun
   expect(errorSpy).not.toHaveBeenCalled();
   expect(warningSpy).not.toHaveBeenCalled();
 });
+
+it('allows closing an active class through confirmation modal and updates status to COMPLETED', async () => {
+  vi.mocked(classService.update).mockResolvedValue({ message: 'Cập nhật lớp học thành công.' });
+  renderClass();
+
+  const closeBtn = await screen.findByRole('button', { name: /^Đóng lớp$/ });
+  expect(closeBtn).toBeVisible();
+
+  await userEvent.click(closeBtn);
+  const modal = await screen.findByRole('dialog');
+  expect(within(modal).getByText(/Bạn có chắc chắn muốn đóng lớp học/)).toBeVisible();
+
+  const confirmBtn = within(modal).getByRole('button', { name: /^Xác nhận$/ });
+  await userEvent.click(confirmBtn);
+
+  expect(classService.update).toHaveBeenCalledWith(1, { status: 'COMPLETED' });
+  expect(await screen.findByRole('button', { name: /^Mở lại lớp$/ })).toBeVisible();
+});
+
+it('cancels closing an active class without calling update API', async () => {
+  renderClass();
+
+  const closeBtn = await screen.findByRole('button', { name: /^Đóng lớp$/ });
+  await userEvent.click(closeBtn);
+
+  const modal = await screen.findByRole('dialog');
+  const cancelBtn = within(modal).getByRole('button', { name: /^Hủy bỏ$/ });
+  await userEvent.click(cancelBtn);
+
+  expect(classService.update).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('allows reopening a completed class through confirmation modal and updates status to ACTIVE', async () => {
+  vi.mocked(classService.getDetail).mockResolvedValue({
+    ...classDetail,
+    status: 'COMPLETED',
+  });
+  vi.mocked(classService.update).mockResolvedValue({ message: 'Cập nhật lớp học thành công.' });
+  renderClass();
+
+  const reopenBtn = await screen.findByRole('button', { name: /^Mở lại lớp$/ });
+  expect(reopenBtn).toBeVisible();
+
+  await userEvent.click(reopenBtn);
+  const modal = await screen.findByRole('dialog');
+  expect(within(modal).getByText(/Bạn có chắc chắn muốn mở lại lớp học/)).toBeVisible();
+
+  const confirmBtn = within(modal).getByRole('button', { name: /^Xác nhận$/ });
+  await userEvent.click(confirmBtn);
+
+  expect(classService.update).toHaveBeenCalledWith(1, { status: 'ACTIVE' });
+  expect(await screen.findByRole('button', { name: /^Đóng lớp$/ })).toBeVisible();
+});
