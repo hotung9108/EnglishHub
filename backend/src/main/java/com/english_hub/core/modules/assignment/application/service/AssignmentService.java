@@ -10,16 +10,20 @@ import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
+import com.english_hub.core.modules.assignment.domain.repository.AssignmentAttemptCountRepository;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
 import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,19 +41,40 @@ public class AssignmentService {
 			"Lớp học chưa được gán giáo viên phụ trách, không thể tạo bài tập.";
 	private static final String CLOSED_ASSIGNMENT_MESSAGE = "Không thể sửa bài tập đã đóng.";
 	private static final String INVALID_STATUS_TRANSITION_MESSAGE = "Không thể chuyển sang trạng thái này.";
+	private static final String CLOSE_AT_ONLY_FOR_REOPEN_MESSAGE = "Chỉ được cập nhật hạn nộp khi mở lại bài tập.";
+	private static final String REOPEN_CLOSE_AT_BEFORE_OPEN_MESSAGE = "Hạn nộp phải sau thời điểm mở bài.";
+	private static final String REOPEN_CLOSE_AT_NOT_FUTURE_MESSAGE = "Hạn nộp khi mở lại phải sau thời điểm hiện tại.";
+	private static final String MAX_SUBMISSIONS_BELOW_ATTEMPTS_MESSAGE =
+			"Số lần nộp tối đa không được nhỏ hơn số lượt đã làm cao nhất của học viên (%d lượt).";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final int TITLE_MAX_LENGTH = 200;
 
 	private final AssignmentRepository assignmentRepository;
 	private final ClassRepository classRepository;
 	private final CurrentUserProvider currentUserProvider;
+	private final AssignmentAttemptCountRepository attemptCountRepository;
+	private final Clock clock;
 
+	@Autowired
 	public AssignmentService(
 			AssignmentRepository assignmentRepository,
 			ClassRepository classRepository,
-			CurrentUserProvider currentUserProvider) {
+			CurrentUserProvider currentUserProvider,
+			AssignmentAttemptCountRepository attemptCountRepository) {
+		this(assignmentRepository, classRepository, currentUserProvider, attemptCountRepository, Clock.systemUTC());
+	}
+
+	AssignmentService(
+			AssignmentRepository assignmentRepository,
+			ClassRepository classRepository,
+			CurrentUserProvider currentUserProvider,
+			AssignmentAttemptCountRepository attemptCountRepository,
+			Clock clock) {
 		this.assignmentRepository = assignmentRepository;
 		this.classRepository = classRepository;
 		this.currentUserProvider = currentUserProvider;
+		this.attemptCountRepository = attemptCountRepository;
+		this.clock = clock;
 	}
 
 	@Transactional(readOnly = true)
@@ -123,7 +148,7 @@ public class AssignmentService {
 			long assignmentId,
 			UpdateAssignmentCommand command) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		if (assignment.status() == AssignmentStatus.CLOSED) {
 			throw ApiException.badRequest(CLOSED_ASSIGNMENT_MESSAGE);
@@ -143,16 +168,28 @@ public class AssignmentService {
 				: command.maxSubmissions();
 		validateTitle(title, false);
 		validateTimeAndSubmissions(openAt, closeAt, maxSubmissions);
+		validateAttemptLimit(assignment, command.maxSubmissions());
 
 		assignment.updateDetails(title, description, openAt, closeAt, maxSubmissions);
 		Assignment savedAssignment = assignmentRepository.save(assignment);
 		return new AssignmentUpdateResult(savedAssignment.maxSubmissions());
 	}
 
+	private void validateAttemptLimit(Assignment assignment, Integer requestedCap) {
+		Integer currentCap = assignment.maxSubmissions();
+		if (requestedCap == null || (currentCap != null && requestedCap >= currentCap)) {
+			return;
+		}
+		long highestAttemptCount = attemptCountRepository.findHighestAttemptCount(assignment.id());
+		if (requestedCap < highestAttemptCount) {
+			throw ApiException.badRequest(MAX_SUBMISSIONS_BELOW_ATTEMPTS_MESSAGE.formatted(highestAttemptCount));
+		}
+	}
+
 	@Transactional
 	public void deleteAssignment(long assignmentId) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		assignment.softDelete();
 		assignmentRepository.save(assignment);
@@ -161,15 +198,35 @@ public class AssignmentService {
 	@Transactional
 	public AssignmentStatus updateStatus(long assignmentId, UpdateAssignmentStatusCommand command) {
 		User caller = requireTeacher();
-		Assignment assignment = findAssignmentOrThrow(assignmentId);
+		Assignment assignment = findAssignmentForUpdateOrThrow(assignmentId);
 		requireTeacherOwnsClass(assignment.classId(), caller);
 		AssignmentStatus nextStatus = parseStatus(command == null ? null : command.status());
+		boolean reopening = assignment.status() == AssignmentStatus.CLOSED && nextStatus == AssignmentStatus.PUBLISHED;
+		OffsetDateTime requestedCloseAt = command.closeAt();
+		if (!reopening && requestedCloseAt != null) {
+			throw ApiException.badRequest(CLOSE_AT_ONLY_FOR_REOPEN_MESSAGE);
+		}
 		if (!assignment.canTransitionTo(nextStatus)) {
 			throw ApiException.badRequest(INVALID_STATUS_TRANSITION_MESSAGE);
 		}
-		assignment.changeStatus(nextStatus);
+		if (reopening) {
+			validateReopenDeadline(assignment, requestedCloseAt);
+			assignment.reopen(requestedCloseAt);
+		} else {
+			assignment.changeStatus(nextStatus);
+		}
 		assignmentRepository.save(assignment);
 		return nextStatus;
+	}
+
+	private void validateReopenDeadline(Assignment assignment, OffsetDateTime requestedCloseAt) {
+		OffsetDateTime effectiveCloseAt = requestedCloseAt == null ? assignment.closeAt() : requestedCloseAt;
+		if (!effectiveCloseAt.isAfter(assignment.openAt())) {
+			throw ApiException.badRequest(REOPEN_CLOSE_AT_BEFORE_OPEN_MESSAGE);
+		}
+		if (!effectiveCloseAt.isAfter(OffsetDateTime.now(clock))) {
+			throw ApiException.badRequest(REOPEN_CLOSE_AT_NOT_FUTURE_MESSAGE);
+		}
 	}
 
 	private User requireTeacher() {
@@ -213,6 +270,15 @@ public class AssignmentService {
 	private Assignment findAssignmentOrThrow(long assignmentId) {
 		return assignmentRepository.findById(assignmentId)
 				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+	}
+
+	private Assignment findAssignmentForUpdateOrThrow(long assignmentId) {
+		try {
+			return assignmentRepository.findByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private AssignmentStatus parseStatusFilter(String statusValue) {

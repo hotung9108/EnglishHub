@@ -1,4 +1,6 @@
 package com.english_hub.core.modules.assignment.application.command;
 
-public record UpdateAssignmentStatusCommand(String status) {
+import java.time.OffsetDateTime;
+
+public record UpdateAssignmentStatusCommand(String status, OffsetDateTime closeAt) {
 }

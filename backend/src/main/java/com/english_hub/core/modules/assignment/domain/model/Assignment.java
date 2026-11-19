@@ -83,14 +83,25 @@ public class Assignment extends BaseEntity<Long> {
 
 	public boolean canTransitionTo(AssignmentStatus nextStatus) {
 		return (status == AssignmentStatus.DRAFT && nextStatus == AssignmentStatus.PUBLISHED)
-				|| (status == AssignmentStatus.PUBLISHED && nextStatus == AssignmentStatus.CLOSED);
+				|| (status == AssignmentStatus.PUBLISHED && nextStatus == AssignmentStatus.CLOSED)
+				|| (status == AssignmentStatus.CLOSED && nextStatus == AssignmentStatus.PUBLISHED);
 	}
 
 	public void changeStatus(AssignmentStatus nextStatus) {
-		if (!canTransitionTo(nextStatus)) {
+		if (status == AssignmentStatus.CLOSED || !canTransitionTo(nextStatus)) {
 			throw new IllegalStateException("Invalid assignment status transition");
 		}
 		status = nextStatus;
+	}
+
+	public void reopen(OffsetDateTime newCloseAt) {
+		if (status != AssignmentStatus.CLOSED) {
+			throw new IllegalStateException("Invalid assignment status transition");
+		}
+		if (newCloseAt != null) {
+			closeAt = newCloseAt;
+		}
+		status = AssignmentStatus.PUBLISHED;
 	}
 
 	public void softDelete() {
