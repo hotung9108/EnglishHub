@@ -114,10 +114,17 @@ export const StudentAnalytics: React.FC = () => {
   return (
     <div className="std-eco-container pb-48">
       {/* Header */}
-      <div className="std-eco-header">
-        <h1 className="std-eco-title">
-          {isVi ? 'Phân tích tiến độ học tập' : 'Progress Analytics'}
-        </h1>
+      <div className="std-eco-header mb-6">
+        <div>
+          <h1 className="std-eco-title">
+            {isVi ? 'Phân tích học tập' : 'Learning Analytics'}
+          </h1>
+          <p className="std-eco-subtitle mt-1">
+            {isVi
+              ? 'Tổng hợp tiến độ và năng lực 4 kỹ năng dựa trên kết quả của tất cả các lớp đã tham gia'
+              : 'Overall progress and 4-skill proficiency across all enrolled classes'}
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -200,7 +207,14 @@ export const StudentAnalytics: React.FC = () => {
         </h2>
         {timeline.length === 0 ? (
           <div className="p-8 text-center text-muted bg-surface rounded-lg border-subtle">
-            {isVi ? 'Chưa có bài tập nào được chấm điểm.' : 'No graded assignments recorded yet.'}
+            <p className="font-semibold text-base mb-1 text-surface">
+              {isVi ? 'Chưa đủ dữ liệu phân tích' : 'Not enough data for analytics'}
+            </p>
+            <p className="text-sm text-muted">
+              {isVi
+                ? 'Chưa có bài tập nào được chấm điểm. Hãy hoàn thành các bài tập được giao để hệ thống bắt đầu phân tích năng lực và tiến độ học tập của bạn.'
+                : 'No graded assignments recorded yet. Complete your assigned exercises to start tracking your skill proficiency and learning progress.'}
+            </p>
           </div>
         ) : (
           <div className="grades-table-responsive">
