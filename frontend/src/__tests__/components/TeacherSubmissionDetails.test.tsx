@@ -688,7 +688,36 @@ it('refreshes speaking grading after the AI request completes', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
   await act(() => vi.advanceTimersByTimeAsync(3500));
-  expect(gradingService.getAiSuggestion).toHaveBeenCalledTimes(2);
+  expect(gradingService.getAiSuggestion).toHaveBeenCalledTimes(3);
+  expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('polls multiple times until AI grading status transitions to AI_GRADED', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  let pollCount = 0;
+  vi.mocked(gradingService.getAiSuggestion).mockImplementation(async () => {
+    pollCount += 1;
+    if (pollCount === 1) {
+      // First poll: still analyzing
+      return { ...ai, status: 'PENDING', aiFeedback: null, suggestedScore: null };
+    }
+    // Second poll: completed
+    return { ...ai, status: 'AI_GRADED', aiFeedback: 'Excellent speaking test!', suggestedScore: 9.0 };
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  // First poll at 2500ms
+  await act(() => vi.advanceTimersByTimeAsync(2500));
+  expect(screen.queryByText('AI đã hoàn thành chấm điểm!')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Đang chấm điểm...' })).toBeDisabled();
+
+  // Second poll at 5000ms
+  await act(() => vi.advanceTimersByTimeAsync(2500));
   expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
 });

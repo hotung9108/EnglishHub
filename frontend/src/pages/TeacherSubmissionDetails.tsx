@@ -796,25 +796,109 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentAction(context)) return;
       showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
-      aiPollTimerRef.current = setTimeout(async () => {
-        aiPollTimerRef.current = null;
-        if (!isCurrentAction(context)) return;
-        const loading = loadModuleData(targetModuleId);
-        const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
-        try {
-          await loading;
-          if (!isCurrentAction(pollContext)) return;
-          showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
-        } catch (pollErr) {
-          if (!isCurrentAction(pollContext)) return;
-          console.error('Error refreshing grading after AI:', pollErr);
-        } finally {
-          if (isCurrentAction(pollContext)) {
-            aiRequestRef.current = null;
-            setIsAnalyzingAi(false);
+      const initialStatus = aiSuggestion?.status;
+      const POLL_INTERVAL_MS = 2500;
+      const MAX_ATTEMPTS = 24;
+
+      const pollAiSuggestion = (attempt: number) => {
+        aiPollTimerRef.current = setTimeout(async () => {
+          aiPollTimerRef.current = null;
+          if (!isCurrentAction(context)) return;
+
+          try {
+            const suggestion = await gradingService.getAiSuggestion(targetModuleId);
+            if (!isCurrentAction(context)) return;
+
+            const isCompleted =
+              suggestion.status === 'AI_GRADED' ||
+              (suggestion.status !== 'PENDING' && suggestion.status !== 'FAILED') ||
+              (Boolean(suggestion.aiFeedback) && suggestion.status !== initialStatus);
+            const isFailed = suggestion.status === 'FAILED';
+
+            if (isCompleted) {
+              const loading = loadModuleData(targetModuleId);
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              try {
+                await loading;
+                if (!isCurrentAction(pollContext)) return;
+                showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+              } catch (pollErr) {
+                if (!isCurrentAction(pollContext)) return;
+                console.error('Error refreshing grading after AI:', pollErr);
+              } finally {
+                if (isCurrentAction(pollContext)) {
+                  aiRequestRef.current = null;
+                  setIsAnalyzingAi(false);
+                }
+              }
+              return;
+            }
+
+            if (isFailed) {
+              const loading = loadModuleData(targetModuleId);
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              try {
+                await loading;
+                if (!isCurrentAction(pollContext)) return;
+                showToast(
+                  suggestion.fallbackMessage ||
+                    (isVi ? 'AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.' : 'AI grading failed. You can grade manually.')
+                );
+              } catch (pollErr) {
+                if (!isCurrentAction(pollContext)) return;
+                console.error('Error refreshing grading after AI failure:', pollErr);
+              } finally {
+                if (isCurrentAction(pollContext)) {
+                  aiRequestRef.current = null;
+                  setIsAnalyzingAi(false);
+                }
+              }
+              return;
+            }
+
+            // Still in progress / PENDING
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              // Max attempts reached (timed out)
+              const loading = loadModuleData(targetModuleId);
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              try {
+                await loading;
+                if (!isCurrentAction(pollContext)) return;
+                showToast(
+                  isVi
+                    ? 'Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.'
+                    : 'AI analysis is taking longer than expected. Please check back shortly.'
+                );
+              } catch (pollErr) {
+                if (!isCurrentAction(pollContext)) return;
+                console.error('Error refreshing grading after AI timeout:', pollErr);
+              } finally {
+                if (isCurrentAction(pollContext)) {
+                  aiRequestRef.current = null;
+                  setIsAnalyzingAi(false);
+                }
+              }
+            }
+          } catch (pollErr) {
+            if (!isCurrentAction(context)) return;
+            console.error('Error polling AI suggestion:', pollErr);
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              if (isCurrentAction(pollContext)) {
+                aiRequestRef.current = null;
+                setIsAnalyzingAi(false);
+                showToast(isVi ? 'Lỗi khi kiểm tra kết quả AI. Vui lòng thử lại.' : 'Failed to retrieve AI grading result. Please try again.');
+              }
+            }
           }
-        }
-      }, 3500);
+        }, POLL_INTERVAL_MS);
+      };
+
+      pollAiSuggestion(1);
     } catch (err) {
       if (!isCurrentAction(context)) return;
       aiRequestRef.current = null;
