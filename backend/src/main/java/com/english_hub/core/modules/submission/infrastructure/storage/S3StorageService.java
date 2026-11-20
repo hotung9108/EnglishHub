@@ -61,12 +61,21 @@ public class S3StorageService implements StorageService, AutoCloseable {
 
 	@Override
 	public PresignedUpload generatePresignedPutUrl(String storageKey, String contentType) {
+		return generatePresignedPutUrl(storageKey, contentType, null);
+	}
+
+	@Override
+	public PresignedUpload generatePresignedPutUrl(String storageKey, String contentType, Long expectedContentLength) {
 		PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(PutObjectPresignRequest.builder()
 				.signatureDuration(PRESIGN_TTL)
-				.putObjectRequest(putObject -> putObject
-						.bucket(bucket)
-						.key(storageKey)
-						.contentType(contentType))
+				.putObjectRequest(putObject -> {
+					putObject.bucket(bucket)
+							.key(storageKey)
+							.contentType(contentType);
+					if (expectedContentLength != null && expectedContentLength > 0) {
+						putObject.contentLength(expectedContentLength);
+					}
+				})
 				.build());
 		return new PresignedUpload(
 				presigned.url().toString(),
@@ -126,6 +135,20 @@ public class S3StorageService implements StorageService, AutoCloseable {
 		} catch (S3Exception exception) {
 			if (exception.statusCode() == 404) {
 				return false;
+			}
+			throw exception;
+		}
+	}
+
+	@Override
+	public Long getObjectSize(String storageKey) {
+		try {
+			return s3Client.headObject(HeadObjectRequest.builder().bucket(bucket).key(storageKey).build()).contentLength();
+		} catch (NoSuchKeyException exception) {
+			return null;
+		} catch (S3Exception exception) {
+			if (exception.statusCode() == 404) {
+				return null;
 			}
 			throw exception;
 		}

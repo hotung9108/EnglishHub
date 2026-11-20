@@ -1331,6 +1331,25 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void submitModule_rejectsAndDeletesFileExceeding10MB() {
+		when(assignmentWindowRepository.findWindowById(5L))
+				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
+		ownedInProgressModule(102L, 88L, 11L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(11L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.objectExists("submissions/88/module-102/essay.pdf")).thenReturn(true);
+		when(storageService.getObjectSize("submissions/88/module-102/essay.pdf"))
+				.thenReturn(10L * 1024 * 1024 + 1L);
+
+		assertThatThrownBy(() -> submissionService.submitModule(102L, null))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dung lượng file vượt quá giới hạn tối đa cho phép (10MB).");
+
+		verify(storageService).deleteObject("submissions/88/module-102/essay.pdf");
+		verify(answerRepository, never()).bulkCreate(any(), any());
+	}
+
+	@Test
 	void submitModule_probesDocxWhenPdfIsMissing() {
 		when(assignmentWindowRepository.findWindowById(5L))
 				.thenReturn(Optional.of(window(5L, open(), close(), 2)));
@@ -2465,6 +2484,46 @@ class SubmissionServiceTest {
 	}
 
 	@Test
+	void getAudioUploadUrl_passesValidFileSizeToStorage() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-150/audio.webm", "audio/webm", 1024L))
+				.thenReturn(presigned("https://bucket/audio.webm", "submissions/88/module-150/audio.webm"));
+
+		UploadUrlResult result = submissionService.getAudioUploadUrl(150L, "audio/webm", 1024L);
+
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/audio.webm");
+		verify(storageService).generatePresignedPutUrl("submissions/88/module-150/audio.webm", "audio/webm", 1024L);
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsNegativeOrZeroFileSize() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm", 0L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dung lượng file phải lớn hơn 0 byte.");
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm", -10L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dung lượng file phải lớn hơn 0 byte.");
+	}
+
+	@Test
+	void getAudioUploadUrl_rejectsFileSizeExceeding10MB() {
+		ownedInProgressModule(150L, 88L, 9L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.SPEAKING, ModuleTaskType.RECORDING)));
+
+		assertThatThrownBy(() -> submissionService.getAudioUploadUrl(150L, "audio/webm", 10L * 1024 * 1024 + 1L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dung lượng file vượt quá giới hạn tối đa cho phép (10MB).");
+	}
+
+	@Test
 	void getAudioUploadUrl_mapsMpegAndWavExtensions() {
 		ownedInProgressModule(150L, 88L, 9L);
 		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
@@ -2585,6 +2644,31 @@ class SubmissionServiceTest {
 		assertThat(result.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
 		assertThat(result.storageKey()).isEqualTo("submissions/88/module-151/essay.pdf");
 		verify(storageService).generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf");
+	}
+
+	@Test
+	void getDocumentUploadUrl_passesValidFileSizeToStorage() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+		when(storageService.generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf", 2048L))
+				.thenReturn(presigned("https://bucket/essay.pdf", "submissions/88/module-151/essay.pdf"));
+
+		UploadUrlResult result = submissionService.getDocumentUploadUrl(151L, "application/pdf", 2048L);
+
+		assertThat(result.uploadUrl()).isEqualTo("https://bucket/essay.pdf");
+		verify(storageService).generatePresignedPutUrl("submissions/88/module-151/essay.pdf", "application/pdf", 2048L);
+	}
+
+	@Test
+	void getDocumentUploadUrl_rejectsFileSizeExceeding10MB() {
+		ownedInProgressModule(151L, 88L, 10L);
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(10L, ModuleSkill.WRITING, ModuleTaskType.ESSAY)));
+
+		assertThatThrownBy(() -> submissionService.getDocumentUploadUrl(151L, "application/pdf", 10L * 1024 * 1024 + 1L))
+				.isInstanceOf(ApiException.class)
+				.hasMessage("Dung lượng file vượt quá giới hạn tối đa cho phép (10MB).");
 	}
 
 	@Test

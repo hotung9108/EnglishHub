@@ -19,6 +19,11 @@ public class UnavailableStorageService implements StorageService {
 	}
 
 	@Override
+	public PresignedUpload generatePresignedPutUrl(String storageKey, String contentType, Long expectedContentLength) {
+		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
+	}
+
+	@Override
 	public String generatePresignedGetUrl(String storageKey) {
 		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
 	}
@@ -35,6 +40,11 @@ public class UnavailableStorageService implements StorageService {
 
 	@Override
 	public boolean objectExists(String storageKey) {
+		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
+	}
+
+	@Override
+	public Long getObjectSize(String storageKey) {
 		throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, NOT_CONFIGURED_MESSAGE);
 	}
 
