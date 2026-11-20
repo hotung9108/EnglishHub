@@ -11,6 +11,7 @@ import { moduleService, type ModuleDetailResponse } from '../api/services/module
 import { questionService } from '../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
@@ -51,6 +52,7 @@ const StudentAssignmentReading: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { warning: toastWarning, error: toastError } = useToast();
   const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
@@ -337,7 +339,7 @@ const StudentAssignmentReading: React.FC = () => {
 
   const handleSubmit = () => {
     if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
     if (!canSubmitModule) return;
@@ -346,7 +348,7 @@ const StudentAssignmentReading: React.FC = () => {
       return;
     }
     if (isStudentQuizBlank(questions, selectedAnswers)) {
-      setError('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
+      toastWarning('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
       return;
     }
     setError(null);

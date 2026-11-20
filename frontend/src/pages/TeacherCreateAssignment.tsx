@@ -31,7 +31,6 @@ import {
   SkillListeningEditor,
   AssignmentPreviewModal
 } from '../components/assignments/editor';
-import { useToast } from '../components/common/ToastContext';
 import { StickyActionBar } from '../components/common';
 import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
@@ -41,7 +40,6 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { language } = useLanguage();
   const isVi = language === 'vi';
-  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
 
   // Get initial skill from query param ?type=speaking | reading | listening | writing
   const querySkill = searchParams.get('type') as AssignmentSkill | null;
@@ -119,7 +117,6 @@ export const TeacherCreateAssignment: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    toastWarning(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -483,7 +480,6 @@ export const TeacherCreateAssignment: React.FC = () => {
       const successMsg = isVi 
         ? (status === 'PUBLISHED' ? 'Giao bài tập mới thành công!' : 'Đã lưu bản nháp bài tập mới!') 
         : (status === 'PUBLISHED' ? 'Assignment published successfully!' : 'Assignment draft saved!');
-      toastSuccess(successMsg);
       setToastMessage(successMsg);
 
       setTimeout(() => {
@@ -492,7 +488,6 @@ export const TeacherCreateAssignment: React.FC = () => {
     } catch (err) {
       console.error('Failed to create assignment:', err);
       const errMsg = isVi ? 'Có lỗi xảy ra khi tạo bài tập. Vui lòng thử lại!' : 'Failed to create assignment. Please try again!';
-      toastError(errMsg);
       showToast(errMsg);
     } finally {
       setIsSubmitting(false);

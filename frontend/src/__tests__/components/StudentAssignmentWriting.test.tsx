@@ -30,6 +30,8 @@ beforeEach(() => {
   vi.mocked(submissionService.submitSubmission).mockResolvedValue({ message: 'Submitted', status: 'SUBMITTED', submittedAt: '2026-10-21T10:00:00Z' });
 });
 
+const VALID_ESSAY_TEXT = 'This is an essay written by student containing more than twenty words to satisfy the minimum length requirement for English writing module in EnglishHub.';
+
 async function setup(entry = '/student/writing/12') {
   const result = renderPage(<StudentAssignmentWriting />, '/student/writing/:id', entry);
   await screen.findByText('Describe your city.');
@@ -67,7 +69,7 @@ describe('StudentAssignmentWriting', () => {
     expect(screen.getByText('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.')).toBeVisible();
     expect(submissionService.submitModule).not.toHaveBeenCalled();
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Thử lại' }));
+    await user.click(screen.getByRole('button', { name: /close notification/i }));
     await waitFor(() => expect(screen.queryByText('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.')).not.toBeInTheDocument());
   });
 
@@ -109,7 +111,7 @@ describe('StudentAssignmentWriting', () => {
   it('submits the essay, clears the draft and opens the submission result', async () => {
     const { editor } = await setup();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    fireEvent.change(editor, { target: { value: 'My essay text' } });
+    fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
     localStorage.setItem('eh_draft_writing_12', 'Old draft');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Nộp bài/ })); });
     expect(screen.getByText(/Nộp bài thành công!/)).toBeVisible();
@@ -224,7 +226,7 @@ it.each(['IN_PROGRESS', 'SUBMITTED', 'GRADED'] as const)('handles remaining Read
   const original = await submissionService.getSubmission(40);
   vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...original, modules: [...original.modules, { id: 51, moduleId: 31, skill: 'READING', taskType: 'QUIZ', status, grading: null }] });
   const { editor } = await setup();
-  fireEvent.change(editor, { target: { value: 'Complete essay' } });
+  fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Nộp bài/ })); });
   if (status === 'IN_PROGRESS') {
@@ -308,7 +310,7 @@ it('handles storage upload failures and MinIO rewrites', async () => {
 
 it('reports failure when submitModule fails', async () => {
   const { editor, user } = await setup();
-  fireEvent.change(editor, { target: { value: 'My good essay' } });
+  fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
   vi.mocked(submissionService.submitModule).mockRejectedValueOnce(new Error('Network error on submit'));
   await user.click(screen.getByRole('button', { name: /Nộp bài/ }));
   expect(await screen.findByText('Network error on submit')).toBeVisible();
@@ -346,7 +348,7 @@ it('navigates to assignment result when submission id is missing on final submit
     id: undefined as unknown as number,
   });
   const { editor } = await setup();
-  fireEvent.change(editor, { target: { value: 'Valid essay content' } });
+  fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: /Nộp bài/ }));
@@ -414,7 +416,7 @@ it('warns when subModuleId is missing in submission', async () => {
     modules: [],
   });
   const { editor } = await setup();
-  fireEvent.change(editor, { target: { value: 'Essay text' } });
+  fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
   await userEvent.click(screen.getByRole('button', { name: /Nộp bài/ }));
   expect(screen.getByText('Không tìm thấy thông tin phần làm bài viết trong bài nộp.')).toBeVisible();
 });
@@ -444,7 +446,7 @@ it('supports URL with moduleId query parameter and completes last module to over
   });
 
   const { editor, user } = await setup('/student/writing/12?moduleId=30&submissionId=40');
-  fireEvent.change(editor, { target: { value: 'This is the completed essay text for multi exam.' } });
+  fireEvent.change(editor, { target: { value: VALID_ESSAY_TEXT } });
 
   await user.click(screen.getByRole('button', { name: /Nộp bài/ }));
   expect(await screen.findByText(/Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm/)).toBeVisible();
@@ -492,4 +494,19 @@ it('parses custom minWords and diagram from markdown instructions', async () => 
   expect(await screen.findByText('Special custom prompt text.')).toBeVisible();
   expect(screen.getByText(/tối thiểu 350 từ/)).toBeVisible();
   expect(screen.getByAltText('Writing Task Diagram')).toHaveAttribute('src', 'https://example.com/chart.png');
+});
+
+it('warns and prevents submission when word count is below minimum 20 words (FE-102)', async () => {
+  const { editor, user } = await setup();
+  fireEvent.change(editor, { target: { value: 'Too short essay with few words.' } });
+  await user.click(screen.getByRole('button', { name: /Nộp bài/ }));
+  expect(screen.getByText(/Bài viết chưa đạt độ dài tối thiểu/)).toBeVisible();
+  expect(submissionService.submitModule).not.toHaveBeenCalled();
+});
+
+it('rejects empty 0-byte file upload (FE-102)', async () => {
+  const { container } = await setup();
+  const emptyFile = new File([], 'empty.pdf', { type: 'application/pdf' });
+  fireEvent.drop(container.querySelector('.writing-dropzone')!, { dataTransfer: { files: [emptyFile] } });
+  expect(screen.getByText(/Tệp tải lên không được rỗng \(0 bytes\)/)).toBeVisible();
 });
