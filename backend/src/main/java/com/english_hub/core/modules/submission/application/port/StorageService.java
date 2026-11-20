@@ -18,6 +18,14 @@ public interface StorageService {
 	PresignedUpload generatePresignedPutUrl(String storageKey, String contentType);
 
 	/**
+	 * Generates a presigned PUT URL for {@code storageKey} with an optional expected
+	 * content length in bytes signed into the request for strict upload size enforcement.
+	 */
+	default PresignedUpload generatePresignedPutUrl(String storageKey, String contentType, Long expectedContentLength) {
+		return generatePresignedPutUrl(storageKey, contentType);
+	}
+
+	/**
 	 * Generates a presigned GET URL for {@code storageKey} allowing temporary
 	 * authenticated read access (e.g. for AI analysis microservice).
 	 */
@@ -48,6 +56,13 @@ public interface StorageService {
 	 * Returns {@code true} when an object exists at {@code storageKey}.
 	 */
 	boolean objectExists(String storageKey);
+
+	/**
+	 * Returns the size in bytes of the object at {@code storageKey}, or {@code null} if missing.
+	 */
+	default Long getObjectSize(String storageKey) {
+		return null;
+	}
 
 	/**
 	 * Deletes the object at {@code storageKey}. Idempotent: deleting a missing
