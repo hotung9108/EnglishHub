@@ -12,6 +12,7 @@ import com.english_hub.core.modules.user.application.port.PasswordGenerator;
 import com.english_hub.core.modules.user.domain.event.AdminUserPasswordResetEvent;
 import com.english_hub.core.modules.user.domain.event.UserSoftDeletedEvent;
 import com.english_hub.core.modules.user.domain.model.FullNameValidator;
+import com.english_hub.core.modules.user.domain.model.PhoneValidator;
 import com.english_hub.core.modules.user.domain.model.User;
 import com.english_hub.core.modules.user.domain.model.UserPage;
 import com.english_hub.core.modules.user.domain.repository.UserRepository;
@@ -128,7 +129,7 @@ public class AdminUserService {
 					emptyToNull(request.specialization()),
 					emptyToNull(request.studentCode()),
 					request.dateOfBirth(),
-					emptyToNull(request.parentPhone()));
+					PhoneValidator.validateAndNormalize(request.parentPhone()));
 			user = userRepository.save(user);
 			if (user.id() == null) {
 				throw new IllegalStateException("User insert did not return an id");

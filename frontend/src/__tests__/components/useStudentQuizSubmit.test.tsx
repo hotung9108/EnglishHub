@@ -304,4 +304,13 @@ describe('useStudentQuizSubmit', () => {
     expect(submissionService.submitModule).not.toHaveBeenCalled();
     expect(submissionService.getSubmission).not.toHaveBeenCalled();
   });
+
+  it('does not invoke submitSubmission when isReviewMode is true', async () => {
+    const { result } = renderHook(() => useStudentQuizSubmit(scope, { isReviewMode: true }));
+    expect(await invoke(() => result.current.submit(answers))).toEqual({ kind: 'completed', submissionId: 325 });
+    expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(1182, { answers }, { signal: expect.any(AbortSignal) });
+    expect(submissionService.getSubmission).toHaveBeenCalledTimes(1);
+    expect(submissionService.submitSubmission).not.toHaveBeenCalled();
+    expect(result.current.state.kind).toBe('completed');
+  });
 });

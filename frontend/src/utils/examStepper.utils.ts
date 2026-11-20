@@ -326,7 +326,8 @@ export function getExamPageRedirectRoute(
   currentSkill: string,
   assignmentId: number | string,
   assignmentModules?: ExamModuleItem[],
-  targetModuleId?: number
+  targetModuleId?: number,
+  allowReview?: boolean
 ): string | null {
   const parentStatus = submission.status?.toUpperCase();
   if (parentStatus === 'SUBMITTED' || parentStatus === 'GRADED') {
@@ -350,6 +351,11 @@ export function getExamPageRedirectRoute(
     if (nextMod) {
       return getSkillRoute(nextMod.skill, assignmentId, submission.id, nextMod.id);
     }
+  }
+
+  // If review/edit is requested (e.g. from stepper or overview) and parent attempt is still IN_PROGRESS, allow staying here
+  if (allowReview) {
+    return null;
   }
 
   // If current module is already completed, advance to next incomplete module or submission result

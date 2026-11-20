@@ -1,9 +1,10 @@
 ﻿/* EnglishHub Student Portal: Writing Interactive Workspace Styles */
 
 .writing-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 24px 48px 24px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* Breadcrumbs */
@@ -39,11 +40,12 @@
   grid-template-columns: 1fr;
   gap: 28px;
   align-items: start;
+  width: 100%;
 }
 
 @media (min-width: 1024px) {
   .writing-grid {
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: minmax(0, 1fr) 380px;
   }
 }
 
@@ -87,7 +89,48 @@
   line-height: 1.6;
 }
 
-/* Editor Toolbar & Textarea */
+/* Floating Toast Notifications at Top-Right Corner */
+.writing-floating-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 99999;
+  max-width: 440px;
+  width: calc(100vw - 48px);
+  padding: 14px 18px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.06);
+  animation: writingToastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.writing-floating-toast-error {
+  background-color: #faf8f5;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #dc2626;
+  color: #991b1b;
+}
+
+.writing-floating-toast-success {
+  background-color: #faf8f5;
+  border: 1px solid #a7f3d0;
+  border-left: 4px solid #059669;
+  color: #065f46;
+}
+
+@keyframes writingToastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 .writing-editor-header {
   display: flex;
   justify-content: space-between;
@@ -95,6 +138,52 @@
   margin-bottom: 16px;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.writing-word-counter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.writing-word-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--surface-container-low, #f8fafc);
+  color: var(--on-surface-variant, #475569);
+  border: 1px solid var(--outline-variant, #e2e8f0);
+  white-space: nowrap;
+}
+
+.writing-word-count-badge.is-warning {
+  background-color: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.writing-word-count-badge .text-primary {
+  color: var(--primary, #0f766e);
+}
+
+.writing-min-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease-in-out;
 }
 
 .writing-toolbar {

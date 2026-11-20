@@ -39,7 +39,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const newItem: ToastItem = { id, type, message, title, duration };
 
-      setToasts((prev) => [...prev, newItem]);
+      setToasts((prev) => [newItem, ...prev.slice(0, 4)]);
 
       if (duration > 0) {
         setTimeout(() => {
@@ -92,6 +92,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={value}>
       {children}
+      <style>{`
+        @keyframes ehToastSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
       <div
         className="eh-toast-container"
         aria-live="polite"
@@ -158,6 +170,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 boxShadow: '0 8px 24px -4px rgba(38, 35, 32, 0.12), 0 2px 6px rgba(38, 35, 32, 0.04)',
                 fontFamily: "var(--eh-font-sans, 'Plus Jakarta Sans', sans-serif)",
                 animation: 'ehToastSlideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
               <div style={{ flexShrink: 0, marginTop: '2px' }}>{config.icon}</div>

@@ -12,7 +12,7 @@ import { userService } from '../../api/services/user.service';
 import type { UserProfile } from '../../api/services/user.service';
 import type { Role } from '../../types/auth';
 import { httpClient } from '../../api/core/client';
-import { NotFoundError, UnauthorizedError } from '../../api/core/errors';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../api/core/errors';
 import { environment } from '../../config/environment';
 
 // Identity comes from local-dev/db-snapshot/users.csv; transport stays mocked.
@@ -75,6 +75,24 @@ it.each([
   const button = language === 'vi' ? 'Đăng nhập' : 'Sign in';
   await user.click(screen.getByRole('button', { name: button }));
   expect(await screen.findByText(language === 'vi' ? 'Tài khoản hoặc mật khẩu không chính xác.' : 'Invalid email or password credentials.')).toBeVisible();
+  expect(screen.getByRole('button', { name: button })).toBeEnabled();
+  expect(screen.getByTestId('location').textContent).toBe('/login');
+  expect(localStorage.getItem(environment.auth.accessTokenKey)).toBeNull();
+  expect(localStorage.getItem(environment.auth.refreshTokenKey)).toBeNull();
+  expect(localStorage.getItem(environment.auth.userKey)).toBeNull();
+  expect(profile).not.toHaveBeenCalled();
+});
+it.each([
+  { language: 'vi', expected: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.' },
+  { language: 'en', expected: 'Your account has been locked. Please contact the administrator.' },
+])('reports locked account error on HTTP 403 in $language', async ({ language, expected }) => {
+  login.mockRejectedValue(new ForbiddenError('Tài khoản đã bị khoá.'));
+  const { user, email, password } = setup(undefined, language);
+  await user.type(email, identity.email);
+  await user.type(password, 'secret');
+  const button = language === 'vi' ? 'Đăng nhập' : 'Sign in';
+  await user.click(screen.getByRole('button', { name: button }));
+  expect(await screen.findByText(expected)).toBeVisible();
   expect(screen.getByRole('button', { name: button })).toBeEnabled();
   expect(screen.getByTestId('location').textContent).toBe('/login');
   expect(localStorage.getItem(environment.auth.accessTokenKey)).toBeNull();

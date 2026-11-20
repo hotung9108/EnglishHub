@@ -3,6 +3,7 @@ import { useEffect, type ReactElement, type ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { LanguageProvider, useLanguage } from '../../contexts/LanguageContext';
+import { ToastProvider } from '../../components/common/ToastContext';
 
 function Language({ language, children }: { language: string; children: ReactNode }) {
   const { language: current, toggleLanguage } = useLanguage();
@@ -19,16 +20,18 @@ function Location() {
 
 export function renderPage(page: ReactElement, path: string, entry = path, state?: object, language = 'vi') {
   return render(
-    <LanguageProvider>
-      <Language language={language}>
-        <MemoryRouter initialEntries={[{ pathname: entry.split('?')[0], search: entry.split('?')[1] ? `?${entry.split('?')[1]}` : '', state }]}>
-          <Location />
-          <Routes>
-            <Route path={path} element={page} />
-            <Route path="*" element={<div>Destination</div>} />
-          </Routes>
-        </MemoryRouter>
-      </Language>
-    </LanguageProvider>,
+    <ToastProvider>
+      <LanguageProvider>
+        <Language language={language}>
+          <MemoryRouter initialEntries={[{ pathname: entry.split('?')[0], search: entry.split('?')[1] ? `?${entry.split('?')[1]}` : '', state }]}>
+            <Location />
+            <Routes>
+              <Route path={path} element={page} />
+              <Route path="*" element={<div>Destination</div>} />
+            </Routes>
+          </MemoryRouter>
+        </Language>
+      </LanguageProvider>
+    </ToastProvider>,
   );
 }

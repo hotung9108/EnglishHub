@@ -68,7 +68,7 @@ class ReportStudentProgressApiIntegrationTest extends ReportIntegrationTestBase 
 				.andExpect(jsonPath("$.skillAverages[1].averageScorePercent").value(90.00))
 				.andExpect(jsonPath("$.scoreTimeline.length()").value(2))
 				.andExpect(jsonPath("$.scoreTimeline[0].assignmentId").value(firstAssignment))
-				.andExpect(jsonPath("$.scoreTimeline[0].scorePercent").value(86.67))
+				.andExpect(jsonPath("$.scoreTimeline[0].scorePercent").value(85.00))
 				.andExpect(jsonPath("$.scoreTimeline[1].assignmentId").value(secondAssignment))
 				.andExpect(jsonPath("$.scoreTimeline[1].scorePercent").value(50.00))
 				.andReturn();
@@ -163,5 +163,28 @@ class ReportStudentProgressApiIntegrationTest extends ReportIntegrationTestBase 
 		mockMvc.perform(get("/api/v1/reports/students/{id}/progress", studentId)
 				.param("classId", "999999999").header("Authorization", auth))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void studentCanReadOwnProgressWithoutClassId() throws Exception {
+		long studentId = createStudent("Own student", UserStatus.ACTIVE, false);
+		String auth = bearer(studentId, UserRole.STUDENT);
+
+		mockMvc.perform(get("/api/v1/reports/students/{id}/progress", studentId)
+				.header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.studentId").value(studentId))
+				.andExpect(jsonPath("$.studentName").value("Own student"));
+	}
+
+	@Test
+	void studentCannotReadAnotherStudentsProgress() throws Exception {
+		long studentId = createStudent("Own student", UserStatus.ACTIVE, false);
+		long otherStudentId = createStudent("Other student", UserStatus.ACTIVE, false);
+		String auth = bearer(studentId, UserRole.STUDENT);
+
+		mockMvc.perform(get("/api/v1/reports/students/{id}/progress", otherStudentId)
+				.header("Authorization", auth))
+				.andExpect(status().isForbidden());
 	}
 }

@@ -11,6 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import { userService } from '../api/services/user.service';
 import type { UserProfile } from '../api/services/user.service';
 import { validateFullName } from '../utils/nameValidation';
+import { validatePhone } from '../utils/phoneValidation';
 import '../styles/settings.css';
 
 const PRESET_AVATARS = [
@@ -48,6 +49,7 @@ export const Profile: React.FC = () => {
   const [nameError, setNameError] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -134,19 +136,28 @@ export const Profile: React.FC = () => {
       return;
     }
 
+    const phoneResult = validatePhone(phone, isVi);
+    if (!phoneResult.isValid) {
+      setPhoneError(phoneResult.errorMessage || '');
+      setErrorMessage(phoneResult.errorMessage || '');
+      return;
+    }
+
     setSaving(true);
     setNameError('');
+    setPhoneError('');
     try {
       const cleanName = valResult.normalized;
+      const cleanPhone = phoneResult.normalized;
       await userService.updateMyProfile({
         fullName: cleanName,
-        phone,
+        phone: cleanPhone,
         avatarUrl,
       });
 
       updateUser({
         fullName: cleanName,
-        phone,
+        phone: cleanPhone,
         avatar: avatarUrl,
       });
 
@@ -414,11 +425,27 @@ export const Profile: React.FC = () => {
                         <label className="adm-form-label">{t('profile.phone')}</label>
                         <input 
                           type="text" 
-                          className="input" 
+                          className={`input ${phoneError ? 'has-error' : ''}`}
                           value={phone}
-                          placeholder="0987 654 321"
-                          onChange={(e) => setPhone(e.target.value)} 
+                          placeholder="0987654321"
+                          onChange={(e) => {
+                            setPhone(e.target.value);
+                            if (phoneError) setPhoneError('');
+                          }} 
+                          onBlur={() => {
+                            const res = validatePhone(phone, isVi);
+                            if (!res.isValid) {
+                              setPhoneError(res.errorMessage || '');
+                            } else {
+                              setPhoneError('');
+                            }
+                          }}
                         />
+                        {phoneError && (
+                          <span className="settings-field-error">
+                            {phoneError}
+                          </span>
+                        )}
                       </div>
                     </div>
 

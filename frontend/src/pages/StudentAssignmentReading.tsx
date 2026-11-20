@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, BookOpen, 
   Bookmark, Highlighter, 
-  ChevronLeft, AlertCircle, RefreshCw, FileCheck, AlertTriangle
+  ChevronLeft, AlertCircle, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -11,6 +11,7 @@ import { moduleService, type ModuleDetailResponse } from '../api/services/module
 import { questionService } from '../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
 import { Button } from '../components/common/Button';
 import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
@@ -51,6 +52,8 @@ const StudentAssignmentReading: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { warning: toastWarning, error: toastError } = useToast();
+  const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
@@ -61,7 +64,7 @@ const StudentAssignmentReading: React.FC = () => {
   const [loadedScope, setLoadedScope] = useState({ key: '', scope: UNAVAILABLE_SCOPE });
   const submitScope = loadedScope.key === viewKey ? loadedScope.scope : UNAVAILABLE_SCOPE;
   const scopeReady = isStudentQuizSubmitScopeValid(submitScope);
-  const quizSubmit = useStudentQuizSubmit(submitScope);
+  const quizSubmit = useStudentQuizSubmit(submitScope, { isReviewMode });
   const submitState = quizSubmit.state;
   const isSubmitting = submitState.kind === 'submitting';
   const viewGeneration = useRef(0);
@@ -99,7 +102,7 @@ const StudentAssignmentReading: React.FC = () => {
       const progress = classifyStudentQuizProgress(sub, scope);
       if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
       if (!isStudentQuizPendingFinalization(sub, scope)) {
-        const redirectRoute = getExamPageRedirectRoute(sub, 'READING', numericId, currentAssignment.modules, moduleId);
+        const redirectRoute = getExamPageRedirectRoute(sub, 'READING', numericId, currentAssignment.modules, moduleId, isReviewMode);
         if (redirectRoute) {
           navigate(redirectRoute, { replace: true });
           return;
@@ -107,7 +110,15 @@ const StudentAssignmentReading: React.FC = () => {
       }
       if (answerScope.current.submissionId !== sub.id) {
         answerScope.current.submissionId = sub.id;
-        setSelectedAnswers({});
+        let savedAnswers: StudentQuizAnswers = {};
+        if (isReviewMode) {
+          try {
+            const raw = localStorage.getItem(`eh_draft_quiz_${numericId}_${moduleId}`)
+              || localStorage.getItem(`eh_draft_quiz_${numericId}_${sub.id}_${moduleId}`);
+            if (raw) savedAnswers = JSON.parse(raw);
+          } catch { /* ignore */ }
+        }
+        setSelectedAnswers(savedAnswers);
         setActiveQuestion(1);
       }
       setSubmission(sub);
@@ -148,7 +159,15 @@ const StudentAssignmentReading: React.FC = () => {
         if (!isMounted) return;
         if (answerScope.current.moduleId !== (moduleId ?? null)) {
           answerScope.current.moduleId = moduleId ?? null;
-          setSelectedAnswers({});
+          let savedAnswers: StudentQuizAnswers = {};
+          if (isReviewMode && moduleId) {
+            try {
+              const raw = localStorage.getItem(`eh_draft_quiz_${numericId}_${moduleId}`)
+                || (requestedSubmissionId ? localStorage.getItem(`eh_draft_quiz_${numericId}_${requestedSubmissionId}_${moduleId}`) : null);
+              if (raw) savedAnswers = JSON.parse(raw);
+            } catch { /* ignore */ }
+          }
+          setSelectedAnswers(savedAnswers);
           setActiveQuestion(1);
         }
 
@@ -245,7 +264,7 @@ const StudentAssignmentReading: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, searchParams, user?.id, viewKey, navigate, setError]);
+  }, [numericId, searchParams, user?.id, viewKey, navigate, setError, isReviewMode]);
 
   const effectiveModules = useMemo(
     () => resolveEffectiveModules(assignment?.modules, submission?.modules),
@@ -266,7 +285,7 @@ const StudentAssignmentReading: React.FC = () => {
       ? `Đề bài có dữ liệu lỗi ở câu ${invalidQuestionNumbers.join(', ')}. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.`
       : 'Đề bài không có danh sách câu hỏi hợp lệ. Chưa thể nộp phần thi. Vui lòng tải lại đề hoặc liên hệ giáo viên.';
   }
-  const recoveryPending = scopeReady && isStudentQuizPendingFinalization(submission, submitScope);
+  const recoveryPending = !isReviewMode && scopeReady && isStudentQuizPendingFinalization(submission, submitScope);
   const finalRejected = submitState.kind === 'failed' && submitState.reason === QUIZ_SUBMIT_ERROR.FINAL_REJECTED;
   const showFinalRetry = submitState.kind === 'pendingFinalization' || finalRejected
     || (submitState.kind === 'idle' && recoveryPending);
@@ -281,24 +300,38 @@ const StudentAssignmentReading: React.FC = () => {
   }
   const displayError = error || submitError || (!isLoading && canSubmitModule ? questionDataError : null);
   const successMessage = submitState.kind === 'completed'
-    ? 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...'
+    ? (isReviewMode
+        ? 'Cập nhật phần thi Reading thành công! Đang chuyển đến màn hình xem lại bài làm...'
+        : 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...')
     : submitState.kind === 'nextSkill'
       ? `Đã hoàn thành phần thi Reading! Đang chuyển tiếp sang ${getSkillLabel(submitState.nextModule.skill)}...` : null;
 
   useEffect(() => {
     if (!scopeReady || (submitState.kind !== 'completed' && submitState.kind !== 'nextSkill')) return;
     const generation = viewGeneration.current;
-    const destination = submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
-      : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id);
-    if (submitState.kind === 'completed') notifyAssignmentSubmitted();
+    const destination = isReviewMode
+      ? `/student/assignments/${submitScope.assignmentId}/overview`
+      : (submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
+          : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id));
+    if (submitState.kind === 'completed' && !isReviewMode) notifyAssignmentSubmitted();
     const timer = setTimeout(() => {
       if (viewGeneration.current === generation) navigate(destination, { replace: true });
     }, NAVIGATION_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [scopeReady, submitState, submitScope, viewKey, navigate]);
+  }, [scopeReady, submitState, submitScope, viewKey, navigate, isReviewMode]);
 
   const handleSelectAnswer = (questionId: number, answer: StudentQuizAnswer) => {
-    if (canSubmitModule) setSelectedAnswers(prev => ({ ...prev, [questionId]: answer }));
+    if (canSubmitModule) {
+      setSelectedAnswers(prev => {
+        const next = { ...prev, [questionId]: answer };
+        if (import.meta.env?.MODE !== 'test' && numericId && submitScope?.moduleId) {
+          try {
+            localStorage.setItem(`eh_draft_quiz_${numericId}_${submitScope.moduleId}`, JSON.stringify(next));
+          } catch { /* ignore */ }
+        }
+        return next;
+      });
+    }
   };
 
   const toggleBookmark = (qId: number) => {
@@ -309,7 +342,7 @@ const StudentAssignmentReading: React.FC = () => {
 
   const handleSubmit = () => {
     if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
     if (!canSubmitModule) return;
@@ -318,7 +351,7 @@ const StudentAssignmentReading: React.FC = () => {
       return;
     }
     if (isStudentQuizBlank(questions, selectedAnswers)) {
-      setError('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
+      toastWarning('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
       return;
     }
     if (unansweredCount > 0) {
@@ -357,22 +390,22 @@ const StudentAssignmentReading: React.FC = () => {
           >
             Tổng quan bài thi
           </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={FileCheck}
-            onClick={() => navigate(`/student/assignments/${id}/overview`)}
-            title="Kiểm tra tiến độ các kỹ năng trước khi nộp bài (UC020)"
-          >
-            Xem lại trước khi nộp
-          </Button>
           
           <div className="exam-breadcrumbs">
-            <span>Hệ thống</span> <ChevronRight size={14} />
-            <span>Lớp học</span> <ChevronRight size={14} />
-            <span className="exam-breadcrumbs-current">
-              {assignment?.title || `Reading Practice #${id}`}
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/dashboard')}>
+              Trang chủ
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-link" onClick={() => navigate('/student/assignments')}>
+              Danh sách bài tập
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-breadcrumbs-title">
+              {assignment?.title || `Reading #${id}`}
+            </span>
+            <ChevronRight size={14} />
+            <span className="exam-skill-badge exam-skill-badge-reading">
+              Kỹ năng Đọc
             </span>
           </div>
         </div>
@@ -388,7 +421,9 @@ const StudentAssignmentReading: React.FC = () => {
               submissionId={submission?.id}
               onSelectModule={(skill, step) => {
                 if (step.isAccessible && step.status !== 'ACTIVE') {
-                  navigate(getSkillRoute(skill, numericId, submission?.id));
+                  const baseRoute = getSkillRoute(skill, numericId, submission?.id, step.module.id);
+                  const targetUrl = step.isCompleted ? `${baseRoute}&mode=review` : baseRoute;
+                  navigate(targetUrl);
                 }
               }}
             />
@@ -619,12 +654,8 @@ const StudentAssignmentReading: React.FC = () => {
                             onClick={() => handleSelectAnswer(currentQuestionItem.id, { questionType: 'MULTIPLE_CHOICE', selectedOptionId: option.id })}
                             className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
                           >
-                            <div className="exam-radio-indicator">
-                              {isSelected && <div className="exam-radio-dot" />}
-                            </div>
-                            <div className="exam-option-content">
-                              <strong className="exam-option-key">{String.fromCharCode(65 + optIdx)}.</strong> {option.content}
-                            </div>
+                            <span className="exam-option-key">{String.fromCharCode(65 + optIdx)}</span>
+                            <span className="exam-option-content">{option.content}</span>
                           </label>
                         );
                       })}
@@ -643,6 +674,7 @@ const StudentAssignmentReading: React.FC = () => {
                 size="sm"
                 icon={ChevronLeft}
                 onClick={() => setActiveQuestion(Math.max(1, activeQuestion - 1))}
+                disabled={activeQuestion <= 1}
               >
                 Câu trước
               </Button>
@@ -652,24 +684,23 @@ const StudentAssignmentReading: React.FC = () => {
                 icon={ChevronRight}
                 iconPosition="right"
                 onClick={() => setActiveQuestion(Math.min(totalQuestions, activeQuestion + 1))}
+                disabled={activeQuestion >= totalQuestions}
               >
                 Câu sau
               </Button>
             </div>
 
-            <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <div className="exam-pane-footer-submit">
               <Button 
                 variant="primary"
                 size="md"
                 loading={isSubmitting}
                 disabled={!canSubmitModule || isSubmitting}
                 onClick={handleSubmit}
+                className="w-full"
               >
-                Hoàn thành & Nộp phần Đọc (Submit Reading)
+                Hoàn thành & Nộp phần Đọc
               </Button>
-              <span className="text-[11px] text-muted text-center">
-                Lưu ý: Nộp bài cho riêng phần thi Đọc này (không nộp toàn bộ bài tập).
-              </span>
             </div>
           </div>
         </div>
