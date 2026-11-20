@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown, AlertCircle, RefreshCw
+  Layers, CheckCircle2, ChevronDown, AlertCircle, RefreshCw, Calendar, Clock, RotateCcw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
@@ -1004,22 +1004,22 @@ export const TeacherEditAssignment: React.FC = () => {
           {/* Active Module Meta Row */}
           {activeModule && (
             <div className="tae-active-mod-meta-card">
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-1 min-w-[240px]">
                 <span className="tae-meta-tag">
-                  {isVi ? `Đang chỉnh sửa: Phần ${activeModuleIndex + 1}` : `Editing Part ${activeModuleIndex + 1}`}
+                  {isVi ? `Phần ${activeModuleIndex + 1}` : `Part ${activeModuleIndex + 1}`}
                 </span>
                 <input
                   type="text"
-                  className="tae-meta-title-input"
+                  className="tae-meta-title-input flex-1"
                   value={activeModule.title || ''}
                   onChange={(e) => handleActiveModuleMetaChange('title', e.target.value)}
-                  placeholder={isVi ? 'Tên gợi nhớ (VD: Passage 1, Task 1: Chart Description...)' : 'Module custom title (optional)...'}
+                  placeholder={isVi ? 'Tên gợi nhớ (VD: Passage 1, Task 1...)' : 'Module custom title (optional)...'}
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-muted">
-                  {isVi ? 'Thang điểm:' : 'Max score:'}
+              <div className="flex items-center gap-1.5 tae-score-badge-wrap">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {isVi ? 'Thang điểm' : 'Score'}
                 </span>
                 <input
                   type="text"
@@ -1039,6 +1039,9 @@ export const TeacherEditAssignment: React.FC = () => {
                     }
                   }}
                 />
+                <span className="text-xs text-muted font-medium">
+                  {isVi ? 'điểm' : 'pts'}
+                </span>
               </div>
             </div>
           )}
@@ -1078,61 +1081,73 @@ export const TeacherEditAssignment: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Schedule & Due Date */}
           <section className="edit-card">
-            <div className="edit-card-header">
+            <div className="edit-card-header pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="edit-card-title flex items-center gap-2 text-sm font-semibold">
+                <Calendar size={15} className="text-primary" />
+                {isVi ? 'Lịch trình bài tập' : 'Assignment Schedule'}
+              </h3>
+            </div>
+
+            <div className="edit-card-body flex flex-col gap-3.5">
               <div>
-                <h3 className="edit-card-title">{isVi ? 'Lịch Nộp Bài' : 'Schedule & Due Date'}</h3>
-                <p className="edit-card-desc">{isVi ? 'Thời gian mở đề và hạn nộp.' : 'Open time and due date.'}</p>
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
+                  <Clock size={13} className="text-slate-400" />
+                  {isVi ? 'Thời gian mở đề' : 'Open Date'}
+                </label>
+                <input 
+                  type="datetime-local" 
+                  className="edit-form-input text-xs" 
+                  value={assignmentData.startDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
+                />
               </div>
-            </div>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">{isVi ? 'Thời gian mở đề (Open at)' : 'Open Time'}</label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.startDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, startDate: e.target.value })}
-              />
-            </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
+                  <Clock size={13} className="text-slate-400" />
+                  {isVi ? 'Hạn chót nộp bài' : 'Due Date'} <span className="text-danger">*</span>
+                </label>
+                <input 
+                  type="datetime-local" 
+                  className="edit-form-input text-xs font-semibold" 
+                  value={assignmentData.dueDate}
+                  onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
+                />
+              </div>
 
-            <div className="edit-form-group">
-              <label className="edit-form-label">
-                {isVi ? 'Hạn chót nộp bài (Close at)' : 'Due Date'} <span style={{ color: '#ef4444' }}>*</span>
-              </label>
-              <input 
-                type="datetime-local" 
-                className="edit-form-input" 
-                value={assignmentData.dueDate}
-                onChange={(e) => setAssignmentData({ ...assignmentData, dueDate: e.target.value })}
-                style={{ fontWeight: 600 }}
-              />
-            </div>
-
-            <div className="edit-form-group" style={{ marginBottom: 0 }}>
-              <label className="edit-form-label">{isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}</label>
-              <input 
-                type="number" 
-                min={1}
-                max={10}
-                className="edit-form-input" 
-                value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
-                placeholder="1"
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === '') {
-                    setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
-                    return;
-                  }
-                  const clean = raw.replace(/^0+/, '');
-                  setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
-                }}
-                onBlur={() => {
-                  if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
-                    setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
-                  }
-                }}
-                style={{ width: '90px' }}
-              />
+              <div>
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
+                  <RotateCcw size={13} className="text-slate-400" />
+                  {isVi ? 'Số lần nộp tối đa' : 'Max Submissions'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    min={1}
+                    max={10}
+                    className="edit-form-input text-xs w-20 text-center font-bold" 
+                    value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
+                    placeholder="1"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                        return;
+                      }
+                      const clean = raw.replace(/^0+/, '');
+                      setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                    }}
+                    onBlur={() => {
+                      if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-muted">
+                    {isVi ? 'lần' : 'times'}
+                  </span>
+                </div>
+              </div>
             </div>
           </section>
 

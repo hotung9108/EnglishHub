@@ -52,7 +52,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
       id: `rq-${Date.now()}`,
       order: newOrder,
       type,
-      prompt: isVi ? `Câu hỏi #${newOrder}: Nhập nội dung câu hỏi...` : `Question #${newOrder}: Enter question statement...`,
+      prompt: '',
       options: initialOptions,
       correctAnswer: defaultAns,
       points: 1
@@ -66,9 +66,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
       id: `rq-${Date.now()}`,
       order: targetIndex + 2,
       type,
-      prompt: isVi
-        ? (type === 'multiple_choice' ? 'Câu hỏi trắc nghiệm mới: Nhập nội dung...' : 'Câu hỏi điền từ mới: Nhập nội dung...')
-        : (type === 'multiple_choice' ? 'New MCQ: Enter question statement...' : 'New blank: Enter statement...'),
+      prompt: '',
       options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
       correctAnswer: type === 'multiple_choice' ? 'A' : '',
       points: 1
@@ -155,11 +153,6 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             <h2 className="edit-card-title">
               {isVi ? 'Bài Đọc Hiểu' : 'Reading Passage'}
             </h2>
-            <p className="edit-card-desc">
-              {isVi
-                ? 'Nhập tiêu đề và toàn bộ nội dung văn bản bài đọc.'
-                : 'Enter passage title and complete reading text.'}
-            </p>
           </div>
         </div>
 
@@ -205,11 +198,6 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
             <h2 className="edit-card-title">
               {isVi ? 'Danh Sách Câu Hỏi & Đáp Án' : 'Reading Questions & Answer Keys'}
             </h2>
-            <p className="edit-card-desc">
-              {isVi
-                ? 'Tạo các câu hỏi trắc nghiệm hoặc điền từ cho bài đọc.'
-                : 'Create multiple choice or short answer questions.'}
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -231,17 +219,12 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
         </div>
 
         {/* Score Summary Badge */}
-        <div className="flex flex-wrap items-center justify-between bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg p-3 text-xs mb-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={15} className="text-blue-600 dark:text-blue-400" />
-            <span className="text-slate-700 dark:text-slate-200 font-medium">
-              {isVi 
-                ? `Tổng điểm module: ${currentTotalScore} điểm • Gồm ${config.questions.length} câu hỏi • Mỗi câu: ${pointsDisplay} điểm` 
-                : `Module Total: ${currentTotalScore} pts • ${config.questions.length} questions • ${pointsDisplay} pts/question`}
-            </span>
-          </div>
-          <span className="text-muted">
-            {isVi ? '(Điểm chia đều tự động theo thang điểm tổng module)' : '(Points distributed evenly by module score)'}
+        <div className="flex items-center gap-2 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-lg px-3 py-2 text-xs mb-3">
+          <CheckCircle size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-slate-700 dark:text-slate-200 font-medium">
+            {isVi 
+              ? `Tổng: ${currentTotalScore} điểm • ${config.questions.length} câu hỏi (${pointsDisplay} điểm/câu)` 
+              : `Total: ${currentTotalScore} pts • ${config.questions.length} questions (${pointsDisplay} pts/question)`}
           </span>
         </div>
 
@@ -314,7 +297,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                       className="edit-form-input font-semibold"
                       value={q.prompt}
                       onChange={(e) => handleUpdateQuestion(qIdx, 'prompt', e.target.value)}
-                      placeholder={isVi ? 'Nhập nội dung câu hỏi...' : 'Enter question statement...'}
+                      placeholder={isVi ? `Câu hỏi #${q.order}: Nhập nội dung câu hỏi...` : `Question #${q.order}: Enter question statement...`}
                     />
                   </div>
 
@@ -397,10 +380,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                   )}
 
                   {/* Quick Insert Below Action Bar */}
-                  <div className="flex items-center justify-between pt-2.5 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
-                    <span className="text-muted font-medium">
-                      {isVi ? 'Chèn câu hỏi ngay bên dưới câu này:' : 'Insert question below this one:'}
-                    </span>
+                  <div className="flex items-center justify-end pt-2 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
                     <div className="flex items-center gap-2">
                       <button
                         type="button"

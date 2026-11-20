@@ -828,21 +828,26 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 10px 16px;
   background-color: var(--eh-surface, #ffffff);
   border: 1px solid var(--eh-border, #E5E8EB);
   border-radius: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
   gap: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .tae-meta-tag {
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--eh-primary, #164E3E);
+  background-color: var(--eh-primary-container, #e6f4ea);
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .tae-meta-title-input {
@@ -852,30 +857,42 @@
   font-size: 13px;
   background-color: var(--eh-canvas, #F8F9FA);
   color: var(--eh-text-primary, #161B19);
-  min-width: 260px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .tae-meta-title-input:focus {
   border-color: var(--eh-primary, #164E3E);
   background-color: var(--eh-surface, #ffffff);
+  box-shadow: 0 0 0 2px rgba(22, 78, 62, 0.1);
+}
+
+.tae-score-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--eh-canvas, #F8F9FA);
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--eh-border, #E5E8EB);
 }
 
 .tae-meta-score-input {
-  width: 60px;
+  width: 50px;
   text-align: center;
-  border: 1px solid var(--eh-border, #E5E8EB);
-  border-radius: 8px;
-  padding: 5px 8px;
+  border: 1px solid var(--eh-border, #cbd5e1);
+  border-radius: 6px;
+  padding: 3px 6px;
   font-size: 13px;
   font-weight: 700;
-  background-color: var(--eh-canvas, #F8F9FA);
+  background-color: #ffffff;
   color: var(--eh-text-primary, #161B19);
   outline: none;
+  transition: border-color 0.2s ease;
 }
 
 .tae-meta-score-input:focus {
   border-color: var(--eh-primary, #164E3E);
+  box-shadow: 0 0 0 2px rgba(22, 78, 62, 0.1);
 }
 
