@@ -147,12 +147,19 @@ export class AssignmentService {
   async updateAssignmentStatus(
     assignmentId: AssignmentId,
     status: AssignmentStatus,
-    options?: ApiRequestOptions
+    options?: ApiRequestOptions & { reopen?: { closeAt?: string } }
   ): Promise<MessageResponse> {
+    const { reopen, ...httpOptions } = options ?? {};
+    const closeAt = reopen?.closeAt;
+
+    if (closeAt !== undefined && status !== 'PUBLISHED') {
+      throw new TypeError('A new deadline requires a PUBLISHED status.');
+    }
+
     return this.http.patch<MessageResponse>(
       `/assignments/${assignmentId}/status`,
-      { status },
-      options
+      closeAt === undefined ? { status } : { status, closeAt },
+      options === undefined ? undefined : httpOptions
     );
   }
 }

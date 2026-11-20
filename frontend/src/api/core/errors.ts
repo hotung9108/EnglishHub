@@ -50,9 +50,10 @@ export class ValidationError extends ApiClientError {
   constructor(
     message = 'Dữ liệu không hợp lệ.',
     errors?: Array<{ field?: string; message?: string }>,
-    rawError?: unknown
+    rawError?: unknown,
+    statusCode: 400 | 422 = 400
   ) {
-    super(message, 400, rawError, errors);
+    super(message, statusCode, rawError, errors);
     this.name = 'ValidationError';
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
@@ -126,7 +127,7 @@ export function parseApiError(error: unknown): ApiClientError {
         return new NotFoundError(message, axiosErr);
       case 400:
       case 422:
-        return new ValidationError(message, validationErrors, axiosErr);
+        return new ValidationError(message, validationErrors, axiosErr, status);
       case 409:
         return new ConflictError(message, axiosErr);
       default:
