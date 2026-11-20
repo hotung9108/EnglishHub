@@ -1127,9 +1127,29 @@ export const TeacherEditAssignment: React.FC = () => {
                   >
                     <Minus size={14} />
                   </button>
-                  <span className="tae-stepper-value">
-                    {assignmentData.maxSubmissions || 1} {isVi ? 'lần' : 'times'}
-                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    className="tae-stepper-input"
+                    value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
+                    placeholder="1"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                        return;
+                      }
+                      const clean = raw.replace(/^0+/, '');
+                      setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                    }}
+                    onBlur={() => {
+                      if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                      }
+                    }}
+                  />
+                  <span className="tae-stepper-unit">{isVi ? 'lần' : 'times'}</span>
                   <button
                     type="button"
                     className="tae-stepper-btn"

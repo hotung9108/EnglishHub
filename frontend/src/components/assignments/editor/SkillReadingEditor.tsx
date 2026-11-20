@@ -297,7 +297,7 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                       className="edit-form-input font-semibold"
                       value={q.prompt}
                       onChange={(e) => handleUpdateQuestion(qIdx, 'prompt', e.target.value)}
-                      placeholder={isVi ? `Câu hỏi #${q.order}: Nhập nội dung câu hỏi...` : `Question #${q.order}: Enter question statement...`}
+                      placeholder={isVi ? 'Nhập nội dung câu hỏi...' : 'Enter question statement...'}
                     />
                   </div>
 

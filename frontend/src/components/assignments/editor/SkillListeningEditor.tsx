@@ -396,7 +396,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                       className="edit-form-input font-semibold"
                       value={q.prompt}
                       onChange={(e) => handleUpdateQuestion(qIdx, 'prompt', e.target.value)}
-                      placeholder={isVi ? `Câu hỏi #${q.order}: Nhập nội dung câu hỏi...` : `Question #${q.order}: Enter question statement...`}
+                      placeholder={isVi ? 'Nhập nội dung câu hỏi hoặc câu có chỗ trống [ _____ ]...' : 'Enter question text or sentence with blank [ _____ ]...'}
                     />
                   </div>
 
