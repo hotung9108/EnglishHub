@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle, UploadCloud } from 'lucide-react';
 import type { 
   ListeningConfig, ListeningQuestionItem 
 } from '../../../types/assignment-editor.types';
@@ -255,19 +255,23 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
           );
         })() : (
           <div
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-              isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 dark:border-slate-700 hover:border-primary'
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+              isDragging
+                ? 'border-primary bg-primary/5 scale-[0.99]'
+                : 'border-slate-200 dark:border-slate-700/80 hover:border-primary/60 hover:bg-emerald-50/20'
             }`}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="text-3xl mb-2">🎧</div>
-            <p className="font-semibold text-sm text-main mb-1">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50 flex items-center justify-center text-primary transition-transform">
+              <UploadCloud size={24} className="text-primary" />
+            </div>
+            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 mb-1">
               {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag & drop audio here or click to browse'}
             </p>
-            <p className="text-xs text-muted">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {isVi ? 'Hỗ trợ .mp3, .wav, .m4a (tối đa 50MB)' : 'Supports .mp3, .wav, .m4a (up to 50MB)'}
             </p>
           </div>
