@@ -88,6 +88,22 @@ class UserProfileServiceTest {
 	}
 
 	@ParameterizedTest
+	@ValueSource(strings = {"abcxyz", " 090abc123 ", "12345678", "1234567890123456"})
+	void rejectsInvalidFormatPhoneBeforeSavingAnyProvidedFields(String phone) {
+		User currentUser = user(12L);
+		currentUser.updatePhone("0900000000");
+		when(currentUserProvider.requireActiveUser()).thenReturn(currentUser);
+
+		assertThatThrownBy(() -> userProfileService.updateMyProfile(new UpdateOwnProfileCommand(
+				"Trần Thị Mai Lan", phone, "https://example.test/new-avatar.png")))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không đúng định dạng.");
+		verify(userRepository, never()).save(any(User.class));
+		assertThat(currentUser.phone()).isEqualTo("0900000000");
+	}
+
+	@ParameterizedTest
 	@MethodSource("phoneUpdates")
 	void savesNormalizedPhoneOrClearsAnExistingPhone(String phone, String expected) {
 		User currentUser = user(12L);
@@ -115,7 +131,7 @@ class UserProfileServiceTest {
 	}
 
 	private static Stream<Arguments> phoneUpdates() {
-		String boundary = "1".repeat(20);
+		String boundary = "1".repeat(15);
 		return Stream.of(Arguments.of(boundary, boundary), Arguments.of(" " + boundary + " ", boundary),
 				Arguments.of("", null), Arguments.of("   ", null));
 	}

@@ -119,7 +119,7 @@ public class ReportService {
 			requireClass(classId);
 		}
 		User user = currentUserProvider.requireActiveUser();
-		requireReportRole(user);
+		requireStudentProgressRole(user, studentId);
 		if (user.role() == UserRole.TEACHER && classId == null) {
 			throw ApiException.badRequest("Giáo viên phải truyền classId.");
 		}
@@ -230,6 +230,16 @@ public class ReportService {
 		if (user.role() != UserRole.ADMIN && user.role() != UserRole.TEACHER) {
 			throw ApiException.forbidden(FORBIDDEN);
 		}
+	}
+
+	private void requireStudentProgressRole(User user, long studentId) {
+		if (user.role() == UserRole.ADMIN || user.role() == UserRole.TEACHER) {
+			return;
+		}
+		if (user.role() == UserRole.STUDENT && user.id() != null && user.id().equals(studentId)) {
+			return;
+		}
+		throw ApiException.forbidden(FORBIDDEN);
 	}
 
 	private void checkClassAccess(User user, Long classId) {

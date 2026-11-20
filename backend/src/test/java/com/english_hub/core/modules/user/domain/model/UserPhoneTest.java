@@ -25,7 +25,7 @@ class UserPhoneTest {
 	}
 
 	@ParameterizedTest
-	@MethodSource("rejectedPhones")
+	@MethodSource("overlongPhones")
 	void rejectsOverlongPhonesBeforeChangingTheOldValue(String input) {
 		User user = user();
 		String previous = user.phone();
@@ -37,27 +37,39 @@ class UserPhoneTest {
 		assertThat(user.phone()).isEqualTo(previous);
 	}
 
+	@ParameterizedTest
+	@MethodSource("invalidFormatPhones")
+	void rejectsInvalidFormatPhonesBeforeChangingTheOldValue(String input) {
+		User user = user();
+		String previous = user.phone();
+
+		assertThatThrownBy(() -> user.updatePhone(input))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không đúng định dạng.");
+		assertThat(user.phone()).isEqualTo(previous);
+	}
+
 	private static Stream<Arguments> acceptedPhones() {
-		String boundary = "1".repeat(20);
 		return Stream.of(
 				Arguments.of(null, null),
 				Arguments.of("", null),
 				Arguments.of(" \t\r\n ", null),
-				Arguments.of("1", "1"),
-				Arguments.of("1".repeat(19), "1".repeat(19)),
-				Arguments.of(boundary, boundary),
-				Arguments.of(" " + boundary, boundary),
-				Arguments.of(boundary + " ", boundary),
-				Arguments.of(" " + boundary + " ", boundary),
-				Arguments.of("+84 90-12", "+84 90-12"),
-				Arguments.of("Đ".repeat(20), "Đ".repeat(20)),
-				Arguments.of("😀".repeat(10), "😀".repeat(10)),
-				Arguments.of("e\u0301".repeat(10), "e\u0301".repeat(10)));
+				Arguments.of("0900000000", "0900000000"),
+				Arguments.of(" 0900000000 ", "0900000000"),
+				Arguments.of("+84900000000", "+84900000000"),
+				Arguments.of("1".repeat(9), "1".repeat(9)),
+				Arguments.of("1".repeat(15), "1".repeat(15)),
+				Arguments.of("+" + "1".repeat(14), "+" + "1".repeat(14)));
 	}
 
-	private static Stream<String> rejectedPhones() {
-		return Stream.of("1".repeat(21), "1".repeat(1000), " " + "1".repeat(21) + " ",
-				"😀".repeat(11), "😀".repeat(20));
+	private static Stream<String> overlongPhones() {
+		return Stream.of("1".repeat(21), "1".repeat(1000), " " + "1".repeat(21) + " ");
+	}
+
+	private static Stream<String> invalidFormatPhones() {
+		return Stream.of("abcxyz", "090abc123", "12345678", "1".repeat(16),
+				"+84 90-12", "Đ".repeat(10), "😀".repeat(10));
 	}
 
 	private User user() {

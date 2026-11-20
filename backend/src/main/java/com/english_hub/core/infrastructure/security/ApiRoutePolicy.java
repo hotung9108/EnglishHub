@@ -58,6 +58,10 @@ public final class ApiRoutePolicy {
 			new RouteRule(HttpMethod.DELETE, "/api/v1/classes/{id}/members/{memberId}", List.of("ADMIN", "TEACHER")),
 
 			// Reports
+			new RouteRule(
+					HttpMethod.GET,
+					"/api/v1/reports/students/{id}/progress",
+					List.of("ADMIN", "TEACHER", "STUDENT")),
 			new RouteRule(HttpMethod.GET, "/api/v1/reports/**", List.of("ADMIN", "TEACHER")),
 
 			// Assignment

@@ -164,4 +164,27 @@ class ReportStudentProgressApiIntegrationTest extends ReportIntegrationTestBase 
 				.param("classId", "999999999").header("Authorization", auth))
 				.andExpect(status().isNotFound());
 	}
+
+	@Test
+	void studentCanReadOwnProgressWithoutClassId() throws Exception {
+		long studentId = createStudent("Own student", UserStatus.ACTIVE, false);
+		String auth = bearer(studentId, UserRole.STUDENT);
+
+		mockMvc.perform(get("/api/v1/reports/students/{id}/progress", studentId)
+				.header("Authorization", auth))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.studentId").value(studentId))
+				.andExpect(jsonPath("$.studentName").value("Own student"));
+	}
+
+	@Test
+	void studentCannotReadAnotherStudentsProgress() throws Exception {
+		long studentId = createStudent("Own student", UserStatus.ACTIVE, false);
+		long otherStudentId = createStudent("Other student", UserStatus.ACTIVE, false);
+		String auth = bearer(studentId, UserRole.STUDENT);
+
+		mockMvc.perform(get("/api/v1/reports/students/{id}/progress", otherStudentId)
+				.header("Authorization", auth))
+				.andExpect(status().isForbidden());
+	}
 }

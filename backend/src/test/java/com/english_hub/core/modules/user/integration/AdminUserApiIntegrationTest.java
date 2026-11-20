@@ -93,6 +93,7 @@ class AdminUserApiIntegrationTest {
 	private static final String NEW_FULL_NAME = "Trần Thị Mai Lan";
 	private static final String NEW_AVATAR = "https://example.test/new-avatar.png";
 	private static final String PHONE_ERROR = "Số điện thoại không được vượt quá 20 ký tự.";
+	private static final String PHONE_FORMAT_ERROR = "Số điện thoại không đúng định dạng.";
 	private static final SqlUpdateInspector SQL_UPDATES = new SqlUpdateInspector();
 
 	@Container
@@ -241,27 +242,38 @@ class AdminUserApiIntegrationTest {
 		assertThat(databaseState()).isEqualTo(before);
 		assertProfileReadback(ORIGINAL_PHONE, ADMIN_FULL_NAME, ORIGINAL_AVATAR);
 
-		body.put("phone", "1".repeat(20));
+		body.put("phone", "1".repeat(15));
 		PhoneUpdate recovered = updatePhone(ownProfile, body);
 
 		assertThat(recovered.response().getResponse().getStatus()).isEqualTo(200);
 		assertThat(recovered.updates()).isPositive();
-		assertStoredProfile("1".repeat(20), NEW_FULL_NAME, ownProfile ? NEW_AVATAR : ORIGINAL_AVATAR);
+		assertStoredProfile("1".repeat(15), NEW_FULL_NAME, ownProfile ? NEW_AVATAR : ORIGINAL_AVATAR);
 	}
 
 	@Test
-	void successiveUpdatesAndUtf16BoundariesRoundTripWithoutTruncation() throws Exception {
-		for (String phone : List.of("1".repeat(19), "Đ".repeat(20), "😀".repeat(10))) {
+	void successiveUpdatesAndValidPhonesRoundTripWithoutTruncation() throws Exception {
+		for (String phone : List.of("1".repeat(9), "1".repeat(12), "1".repeat(15))) {
 			PhoneUpdate update = updatePhone(true, phoneBody(phone));
 			assertThat(update.response().getResponse().getStatus()).isEqualTo(200);
 			assertThat(update.updates()).isPositive();
 			assertStoredProfile(phone, ADMIN_FULL_NAME, ORIGINAL_AVATAR);
 		}
 		Map<String, Object> before = databaseState();
-		PhoneUpdate rejected = updatePhone(true, phoneBody("😀".repeat(11)));
-		assertPhoneError(rejected.response(), PHONE_ERROR);
+		PhoneUpdate rejected = updatePhone(true, phoneBody("abcxyz"));
+		assertPhoneError(rejected.response(), PHONE_FORMAT_ERROR);
 		assertThat(rejected.updates()).isZero();
 		assertThat(databaseState()).isEqualTo(before);
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {true, false})
+	void rejectsNonDigitPhoneFormatLikeAbcxyz(boolean ownProfile) throws Exception {
+		Map<String, Object> before = databaseState();
+		PhoneUpdate rejected = updatePhone(ownProfile, phoneBody("abcxyz"));
+		assertPhoneError(rejected.response(), PHONE_FORMAT_ERROR);
+		assertThat(rejected.updates()).isZero();
+		assertThat(databaseState()).isEqualTo(before);
+		assertProfileReadback(ORIGINAL_PHONE, ADMIN_FULL_NAME, ORIGINAL_AVATAR);
 	}
 
 	@ParameterizedTest(name = "CRUD: {0}")
@@ -309,9 +321,9 @@ class AdminUserApiIntegrationTest {
 		assertThat(databaseState()).isEqualTo(before);
 		assertProfileReadback(ORIGINAL_PHONE, ADMIN_FULL_NAME, ORIGINAL_AVATAR);
 
-		request.setPhone("1".repeat(20));
+		request.setPhone("1".repeat(15));
 		crudService.update(callerId, request);
-		assertStoredProfile("1".repeat(20), NEW_FULL_NAME, NEW_AVATAR);
+		assertStoredProfile("1".repeat(15), NEW_FULL_NAME, NEW_AVATAR);
 	}
 
 	@ParameterizedTest
@@ -343,8 +355,8 @@ class AdminUserApiIntegrationTest {
 	}
 
 	private static Stream<Arguments> phoneCases() {
-		String boundary = "1".repeat(20);
-		return Stream.of(Arguments.of("20 characters", boundary, 200, boundary),
+		String boundary = "1".repeat(15);
+		return Stream.of(Arguments.of("15 characters", boundary, 200, boundary),
 				Arguments.of("leading space", " " + boundary, 200, boundary),
 				Arguments.of("trailing space", boundary + " ", 200, boundary),
 				Arguments.of("both edges", " " + boundary + " ", 200, boundary),
