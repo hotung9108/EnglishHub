@@ -255,18 +255,14 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
           );
         })() : (
           <div
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-              isDragging
-                ? 'border-primary bg-primary/5 scale-[0.99]'
-                : 'border-slate-200 dark:border-slate-700/80 hover:border-primary/60 hover:bg-emerald-50/20'
-            }`}
+            className={`tae-audio-dropzone ${isDragging ? 'dragging' : ''}`}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50 flex items-center justify-center text-primary transition-transform">
-              <UploadCloud size={24} className="text-primary" />
+            <div className="tae-audio-icon-wrap">
+              <UploadCloud size={24} />
             </div>
             <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 mb-1">
               {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag & drop audio here or click to browse'}
@@ -374,10 +370,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                         </button>
                       </div>
 
-                      {/* Readonly Score Pill */}
-                      <div className="flex items-center gap-1.5 text-xs text-muted bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-                        <span className="font-semibold text-primary">{pointsDisplay} {isVi ? 'điểm' : 'pts'}</span>
-                      </div>
+                      {/* Score Pill */}
+                      <span className="question-score-pill">
+                        {pointsDisplay} {isVi ? 'điểm' : 'pts'}
+                      </span>
 
                       <button 
                         type="button" 

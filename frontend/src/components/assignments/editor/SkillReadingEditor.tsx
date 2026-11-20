@@ -271,10 +271,10 @@ export const SkillReadingEditor: React.FC<SkillReadingEditorProps> = ({ config, 
                         </button>
                       </div>
 
-                      {/* Readonly Score Pill */}
-                      <div className="flex items-center gap-1.5 text-xs text-muted bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-                        <span className="font-semibold text-primary">{pointsDisplay} {isVi ? 'điểm' : 'pts'}</span>
-                      </div>
+                      {/* Score Pill */}
+                      <span className="question-score-pill">
+                        {pointsDisplay} {isVi ? 'điểm' : 'pts'}
+                      </span>
 
                       <button
                         type="button"
