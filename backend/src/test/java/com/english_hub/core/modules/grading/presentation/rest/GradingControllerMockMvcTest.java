@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.english_hub.core.modules.grading.application.service.GradingService;
 import com.english_hub.core.common.ApiException;
 import com.english_hub.core.common.GlobalExceptionHandler;
-import com.english_hub.core.modules.grading.domain.model.GradingPage;
+import com.english_hub.core.modules.grading.application.dto.GradingListPage;
 import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class GradingControllerMockMvcTest {
 	@Test
 	void gradingListUsesTheExistingDataAndPaginationEnvelope() throws Exception {
 		when(gradingService.listGradings(null, null, null, 2, 5))
-				.thenReturn(new GradingPage(Collections.emptyList(), 2, 5, 11));
+				.thenReturn(new GradingListPage(Collections.emptyList(), 2, 5, 11));
 
 		mockMvc.perform(get("/api/v1/gradings").param("page", "2").param("limit", "5"))
 				.andExpect(status().isOk())

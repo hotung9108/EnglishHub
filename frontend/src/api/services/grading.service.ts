@@ -103,6 +103,16 @@ export interface GradingSummaryResponse {
   id: number;
   status: GradingStatus;
   finalScore: number | null;
+  submissionModuleId?: number;
+  assignmentId?: number;
+  assignmentTitle?: string;
+  classId?: number;
+  className?: string;
+  teacherId?: number;
+  teacherName?: string;
+  studentId?: number;
+  studentName?: string;
+  gradedAt?: string | null;
 }
 
 export interface GradingPagination {

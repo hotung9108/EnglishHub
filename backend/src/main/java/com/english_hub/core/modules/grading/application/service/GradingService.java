@@ -5,6 +5,9 @@ import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.modules.classroom.domain.model.EnglishClass;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.grading.application.dto.GradingChangeLogItem;
+import com.english_hub.core.modules.grading.application.dto.GradingListPage;
+import com.english_hub.core.modules.grading.application.dto.GradingMetadata;
+import com.english_hub.core.modules.grading.application.dto.GradingSummaryItem;
 import com.english_hub.core.modules.grading.domain.model.AnnotationSource;
 import com.english_hub.core.modules.grading.domain.model.AnswerAnnotation;
 import com.english_hub.core.modules.grading.domain.model.Grading;
@@ -345,12 +348,14 @@ public class GradingService {
 	public Grading getById(long gradingId) {
 		User caller = currentUserProvider.requireActiveUser();
 		Grading grading = requireGrading(gradingId);
-		GradingContext context = requireGradingContext(gradingId);
-		requireSubmissionReadAccess(context, caller);
+		if (caller.role() != UserRole.ADMIN) {
+			GradingContext context = requireGradingContext(gradingId);
+			requireSubmissionReadAccess(context, caller);
+		}
 		return grading;
 	}
 
-	public GradingPage listGradings(Long classId, Long studentId, String statusValue, int page, int limit) {
+	public GradingListPage listGradings(Long classId, Long studentId, String statusValue, int page, int limit) {
 		User caller = currentUserProvider.requireActiveUser();
 		if (caller.role() != UserRole.TEACHER && caller.role() != UserRole.ADMIN) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
@@ -361,7 +366,33 @@ public class GradingService {
 		}
 		GradingStatus status = parseStatus(statusValue);
 		Long teacherId = caller.role() == UserRole.TEACHER ? caller.id() : null;
-		return gradingRepository.findPage(new GradingFilter(classId, studentId, status, teacherId), page, limit);
+		GradingPage gradingPage = gradingRepository.findPage(new GradingFilter(classId, studentId, status, teacherId), page, limit);
+
+		List<Long> submissionModuleIds = gradingPage.getContent().stream()
+				.map(Grading::submissionModuleId)
+				.filter(Objects::nonNull)
+				.toList();
+
+		java.util.Map<Long, GradingMetadata> metadataMap =
+				gradingContextRepository.findMetadataBySubmissionModuleIds(submissionModuleIds);
+
+		List<GradingSummaryItem> items = gradingPage.getContent().stream()
+				.map(grading -> {
+					GradingMetadata meta = metadataMap != null ? metadataMap.get(grading.submissionModuleId()) : null;
+					return new GradingSummaryItem(
+							grading,
+							meta != null ? meta.assignmentId() : null,
+							meta != null ? meta.assignmentTitle() : null,
+							meta != null ? meta.classId() : null,
+							meta != null ? meta.className() : null,
+							meta != null ? meta.teacherId() : null,
+							meta != null ? meta.teacherName() : null,
+							meta != null ? meta.studentId() : null,
+							meta != null ? meta.studentName() : null);
+				})
+				.toList();
+
+		return new GradingListPage(items, gradingPage.getPage(), gradingPage.getSize(), gradingPage.getTotalElements());
 	}
 
 	public List<AnswerAnnotation> listAnnotations(long answerId) {
@@ -436,8 +467,8 @@ public class GradingService {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
 		requireGrading(gradingId);
-		GradingContext context = requireGradingContext(gradingId);
 		if (caller.role() == UserRole.TEACHER) {
+			GradingContext context = requireGradingContext(gradingId);
 			requireTeacherOwnsContext(context, caller);
 		}
 		return gradingChangeLogRepository.findByGradingIdNewestFirst(gradingId).stream()

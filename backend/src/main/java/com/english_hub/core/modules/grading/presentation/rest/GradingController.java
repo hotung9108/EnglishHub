@@ -1,7 +1,7 @@
 package com.english_hub.core.modules.grading.presentation.rest;
 
+import com.english_hub.core.modules.grading.application.dto.GradingListPage;
 import com.english_hub.core.modules.grading.application.service.GradingService;
-import com.english_hub.core.modules.grading.domain.model.GradingPage;
 import com.english_hub.core.modules.grading.presentation.rest.dto.AiGradingSuggestionResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.AnswerAnnotationListResponse;
 import com.english_hub.core.modules.grading.presentation.rest.dto.AnswerAnnotationResponse;
@@ -87,10 +87,10 @@ public class GradingController {
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int limit) {
-		GradingPage result = gradingService.listGradings(classId, studentId, status, page, limit);
+		GradingListPage result = gradingService.listGradings(classId, studentId, status, page, limit);
 		return ResponseEntity.ok(new GradingListResponse(
-				result.getContent().stream().map(GradingSummaryResponse::from).toList(),
-				new PaginationResponse(result.getPage(), result.getSize(), result.getTotalElements())));
+				result.content().stream().map(GradingSummaryResponse::from).toList(),
+				new PaginationResponse(result.page(), result.limit(), result.totalElements())));
 	}
 
 	@GetMapping("/answers/{id}/annotations")
