@@ -796,9 +796,26 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentAction(context)) return;
       showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
-      const initialStatus = aiSuggestion?.status;
       const POLL_INTERVAL_MS = 2500;
       const MAX_ATTEMPTS = 24;
+
+      const finishAiPolling = async (message: string) => {
+        const loading = loadModuleData(targetModuleId);
+        const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+        try {
+          await loading;
+          if (isCurrentAction(pollContext)) {
+            showToast(message);
+          }
+        } catch (pollErr) {
+          console.error('Error refreshing grading after AI:', pollErr);
+        } finally {
+          if (isCurrentAction(pollContext)) {
+            aiRequestRef.current = null;
+            setIsAnalyzingAi(false);
+          }
+        }
+      };
 
       const pollAiSuggestion = (attempt: number) => {
         aiPollTimerRef.current = setTimeout(async () => {
@@ -809,80 +826,22 @@ export const TeacherSubmissionDetails: React.FC = () => {
             const suggestion = await gradingService.getAiSuggestion(targetModuleId);
             if (!isCurrentAction(context)) return;
 
-            const isCompleted =
-              suggestion.status === 'AI_GRADED' ||
-              (suggestion.status !== 'PENDING' && suggestion.status !== 'FAILED') ||
-              (Boolean(suggestion.aiFeedback) && suggestion.status !== initialStatus);
-            const isFailed = suggestion.status === 'FAILED';
-
-            if (isCompleted) {
-              const loading = loadModuleData(targetModuleId);
-              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
-              try {
-                await loading;
-                if (!isCurrentAction(pollContext)) return;
-                showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
-              } catch (pollErr) {
-                if (!isCurrentAction(pollContext)) return;
-                console.error('Error refreshing grading after AI:', pollErr);
-              } finally {
-                if (isCurrentAction(pollContext)) {
-                  aiRequestRef.current = null;
-                  setIsAnalyzingAi(false);
-                }
-              }
-              return;
+            if (suggestion.status === 'FAILED') {
+              const fallbackMsg = suggestion.fallbackMessage || (isVi ? 'AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.' : 'AI grading failed. You can grade manually.');
+              return finishAiPolling(fallbackMsg);
             }
 
-            if (isFailed) {
-              const loading = loadModuleData(targetModuleId);
-              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
-              try {
-                await loading;
-                if (!isCurrentAction(pollContext)) return;
-                showToast(
-                  suggestion.fallbackMessage ||
-                    (isVi ? 'AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.' : 'AI grading failed. You can grade manually.')
-                );
-              } catch (pollErr) {
-                if (!isCurrentAction(pollContext)) return;
-                console.error('Error refreshing grading after AI failure:', pollErr);
-              } finally {
-                if (isCurrentAction(pollContext)) {
-                  aiRequestRef.current = null;
-                  setIsAnalyzingAi(false);
-                }
-              }
-              return;
+            if (suggestion.status === 'AI_GRADED' || suggestion.status === 'COMPLETED') {
+              return finishAiPolling(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
             }
 
-            // Still in progress / PENDING
             if (attempt < MAX_ATTEMPTS) {
               pollAiSuggestion(attempt + 1);
             } else {
-              // Max attempts reached (timed out)
-              const loading = loadModuleData(targetModuleId);
-              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
-              try {
-                await loading;
-                if (!isCurrentAction(pollContext)) return;
-                showToast(
-                  isVi
-                    ? 'Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.'
-                    : 'AI analysis is taking longer than expected. Please check back shortly.'
-                );
-              } catch (pollErr) {
-                if (!isCurrentAction(pollContext)) return;
-                console.error('Error refreshing grading after AI timeout:', pollErr);
-              } finally {
-                if (isCurrentAction(pollContext)) {
-                  aiRequestRef.current = null;
-                  setIsAnalyzingAi(false);
-                }
-              }
+              const timeoutMsg = isVi ? 'Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.' : 'AI analysis is taking longer than expected. Please check back shortly.';
+              return finishAiPolling(timeoutMsg);
             }
           } catch (pollErr) {
-            if (!isCurrentAction(context)) return;
             console.error('Error polling AI suggestion:', pollErr);
             if (attempt < MAX_ATTEMPTS) {
               pollAiSuggestion(attempt + 1);

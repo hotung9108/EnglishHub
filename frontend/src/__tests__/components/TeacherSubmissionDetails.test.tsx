@@ -721,6 +721,64 @@ it('polls multiple times until AI grading status transitions to AI_GRADED', asyn
   expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
 });
+
+it('handles AI grading failure during polling', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({
+    ...ai,
+    status: 'FAILED',
+    fallbackMessage: '',
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+  await act(() => vi.advanceTimersByTimeAsync(2500));
+
+  expect(screen.getByText('AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('handles AI grading polling timeout and error retry', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  // Always return PENDING to test max attempts timeout
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({
+    ...ai,
+    status: 'PENDING',
+    aiFeedback: null,
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  // Advance through 24 attempts (24 * 2500 = 60000ms)
+  for (let i = 0; i < 24; i++) {
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+  }
+
+  expect(screen.getByText('Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.')).toBeVisible();
+  expect(screen.getByRole('button', { name: /Chấm.*bằng AI/ })).toBeEnabled();
+});
+
+it('retries on polling error and eventually reports error if max attempts reached', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  vi.mocked(gradingService.getAiSuggestion).mockRejectedValue(new Error('Network drop'));
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  for (let i = 0; i < 24; i++) {
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+  }
+
+  expect(screen.getByText('Lỗi khi kiểm tra kết quả AI. Vui lòng thử lại.')).toBeVisible();
+  expect(screen.getByRole('button', { name: /Chấm.*bằng AI/ })).toBeEnabled();
+});
 it.each(['assigned', 'fallback', 'error', 'route', 'route-error'] as const)('resolves student identity from %s', async mode => {
   if (mode === 'error' || mode === 'route-error') vi.mocked(classService.list).mockRejectedValue(new Error('Offline'));
   else if (mode !== 'route') {
