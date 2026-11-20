@@ -72,7 +72,7 @@ export const ROUTE_TITLE_RULES: RouteTitleRule[] = [
   { pattern: /^\/student\/assignments\/?$/, titleVi: 'Danh sách bài tập', titleEn: 'My Assignments' },
   { pattern: /^\/student\/feedback\/?$/, titleVi: 'Xem bài chữa & Feedback', titleEn: 'Feedback & Corrections' },
   { pattern: /^\/student\/grades\/?$/, titleVi: 'Bảng điểm & Trạng thái', titleEn: 'Grades & Status' },
-  { pattern: /^\/student\/analytics\/?$/, titleVi: 'Phân tích năng lực 4KN', titleEn: 'Skills Analytics' },
+  { pattern: /^\/student\/analytics\/?$/, titleVi: 'Phân tích học tập', titleEn: 'Learning Analytics' },
   { pattern: /^\/student\/settings\/?$/, titleVi: 'Cài đặt', titleEn: 'Settings' },
   { pattern: /^\/student\/profile\/?$/, titleVi: 'Hồ sơ cá nhân', titleEn: 'Profile' },
 ];

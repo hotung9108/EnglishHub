@@ -1,0 +1,740 @@
+{
+  "projectCode": "EAM",
+  "rootSuiteId": 243,
+  "layout": "function-group/UC/case",
+  "ucSuites": {
+    "UC001": 275,
+    "UC002": 276,
+    "UC003": 277,
+    "UC004": 278,
+    "UC005": 279,
+    "UC006": 280,
+    "UC007": 281,
+    "UC008": 282,
+    "UC009": 283,
+    "UC010": 284,
+    "UC011": 285,
+    "UC012": 286,
+    "UC013": 287,
+    "UC014": 288,
+    "UC015": 289,
+    "UC016": 290,
+    "UC017": 291,
+    "UC018": 292,
+    "UC019": 293,
+    "UC020": 294,
+    "UC021": 295,
+    "UC022": 296,
+    "UC023": 297,
+    "UC024": 298,
+    "UC025": 299,
+    "UC026": 300,
+    "UC027": 301,
+    "UC028": 302,
+    "UC029": 303,
+    "UC030": 304,
+    "UC031": 305,
+    "UC032": 306,
+    "UC033": 307,
+    "UC034": 308,
+    "UC035": 309
+  },
+  "groups": {
+    "auth": 268,
+    "users": 269,
+    "classes": 270,
+    "assignments": 271,
+    "attempts": 272,
+    "grading": 273,
+    "reports": 274
+  },
+  "nfrSuiteId": 310,
+  "excludedSuiteId": 260,
+  "cases": {
+    "LOGIN_001": {
+      "qaseCaseId": 4819,
+      "suiteId": 275
+    },
+    "LOGIN_002": {
+      "qaseCaseId": 4820,
+      "suiteId": 275
+    },
+    "LOGIN_003": {
+      "qaseCaseId": 4821,
+      "suiteId": 275
+    },
+    "LOGIN_004": {
+      "qaseCaseId": 4822,
+      "suiteId": 275
+    },
+    "LOGIN_005": {
+      "qaseCaseId": 4823,
+      "suiteId": 275
+    },
+    "LOGIN_006": {
+      "qaseCaseId": 4824,
+      "suiteId": 275
+    },
+    "LOGIN_007": {
+      "qaseCaseId": 4825,
+      "suiteId": 275
+    },
+    "LOGIN_008": {
+      "qaseCaseId": 4826,
+      "suiteId": 275
+    },
+    "LOGIN_009": {
+      "qaseCaseId": 4827,
+      "suiteId": 275
+    },
+    "LOGIN_010": {
+      "qaseCaseId": 4828,
+      "suiteId": 275
+    },
+    "LOGIN_011": {
+      "qaseCaseId": 4829,
+      "suiteId": 275
+    },
+    "LOGIN_012": {
+      "qaseCaseId": 4830,
+      "suiteId": 275
+    },
+    "LOGIN_013": {
+      "qaseCaseId": 4831,
+      "suiteId": 275
+    },
+    "LOGIN_014": {
+      "qaseCaseId": 4832,
+      "suiteId": 275
+    },
+    "LOGIN_015": {
+      "qaseCaseId": 4833,
+      "suiteId": 275
+    },
+    "LOGIN_016": {
+      "qaseCaseId": 4834,
+      "suiteId": 275
+    },
+    "LOGIN_017": {
+      "qaseCaseId": 4835,
+      "suiteId": 275
+    },
+    "LOGIN_018": {
+      "qaseCaseId": 4836,
+      "suiteId": 275
+    },
+    "LOGIN_019": {
+      "qaseCaseId": 4837,
+      "suiteId": 275
+    },
+    "LOGIN_020": {
+      "qaseCaseId": 4838,
+      "suiteId": 275
+    },
+    "LOGIN_021": {
+      "qaseCaseId": 4839,
+      "suiteId": 275
+    },
+    "LOGIN_022": {
+      "qaseCaseId": 4840,
+      "suiteId": 275
+    },
+    "LOGIN_023": {
+      "qaseCaseId": 4841,
+      "suiteId": 275
+    },
+    "LOGIN_024": {
+      "qaseCaseId": 4842,
+      "suiteId": 275
+    },
+    "LOGIN_025": {
+      "qaseCaseId": 4843,
+      "suiteId": 275
+    },
+    "LOGOUT_001": {
+      "qaseCaseId": 4844,
+      "suiteId": 276
+    },
+    "LOGOUT_002": {
+      "qaseCaseId": 4845,
+      "suiteId": 276
+    },
+    "LOGOUT_003": {
+      "qaseCaseId": 4846,
+      "suiteId": 276
+    },
+    "LOGOUT_004": {
+      "qaseCaseId": 4847,
+      "suiteId": 276
+    },
+    "LOGOUT_005": {
+      "qaseCaseId": 4848,
+      "suiteId": 276
+    },
+    "PROF_001": {
+      "qaseCaseId": 4849,
+      "suiteId": 277
+    },
+    "PROF_002": {
+      "qaseCaseId": 4850,
+      "suiteId": 277
+    },
+    "PROF_003": {
+      "qaseCaseId": 4851,
+      "suiteId": 277
+    },
+    "PROF_004": {
+      "qaseCaseId": 4852,
+      "suiteId": 277
+    },
+    "PROF_005": {
+      "qaseCaseId": 4853,
+      "suiteId": 277
+    },
+    "PROF_006": {
+      "qaseCaseId": 4854,
+      "suiteId": 277
+    },
+    "PROF_007": {
+      "qaseCaseId": 4855,
+      "suiteId": 277
+    },
+    "PROF_008": {
+      "qaseCaseId": 4856,
+      "suiteId": 277
+    },
+    "PROF_009": {
+      "qaseCaseId": 4857,
+      "suiteId": 277
+    },
+    "PROF_010": {
+      "qaseCaseId": 4858,
+      "suiteId": 277
+    },
+    "PROF_011": {
+      "qaseCaseId": 4859,
+      "suiteId": 277
+    },
+    "PROF_012": {
+      "qaseCaseId": 4860,
+      "suiteId": 277
+    },
+    "USER_001": {
+      "qaseCaseId": 4861,
+      "suiteId": 278
+    },
+    "USER_002": {
+      "qaseCaseId": 4862,
+      "suiteId": 278
+    },
+    "USER_003": {
+      "qaseCaseId": 4863,
+      "suiteId": 278
+    },
+    "USER_004": {
+      "qaseCaseId": 4864,
+      "suiteId": 278
+    },
+    "USER_005": {
+      "qaseCaseId": 4865,
+      "suiteId": 278
+    },
+    "USER_006": {
+      "qaseCaseId": 4866,
+      "suiteId": 278
+    },
+    "USER_007": {
+      "qaseCaseId": 4867,
+      "suiteId": 278
+    },
+    "USER_008": {
+      "qaseCaseId": 4868,
+      "suiteId": 278
+    },
+    "USER_009": {
+      "qaseCaseId": 4869,
+      "suiteId": 278
+    },
+    "USER_010": {
+      "qaseCaseId": 4870,
+      "suiteId": 278
+    },
+    "USER_011": {
+      "qaseCaseId": 4871,
+      "suiteId": 278
+    },
+    "USER_012": {
+      "qaseCaseId": 4872,
+      "suiteId": 278
+    },
+    "USER_013": {
+      "qaseCaseId": 4873,
+      "suiteId": 278
+    },
+    "RBAC_001": {
+      "qaseCaseId": 4874,
+      "suiteId": 279
+    },
+    "RBAC_002": {
+      "qaseCaseId": 4875,
+      "suiteId": 279
+    },
+    "RBAC_003": {
+      "qaseCaseId": 4876,
+      "suiteId": 279
+    },
+    "RBAC_004": {
+      "qaseCaseId": 4877,
+      "suiteId": 279
+    },
+    "RBAC_005": {
+      "qaseCaseId": 4878,
+      "suiteId": 279
+    },
+    "RBAC_006": {
+      "qaseCaseId": 4879,
+      "suiteId": 279
+    },
+    "TCHR_001": {
+      "qaseCaseId": 4880,
+      "suiteId": 280
+    },
+    "TCHR_002": {
+      "qaseCaseId": 4881,
+      "suiteId": 280
+    },
+    "TCHR_003": {
+      "qaseCaseId": 4882,
+      "suiteId": 280
+    },
+    "TCHR_004": {
+      "qaseCaseId": 4883,
+      "suiteId": 280
+    },
+    "STDT_001": {
+      "qaseCaseId": 4884,
+      "suiteId": 281
+    },
+    "STDT_002": {
+      "qaseCaseId": 4885,
+      "suiteId": 281
+    },
+    "STDT_003": {
+      "qaseCaseId": 4886,
+      "suiteId": 281
+    },
+    "STDT_004": {
+      "qaseCaseId": 4887,
+      "suiteId": 281
+    },
+    "CLS_001": {
+      "qaseCaseId": 4888,
+      "suiteId": 282
+    },
+    "CLS_002": {
+      "qaseCaseId": 4889,
+      "suiteId": 282
+    },
+    "CLS_003": {
+      "qaseCaseId": 4890,
+      "suiteId": 282
+    },
+    "CLS_004": {
+      "qaseCaseId": 4891,
+      "suiteId": 282
+    },
+    "CLS_005": {
+      "qaseCaseId": 4892,
+      "suiteId": 282
+    },
+    "CLS_006": {
+      "qaseCaseId": 4893,
+      "suiteId": 282
+    },
+    "CLS_007": {
+      "qaseCaseId": 4894,
+      "suiteId": 282
+    },
+    "CLS_008": {
+      "qaseCaseId": 4895,
+      "suiteId": 282
+    },
+    "MEM_001": {
+      "qaseCaseId": 4896,
+      "suiteId": 283
+    },
+    "MEM_002": {
+      "qaseCaseId": 4897,
+      "suiteId": 283
+    },
+    "MEM_003": {
+      "qaseCaseId": 4898,
+      "suiteId": 283
+    },
+    "MEM_004": {
+      "qaseCaseId": 4899,
+      "suiteId": 283
+    },
+    "MEM_005": {
+      "qaseCaseId": 4900,
+      "suiteId": 283
+    },
+    "CLV_001": {
+      "qaseCaseId": 4901,
+      "suiteId": 284
+    },
+    "CLV_002": {
+      "qaseCaseId": 4902,
+      "suiteId": 284
+    },
+    "CLV_003": {
+      "qaseCaseId": 4903,
+      "suiteId": 284
+    },
+    "ASG_001": {
+      "qaseCaseId": 4904,
+      "suiteId": 285
+    },
+    "ASG_002": {
+      "qaseCaseId": 4905,
+      "suiteId": 285
+    },
+    "ASG_003": {
+      "qaseCaseId": 4906,
+      "suiteId": 285
+    },
+    "ASG_004": {
+      "qaseCaseId": 4907,
+      "suiteId": 286
+    },
+    "ASG_005": {
+      "qaseCaseId": 4908,
+      "suiteId": 286
+    },
+    "ASG_006": {
+      "qaseCaseId": 4909,
+      "suiteId": 286
+    },
+    "ASG_007": {
+      "qaseCaseId": 4910,
+      "suiteId": 286
+    },
+    "ASG_008": {
+      "qaseCaseId": 4911,
+      "suiteId": 286
+    },
+    "ASG_009": {
+      "qaseCaseId": 4912,
+      "suiteId": 286
+    },
+    "ASG_010": {
+      "qaseCaseId": 4913,
+      "suiteId": 286
+    },
+    "ASG_011": {
+      "qaseCaseId": 4914,
+      "suiteId": 286
+    },
+    "ASG_012": {
+      "qaseCaseId": 4915,
+      "suiteId": 286
+    },
+    "ASG_013": {
+      "qaseCaseId": 4916,
+      "suiteId": 286
+    },
+    "ASG_014": {
+      "qaseCaseId": 4917,
+      "suiteId": 286
+    },
+    "ASG_015": {
+      "qaseCaseId": 4918,
+      "suiteId": 286
+    },
+    "ASG_016": {
+      "qaseCaseId": 4919,
+      "suiteId": 286
+    },
+    "ASG_017": {
+      "qaseCaseId": 4920,
+      "suiteId": 287
+    },
+    "ASG_018": {
+      "qaseCaseId": 4921,
+      "suiteId": 287
+    },
+    "ASG_019": {
+      "qaseCaseId": 4922,
+      "suiteId": 288
+    },
+    "ASG_020": {
+      "qaseCaseId": 4923,
+      "suiteId": 288
+    },
+    "ASG_021": {
+      "qaseCaseId": 4924,
+      "suiteId": 287
+    },
+    "ASG_022": {
+      "qaseCaseId": 4925,
+      "suiteId": 285
+    },
+    "DO_001": {
+      "qaseCaseId": 4926,
+      "suiteId": 289
+    },
+    "DO_002": {
+      "qaseCaseId": 4927,
+      "suiteId": 289
+    },
+    "DO_003": {
+      "qaseCaseId": 4928,
+      "suiteId": 290
+    },
+    "DO_004": {
+      "qaseCaseId": 4929,
+      "suiteId": 290
+    },
+    "DO_005": {
+      "qaseCaseId": 4930,
+      "suiteId": 290
+    },
+    "DO_006": {
+      "qaseCaseId": 4931,
+      "suiteId": 291
+    },
+    "DO_007": {
+      "qaseCaseId": 4932,
+      "suiteId": 291
+    },
+    "DO_008": {
+      "qaseCaseId": 4933,
+      "suiteId": 291
+    },
+    "DO_009": {
+      "qaseCaseId": 4934,
+      "suiteId": 292
+    },
+    "DO_010": {
+      "qaseCaseId": 4935,
+      "suiteId": 292
+    },
+    "DO_011": {
+      "qaseCaseId": 4936,
+      "suiteId": 293
+    },
+    "DO_012": {
+      "qaseCaseId": 4937,
+      "suiteId": 293
+    },
+    "DO_013": {
+      "qaseCaseId": 4938,
+      "suiteId": 295
+    },
+    "DO_014": {
+      "qaseCaseId": 4939,
+      "suiteId": 295
+    },
+    "DO_015": {
+      "qaseCaseId": 4940,
+      "suiteId": 295
+    },
+    "DO_016": {
+      "qaseCaseId": 4941,
+      "suiteId": 295
+    },
+    "DO_017": {
+      "qaseCaseId": 4942,
+      "suiteId": 260
+    },
+    "DO_018": {
+      "qaseCaseId": 4943,
+      "suiteId": 295
+    },
+    "DO_019": {
+      "qaseCaseId": 4944,
+      "suiteId": 296
+    },
+    "DO_020": {
+      "qaseCaseId": 4945,
+      "suiteId": 296
+    },
+    "DO_021": {
+      "qaseCaseId": 4946,
+      "suiteId": 296
+    },
+    "DO_022": {
+      "qaseCaseId": 4947,
+      "suiteId": 294
+    },
+    "DO_023": {
+      "qaseCaseId": 4948,
+      "suiteId": 297
+    },
+    "GRD_001": {
+      "qaseCaseId": 4949,
+      "suiteId": 298
+    },
+    "GRD_002": {
+      "qaseCaseId": 4950,
+      "suiteId": 298
+    },
+    "GRD_003": {
+      "qaseCaseId": 4951,
+      "suiteId": 298
+    },
+    "GRD_004": {
+      "qaseCaseId": 4952,
+      "suiteId": 298
+    },
+    "GRD_005": {
+      "qaseCaseId": 4953,
+      "suiteId": 298
+    },
+    "GRD_006": {
+      "qaseCaseId": 4954,
+      "suiteId": 298
+    },
+    "GRD_007": {
+      "qaseCaseId": 4955,
+      "suiteId": 298
+    },
+    "GRD_008": {
+      "qaseCaseId": 4956,
+      "suiteId": 299
+    },
+    "GRD_009": {
+      "qaseCaseId": 4957,
+      "suiteId": 299
+    },
+    "GRD_010": {
+      "qaseCaseId": 4958,
+      "suiteId": 299
+    },
+    "GRD_011": {
+      "qaseCaseId": 4959,
+      "suiteId": 300
+    },
+    "GRD_012": {
+      "qaseCaseId": 4960,
+      "suiteId": 260
+    },
+    "GRD_013": {
+      "qaseCaseId": 4961,
+      "suiteId": 301
+    },
+    "GRD_014": {
+      "qaseCaseId": 4962,
+      "suiteId": 302
+    },
+    "GRD_015": {
+      "qaseCaseId": 4963,
+      "suiteId": 301
+    },
+    "GRD_016": {
+      "qaseCaseId": 4964,
+      "suiteId": 298
+    },
+    "SCR_001": {
+      "qaseCaseId": 4965,
+      "suiteId": 303
+    },
+    "SCR_002": {
+      "qaseCaseId": 4966,
+      "suiteId": 303
+    },
+    "SCR_003": {
+      "qaseCaseId": 4967,
+      "suiteId": 303
+    },
+    "SCR_004": {
+      "qaseCaseId": 4968,
+      "suiteId": 304
+    },
+    "SCR_005": {
+      "qaseCaseId": 4969,
+      "suiteId": 304
+    },
+    "RES_001": {
+      "qaseCaseId": 4970,
+      "suiteId": 305
+    },
+    "RES_002": {
+      "qaseCaseId": 4971,
+      "suiteId": 305
+    },
+    "RES_003": {
+      "qaseCaseId": 4972,
+      "suiteId": 306
+    },
+    "RES_004": {
+      "qaseCaseId": 4973,
+      "suiteId": 306
+    },
+    "RES_005": {
+      "qaseCaseId": 4974,
+      "suiteId": 307
+    },
+    "RES_006": {
+      "qaseCaseId": 4975,
+      "suiteId": 307
+    },
+    "RES_007": {
+      "qaseCaseId": 4976,
+      "suiteId": 308
+    },
+    "RES_008": {
+      "qaseCaseId": 4977,
+      "suiteId": 309
+    },
+    "RES_009": {
+      "qaseCaseId": 4978,
+      "suiteId": 309
+    },
+    "RES_010": {
+      "qaseCaseId": 4979,
+      "suiteId": 309
+    },
+    "NFR_001": {
+      "qaseCaseId": 4980,
+      "suiteId": 310
+    },
+    "NFR_002": {
+      "qaseCaseId": 4981,
+      "suiteId": 310
+    },
+    "NFR_003": {
+      "qaseCaseId": 4982,
+      "suiteId": 310
+    },
+    "NFR_004": {
+      "qaseCaseId": 4983,
+      "suiteId": 310
+    },
+    "NFR_005": {
+      "qaseCaseId": 4984,
+      "suiteId": 310
+    },
+    "NFR_006": {
+      "qaseCaseId": 4985,
+      "suiteId": 310
+    },
+    "NFR_007": {
+      "qaseCaseId": 4986,
+      "suiteId": 310
+    },
+    "NFR_008": {
+      "qaseCaseId": 4987,
+      "suiteId": 310
+    },
+    "NFR_009": {
+      "qaseCaseId": 4988,
+      "suiteId": 310
+    }
+  },
+  "verification": {
+    "updatesAcknowledged": 170,
+    "fullReadback": "incomplete: Qase list calls did not finish; cancelled read-only verification"
+  },
+  "backup": "D:/ki7/prj1/backups/qase-ui-before-replacement-20261117/before-uc-layout.json"
+}

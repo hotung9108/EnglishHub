@@ -141,15 +141,7 @@ public class User extends BaseEntity<Long> {
 	}
 
 	public void updatePhone(String phone) {
-		String normalized = phone == null ? null : phone.trim();
-		if (normalized != null && normalized.isEmpty()) {
-			normalized = null;
-		}
-		if (normalized != null && normalized.length() > 20) {
-			throw com.english_hub.core.common.ApiException.badRequest(
-					"Số điện thoại không được vượt quá 20 ký tự.");
-		}
-		this.phone = normalized;
+		this.phone = PhoneValidator.validateAndNormalize(phone);
 	}
 
 	public void updateAvatarUrl(String avatarUrl) {
@@ -166,7 +158,7 @@ public class User extends BaseEntity<Long> {
 			String parentPhone) {
 		this.studentCode = studentCode;
 		this.dateOfBirth = dateOfBirth;
-		this.parentPhone = parentPhone;
+		this.parentPhone = PhoneValidator.validateAndNormalize(parentPhone);
 	}
 
 	public void changePassword(String passwordHash) {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
-import { authService } from '@/api';
+import { authService, ApiClientError } from '@/api';
 import { 
   Mail, Lock, Eye, EyeOff, ArrowRight, 
   Globe, AlertCircle 
@@ -43,8 +43,21 @@ const LoginForm: React.FC = () => {
       } else {
         navigate(from, { replace: true });
       }
-    } catch {
-      setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác.' : 'Invalid email or password credentials.');
+    } catch (err: unknown) {
+      const isForbidden =
+        (err instanceof ApiClientError && err.statusCode === 403) ||
+        (err as { statusCode?: number })?.statusCode === 403 ||
+        (err as { response?: { status?: number } })?.response?.status === 403;
+
+      if (isForbidden) {
+        setError(
+          isVi
+            ? 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.'
+            : 'Your account has been locked. Please contact the administrator.'
+        );
+      } else {
+        setError(isVi ? 'Tài khoản hoặc mật khẩu không chính xác.' : 'Invalid email or password credentials.');
+      }
     } finally {
       setIsSubmitting(false);
     }

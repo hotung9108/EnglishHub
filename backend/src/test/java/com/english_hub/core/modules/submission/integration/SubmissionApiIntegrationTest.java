@@ -757,7 +757,7 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void submitModuleRejectsResubmission() throws Exception {
+	void submitModuleAllowsResubmissionWhileSubmissionIsInProgress() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long submissionModuleId = quizSubmissionModuleId(submissionId);
 		String body = "{\"answers\":["
@@ -773,8 +773,8 @@ class SubmissionApiIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Phần làm bài này đã được nộp."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
 	}
 
 	@Test
@@ -1170,7 +1170,7 @@ class SubmissionApiIntegrationTest {
 	}
 
 	@Test
-	void getSubmissionModuleDetailRejectsASubmissionThatIsNotSubmittedYet() throws Exception {
+	void getSubmissionModuleDetailAllowsSubmittedModuleWhenSubmissionIsInProgress() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long submissionModuleId = quizSubmissionModuleId(submissionId);
 		submitQuizModule(submissionModuleId);
@@ -1182,8 +1182,9 @@ class SubmissionApiIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/submission-modules/{id}", submissionModuleId)
 						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT)))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value("Phần làm bài chưa được nộp."));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(submissionModuleId))
+				.andExpect(jsonPath("$.status").value("SUBMITTED"));
 	}
 
 	@Test

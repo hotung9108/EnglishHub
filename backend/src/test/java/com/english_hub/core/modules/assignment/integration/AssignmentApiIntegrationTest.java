@@ -1,5 +1,7 @@
 package com.english_hub.core.modules.assignment.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -14,12 +16,19 @@ import com.english_hub.core.common.domain.UserRole;
 import com.english_hub.core.common.domain.UserStatus;
 import com.english_hub.core.infrastructure.persistence.entity.Assignment;
 import com.english_hub.core.infrastructure.persistence.entity.AssignmentStatus;
+import com.english_hub.core.infrastructure.persistence.entity.Submission;
+import com.english_hub.core.infrastructure.persistence.entity.SubmissionStatus;
 import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepository;
+import com.english_hub.core.infrastructure.persistence.repository.SubmissionRepository;
 import com.english_hub.core.infrastructure.security.JwtTokenService;
+import com.english_hub.core.modules.assignment.application.service.AssignmentService;
+import com.english_hub.core.modules.assignment.domain.repository.AssignmentAttemptCountRepository;
+import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassJpaRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.repository.ClassMemberJpaRepository;
+import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.StudentProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.TeacherProfile;
 import com.english_hub.core.modules.user.infrastructure.persistence.entity.User;
@@ -27,56 +36,71 @@ import com.english_hub.core.infrastructure.persistence.repository.StudentProfile
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(AssignmentApiIntegrationTest.FixedClockConfiguration.class)
+@EnabledIfEnvironmentVariable(named = "SPRING_DATASOURCE_URL", matches = "jdbc:postgresql://[^/]+/[\\w-]+_test(?:\\?.*)?")
 @Transactional
 class AssignmentApiIntegrationTest {
 
-	@Autowired
-	private MockMvc mockMvc;
+	private static final OffsetDateTime TEST_NOW = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS);
+	private static final OffsetDateTime OPEN_AT = TEST_NOW.minusDays(2);
+	private static final OffsetDateTime FUTURE_CLOSE_AT = TEST_NOW.plusDays(2);
 
-	@Autowired
-	private UserRepository userRepository;
-
-	@Autowired
-	private TeacherProfileRepository teacherProfileRepository;
-
-	@Autowired
-	private StudentProfileRepository studentProfileRepository;
-
-	@Autowired
-	private ClassJpaRepository classRepository;
-
-	@Autowired
-	private ClassMemberJpaRepository classMemberRepository;
-
-	@Autowired
-	private AssignmentRepository assignmentRepository;
-
-	@Autowired
-	private JwtTokenService jwtTokenService;
-
-	@PersistenceContext
-	private EntityManager entityManager;
+	private final MockMvc mockMvc;
+	private final UserRepository userRepository;
+	private final TeacherProfileRepository teacherProfileRepository;
+	private final StudentProfileRepository studentProfileRepository;
+	private final ClassJpaRepository classRepository;
+	private final ClassMemberJpaRepository classMemberRepository;
+	private final AssignmentRepository assignmentRepository;
+	private final SubmissionRepository submissionRepository;
+	private final JwtTokenService jwtTokenService;
+	private final EntityManager entityManager;
+	private final TransactionTemplate raceTransaction;
 
 	private Long adminId;
 	private Long teacherId;
@@ -85,6 +109,25 @@ class AssignmentApiIntegrationTest {
 	private Long otherStudentId;
 	private Long classId;
 	private Long assignmentId;
+
+	@Autowired
+	AssignmentApiIntegrationTest(MockMvc mockMvc, UserRepository userRepository,
+			TeacherProfileRepository teacherProfileRepository, StudentProfileRepository studentProfileRepository,
+			ClassJpaRepository classRepository, ClassMemberJpaRepository classMemberRepository,
+			AssignmentRepository assignmentRepository, SubmissionRepository submissionRepository,
+			JwtTokenService jwtTokenService, EntityManager entityManager, PlatformTransactionManager transactionManager) {
+		this.mockMvc = mockMvc;
+		this.userRepository = userRepository;
+		this.teacherProfileRepository = teacherProfileRepository;
+		this.studentProfileRepository = studentProfileRepository;
+		this.classRepository = classRepository;
+		this.classMemberRepository = classMemberRepository;
+		this.assignmentRepository = assignmentRepository;
+		this.submissionRepository = submissionRepository;
+		this.jwtTokenService = jwtTokenService;
+		this.entityManager = entityManager;
+		this.raceTransaction = new TransactionTemplate(transactionManager);
+	}
 
 	@BeforeEach
 	void setUp() {
@@ -362,14 +405,301 @@ class AssignmentApiIntegrationTest {
 				.andExpect(jsonPath("$.error").value("Không thể sửa bài tập đã đóng."));
 	}
 
+	@ParameterizedTest
+	@CsvSource({
+			"DRAFT, DRAFT, 400", "DRAFT, PUBLISHED, 200", "DRAFT, CLOSED, 400",
+			"PUBLISHED, DRAFT, 400", "PUBLISHED, PUBLISHED, 400", "PUBLISHED, CLOSED, 200",
+			"CLOSED, DRAFT, 400", "CLOSED, PUBLISHED, 200", "CLOSED, CLOSED, 400"
+	})
+	void allowsOnlyValidStatusTransitions(AssignmentStatus current, AssignmentStatus target, int expectedStatus)
+			throws Exception {
+		Assignment before = saveBe84Assignment(current, FUTURE_CLOSE_AT, 2, false);
+		mockMvc.perform(patchStatus(before.getId(), statusBody(target, null))
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().is(expectedStatus));
+
+		Assignment stored = reloadAssignment(before.getId());
+		if (expectedStatus == 200) {
+			assertThat(stored.getStatus()).isEqualTo(target);
+			assertThat(stored.getCloseAt()).isEqualTo(before.getCloseAt());
+		} else {
+			assertThat(stored).usingRecursiveComparison().isEqualTo(before);
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {false, true})
+	void reopensAssignmentAndAllowsEditAndNextAttempt(boolean extendDeadline) throws Exception {
+		OffsetDateTime storedCloseAt = extendDeadline ? TEST_NOW.minusDays(1) : FUTURE_CLOSE_AT;
+		OffsetDateTime requestedCloseAt = extendDeadline ? FUTURE_CLOSE_AT : null;
+		Assignment before = saveBe84Assignment(AssignmentStatus.CLOSED, storedCloseAt, 2, false);
+		Long id = before.getId();
+		OffsetDateTime submittedAt = TEST_NOW.minusDays(2).plusHours(1);
+		Long previousAttemptId = submissionRepository.saveAndFlush(
+				new Submission(id, studentId, 1, submittedAt, SubmissionStatus.SUBMITTED)).getId();
+
+		mockMvc.perform(patchStatus(id, statusBody(AssignmentStatus.PUBLISHED, requestedCloseAt))
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk());
+		Assignment reopened = reloadAssignment(id);
+		assertThat(reopened.getCloseAt().toInstant()).isEqualTo(FUTURE_CLOSE_AT.toInstant());
+		assertThat(reopened.getOpenAt()).isEqualTo(before.getOpenAt());
+		mockMvc.perform(get("/api/v1/assignments/{id}", id)
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("PUBLISHED"));
+
+		mockMvc.perform(putAssignment(id, "{\"title\":\"Updated after reopening\"}")
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk());
+		assertThat(reloadAssignment(id).getTitle()).isEqualTo("Updated after reopening");
+
+		mockMvc.perform(post("/api/v1/assignments/{id}/submissions", id)
+					.header(HttpHeaders.AUTHORIZATION, bearer(studentId, UserRole.STUDENT)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.attemptNumber").value(2));
+		entityManager.flush();
+		entityManager.clear();
+		Submission previousAttempt = submissionRepository.findById(previousAttemptId).orElseThrow();
+		assertThat(previousAttempt.getStatus()).isEqualTo(SubmissionStatus.SUBMITTED);
+		assertThat(previousAttempt.getSubmittedAt().toInstant()).isEqualTo(submittedAt.toInstant());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidReopenDeadlines")
+	void rejectsInvalidReopenDeadlineAndPreservesAssignment(String scenario, OffsetDateTime storedCloseAt,
+			OffsetDateTime requestedCloseAt, String expectedError) throws Exception {
+		Assignment before = saveBe84Assignment(AssignmentStatus.CLOSED, storedCloseAt, 2, false);
+
+		mockMvc.perform(patchStatus(before.getId(), statusBody(AssignmentStatus.PUBLISHED, requestedCloseAt))
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value(expectedError));
+
+		assertThat(reloadAssignment(before.getId())).usingRecursiveComparison().isEqualTo(before);
+	}
+
+	private static Stream<Arguments> invalidReopenDeadlines() {
+		String notFuture = "Hạn nộp khi mở lại phải sau thời điểm hiện tại.";
+		return Stream.of(
+				Arguments.of("before openAt", FUTURE_CLOSE_AT, OPEN_AT.minusDays(1),
+						"Hạn nộp phải sau thời điểm mở bài."),
+				Arguments.of("equal to now", FUTURE_CLOSE_AT, TEST_NOW, notFuture),
+				Arguments.of("expired stored deadline", TEST_NOW.minusDays(1), null, notFuture));
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {
+			"2, 1, 400, 2", "3, 1, 400, 3", "null, 1, 400, null",
+			"3, 2, 200, 2", "2, 2, 200, 2", "2, null, 200, 2", "null, 2, 200, 2"
+	}, nullValues = "null")
+	void appliesMaxSubmissionsPolicy(Integer currentCap, Integer requestedCap, int expectedStatus, Integer expectedCap)
+			throws Exception {
+		Assignment before = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, currentCap, false);
+		classMemberRepository.save(new ClassMemberEntity(classId, otherStudentId));
+		OffsetDateTime submittedAt = TEST_NOW.minusHours(1);
+		submissionRepository.saveAll(List.of(
+				new Submission(before.getId(), studentId, 1, submittedAt, SubmissionStatus.SUBMITTED),
+				new Submission(before.getId(), studentId, 2, null, SubmissionStatus.IN_PROGRESS),
+				new Submission(before.getId(), otherStudentId, 1, submittedAt, SubmissionStatus.SUBMITTED)));
+
+		String body = "{\"maxSubmissions\":" + requestedCap + ",\"title\":\"Updated cap policy\"}";
+		var result = mockMvc.perform(putAssignment(before.getId(), body)
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().is(expectedStatus));
+
+		Assignment stored = reloadAssignment(before.getId());
+		assertThat(stored.getMaxSubmissions()).isEqualTo(expectedCap);
+		if (expectedStatus == 400) {
+			result.andExpect(jsonPath("$.error").value(
+					"Số lần nộp tối đa không được nhỏ hơn số lượt đã làm cao nhất của học viên (2 lượt)."));
+			assertThat(stored).usingRecursiveComparison().isEqualTo(before);
+		} else {
+			result.andExpect(jsonPath("$.maxSubmissions").value(expectedCap));
+			assertThat(stored.getTitle()).isEqualTo("Updated cap policy");
+		}
+	}
+
 	@Test
-	void getAndUpdateResponsesIncludeMaxSubmissions() throws Exception {
-		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
+	void canDecreaseCapWhenOnlyOtherAssignmentsHaveAttempts() throws Exception {
+		Assignment otherAssignment = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 3, false);
+		submissionRepository.saveAll(List.of(
+				new Submission(otherAssignment.getId(), studentId, 1, TEST_NOW.minusHours(1), SubmissionStatus.SUBMITTED),
+				new Submission(otherAssignment.getId(), studentId, 2, null, SubmissionStatus.IN_PROGRESS)));
+		Assignment target = saveBe84Assignment(AssignmentStatus.DRAFT, FUTURE_CLOSE_AT, 3, false);
+
+		mockMvc.perform(putAssignment(target.getId(), "{\"maxSubmissions\":1}")
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(1));
+		assertThat(reloadAssignment(target.getId()).getMaxSubmissions()).isEqualTo(1);
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, -1})
+	void rejectsNonPositiveCapWithoutChangingAssignment(int requestedCap) throws Exception {
+		Assignment before = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 2, false);
+
+		mockMvc.perform(putAssignment(before.getId(), "{\"maxSubmissions\":" + requestedCap + "}")
+					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
+				.andExpect(status().isBadRequest());
+		assertThat(reloadAssignment(before.getId())).usingRecursiveComparison().isEqualTo(before);
+	}
+
+	@Test
+	void rejectsDecimalCapAndKeepsAssignmentUnchanged() throws Exception {
+		Assignment before = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 3, false);
+		String authorization = bearer(teacherId, UserRole.TEACHER);
+		mockMvc.perform(putAssignment(before.getId(), "{\"maxSubmissions\":1.5,\"title\":\"Should not be saved\"}")
+					.header(HttpHeaders.AUTHORIZATION, authorization))
+				.andExpect(status().isBadRequest());
+
+		assertThat(reloadAssignment(before.getId())).usingRecursiveComparison().isEqualTo(before);
+		mockMvc.perform(get("/api/v1/assignments/{id}", before.getId())
+					.header(HttpHeaders.AUTHORIZATION, authorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(3));
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {false, true})
+	@EnabledIfEnvironmentVariable(named = "BE84_DISPOSABLE_DB", matches = "true")
+	void serializesCapReductionAndStartingNextAttempt(boolean startFirst) throws Exception {
+		Long id = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 2, false).getId();
+		submissionRepository.save(new Submission(id, studentId, 1, TEST_NOW.minusHours(1), SubmissionStatus.SUBMITTED));
+		var start = post("/api/v1/assignments/{id}/submissions", id)
+				.header(HttpHeaders.AUTHORIZATION, bearer(studentId, UserRole.STUDENT));
+		var reduce = putAssignment(id, "{\"maxSubmissions\":1}")
+				.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER));
+
+		if (startFirst) {
+			MvcResult blockedUpdate = performOverlappingWrites(start, 201, reduce);
+			assertThat(blockedUpdate.getResponse().getStatus()).isEqualTo(400);
+			assertThat(blockedUpdate.getResponse().getContentAsString()).contains("2 lượt");
+		} else {
+			MvcResult blockedStart = performOverlappingWrites(reduce, 200, start);
+			assertThat(blockedStart.getResponse().getStatus()).isEqualTo(400);
+		}
+
+		int expected = startFirst ? 2 : 1;
+		assertThat(assignmentRepository.findById(id).orElseThrow().getMaxSubmissions()).isEqualTo(expected);
+		assertThat(submissionRepository.findAttemptCountsByAssignmentId(id, PageRequest.of(0, 1)))
+				.containsExactly((long) expected);
+	}
+
+	@Test
+	@EnabledIfEnvironmentVariable(named = "BE84_DISPOSABLE_DB", matches = "true")
+	void statusUpdatePreservesDetailsFromAnOverlappingPut() throws Exception {
+		Long id = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 2, false).getId();
+		OffsetDateTime newCloseAt = FUTURE_CLOSE_AT.plusDays(1);
+		String authorization = bearer(teacherId, UserRole.TEACHER);
+		var edit = putAssignment(id, "{\"title\":\"Concurrent edit\",\"closeAt\":\"" + newCloseAt + "\"}")
+				.header(HttpHeaders.AUTHORIZATION, authorization);
+		var close = patchStatus(id, statusBody(AssignmentStatus.CLOSED, null))
+				.header(HttpHeaders.AUTHORIZATION, authorization);
+
+		assertThat(performOverlappingWrites(edit, 200, close).getResponse().getStatus()).isEqualTo(200);
+
+		Assignment stored = assignmentRepository.findById(id).orElseThrow();
+		assertThat(stored.getStatus()).isEqualTo(AssignmentStatus.CLOSED);
+		assertThat(stored.getTitle()).isEqualTo("Concurrent edit");
+		assertThat(stored.getCloseAt().toInstant()).isEqualTo(newCloseAt.toInstant());
+	}
+
+	private MvcResult performOverlappingWrites(MockHttpServletRequestBuilder firstRequest, int expectedFirstStatus,
+			MockHttpServletRequestBuilder secondRequest) throws Exception {
+		// The disposable database is required because both request threads need committed fixtures.
+		TestTransaction.flagForCommit();
+		TestTransaction.end();
+		CountDownLatch firstWriteApplied = new CountDownLatch(1);
+		CountDownLatch allowCommit = new CountDownLatch(1);
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		try {
+			Future<?> first = executor.submit(() -> raceTransaction.executeWithoutResult(transaction -> {
+				int statusCode = performRequest(firstRequest).getResponse().getStatus();
+				firstWriteApplied.countDown();
+				assertThat(statusCode).isEqualTo(expectedFirstStatus);
+				try {
+					assertThat(allowCommit.await(10, TimeUnit.SECONDS)).isTrue();
+				} catch (InterruptedException exception) {
+					Thread.currentThread().interrupt();
+					throw new IllegalStateException(exception);
+				}
+			}));
+			assertThat(firstWriteApplied.await(10, TimeUnit.SECONDS)).isTrue();
+			Future<MvcResult> second = executor.submit(() -> performRequest(secondRequest));
+			assertThrows(TimeoutException.class, () -> second.get(250, TimeUnit.MILLISECONDS));
+			allowCommit.countDown();
+			first.get(10, TimeUnit.SECONDS);
+			return second.get(10, TimeUnit.SECONDS);
+		} finally {
+			allowCommit.countDown();
+			executor.shutdownNow();
+		}
+	}
+
+	private MvcResult performRequest(MockHttpServletRequestBuilder request) {
+		try {
+			return mockMvc.perform(request).andReturn();
+		} catch (Exception exception) {
+			throw new IllegalStateException(exception);
+		}
+	}
+
+	@ParameterizedTest
+	@NullSource
+	@EnumSource(value = UserRole.class, names = {"STUDENT", "ADMIN", "TEACHER"})
+	void rejectsReopenAndCapUpdateWithoutOwnership(UserRole role) throws Exception {
+		Assignment closed = saveBe84Assignment(AssignmentStatus.CLOSED, FUTURE_CLOSE_AT, 2, false);
+		Assignment published = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 2, false);
+		var reopen = patchStatus(closed.getId(), statusBody(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT.plusDays(1)));
+		var update = putAssignment(published.getId(), "{\"maxSubmissions\":1}");
+		if (role != null) {
+			Long callerId = switch (role) {
+				case STUDENT -> studentId;
+				case ADMIN -> adminId;
+				case TEACHER -> otherTeacherId;
+			};
+			String authorization = bearer(callerId, role);
+			reopen.header(HttpHeaders.AUTHORIZATION, authorization);
+			update.header(HttpHeaders.AUTHORIZATION, authorization);
+		}
+
+		int expectedStatus = role == null ? 401 : 403;
+		mockMvc.perform(reopen).andExpect(status().is(expectedStatus));
+		mockMvc.perform(update).andExpect(status().is(expectedStatus));
+		assertThat(reloadAssignment(closed.getId())).usingRecursiveComparison().isEqualTo(closed);
+		assertThat(reloadAssignment(published.getId())).usingRecursiveComparison().isEqualTo(published);
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {false, true})
+	void rejectsStatusAndCapUpdatesForMissingOrDeletedAssignment(boolean deleted) throws Exception {
+		Assignment deletedAssignment = deleted ? saveBe84Assignment(AssignmentStatus.CLOSED, FUTURE_CLOSE_AT, 2, true) : null;
+		long id = deleted ? deletedAssignment.getId() : -assignmentId;
+		String authorization = bearer(teacherId, UserRole.TEACHER);
+
+		mockMvc.perform(patchStatus(id, statusBody(AssignmentStatus.PUBLISHED, null))
+					.header(HttpHeaders.AUTHORIZATION, authorization))
+				.andExpect(status().isNotFound());
+		mockMvc.perform(putAssignment(id, "{\"maxSubmissions\":1}")
+					.header(HttpHeaders.AUTHORIZATION, authorization))
+				.andExpect(status().isNotFound());
+		if (deleted) {
+			assertThat(reloadAssignment(id)).usingRecursiveComparison().isEqualTo(deletedAssignment);
+		}
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = AssignmentStatus.class, names = {"DRAFT", "PUBLISHED"})
+	void getAndUpdateResponsesIncludeMaxSubmissions(AssignmentStatus initialStatus) throws Exception {
+		Long id = saveBe84Assignment(initialStatus, FUTURE_CLOSE_AT, 1, false).getId();
+		mockMvc.perform(get("/api/v1/assignments/{id}", id)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.maxSubmissions").value(2));
+				.andExpect(jsonPath("$.maxSubmissions").value(1));
 
-		mockMvc.perform(put("/api/v1/assignments/{id}", assignmentId)
+		mockMvc.perform(put("/api/v1/assignments/{id}", id)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER))
 					.contentType(MediaType.APPLICATION_JSON)
 					.content("{\"maxSubmissions\":3}"))
@@ -380,10 +710,11 @@ class AssignmentApiIntegrationTest {
 		entityManager.flush();
 		entityManager.clear();
 
-		mockMvc.perform(get("/api/v1/assignments/{id}", assignmentId)
+		mockMvc.perform(get("/api/v1/assignments/{id}", id)
 					.header("Authorization", bearer(teacherId, UserRole.TEACHER)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.maxSubmissions").value(3));
+		assertThat(assignmentRepository.findById(id).orElseThrow().getMaxSubmissions()).isEqualTo(3);
 	}
 
 	@Test
@@ -628,6 +959,35 @@ class AssignmentApiIntegrationTest {
 				Arguments.of("DRAFT", "1", "abc", "MEMBER", 400, invalidData));
 	}
 
+	private Assignment saveBe84Assignment(AssignmentStatus status, OffsetDateTime closeAt, Integer cap, boolean deleted) {
+		Assignment assignment = assignmentRepository.saveAndFlush(new Assignment(
+				classId, "Assignment policy " + uniqueSuffix(), "Instructions", OPEN_AT, closeAt, cap, deleted, status));
+		entityManager.refresh(assignment);
+		entityManager.detach(assignment);
+		return assignment;
+	}
+
+	private Assignment reloadAssignment(Long id) {
+		entityManager.flush();
+		entityManager.clear();
+		return assignmentRepository.findById(id).orElseThrow();
+	}
+
+	private static MockHttpServletRequestBuilder patchStatus(Long id, String body) {
+		return patch("/api/v1/assignments/{id}/status", id).contentType(MediaType.APPLICATION_JSON).content(body);
+	}
+
+	private static MockHttpServletRequestBuilder putAssignment(Long id, String body) {
+		return put("/api/v1/assignments/{id}", id).contentType(MediaType.APPLICATION_JSON).content(body);
+	}
+
+	private static String statusBody(AssignmentStatus target, OffsetDateTime closeAt) {
+		if (closeAt == null) {
+			return "{\"status\":\"" + target + "\"}";
+		}
+		return "{\"status\":\"" + target + "\",\"closeAt\":\"" + closeAt + "\"}";
+	}
+
 	private Assignment saveAssignmentFromFixture(Long targetClassId, AssignmentStatus assignmentStatus, boolean deleted) {
 		Assignment fixture = assignmentRepository.findById(assignmentId).orElseThrow();
 		return assignmentRepository.save(new Assignment(
@@ -685,5 +1045,23 @@ class AssignmentApiIntegrationTest {
 
 	private String uniqueSuffix() {
 		return UUID.randomUUID().toString().substring(0, 8);
+	}
+
+	@TestConfiguration(proxyBeanMethods = false)
+	static class FixedClockConfiguration {
+
+		@Bean
+		@Primary
+		AssignmentService assignmentServiceWithFixedClock(
+				com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository assignmentRepository,
+				ClassRepository classRepository, CurrentUserProvider currentUserProvider,
+				AssignmentAttemptCountRepository attemptCountRepository) throws NoSuchMethodException {
+			var constructor = AssignmentService.class.getDeclaredConstructor(
+					com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository.class,
+					ClassRepository.class, CurrentUserProvider.class, AssignmentAttemptCountRepository.class, Clock.class);
+			Clock clock = Clock.fixed(TEST_NOW.toInstant(), ZoneOffset.UTC);
+			return BeanUtils.instantiateClass(constructor, assignmentRepository, classRepository, currentUserProvider,
+					attemptCountRepository, clock);
+		}
 	}
 }

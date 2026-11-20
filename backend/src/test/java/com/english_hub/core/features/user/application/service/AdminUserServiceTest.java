@@ -337,6 +337,24 @@ class AdminUserServiceTest {
 	}
 
 	@ParameterizedTest
+	@ValueSource(strings = {"abcxyz", " 090abc123 ", "12345678", "1234567890123456"})
+	void rejectsInvalidFormatPhoneBeforeSavingBaseOrProfileChanges(String phone) {
+		User target = user(41L, UserRole.TEACHER);
+		target.updatePhone("0900000000");
+		when(currentUserProvider.requireAdmin()).thenReturn(user(1L, UserRole.ADMIN));
+		when(userRepository.findById(41L)).thenReturn(Optional.of(target));
+
+		assertThatThrownBy(() -> adminUserService.updateUser(41L,
+				new UpdateUserCommand("Trần Thị Mai Lan", phone, "Changed specialization", null, null, null)))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không đúng định dạng.");
+		verify(userRepository, never()).save(any(User.class));
+		assertThat(target.phone()).isEqualTo("0900000000");
+		assertThat(target.specialization()).isEqualTo("IELTS");
+	}
+
+	@ParameterizedTest
 	@MethodSource("phoneUpdates")
 	void savesNormalizedPhoneOrClearsAnExistingPhone(String phone, String expected) {
 		User target = user(41L, UserRole.STUDENT);
@@ -365,7 +383,7 @@ class AdminUserServiceTest {
 	}
 
 	private static Stream<Arguments> phoneUpdates() {
-		String boundary = "1".repeat(20);
+		String boundary = "1".repeat(15);
 		return Stream.of(Arguments.of(boundary, boundary), Arguments.of(" " + boundary + " ", boundary),
 				Arguments.of("", null), Arguments.of("   ", null));
 	}

@@ -390,7 +390,11 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
 
     fireEvent.error(initialAudio!);
 
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    await waitFor(() => {
+      const audio = container.querySelector('audio');
+      expect(audio).not.toBeNull();
+      expect(audio).toHaveAttribute('src', FALLBACK_AUDIO_URL);
+    });
     const refreshedAudio = container.querySelector('audio')!;
     const media = configureAudio(refreshedAudio, 90);
     fireEvent.loadedMetadata(refreshedAudio);
@@ -411,7 +415,11 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Thử lại' }));
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    await waitFor(() => {
+      const audio = container.querySelector('audio');
+      expect(audio).not.toBeNull();
+      expect(audio).toHaveAttribute('src', FALLBACK_AUDIO_URL);
+    });
     fireEvent.error(container.querySelector('audio')!);
 
     expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();

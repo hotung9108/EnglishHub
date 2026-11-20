@@ -77,7 +77,8 @@ test('pageTitle - getPageTitle resolves student routes with skill types', () => 
   assert.strictEqual(getPageTitle('/student/assignments/15', 'vi'), 'Luyện viết Writing');
   assert.strictEqual(getPageTitle('/student/feedback', 'vi'), 'Xem bài chữa & Feedback');
   assert.strictEqual(getPageTitle('/student/grades', 'vi'), 'Bảng điểm & Trạng thái');
-  assert.strictEqual(getPageTitle('/student/analytics', 'vi'), 'Phân tích năng lực 4KN');
+  assert.strictEqual(getPageTitle('/student/analytics', 'vi'), 'Phân tích học tập');
+  assert.strictEqual(getPageTitle('/student/analytics', 'en'), 'Learning Analytics');
   assert.strictEqual(getPageTitle('/student/settings', 'vi'), 'Cài đặt');
   assert.strictEqual(getPageTitle('/student/profile', 'vi'), 'Hồ sơ cá nhân');
 });

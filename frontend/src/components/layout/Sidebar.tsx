@@ -188,6 +188,7 @@ const Sidebar = ({ isOpen, onCloseMobile }: SidebarProps) => {
         title: t('sectionResults'),
         items: [
           { path: '/student/grades', label: t('menuStudentGrades'), icon: CheckCircle },
+          { path: '/student/analytics', label: t('menuStudentAnalytics'), icon: BarChart3 },
           { path: '/student/feedback', label: t('menuStudentFeedback'), icon: TrendingUp },
         ]
       }
