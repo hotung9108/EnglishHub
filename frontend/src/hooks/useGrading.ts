@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseApiError, type ApiClientError } from '@/api/core/errors';
+import { isRequestCanceled, parseApiError, type ApiClientError } from '@/api/core/errors';
 import { gradingService } from '@/api/services/grading.service';
 import type {
   GradingDetailResponse,
@@ -91,6 +91,9 @@ export function useGrading(submissionModuleId?: number): UseGradingResult {
       setState({ grading, isLoading: false, error: null });
       return grading;
     } catch (cause) {
+      if (isRequestCanceled(cause)) {
+        return null;
+      }
       if (mounted.current && currentId.current === id && currentRequestId === requestId.current) {
         setState(current => ({ ...current, isLoading: false, error: parseApiError(cause) }));
       }
@@ -232,6 +235,9 @@ export function useStudentGradingResult(submissionModuleId?: number): UseStudent
       setState({ result, isLoading: false, error: null });
       return result;
     } catch (cause) {
+      if (isRequestCanceled(cause)) {
+        return null;
+      }
       if (mounted.current && currentId.current === id && currentRequestId === requestId.current) {
         setState(current => ({ ...current, isLoading: false, error: parseApiError(cause) }));
       }

@@ -12,6 +12,8 @@ export {
   ConflictError,
   NetworkError,
   TimeoutError,
+  RequestCanceledError,
+  isRequestCanceled,
   parseApiError,
 } from './core/errors';
 export { TokenRefreshManager, AUTH_EVENTS } from './core/interceptors';

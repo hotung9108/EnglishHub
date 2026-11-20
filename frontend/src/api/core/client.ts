@@ -56,7 +56,7 @@ export class AxiosHttpClientAdapter implements IHttpClient {
       return response.data;
     };
 
-    if (!options?.skipCache) {
+    if (!options?.skipCache && !options?.signal) {
       return apiCache.dedupe<T>(key, fetcher);
     }
 
