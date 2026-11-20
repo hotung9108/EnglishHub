@@ -321,7 +321,7 @@ const StudentAssignmentReading: React.FC = () => {
     if (canSubmitModule) {
       setSelectedAnswers(prev => {
         const next = { ...prev, [questionId]: answer };
-        if (process.env.NODE_ENV !== 'test' && numericId && submitScope?.moduleId) {
+        if (import.meta.env?.MODE !== 'test' && numericId && submitScope?.moduleId) {
           try {
             localStorage.setItem(`eh_draft_quiz_${numericId}_${submitScope.moduleId}`, JSON.stringify(next));
           } catch { /* ignore */ }

@@ -275,11 +275,11 @@ const StudentAssignmentOverview: React.FC = () => {
     try {
       await submissionService.submitSubmission(inProgressSub.id);
       try {
-        localStorage.removeItem(`eh_draft_writing_${numericId}`);
-        localStorage.removeItem(`eh_last_writing_${numericId}`);
+        localStorage.removeItem(`eh_draft_writing_${numericAssignmentId}`);
+        localStorage.removeItem(`eh_last_writing_${numericAssignmentId}`);
         if (assignment?.modules) {
           for (const m of assignment.modules) {
-            localStorage.removeItem(`eh_draft_quiz_${numericId}_${m.id}`);
+            localStorage.removeItem(`eh_draft_quiz_${numericAssignmentId}_${m.id}`);
           }
         }
       } catch { /* ignore */ }
