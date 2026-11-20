@@ -31,7 +31,6 @@ import {
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
-import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import { normalizeStorageUrl } from '../utils/storage.utils';
 import '../styles/student-exam.css';
 import '../styles/student-speaking.css';
@@ -354,7 +353,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate, isReviewMode]);
 
   // Handle Play/Pause for recorded audio or uploaded audio
   const effectiveAudioUrl = audioInputMode === 'mic' ? audioUrl : uploadedAudioUrl;

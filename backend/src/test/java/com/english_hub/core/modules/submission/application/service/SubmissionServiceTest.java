@@ -2038,7 +2038,7 @@ class SubmissionServiceTest {
 	}
 
 	@Test
-	void getModuleDetailRejectsASubmissionThatIsNotSubmittedYet() {
+	void getModuleDetailAllowsSubmittedModuleWhenSubmissionIsInProgress() {
 		when(currentUserProvider.requireActiveUser()).thenReturn(student(41L));
 		SubmissionModule submittedModule = submittedModule(9L);
 		submittedModule.setId(150L);
@@ -2046,12 +2046,15 @@ class SubmissionServiceTest {
 		Submission submission = submission(5L, 41L, 1);
 		submission.setId(88L);
 		when(submissionRepository.findById(5L)).thenReturn(Optional.of(submission));
+		when(assignmentModuleRepository.findModulesByAssignmentId(5L))
+				.thenReturn(List.of(moduleInfo(9L, ModuleSkill.READING, ModuleTaskType.QUIZ)));
+		when(moduleQuestionRepository.findDetailsByModuleId(9L)).thenReturn(List.of());
+		when(answerRepository.findBySubmissionModuleId(150L)).thenReturn(List.of());
 
-		assertThatThrownBy(() -> submissionService.getModuleDetail(150L))
-				.isInstanceOf(ApiException.class)
-				.hasMessage("Phần làm bài chưa được nộp.")
-				.satisfies(exception -> assertThat(((ApiException) exception).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-		verify(gradingRepository, never()).findBySubmissionModuleId(anyLong());
+		SubmissionModuleDetailResult detail = submissionService.getModuleDetail(150L);
+		assertThat(detail).isNotNull();
+		assertThat(detail.id()).isEqualTo(150L);
+		assertThat(detail.status()).isEqualTo(SubmissionStatus.SUBMITTED);
 	}
 
 	@ParameterizedTest(name = "{0}, {1}, camelCase={2}, answered={3}")

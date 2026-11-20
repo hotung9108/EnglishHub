@@ -250,8 +250,9 @@ const StudentAssignmentOverview: React.FC = () => {
     }
   };
 
+  const [renderTimestamp] = useState(() => Date.now());
   const isPastDeadline = Boolean(
-    assignment?.closeAt && new Date(assignment.closeAt).getTime() < Date.now()
+    assignment?.closeAt && new Date(assignment.closeAt).getTime() < renderTimestamp
   );
   const isClosedOrExpired = assignment?.status === 'CLOSED' || isPastDeadline;
 

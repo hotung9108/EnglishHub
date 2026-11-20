@@ -261,7 +261,7 @@ const StudentAssignmentReading: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, searchParams, user?.id, viewKey, navigate, setError]);
+  }, [numericId, searchParams, user?.id, viewKey, navigate, setError, isReviewMode]);
 
   const effectiveModules = useMemo(
     () => resolveEffectiveModules(assignment?.modules, submission?.modules),
@@ -315,7 +315,7 @@ const StudentAssignmentReading: React.FC = () => {
       if (viewGeneration.current === generation) navigate(destination, { replace: true });
     }, NAVIGATION_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [scopeReady, submitState, submitScope, viewKey, navigate]);
+  }, [scopeReady, submitState, submitScope, viewKey, navigate, isReviewMode]);
 
   const handleSelectAnswer = (questionId: number, answer: StudentQuizAnswer) => {
     if (canSubmitModule) {

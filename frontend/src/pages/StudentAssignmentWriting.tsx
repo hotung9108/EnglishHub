@@ -27,7 +27,6 @@ import {
   resolveEffectiveModules,
   getBackendDocumentMimeType
 } from '../utils/examStepper.utils';
-import { notifyAssignmentSubmitted } from '../utils/assignmentEvents.utils';
 import '../styles/student-exam.css';
 import '../styles/student-writing.css';
 
@@ -280,7 +279,7 @@ const StudentAssignmentWriting: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numericId, id, searchParams, user?.id, reloadKey, navigate]);
+  }, [numericId, id, searchParams, user?.id, reloadKey, navigate, isReviewMode]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
