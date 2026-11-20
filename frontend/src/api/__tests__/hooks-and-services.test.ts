@@ -5,7 +5,7 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { MemoryTokenStorage } from '../core/token-storage';
 import { TokenRefreshManager } from '../core/interceptors';
 import { AuthService } from '../services/auth.service';
-import { NotFoundError } from '../core/errors';
+import { NotFoundError, parseApiError, RequestCanceledError, TimeoutError } from '../core/errors';
 import { environment } from '../../config/environment';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
@@ -576,6 +576,23 @@ test('AssignmentService - rejects a supplied deadline for DRAFT and CLOSED befor
     );
   }
   assert.deepStrictEqual(mockHttp.calls, []);
+});
+
+test('AssignmentService - treats a browser XHR abort as unconfirmed and preserves explicit cancellation', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const service = new AssignmentService(mockHttp);
+  const browserAbort = new axios.AxiosError('Request aborted', axios.AxiosError.ECONNABORTED);
+  mockHttp.mockError = parseApiError(browserAbort);
+  assert.ok(mockHttp.mockError instanceof RequestCanceledError);
+  await assert.rejects(service.updateAssignmentStatus(42, 'PUBLISHED'),
+    error => error instanceof TimeoutError && error.rawError === browserAbort);
+  assert.equal(mockHttp.calls.length, 1);
+
+  const explicitCancel = parseApiError(new axios.CanceledError());
+  mockHttp.mockError = explicitCancel;
+  await assert.rejects(service.updateAssignmentStatus(42, 'CLOSED'), error => error === explicitCancel);
+  assert.equal(mockHttp.calls.length, 2);
 });
 
 test('AssignmentService - trims/clamps params and omits empty status', async () => {

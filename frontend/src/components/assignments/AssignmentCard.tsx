@@ -1,5 +1,5 @@
 import {
-  ArrowRight, BookOpen, Clock, Edit2, GraduationCap, Headphones, Mic, PenTool, Sparkles,
+  ArrowRight, BookOpen, Clock, Edit2, GraduationCap, Headphones, Mic, PenTool, Sparkles, Trash2,
 } from 'lucide-react';
 import type { AssignmentSkill, AssignmentStatus } from '../../api/services/assignment.service';
 import { toSkillBadgeTypes, type AssignmentBadgeType } from '../../utils/assignmentSkills';
@@ -37,6 +37,7 @@ interface AssignmentCardProps {
   currentTimestamp: number;
   onViewDetails: () => void;
   onEdit: () => void;
+  onDelete?: () => void;
   onViewSubmissions: () => void;
   onChangeLifecycle: (item: AssignmentDisplayItem) => void;
   isUpdatingLifecycle: boolean;
@@ -48,6 +49,7 @@ export function AssignmentCard({
   currentTimestamp,
   onViewDetails,
   onEdit,
+  onDelete,
   onViewSubmissions,
   onChangeLifecycle,
   isUpdatingLifecycle,
@@ -265,6 +267,18 @@ export function AssignmentCard({
           >
             {isPublished ? (isVi ? 'Khóa bài tập' : 'Close assignment') : (isVi ? 'Mở bài tập' : 'Open assignment')}
           </Button>
+
+          {onDelete && (
+            <button
+              type="button"
+              className="teacher-assignment-btn-delete"
+              onClick={onDelete}
+              title={isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+            >
+              <Trash2 size={13} />
+              <span>{isVi ? 'Xóa bài tập' : 'Delete Assignment'}</span>
+            </button>
+          )}
 
           <button
             type="button"

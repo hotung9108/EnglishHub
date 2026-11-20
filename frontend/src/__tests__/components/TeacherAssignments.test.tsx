@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiCache } from '../../api/core/cache';
 import { ApiClientError, NetworkError, parseApiError, TimeoutError, ValidationError } from '../../api/core/errors';
+import { MockHttpClient } from '../../api/__tests__/helpers/mock-http-client';
 import {
   assignmentService,
   type AssignmentListResponse,
@@ -18,7 +19,7 @@ import { deferred } from '../deferred';
 import { renderPage } from './renderPage';
 
 vi.mock('../../api/services/assignment.service', () => ({
-  assignmentService: { listAssignments: vi.fn(), updateAssignmentStatus: vi.fn() },
+  assignmentService: { listAssignments: vi.fn(), updateAssignmentStatus: vi.fn(), deleteAssignment: vi.fn() },
 }));
 vi.mock('../../api/services/class.service', () => ({
   classService: { list: vi.fn(), listMembers: vi.fn() },
@@ -155,9 +156,29 @@ beforeEach(() => {
   vi.mocked(classService.listMembers).mockReset().mockResolvedValue([]);
   vi.mocked(assignmentService.listAssignments).mockReset().mockResolvedValue(assignmentsResponse([]));
   vi.mocked(assignmentService.updateAssignmentStatus).mockReset().mockResolvedValue(response);
+  vi.mocked(assignmentService.deleteAssignment).mockReset().mockResolvedValue(response);
   vi.mocked(submissionService.listSubmissions).mockReset().mockResolvedValue({
     data: [], pagination: { page: 1, limit: 100, total: 0 },
   });
+});
+
+it('keeps one card and preserves delete confirmation alongside lifecycle actions', async () => {
+  await showAssignments([defaultAssignment]);
+  expect(screen.getAllByRole('heading', { name: defaultAssignment.title, level: 3 })).toHaveLength(1);
+  const card = cardById(42);
+  const remove = within(card).getByRole('button', { name: 'Xóa bài tập' });
+  expect(within(card).getByRole('button', { name: copy.vi.open })).toBeEnabled();
+
+  fireEvent.click(remove);
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Xóa bài tập' })).getByRole('button', { name: 'Hủy' }));
+  expect(assignmentService.deleteAssignment).not.toHaveBeenCalled();
+
+  vi.mocked(assignmentService.listAssignments).mockResolvedValueOnce(assignmentsResponse([]));
+  fireEvent.click(remove);
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Xóa bài tập' })).getByRole('button', { name: 'Xác nhận' }));
+  expect(await screen.findByText('Chưa có bài tập nào')).toBeVisible();
+  expect(assignmentService.deleteAssignment).toHaveBeenCalledExactlyOnceWith(42);
+  expect(assignmentService.updateAssignmentStatus).not.toHaveBeenCalled();
 });
 
 it.each(['vi', 'en'] as const)('C01/P04: opens a draft without a deadline field (%s)', async language => {
@@ -998,9 +1019,13 @@ it.each([
   await showAssignments([defaultAssignment]);
   const background = deferred<AssignmentListResponse>();
   vi.mocked(assignmentService.listAssignments).mockReturnValueOnce(background.promise);
-  const error = parseApiError(new AxiosError(axiosMessage, AxiosError.ECONNABORTED));
-  expect(error).toBeInstanceOf(TimeoutError);
-  vi.mocked(assignmentService.updateAssignmentStatus).mockRejectedValueOnce(error);
+  const { AssignmentService } = await vi.importActual<typeof import('../../api/services/assignment.service')>(
+    '../../api/services/assignment.service'
+  );
+  const http = new MockHttpClient();
+  http.mockError = parseApiError(new AxiosError(axiosMessage, AxiosError.ECONNABORTED));
+  const service = new AssignmentService(http);
+  vi.mocked(assignmentService.updateAssignmentStatus).mockImplementationOnce(service.updateAssignmentStatus.bind(service));
 
   pressConfirm(openDialog(cardById(42), copy.vi.open), copy.vi.open);
 

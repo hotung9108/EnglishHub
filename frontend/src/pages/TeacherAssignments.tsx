@@ -5,12 +5,8 @@ import { ApiClientError, NetworkError, TimeoutError } from '../api/core/errors';
 import { classService, type ClassSummary } from '../api/services/class.service';
 import { assignmentService } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
-import { 
-  Plus, Mic, BookOpen, Headphones, PenTool, 
-  Search, AlertCircle, FileText, 
-  X, RefreshCw
-  X, Edit2, RefreshCw, Clock, Sparkles,
-  GraduationCap, ArrowRight, Trash2
+import {
+  Plus, Mic, BookOpen, Headphones, PenTool, Search, AlertCircle, FileText, X, RefreshCw,
 } from 'lucide-react';
 import { Button, ConfirmModal, EmptyState, MetricCard, Pagination, LoadingState, useToast } from '../components/common';
 import { AssignmentCard, type AssignmentDisplayItem } from '../components/assignments/AssignmentCard';
@@ -751,126 +747,12 @@ export const TeacherAssignments: React.FC = () => {
               currentTimestamp={currentTimestamp}
               onViewDetails={() => navigate(`/teacher/assignments/${item.id}`)}
               onEdit={() => navigate(`/teacher/assignments/${item.id}/edit`)}
+              onDelete={() => setAssignmentToDelete(item)}
               onViewSubmissions={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
               onChangeLifecycle={handleRequestStatusChange}
               isUpdatingLifecycle={isUpdatingLifecycle || !isClassSnapshotCurrent}
             />
           ))}
-          {paginatedAssignments.map((item) => {
-            const submissionPercent = item.totalStudents > 0 
-              ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100)) 
-              : 0;
-
-            return (
-              <div key={item.id} className="teacher-assignment-card">
-                {/* 1. Header Line: Identity (Code, Class, Skills) & Grading Status */}
-                <div className="teacher-assignment-card-header">
-                  <div className="teacher-assignment-card-identity">
-                    <span className="teacher-assignment-code-badge">{item.code}</span>
-                    <div className="teacher-assignment-class-tag">
-                      <GraduationCap size={13} />
-                      <span>{item.className}</span>
-                    </div>
-                    {renderSkillBadges(item.skills)}
-                  </div>
-
-                  <div className="teacher-assignment-card-status">
-                    {item.submittedCount === 0 ? (
-                      <span className="teacher-assignment-upcoming-pill">
-                        <span className="teacher-assignment-status-dot" style={{ backgroundColor: '#94a3b8' }} />
-                        <span>{isVi ? 'Chưa có bài nộp' : 'No submissions'}</span>
-                      </span>
-                    ) : item.pendingGradingCount > 0 ? (
-                      <span className="teacher-assignment-pending-pill">
-                        <span className="teacher-assignment-status-dot pending" />
-                        <span>{item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}</span>
-                      </span>
-                    ) : (
-                      <span className="teacher-assignment-done-pill">
-                        <span className="teacher-assignment-status-dot done" />
-                        <span>{isVi ? 'Đã chấm hoàn tất' : 'All graded'}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Main Title */}
-                <h3 
-                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
-                  className="teacher-assignment-title"
-                >
-                  {item.title}
-                </h3>
-
-                {/* 3. Divider */}
-                <div className="teacher-assignment-card-divider" />
-
-                {/* 4. Footer Line: Deadline & Turnout Progress (Left) + Actions (Right) */}
-                <div className="teacher-assignment-card-footer">
-                  <div className="teacher-assignment-footer-meta">
-                    {renderDeadlineTag(item)}
-
-                    <span className="teacher-assignment-meta-separator">•</span>
-
-                    <div className="teacher-assignment-turnout-group">
-                      <span className="teacher-assignment-turnout-label">
-                        {isVi ? 'Đã nộp:' : 'Turnout:'} <strong>{item.submittedCount}/{item.totalStudents}</strong> ({submissionPercent}%)
-                      </span>
-                      <div className="teacher-assignment-mini-progress">
-                        <div 
-                          className="teacher-assignment-mini-fill"
-                          style={{ width: `${submissionPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="teacher-assignment-card-actions">
-                    {item.status !== 'closed' && (
-                      <button
-                        type="button"
-                        className="teacher-assignment-btn-edit"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/teacher/assignments/${item.id}/edit`);
-                        }}
-                        title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
-                      >
-                        <Edit2 size={13} />
-                        <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      className="teacher-assignment-btn-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAssignmentToDelete(item);
-                      }}
-                      title={isVi ? 'Xóa bài tập' : 'Delete Assignment'}
-                    >
-                      <Trash2 size={13} />
-                      <span>{isVi ? 'Xóa bài tập' : 'Delete Assignment'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="teacher-assignment-btn-primary"
-                      onClick={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
-                    >
-                      <span>
-                        {item.pendingGradingCount > 0 
-                          ? (isVi ? 'Chấm bài ngay' : 'Grade Now') 
-                          : (isVi ? 'Quản lý bài nộp' : 'View Submissions')}
-                      </span>
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
 
           {filteredAssignments.length === 0 && (
             <EmptyState

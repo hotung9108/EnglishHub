@@ -1,4 +1,5 @@
 import { httpClient } from '../core/client';
+import { RequestCanceledError, TimeoutError } from '../core/errors';
 import type { MessageResponse, PaginationResponse } from '../interfaces/api-response.interface';
 import type { ApiRequestOptions, IHttpClient } from '../interfaces/http.interface';
 
@@ -156,11 +157,20 @@ export class AssignmentService {
       throw new TypeError('A new deadline requires a PUBLISHED status.');
     }
 
-    return this.http.patch<MessageResponse>(
-      `/assignments/${assignmentId}/status`,
-      closeAt === undefined ? { status } : { status, closeAt },
-      options === undefined ? undefined : httpOptions
-    );
+    try {
+      return await this.http.patch<MessageResponse>(
+        `/assignments/${assignmentId}/status`,
+        closeAt === undefined ? { status } : { status, closeAt },
+        options === undefined ? undefined : httpOptions
+      );
+    } catch (error) {
+      const cause = error instanceof RequestCanceledError ? error.rawError : null;
+      if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ECONNABORTED'
+        && (!('response' in cause) || cause.response == null)) {
+        throw new TimeoutError(undefined, cause);
+      }
+      throw error;
+    }
   }
 }
 
