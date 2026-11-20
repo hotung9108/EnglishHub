@@ -17,6 +17,7 @@ import {
   Headphones
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
@@ -46,12 +47,12 @@ const StudentAssignmentSpeaking: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { warning: toastWarning, error: toastError, success: toastSuccess } = useToast();
   const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showEmptyConfirmModal, setShowEmptyConfirmModal] = useState(false);
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
@@ -96,14 +97,14 @@ const StudentAssignmentSpeaking: React.FC = () => {
 
     const MAX_AUDIO_SIZE = 25 * 1024 * 1024;
     if (file.size > MAX_AUDIO_SIZE) {
-      setError('Dung lượng tệp âm thanh không được vượt quá 25MB.');
+      toastError('Dung lượng tệp âm thanh không được vượt quá 25MB.');
       return;
     }
 
     const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/webm', 'audio/m4a', 'audio/mp4', 'audio/x-m4a'];
     const isExtensionValid = /\.(mp3|wav|m4a|webm|mp4)$/i.test(file.name);
     if (!validTypes.includes(file.type) && !isExtensionValid) {
-      setError('Định dạng tệp âm thanh không được hỗ trợ. Vui lòng tải lên tệp .mp3, .wav, .m4a hoặc .webm.');
+      toastError('Định dạng tệp âm thanh không được hỗ trợ. Vui lòng tải lên tệp .mp3, .wav, .m4a hoặc .webm.');
       return;
     }
 
@@ -388,7 +389,7 @@ const StudentAssignmentSpeaking: React.FC = () => {
     if (!isRecording) {
       if (assignment?.status && assignment.status !== 'PUBLISHED') {
         const statusLabel = assignment.status === 'DRAFT' ? 'Nháp (DRAFT)' : assignment.status;
-        setError(`Bài tập này đang ở trạng thái ${statusLabel}, chưa thể thực hiện ghi âm làm bài.`);
+        toastWarning(`Bài tập này đang ở trạng thái ${statusLabel}, chưa thể thực hiện ghi âm làm bài.`);
         return;
       }
       if (isPlaying && audioPlayerRef.current) {
@@ -492,17 +493,17 @@ const StudentAssignmentSpeaking: React.FC = () => {
   // Submit flow: Upload Blob to Presigned S3 URL -> submitModule with audioStorageKey
   const handleSubmitAssignment = async () => {
     if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
 
     if (isRecording) {
-      setError('Vui lòng bấm dừng ghi âm và nghe lại bản ghi trước khi nộp bài.');
+      toastWarning('Vui lòng bấm dừng ghi âm và nghe lại bản ghi trước khi nộp bài.');
       return;
     }
 
     if (!submission) {
-      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      toastError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
       return;
     }
 
@@ -563,11 +564,10 @@ const StudentAssignmentSpeaking: React.FC = () => {
       const allOthersDone = otherModules.length === 0 || otherModules.every((m) => m.status === 'SUBMITTED' || m.status === 'GRADED');
 
       if (isReviewMode || allOthersDone) {
-        setSuccessMessage(
-          isReviewMode
-            ? 'Cập nhật phần thi Speaking thành công! Đang chuyển đến màn hình xem lại bài làm...'
-            : 'Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...'
-        );
+        const msg = isReviewMode
+          ? 'Cập nhật phần thi Speaking thành công! Đang chuyển đến màn hình xem lại bài làm...'
+          : 'Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...';
+        toastSuccess(msg);
         setTimeout(() => {
           navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
@@ -576,13 +576,15 @@ const StudentAssignmentSpeaking: React.FC = () => {
         const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
-          setSuccessMessage(`Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          const msg = `Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`;
+          toastSuccess(msg);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
           setTimeout(() => {
             navigate(nextRoute, { replace: true });
           }, 1200);
         } else {
-          setSuccessMessage('Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...');
+          const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
+          toastSuccess(msg);
           setTimeout(() => {
             navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
@@ -697,11 +699,6 @@ const StudentAssignmentSpeaking: React.FC = () => {
         </div>
       )}
 
-      {successMessage && (
-        <div className="speaking-success-banner">
-          <span>{successMessage}</span>
-        </div>
-      )}
 
       {/* Main 2-Column Grid */}
       <div className="speaking-grid">

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import type { WritingConfig } from '../../../types/assignment-editor.types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useToast } from '../../common/ToastContext';
 import { Image, Upload, X } from 'lucide-react';
 
 interface SkillWritingEditorProps {
@@ -10,6 +11,7 @@ interface SkillWritingEditorProps {
 
 export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, onChange }) => {
   const { language } = useLanguage();
+  const { error: toastError } = useToast();
   const isVi = language === 'vi';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -21,7 +23,7 @@ export const SkillWritingEditor: React.FC<SkillWritingEditorProps> = ({ config, 
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert(isVi ? 'Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP)!' : 'Please select a valid image file (PNG, JPG, WebP)!');
+      toastError(isVi ? 'Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP)!' : 'Please select a valid image file (PNG, JPG, WebP)!');
       return;
     }
     const reader = new FileReader();

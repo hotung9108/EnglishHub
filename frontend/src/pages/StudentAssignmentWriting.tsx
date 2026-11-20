@@ -17,6 +17,7 @@ import {
 } from '../api/services/submission.service';
 import { parseApiError } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../components/common/ToastContext';
 import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
@@ -37,13 +38,13 @@ const StudentAssignmentWriting: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { warning: toastWarning, error: toastError, success: toastSuccess } = useToast();
   const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetailResponse | null>(null);
@@ -308,18 +309,18 @@ const StudentAssignmentWriting: React.FC = () => {
     const hasValidMime = file.type ? validMimes.includes(file.type) : true;
 
     if (!hasValidExt && !hasValidMime) {
-      setError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF hoặc DOCX.');
+      toastError('Định dạng tệp không được hỗ trợ. Vui lòng tải lên tệp PDF hoặc DOCX.');
       return;
     }
 
     if (file.size === 0) {
-      setError('Tệp tải lên không được rỗng (0 bytes). Vui lòng chọn tệp bài viết hợp lệ.');
+      toastError('Tệp tải lên không được rỗng (0 bytes). Vui lòng chọn tệp bài viết hợp lệ.');
       return;
     }
 
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      setError('Kích thước tệp vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.');
+      toastError('Kích thước tệp vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.');
       return;
     }
 
@@ -403,23 +404,23 @@ const StudentAssignmentWriting: React.FC = () => {
       autoSaveTimerRef.current = null;
     }
     if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
+      toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
       return;
     }
 
     const trimmedText = editorText.trim();
     if (!uploadedFile) {
       if (trimmedText === '') {
-        setError('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
+        toastWarning('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.');
         return;
       }
       if (wordCount < MIN_WRITING_WORDS) {
-        setError(`Bài viết chưa đạt độ dài tối thiểu (${wordCount}/${MIN_WRITING_WORDS} từ). Vui lòng viết ít nhất ${MIN_WRITING_WORDS} từ trước khi nộp.`);
+        toastWarning(`Bài viết chưa đạt độ dài tối thiểu (${wordCount}/${MIN_WRITING_WORDS} từ). Vui lòng viết ít nhất ${MIN_WRITING_WORDS} từ trước khi nộp.`);
         return;
       }
     }
     if (!submission) {
-      setError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
+      toastError('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang hoặc liên hệ giáo viên.');
       return;
     }
 
@@ -432,7 +433,7 @@ const StudentAssignmentWriting: React.FC = () => {
     const subModuleId = writingSubMod?.id || submission.modules?.[0]?.id;
 
     if (!subModuleId) {
-      setError('Không tìm thấy thông tin phần làm bài viết trong bài nộp.');
+      toastError('Không tìm thấy thông tin phần làm bài viết trong bài nộp.');
       return;
     }
 
@@ -499,7 +500,7 @@ const StudentAssignmentWriting: React.FC = () => {
       localStorage.removeItem(`eh_draft_writing_${id}`);
 
       if (isReviewMode || allOthersDone) {
-        setSuccessMessage('Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...');
+        toastSuccess('Nộp bài thành công! Đang chuyển đến màn hình xem lại bài làm...');
         setTimeout(() => {
           navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
@@ -508,13 +509,13 @@ const StudentAssignmentWriting: React.FC = () => {
         const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
         if (nextMod) {
           const nextSkillLabel = getSkillLabel(nextMod.skill);
-          setSuccessMessage(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
+          toastSuccess(`Đã hoàn thành phần thi Writing! Đang chuyển tiếp sang ${nextSkillLabel}...`);
           const nextRoute = getSkillRoute(nextMod.skill, numericId, subId, nextMod.id);
           setTimeout(() => {
             navigate(nextRoute, { replace: true });
           }, 1200);
         } else {
-          setSuccessMessage('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
+          toastSuccess('Đã hoàn thành phần thi Writing! Đang quay lại trang tổng quan bài tập...');
           setTimeout(() => {
             navigate(`/student/assignments/${id}/overview`, { replace: true });
           }, 1200);
@@ -615,26 +616,19 @@ const StudentAssignmentWriting: React.FC = () => {
 
       <div className="exam-workspace-full">
         {error && (
-          <div className="analytics-error-banner">
-            <div className="flex items-center gap-10">
+          <div className="exam-alert-error mb-4" role="alert">
+            <div className="exam-alert-msg">
               <AlertCircle size={20} />
-              <span className="text-sm">{error}</span>
+              <span>{error}</span>
             </div>
             <Button
               variant="danger"
               size="sm"
+              icon={RefreshCw}
               onClick={handleRetry}
-              icon={<RefreshCw size={13} />}
             >
               Thử lại
             </Button>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="p-16 mb-20 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center gap-10 text-emerald-800">
-            <CheckCircle size={20} />
-            <span className="text-sm font-semibold">{successMessage}</span>
           </div>
         )}
 
@@ -666,21 +660,19 @@ const StudentAssignmentWriting: React.FC = () => {
           {/* Text Editor */}
           <div className="writing-card">
             <div className="writing-editor-header">
-              <div className="flex items-center gap-16">
-                <div className={`px-12 py-4 rounded-md text-xs font-medium flex items-center gap-6 ${
-                  wordCount >= MIN_WRITING_WORDS
-                    ? 'bg-slate-100 text-slate-700'
-                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+              <div className="writing-word-counter-group">
+                <div className={`writing-word-count-badge ${
+                  wordCount >= MIN_WRITING_WORDS ? 'is-valid' : 'is-warning'
                 }`}>
                   <span>Đếm từ: <span className={wordCount >= MIN_WRITING_WORDS ? 'text-primary font-bold' : 'text-amber-800 font-bold'}>{wordCount}</span> / tối thiểu {parsedInstructions.minWords} từ</span>
-                  {wordCount < MIN_WRITING_WORDS && !uploadedFile && (
-                    <span className="text-[11px] text-amber-700 font-normal">
-                      (Tối thiểu hệ thống: {MIN_WRITING_WORDS} từ)
-                    </span>
-                  )}
                 </div>
+                {wordCount < MIN_WRITING_WORDS && !uploadedFile && (
+                  <span className="writing-min-pill" title="Yêu cầu tối thiểu để AI có thể chấm điểm bài viết">
+                    (Tối thiểu hệ thống: {MIN_WRITING_WORDS} từ)
+                  </span>
+                )}
                 {isDraftSaved && (
-                  <div className="flex items-center gap-6 text-xs text-emerald-600 font-medium">
+                  <div className="flex items-center gap-6 text-xs text-emerald-600 font-medium ml-4">
                     <CheckCircle size={14} /> Đã lưu bản nháp!
                   </div>
                 )}
@@ -807,7 +799,7 @@ const StudentAssignmentWriting: React.FC = () => {
                 className="w-full"
                 icon={isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               >
-                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài'}
+                {isSubmitting ? 'Đang nộp bài...' : 'Nộp bài (Submit)'}
               </Button>
 
               <Button 

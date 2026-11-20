@@ -69,7 +69,7 @@ describe('StudentAssignmentWriting', () => {
     expect(screen.getByText('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.')).toBeVisible();
     expect(submissionService.submitModule).not.toHaveBeenCalled();
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Thử lại' }));
+    await user.click(screen.getByRole('button', { name: /close notification/i }));
     await waitFor(() => expect(screen.queryByText('Vui lòng nhập nội dung bài luận hoặc tải lên tệp bài làm trước khi nộp.')).not.toBeInTheDocument());
   });
 
