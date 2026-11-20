@@ -108,6 +108,12 @@ test('Error Parsing - handles various error shapes', () => {
   assert.ok(parsed400 instanceof ValidationError);
   assert.strictEqual(parsed400.message, 'Dữ liệu không hợp lệ.');
   assert.strictEqual(parsed400.errors?.length, 1);
+  assert.strictEqual(parsed400.statusCode, 400);
+
+  const parsed422 = parseApiError({ ...axios400, response: { ...axios400.response, status: 422 } });
+  assert.ok(parsed422 instanceof ValidationError);
+  assert.strictEqual(parsed422.statusCode, 422);
+  assert.deepStrictEqual(parsed422.errors, parsed400.errors);
 
   // Timeout error code ECONNABORTED
   const timeoutAxios = {

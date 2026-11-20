@@ -29,6 +29,41 @@ export function formatToLocalDateTimeInput(dateInput?: Date | string | number | 
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+export type ReopenDeadlineError = 'required' | 'invalid' | 'future' | 'afterOpen';
+
+export interface ReopenDeadlineDraft {
+  originalCloseAt: string | null;
+  prefillValue: string;
+  inputValue: string;
+}
+
+export function createReopenDeadlineDraft(originalCloseAt: string | null, now: number): ReopenDeadlineDraft {
+  const prefillValue = originalCloseAt !== null && Date.parse(originalCloseAt) > now
+    ? formatToLocalDateTimeInput(originalCloseAt)
+    : '';
+  return { originalCloseAt, prefillValue, inputValue: prefillValue };
+}
+
+export function validateReopenDeadline(
+  { originalCloseAt, prefillValue, inputValue }: ReopenDeadlineDraft,
+  openAt: string | null | undefined,
+  now: number,
+): { valid: true; closeAt?: string } | { valid: false; error: ReopenDeadlineError } {
+  if (!inputValue) return { valid: false, error: 'required' };
+
+  const keepDeadline = prefillValue !== '' && inputValue === prefillValue;
+  const instant = new Date(keepDeadline ? originalCloseAt ?? '' : inputValue);
+  const timestamp = instant.getTime();
+  if (!Number.isFinite(timestamp) || (!keepDeadline && formatToLocalDateTimeInput(instant) !== inputValue)) {
+    return { valid: false, error: 'invalid' };
+  }
+
+  if (openAt && timestamp <= Date.parse(openAt)) return { valid: false, error: 'afterOpen' };
+  if (timestamp <= now) return { valid: false, error: 'future' };
+
+  return keepDeadline ? { valid: true } : { valid: true, closeAt: instant.toISOString() };
+}
+
 /**
  * Cộng thêm số ngày vào một mốc thời gian.
  *

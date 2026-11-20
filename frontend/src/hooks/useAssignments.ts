@@ -100,15 +100,21 @@ export function useDeleteAssignment(
   );
 }
 
+type UpdateAssignmentStatusVariables =
+  | { id: AssignmentId; status: AssignmentStatus; reopen?: never }
+  | { id: AssignmentId; status: 'PUBLISHED'; reopen: { closeAt?: string } };
+
 export interface UseUpdateAssignmentStatusOptions {
-  onSuccess?: (data: MessageResponse, variables: { id: AssignmentId; status: AssignmentStatus }) => void;
+  onSuccess?: (data: MessageResponse, variables: UpdateAssignmentStatusVariables) => void;
 }
 
 export function useUpdateAssignmentStatus(
   options?: UseUpdateAssignmentStatusOptions
-): UseMutationResult<MessageResponse, { id: AssignmentId; status: AssignmentStatus }> {
-  return useMutation<MessageResponse, { id: AssignmentId; status: AssignmentStatus }>(
-    ({ id, status }) => assignmentService.updateAssignmentStatus(id, status),
+): UseMutationResult<MessageResponse, UpdateAssignmentStatusVariables> {
+  return useMutation<MessageResponse, UpdateAssignmentStatusVariables>(
+    ({ id, status, reopen }) => reopen === undefined
+      ? assignmentService.updateAssignmentStatus(id, status)
+      : assignmentService.updateAssignmentStatus(id, status, { reopen }),
     {
       onSuccess: options?.onSuccess,
     }

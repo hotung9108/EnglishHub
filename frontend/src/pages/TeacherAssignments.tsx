@@ -1,37 +1,226 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useId, useRef, useLayoutEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ApiClientError, NetworkError, TimeoutError } from '../api/core/errors';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService, type AssignmentSummary, type AssignmentSkill } from '../api/services/assignment.service';
+import { assignmentService } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
-import { 
-  Plus, Mic, BookOpen, Headphones, PenTool, 
-  Search, AlertCircle, FileText, 
-  X, Edit2, RefreshCw, Clock, Sparkles,
-  GraduationCap, ArrowRight, Trash2
+import {
+  Plus, Mic, BookOpen, Headphones, PenTool, Search, AlertCircle, FileText, X, RefreshCw,
 } from 'lucide-react';
-import { Button, EmptyState, MetricCard, Pagination, LoadingState } from '../components/common';
-import { matchesSkillFilter, toSkillBadgeTypes, type AssignmentBadgeType, type AssignmentSkillFilter } from '../utils/assignmentSkills';
+import { Button, ConfirmModal, EmptyState, MetricCard, Pagination, LoadingState, useToast } from '../components/common';
+import { AssignmentCard, type AssignmentDisplayItem } from '../components/assignments/AssignmentCard';
+import { useUpdateAssignmentStatus } from '../hooks/useAssignments';
+import { matchesSkillFilter, type AssignmentSkillFilter } from '../utils/assignmentSkills';
+import {
+  createReopenDeadlineDraft, validateReopenDeadline, type ReopenDeadlineDraft, type ReopenDeadlineError,
+} from '../utils/dateTime.utils';
 
-interface AssignmentDisplayItem {
-  id: string;
-  code: string;
-  skills: AssignmentSkill[];
-  title: string;
-  className: string;
-  dueDate: string;
-  daysLeft?: number;
-  closeDate?: Date | null;
-  totalStudents: number;
-  submittedCount: number;
-  pendingGradingCount: number;
-  status: 'open' | 'closed' | 'upcoming';
+type AssignmentIdentity = Pick<AssignmentDisplayItem, 'id' | 'classId'>;
+type LocalizedText = { vi: string; en: string };
+type AssignmentStatusAction = AssignmentIdentity & (
+  | { lifecycleStatus: 'DRAFT'; action: 'open' }
+  | { lifecycleStatus: 'PUBLISHED'; action: 'close' }
+  | {
+      lifecycleStatus: 'CLOSED'; action: 'reopen'; deadline: ReopenDeadlineDraft;
+      fieldError?: LocalizedText; rejectedDeadline?: { closeAt: string | null; message: LocalizedText };
+    }
+);
+
+const statusActionCopy = {
+  open: {
+    title: { vi: 'Mở bài tập', en: 'Open assignment' },
+    message: { vi: 'Mở bài tập này cho học viên làm bài?', en: 'Open this assignment for students to work on?' },
+    success: { vi: 'Đã mở bài tập.', en: 'Assignment opened.' },
+  },
+  close: {
+    title: { vi: 'Khóa bài tập', en: 'Close assignment' },
+    message: {
+      vi: 'Học viên chưa nộp bài sẽ không thể nộp sau khi khóa bài tập.',
+      en: 'Students who have not submitted will be unable to submit after the assignment is closed.',
+    },
+    success: { vi: 'Đã khóa bài tập.', en: 'Assignment closed.' },
+  },
+  reopen: {
+    title: { vi: 'Mở lại bài tập', en: 'Reopen assignment' },
+    message: { vi: 'Mở lại bài tập này cho học viên làm bài?', en: 'Reopen this assignment for students to work on?' },
+    success: { vi: 'Đã mở lại bài tập.', en: 'Assignment reopened.' },
+  },
+};
+
+const deadlineMessages: Record<ReopenDeadlineError, LocalizedText> = {
+  required: { vi: 'Vui lòng nhập hạn nộp mới.', en: 'Enter a new deadline.' },
+  invalid: { vi: 'Ngày giờ không hợp lệ.', en: 'Enter a valid date and time.' },
+  future: {
+    vi: 'Hạn nộp khi mở lại phải sau thời điểm hiện tại.',
+    en: 'The new deadline must be in the future.',
+  },
+  afterOpen: {
+    vi: 'Hạn nộp phải sau thời điểm mở bài.',
+    en: 'The deadline must be after the assignment opening time.',
+  },
+};
+
+const backendStatusErrors = new Map<string, { type: 'deadline' | 'state'; message: LocalizedText }>([
+  [deadlineMessages.afterOpen.vi, { type: 'deadline', message: deadlineMessages.afterOpen }],
+  [deadlineMessages.future.vi, { type: 'deadline', message: deadlineMessages.future }],
+  ['Không thể chuyển sang trạng thái này.', {
+    type: 'state', message: { vi: 'Chuyển trạng thái bài tập bị từ chối.', en: 'The assignment status change was rejected.' },
+  }],
+  ['Chỉ được cập nhật hạn nộp khi mở lại bài tập.', {
+    type: 'state', message: { vi: 'Chuyển trạng thái bài tập bị từ chối.', en: 'The assignment status change was rejected.' },
+  }],
+]);
+
+const genericStatusError: LocalizedText = {
+  vi: 'Không thể cập nhật trạng thái bài tập.',
+  en: 'Could not update the assignment status.',
+};
+
+const assignmentLoadError: LocalizedText = {
+  vi: 'Không thể tải danh sách bài tập. Vui lòng thử lại.',
+  en: 'Failed to load assignments. Please retry.',
+};
+
+const statusErrorCopy: Partial<Record<number, LocalizedText>> = {
+  401: { vi: 'Phiên đăng nhập đã hết hạn.', en: 'Your session has expired.' },
+  403: { vi: 'Bạn không có quyền thực hiện thao tác này.', en: 'You do not have permission to perform this action.' },
+  404: { vi: 'Bài tập hoặc lớp không còn truy cập được.', en: 'The assignment or class is no longer accessible.' },
+  409: { vi: 'Bài tập đang được cập nhật, vui lòng thử lại.', en: 'The assignment is being updated. Please try again.' },
+};
+
+function getStatusErrorMessage(error: unknown, statusCode: number | undefined): LocalizedText {
+  if (error instanceof NetworkError) {
+    return { vi: 'Lỗi kết nối. Vui lòng thử lại.', en: 'Connection error. Please try again.' };
+  }
+  if (statusCode === 408 || statusCode === undefined) return genericStatusError;
+  const message = statusErrorCopy[statusCode];
+  if (message) return message;
+  if (statusCode >= 400 && statusCode < 500) {
+    return { vi: 'Yêu cầu thất bại.', en: 'The request failed.' };
+  }
+  if (statusCode >= 500 && statusCode < 600) {
+    return { vi: 'Lỗi máy chủ. Vui lòng thử lại.', en: 'Server error. Please try again.' };
+  }
+  return genericStatusError;
+}
+
+function matchesAssignment(item: AssignmentIdentity, target: AssignmentIdentity) {
+  return item.id === target.id && item.classId === target.classId;
+}
+
+function mapAssignmentDeadline(
+  closeAt: string | null,
+  lifecycleStatus: AssignmentDisplayItem['lifecycleStatus'],
+  currentTimestamp: number,
+  isVi: boolean,
+): Pick<AssignmentDisplayItem, 'closeDate' | 'daysLeft' | 'status' | 'dueDate'> {
+  const closeDate = closeAt ? new Date(closeAt) : null;
+  let daysLeft: number | undefined;
+  let status: AssignmentDisplayItem['status'] = 'open';
+
+  if (closeDate) {
+    const msDiff = closeDate.getTime() - currentTimestamp;
+    daysLeft = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+    if (msDiff < 0) {
+      status = 'closed';
+    } else if (lifecycleStatus === 'DRAFT') {
+      status = 'upcoming';
+    }
+  }
+
+  const dueDate = closeDate
+    ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : (isVi ? 'Không thời hạn' : 'No deadline');
+
+  return { closeDate, daysLeft, status, dueDate };
+}
+
+interface AssignmentListScope {
+  classes: ClassSummary[];
+  selectedClassId: string;
+  isVi: boolean;
+}
+
+function includesClass(selectedClassId: string, classId: number) {
+  return !selectedClassId || selectedClassId === 'all' || selectedClassId === String(classId);
+}
+
+function isSubmissionFullyGraded(submission: SubmissionListItem) {
+  return submission.status === 'GRADED'
+    || Boolean(submission.modules?.length && submission.modules.every(module => module.grading?.status === 'COMPLETED'));
+}
+
+async function loadAssignments(
+  { classes, selectedClassId, isVi }: AssignmentListScope,
+  currentTimestamp: number,
+  backgroundSignal?: AbortSignal,
+): Promise<AssignmentDisplayItem[]> {
+  const options = backgroundSignal ? { skipCache: true, signal: backgroundSignal } : { skipCache: true };
+  const read = <T, F>(request: Promise<T>, fallback: F): Promise<T | F> =>
+    backgroundSignal ? request : request.catch(() => fallback);
+  const targetClasses = classes.filter(cls => includesClass(selectedClassId, cls.id));
+  const classResults = await Promise.all(targetClasses.map(async cls => {
+    const [members, assignmentResponse] = await Promise.all([
+      read(classService.listMembers(cls.id, options), []),
+      read(assignmentService.listAssignments(cls.id, { limit: 50 }, options), { data: [] }),
+    ]);
+    backgroundSignal?.throwIfAborted();
+    const totalStudents = Array.isArray(members) ? members.length : 0;
+    const rawAssignments = assignmentResponse.data || [];
+
+    return Promise.all(rawAssignments.map(async raw => {
+      const submissions = await read(
+        submissionService.listSubmissions({ assignmentId: raw.id, limit: 100 }, options).then(res => res.data || []),
+        [],
+      );
+      const submitted = submissions.filter(submission => submission.status !== 'IN_PROGRESS');
+      const closeAt = raw.closeAt ?? null;
+
+      return {
+        id: String(raw.id),
+        classId: cls.id,
+        code: `HW-${raw.id.toString().padStart(2, '0')}`,
+        skills: raw.skills ?? [],
+        title: raw.title,
+        className: cls.name,
+        ...mapAssignmentDeadline(closeAt, raw.status, currentTimestamp, isVi),
+        closeAt,
+        ...(raw.openAt !== undefined ? { openAt: raw.openAt } : {}),
+        totalStudents,
+        submittedCount: submitted.length,
+        pendingGradingCount: submitted.filter(submission => !isSubmissionFullyGraded(submission)).length,
+        lifecycleStatus: raw.status,
+      };
+    }));
+  }));
+  return classResults.flat();
 }
 
 export const TeacherAssignments: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const isVi = language === 'vi';
+  const locale = isVi ? 'vi' : 'en';
+  const toast = useToast();
+  const { mutateAsync, isLoading: isUpdatingLifecycle } = useUpdateAssignmentStatus();
+  const [statusAction, setStatusAction] = useState<AssignmentStatusAction | null>(null);
+  const dialogTargetRef = useRef<Pick<AssignmentStatusAction, 'id' | 'classId' | 'lifecycleStatus'> | null>(null);
+  const inFlightRef = useRef(false);
+  const loadVersion = useRef(0);
+  const backgroundLoad = useRef<AbortController | null>(null);
+  const activeView = useRef<(AssignmentListScope & {
+    assignments: AssignmentDisplayItem[]; loadedClassId: string | null; t: typeof t;
+  }) | null>(null);
+  const deadlineInputId = useId();
+  const deadlineHelpId = `${deadlineInputId}-help`;
+  const deadlineErrorId = `${deadlineInputId}-error`;
 
   // API State
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -44,6 +233,7 @@ export const TeacherAssignments: React.FC = () => {
 
   // Assignments & Submissions
   const [assignments, setAssignments] = useState<AssignmentDisplayItem[]>([]);
+  const [loadedClassId, setLoadedClassId] = useState<string | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<AssignmentDisplayItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [skillFilter, setSkillFilter] = useState<AssignmentSkillFilter>('all');
@@ -53,6 +243,23 @@ export const TeacherAssignments: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const invalidateLoads = useCallback(() => {
+    loadVersion.current += 1;
+    backgroundLoad.current?.abort();
+    backgroundLoad.current = null;
+  }, []);
+
+  useLayoutEffect(() => invalidateLoads, [classes, selectedClassId, isVi, reloadKey, invalidateLoads]);
+  useLayoutEffect(() => {
+    activeView.current = { classes, selectedClassId, isVi, assignments, loadedClassId, t };
+    return () => { activeView.current = null; };
+  }, [classes, selectedClassId, isVi, assignments, loadedClassId, t]);
+
+  const setDialog = (action: AssignmentStatusAction | null) => {
+    dialogTargetRef.current = action && { id: action.id, classId: action.classId, lifecycleStatus: action.lifecycleStatus };
+    setStatusAction(action);
+  };
 
   const handleSkillFilterChange = (skill: AssignmentSkillFilter) => {
     setSkillFilter(skill);
@@ -65,6 +272,17 @@ export const TeacherAssignments: React.FC = () => {
   };
 
   const handleClassFilterChange = (classId: string) => {
+    if (classId !== selectedClassId) {
+      invalidateLoads();
+      if (activeView.current) {
+        activeView.current.selectedClassId = classId;
+        activeView.current.loadedClassId = null;
+      }
+      setLoadedClassId(null);
+      setError(null);
+      const target = dialogTargetRef.current;
+      if (!inFlightRef.current && target && !includesClass(classId, target.classId)) setDialog(null);
+    }
     setSelectedClassId(classId);
     setCurrentPage(1);
   };
@@ -72,6 +290,7 @@ export const TeacherAssignments: React.FC = () => {
   const [currentTimestamp] = useState(() => Date.now());
 
   const handleRetry = () => {
+    invalidateLoads();
     setIsLoading(true);
     setError(null);
     setReloadKey((prev) => prev + 1);
@@ -105,127 +324,39 @@ export const TeacherAssignments: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error('Failed to load classes for assignment management:', err);
+        if (isMounted) console.error('Failed to load classes for assignment management:', err);
       }
     };
     fetchClasses();
     return () => { isMounted = false; };
   }, []); // Run once on mount to avoid re-triggering when selectedClassId changes
 
-  // 2. Fetch Assignments for selected class (or all classes if 'all')
+  // Foreground reads retain the existing fallbacks and loading behavior.
   useEffect(() => {
-    let isMounted = true;
-
+    const version = ++loadVersion.current;
     const fetchAssignments = async () => {
       if (classes.length === 0) {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
         return;
       }
+
       try {
-        const targetClasses = selectedClassId && selectedClassId !== 'all'
-          ? classes.filter((c) => String(c.id) === selectedClassId)
-          : classes;
-
-        const classResults = await Promise.all(
-          targetClasses.map(async (cls) => {
-            const [membersRes, assignRes] = await Promise.all([
-              classService.listMembers(cls.id).catch(() => []),
-              assignmentService.listAssignments(cls.id, { limit: 50 }).catch(() => ({ data: [] as AssignmentSummary[] })),
-            ]);
-
-            const membersCount = Array.isArray(membersRes) ? membersRes.length : 0;
-            const rawAssignments: AssignmentSummary[] = assignRes.data || [];
-
-            const assignmentItems = await Promise.all(
-              rawAssignments.map(async (raw): Promise<AssignmentDisplayItem> => {
-                let submissions: SubmissionListItem[];
-                try {
-                  const subRes = await submissionService.listSubmissions({ assignmentId: raw.id, limit: 100 });
-                  submissions = subRes.data || [];
-                } catch {
-                  submissions = [];
-                }
-
-                const isSubmissionFullyGraded = (s: SubmissionListItem) => {
-                  if (s.status === 'GRADED') return true;
-                  if (s.modules && s.modules.length > 0) {
-                    return s.modules.every((m) => m.grading?.status === 'COMPLETED');
-                  }
-                  return false;
-                };
-
-                const submittedSubmissions = submissions.filter((s) => s.status !== 'IN_PROGRESS');
-                const submittedCount = submittedSubmissions.length;
-                const pendingGradingCount = submittedSubmissions.filter((s) => !isSubmissionFullyGraded(s)).length;
-
-                // Days left & Status
-                const closeDate = raw.closeAt ? new Date(raw.closeAt) : null;
-                let daysLeft: number | undefined = undefined;
-                let status: 'open' | 'closed' | 'upcoming' = 'open';
-
-                if (closeDate) {
-                  const msDiff = closeDate.getTime() - currentTimestamp;
-                  daysLeft = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-                  if (msDiff < 0) {
-                    status = 'closed';
-                  } else if (raw.status === 'DRAFT') {
-                    status = 'upcoming';
-                  } else {
-                    status = 'open';
-                  }
-                }
-
-                const dueDateStr = closeDate
-                  ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  : (isVi ? 'Không thời hạn' : 'No deadline');
-
-                return {
-                  id: String(raw.id),
-                  code: `HW-${raw.id.toString().padStart(2, '0')}`,
-                  skills: raw.skills ?? [],
-                  title: raw.title,
-                  className: cls.name,
-                  dueDate: dueDateStr,
-                  daysLeft,
-                  closeDate,
-                  totalStudents: membersCount,
-                  submittedCount,
-                  pendingGradingCount,
-                  status
-                };
-              })
-            );
-
-            return assignmentItems;
-          })
-        );
-
-        if (isMounted) {
-          setAssignments(classResults.flat());
+        const rows = await loadAssignments({ classes, selectedClassId, isVi }, currentTimestamp);
+        if (loadVersion.current === version) {
+          setAssignments(rows);
+          setLoadedClassId(selectedClassId);
         }
-      } catch (err) {
-        console.error('Failed to load assignments:', err);
-        if (isMounted) {
-          setError(isVi ? 'Không thể tải danh sách bài tập. Vui lòng thử lại.' : 'Failed to load assignments. Please retry.');
+      } catch (error) {
+        if (loadVersion.current === version) {
+          console.error('Failed to load assignments:', error);
+          setError(assignmentLoadError[isVi ? 'vi' : 'en']);
         }
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (loadVersion.current === version) setIsLoading(false);
       }
     };
 
-    fetchAssignments();
-
-    return () => {
-      isMounted = false;
-    };
+    void fetchAssignments();
   }, [classes, selectedClassId, isVi, reloadKey, currentTimestamp]);
 
   const filteredAssignments = useMemo(() => {
@@ -249,133 +380,206 @@ export const TeacherAssignments: React.FC = () => {
 
   const stats = useMemo(() => {
     const total = assignments.length;
-    const openCount = assignments.filter((a) => a.status === 'open').length;
     const pendingTotal = assignments.reduce((sum, a) => sum + a.pendingGradingCount, 0);
     const avgSubmission = total > 0
       ? Math.round((assignments.reduce((sum, a) => sum + (a.totalStudents > 0 ? a.submittedCount / a.totalStudents : 0), 0) / total) * 100)
       : 0;
     return {
       total,
-      openCount,
       pendingTotal,
       avgSubmission: Math.min(100, Math.max(0, avgSubmission || 0))
     };
   }, [assignments]);
 
-  const getSkillBadge = (type: AssignmentBadgeType) => {
-    switch (type) {
-      case 'writing':
-        return (
-          <span key={type} className="teacher-skill-mini-badge writing">
-            <PenTool size={11} />
-            <span>Writing</span>
-          </span>
-        );
-      case 'speaking':
-        return (
-          <span key={type} className="teacher-skill-mini-badge speaking">
-            <Mic size={11} />
-            <span>Speaking</span>
-          </span>
-        );
-      case 'reading':
-        return (
-          <span key={type} className="teacher-skill-mini-badge reading">
-            <BookOpen size={11} />
-            <span>Reading</span>
-          </span>
-        );
-      case 'listening':
-        return (
-          <span key={type} className="teacher-skill-mini-badge listening">
-            <Headphones size={11} />
-            <span>Listening</span>
-          </span>
-        );
+  // eslint-disable-next-line react-hooks/purity -- The active count must use a fresh clock on each render.
+  const now = Date.now();
+  const openCount = assignments.filter(({ lifecycleStatus, closeAt }) =>
+    lifecycleStatus === 'PUBLISHED' && closeAt !== null && Date.parse(closeAt) >= now
+  ).length;
+
+  const selectedAssignment = statusAction && assignments.find(item => matchesAssignment(item, statusAction));
+  const isClassSnapshotCurrent = loadedClassId === selectedClassId;
+  const reopenAction = statusAction?.action === 'reopen' ? statusAction : null;
+  const deadlineValidation = reopenAction && validateReopenDeadline(reopenAction.deadline, selectedAssignment?.openAt, now);
+  const rejectedDeadline = reopenAction?.rejectedDeadline;
+  const isDeadlineRejected = !!(reopenAction && rejectedDeadline && deadlineValidation?.valid
+    && rejectedDeadline.closeAt === (deadlineValidation.closeAt ?? reopenAction.deadline.originalCloseAt));
+  const deadlineError = reopenAction?.fieldError
+    ?? (isDeadlineRejected ? rejectedDeadline?.message : undefined)
+    ?? (deadlineValidation && !deadlineValidation.valid ? deadlineMessages[deadlineValidation.error] : undefined);
+  const dialogCopy = statusActionCopy[statusAction?.action ?? 'close'];
+
+  const reconcileDialog = (rows: AssignmentDisplayItem[], isVietnamese: boolean) => {
+    const target = dialogTargetRef.current;
+    if (!target) return;
+
+    const row = rows.find(item => matchesAssignment(item, target));
+    if (!row) {
+      setDialog(null);
+      toast.info(isVietnamese ? 'Bài tập không còn trong danh sách đang xem.' : 'The assignment is no longer in the current list.');
+      return;
     }
-    return null;
+    if (row.lifecycleStatus !== target.lifecycleStatus) {
+      setDialog(null);
+      toast.info(isVietnamese ? 'Trạng thái bài tập đã thay đổi.' : 'The assignment status has changed.');
+      return;
+    }
+    if (row.lifecycleStatus === 'CLOSED') {
+      const refreshedDeadline = createReopenDeadlineDraft(row.closeAt, Date.now());
+      setStatusAction(current => {
+        if (current?.action !== 'reopen' || !matchesAssignment(current, target) || current.deadline.originalCloseAt === row.closeAt) {
+          return current;
+        }
+        const { deadline } = current;
+        return {
+          ...current,
+          deadline: deadline.inputValue === deadline.prefillValue
+            ? refreshedDeadline
+            : { ...deadline, originalCloseAt: row.closeAt },
+        };
+      });
+    }
   };
 
-  const renderSkillBadges = (skills: AssignmentSkill[]) => {
-    const badgeTypes = toSkillBadgeTypes(skills);
-    if (badgeTypes.length === 4) {
-      return (
-        <span className="teacher-skill-combined-badge" title="Reading, Listening, Writing, Speaking">
-          <Sparkles size={11} />
-          <span>{isVi ? '4 Kỹ năng' : '4 Skills'}</span>
-        </span>
-      );
+  const refreshAssignments = async () => {
+    const view = activeView.current;
+    if (!view) return;
+
+    invalidateLoads();
+    const version = loadVersion.current;
+    const controller = new AbortController();
+    backgroundLoad.current = controller;
+
+    try {
+      const rows = await loadAssignments(view, currentTimestamp, controller.signal);
+      if (loadVersion.current !== version) return;
+      setAssignments(rows);
+      setLoadedClassId(view.selectedClassId);
+      reconcileDialog(rows, view.isVi);
+    } catch {
+      if (loadVersion.current !== version) return;
+      controller.abort();
+      toast.warning(view.isVi ? 'Không thể làm mới danh sách bài tập.' : 'Could not refresh the assignment list.');
+      if (view.loadedClassId !== view.selectedClassId) setError(assignmentLoadError[view.isVi ? 'vi' : 'en']);
+    } finally {
+      if (loadVersion.current === version) {
+        backgroundLoad.current = null;
+        setIsLoading(false);
+      }
     }
-    return (
-      <div className="teacher-assignment-skills-wrap">
-        {badgeTypes.map(getSkillBadge)}
-      </div>
+  };
+
+  const handleRequestStatusChange = ({ id, classId, lifecycleStatus, closeAt }: AssignmentDisplayItem) => {
+    const view = activeView.current;
+    if (inFlightRef.current || !view || view.loadedClassId !== view.selectedClassId
+      || !includesClass(view.selectedClassId, classId)) return;
+
+    if (lifecycleStatus === 'CLOSED') {
+      setDialog({
+        id, classId, lifecycleStatus, action: 'reopen', deadline: createReopenDeadlineDraft(closeAt, Date.now()),
+      });
+    } else if (lifecycleStatus === 'DRAFT') {
+      setDialog({ id, classId, lifecycleStatus, action: 'open' });
+    } else {
+      setDialog({ id, classId, lifecycleStatus, action: 'close' });
+    }
+  };
+
+  const handleDeadlineChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value, validity } = event.currentTarget;
+    const fieldError = validity.badInput ? deadlineMessages.invalid : undefined;
+    setStatusAction(current => current?.action === 'reopen'
+      ? { ...current, deadline: { ...current.deadline, inputValue: value }, fieldError }
+      : current
     );
   };
 
-  const renderDeadlineTag = (item: AssignmentDisplayItem) => {
-    if (!item.closeDate || isNaN(item.closeDate.getTime())) {
-      return (
-        <span className="teacher-assignment-deadline-tag">
-          <Clock size={11} />
-          <span>{isVi ? 'Không thời hạn' : 'No deadline'}</span>
-        </span>
-      );
+  const handleConfirmStatusChange = async () => {
+    if (!statusAction || inFlightRef.current) return;
+
+    const { id, classId, lifecycleStatus, action } = statusAction;
+    const view = activeView.current;
+    if (!view) return;
+    if (view.loadedClassId !== view.selectedClassId || !includesClass(view.selectedClassId, classId)
+      || selectedAssignment?.lifecycleStatus !== lifecycleStatus) {
+      setDialog(null);
+      toast.warning(isVi ? 'Dữ liệu bài tập đã thay đổi.' : 'Assignment data has changed.');
+      return;
     }
 
-    const d = item.closeDate;
-    const now = new Date(currentTimestamp);
-    const isToday = d.toDateString() === now.toDateString();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const isTomorrow = d.toDateString() === tomorrow.toDateString();
-
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const timeStr = `${hours}:${minutes}`;
-
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const dateStr = `${day}/${month}`;
-
-    if (item.status === 'closed') {
-      return (
-        <span className="teacher-assignment-deadline-tag expired">
-          <Clock size={11} />
-          <span>{isVi ? `Đã đóng (${dateStr})` : `Closed (${dateStr})`}</span>
-        </span>
-      );
+    let newCloseAt: string | undefined;
+    if (statusAction.action === 'reopen') {
+      const validation = validateReopenDeadline(statusAction.deadline, selectedAssignment.openAt, Date.now());
+      if (!validation.valid) {
+        setStatusAction({ ...statusAction, fieldError: deadlineMessages[validation.error] });
+        return;
+      }
+      newCloseAt = validation.closeAt;
+      if (statusAction.rejectedDeadline?.closeAt === (newCloseAt ?? statusAction.deadline.originalCloseAt)) return;
     }
 
-    if (isToday) {
-      return (
-        <span className="teacher-assignment-deadline-tag urgent">
-          <Clock size={11} />
-          <span>{isVi ? `Hết hạn hôm nay • ${timeStr}` : `Due today • ${timeStr}`}</span>
-        </span>
-      );
-    }
+    const nextStatus = action === 'close' ? 'CLOSED' : 'PUBLISHED';
+    const variables: Parameters<typeof mutateAsync>[0] = newCloseAt === undefined
+      ? { id: Number(id), status: nextStatus }
+      : { id: Number(id), status: 'PUBLISHED', reopen: { closeAt: newCloseAt } };
+    const updatedDeadline = newCloseAt === undefined
+      ? {}
+      : { closeAt: newCloseAt, ...mapAssignmentDeadline(newCloseAt, nextStatus, currentTimestamp, isVi) };
 
-    if (isTomorrow) {
-      return (
-        <span className="teacher-assignment-deadline-tag urgent">
-          <Clock size={11} />
-          <span>{isVi ? `Hạn ngày mai • ${timeStr}` : `Due tomorrow • ${timeStr}`}</span>
-        </span>
-      );
-    }
+    try {
+      inFlightRef.current = true;
+      await mutateAsync(variables);
+      const view = activeView.current;
+      if (!view) return;
 
-    return (
-      <span className="teacher-assignment-deadline-tag">
-        <Clock size={11} />
-        <span>{isVi ? `Hạn nộp: ${timeStr}, ${dateStr}` : `Due: ${timeStr}, ${dateStr}`}</span>
-        {item.daysLeft !== undefined && item.daysLeft > 0 && (
-          <span className="teacher-assignment-deadline-sub">
-            {isVi ? `(Còn ${item.daysLeft} ngày)` : `(${item.daysLeft}d left)`}
-          </span>
-        )}
-      </span>
-    );
+      toast.success(statusActionCopy[action].success[view.isVi ? 'vi' : 'en']);
+      setDialog(null);
+      if (!includesClass(view.selectedClassId, statusAction.classId)
+        || !view.assignments.some(item => matchesAssignment(item, statusAction))) return;
+
+      invalidateLoads();
+      setAssignments(items => items.map(item =>
+        matchesAssignment(item, statusAction) ? { ...item, ...updatedDeadline, lifecycleStatus: nextStatus } : item
+      ));
+      void refreshAssignments();
+    } catch (error: unknown) {
+      const view = activeView.current;
+      if (!view) return;
+      if (error instanceof TimeoutError) {
+        toast.warning(view.t('teacherAssignments.statusResponseUnconfirmed'));
+        setDialog(null);
+        void refreshAssignments();
+        return;
+      }
+      const errorLocale = view.isVi ? 'vi' : 'en';
+      const statusCode = error instanceof ApiClientError ? error.statusCode : undefined;
+
+      if (error instanceof ApiClientError && statusCode === 400) {
+        const knownError = backendStatusErrors.get(error.message.trim());
+        if (statusAction.action === 'reopen' && knownError?.type === 'deadline') {
+          const rejectedDeadline = {
+            closeAt: newCloseAt ?? statusAction.deadline.originalCloseAt,
+            message: knownError.message,
+          };
+          setStatusAction(current => current?.action === 'reopen' && matchesAssignment(current, statusAction)
+            ? { ...current, rejectedDeadline }
+            : current
+          );
+          toast.error(knownError.message[errorLocale]);
+        } else {
+          setDialog(null);
+          toast.error((knownError?.type === 'state' ? knownError.message : genericStatusError)[errorLocale]);
+        }
+        void refreshAssignments();
+        return;
+      }
+
+      if (statusCode !== 409) setDialog(null);
+      toast.error(getStatusErrorMessage(error, statusCode)[errorLocale]);
+      if (statusCode === 404 || statusCode === 409) void refreshAssignments();
+    } finally {
+      inFlightRef.current = false;
+    }
   };
 
   const handleSelectSkillToCreate = (skillType: string) => {
@@ -456,7 +660,7 @@ export const TeacherAssignments: React.FC = () => {
           />
           <MetricCard
             title={isVi ? 'Đang mở' : 'Active'}
-            value={stats.openCount}
+            value={openCount}
             className="h-full"
           />
           <MetricCard
@@ -535,121 +739,20 @@ export const TeacherAssignments: React.FC = () => {
       {/* Assignments List */}
       {!isLoading && !error && (
         <div className="teacher-assignments-list">
-          {paginatedAssignments.map((item) => {
-            const submissionPercent = item.totalStudents > 0 
-              ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100)) 
-              : 0;
-
-            return (
-              <div key={item.id} className="teacher-assignment-card">
-                {/* 1. Header Line: Identity (Code, Class, Skills) & Grading Status */}
-                <div className="teacher-assignment-card-header">
-                  <div className="teacher-assignment-card-identity">
-                    <span className="teacher-assignment-code-badge">{item.code}</span>
-                    <div className="teacher-assignment-class-tag">
-                      <GraduationCap size={13} />
-                      <span>{item.className}</span>
-                    </div>
-                    {renderSkillBadges(item.skills)}
-                  </div>
-
-                  <div className="teacher-assignment-card-status">
-                    {item.submittedCount === 0 ? (
-                      <span className="teacher-assignment-upcoming-pill">
-                        <span className="teacher-assignment-status-dot" style={{ backgroundColor: '#94a3b8' }} />
-                        <span>{isVi ? 'Chưa có bài nộp' : 'No submissions'}</span>
-                      </span>
-                    ) : item.pendingGradingCount > 0 ? (
-                      <span className="teacher-assignment-pending-pill">
-                        <span className="teacher-assignment-status-dot pending" />
-                        <span>{item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}</span>
-                      </span>
-                    ) : (
-                      <span className="teacher-assignment-done-pill">
-                        <span className="teacher-assignment-status-dot done" />
-                        <span>{isVi ? 'Đã chấm hoàn tất' : 'All graded'}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Main Title */}
-                <h3 
-                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
-                  className="teacher-assignment-title"
-                >
-                  {item.title}
-                </h3>
-
-                {/* 3. Divider */}
-                <div className="teacher-assignment-card-divider" />
-
-                {/* 4. Footer Line: Deadline & Turnout Progress (Left) + Actions (Right) */}
-                <div className="teacher-assignment-card-footer">
-                  <div className="teacher-assignment-footer-meta">
-                    {renderDeadlineTag(item)}
-
-                    <span className="teacher-assignment-meta-separator">•</span>
-
-                    <div className="teacher-assignment-turnout-group">
-                      <span className="teacher-assignment-turnout-label">
-                        {isVi ? 'Đã nộp:' : 'Turnout:'} <strong>{item.submittedCount}/{item.totalStudents}</strong> ({submissionPercent}%)
-                      </span>
-                      <div className="teacher-assignment-mini-progress">
-                        <div 
-                          className="teacher-assignment-mini-fill"
-                          style={{ width: `${submissionPercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="teacher-assignment-card-actions">
-                    {item.status !== 'closed' && (
-                      <button
-                        type="button"
-                        className="teacher-assignment-btn-edit"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/teacher/assignments/${item.id}/edit`);
-                        }}
-                        title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
-                      >
-                        <Edit2 size={13} />
-                        <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      className="teacher-assignment-btn-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAssignmentToDelete(item);
-                      }}
-                      title={isVi ? 'Xóa bài tập' : 'Delete Assignment'}
-                    >
-                      <Trash2 size={13} />
-                      <span>{isVi ? 'Xóa bài tập' : 'Delete Assignment'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="teacher-assignment-btn-primary"
-                      onClick={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
-                    >
-                      <span>
-                        {item.pendingGradingCount > 0 
-                          ? (isVi ? 'Chấm bài ngay' : 'Grade Now') 
-                          : (isVi ? 'Quản lý bài nộp' : 'View Submissions')}
-                      </span>
-                      <ArrowRight size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {paginatedAssignments.map((item) => (
+            <AssignmentCard
+              key={`${item.classId}:${item.id}`}
+              item={item}
+              isVi={isVi}
+              currentTimestamp={currentTimestamp}
+              onViewDetails={() => navigate(`/teacher/assignments/${item.id}`)}
+              onEdit={() => navigate(`/teacher/assignments/${item.id}/edit`)}
+              onDelete={() => setAssignmentToDelete(item)}
+              onViewSubmissions={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
+              onChangeLifecycle={handleRequestStatusChange}
+              isUpdatingLifecycle={isUpdatingLifecycle || !isClassSnapshotCurrent}
+            />
+          ))}
 
           {filteredAssignments.length === 0 && (
             <EmptyState
@@ -689,6 +792,49 @@ export const TeacherAssignments: React.FC = () => {
           variant="standalone"
         />
       )}
+
+      <ConfirmModal
+        isOpen={statusAction !== null}
+        trapFocus
+        title={dialogCopy.title[locale]}
+        message={dialogCopy.message[locale]}
+        confirmText={dialogCopy.title[locale]}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        closeLabel={isVi ? 'Đóng' : 'Close'}
+        variant={statusAction?.action === 'close' ? 'danger' : 'primary'}
+        isLoading={isUpdatingLifecycle}
+        confirmDisabled={isUpdatingLifecycle || !isClassSnapshotCurrent || isDeadlineRejected || deadlineValidation?.valid === false}
+        onConfirm={handleConfirmStatusChange}
+        onCancel={() => {
+          if (!inFlightRef.current) setDialog(null);
+        }}
+      >
+        {reopenAction && (
+          <div className="mt-4">
+            <label htmlFor={deadlineInputId} className="edit-form-label">
+              {isVi ? 'Hạn nộp mới' : 'New deadline'}
+            </label>
+            <input
+              id={deadlineInputId}
+              className="edit-form-input"
+              type="datetime-local"
+              value={reopenAction.deadline.inputValue}
+              onChange={handleDeadlineChange}
+              required
+              data-initial-focus
+              disabled={isUpdatingLifecycle}
+              aria-invalid={Boolean(deadlineError)}
+              aria-describedby={deadlineError ? `${deadlineHelpId} ${deadlineErrorId}` : deadlineHelpId}
+            />
+            <p id={deadlineHelpId} className="text-xs text-muted">
+              {isVi ? 'Chọn hạn nộp mới ở tương lai.' : 'Choose a new deadline in the future.'}
+            </p>
+            {deadlineError && (
+              <p id={deadlineErrorId} className="text-xs text-danger" role="alert">{deadlineError[locale]}</p>
+            )}
+          </div>
+        )}
+      </ConfirmModal>
 
       {/* Skill Picker Modal */}
       {showSkillModal && (

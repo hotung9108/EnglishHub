@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef, type ReactNode } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { Button } from './Button';
 
@@ -6,8 +6,12 @@ export interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
   message: string;
+  children?: ReactNode;
   confirmText?: string;
   cancelText?: string;
+  confirmDisabled?: boolean;
+  closeLabel?: string;
+  trapFocus?: boolean;
   variant?: 'danger' | 'warning' | 'primary';
   isLoading?: boolean;
   onConfirm: () => void | Promise<void>;
@@ -18,13 +22,49 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   title,
   message,
+  children,
   confirmText = 'Xác nhận',
   cancelText = 'Hủy bỏ',
+  confirmDisabled = false,
+  closeLabel = 'Đóng',
+  trapFocus = false,
   variant = 'danger',
   isLoading = false,
   onConfirm,
   onCancel,
 }) => {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !trapFocus || !dialog) return;
+
+    const previousFocus = document.activeElement;
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex]',
+    )).filter(element => element.tabIndex >= 0 && !element.matches(':disabled'));
+    const controls = focusable();
+    (controls.find(element => element.hasAttribute('data-initial-focus')) ?? controls[0] ?? dialog).focus();
+
+    const keepFocusInside = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || event.defaultPrevented) return;
+      const controls = focusable();
+      const current = document.activeElement;
+      const boundary = event.shiftKey ? controls.at(-1) : controls[0];
+      if (!controls.some(element => element === current)
+        || current === (event.shiftKey ? controls[0] : controls.at(-1))) {
+        event.preventDefault();
+        (boundary ?? dialog).focus();
+      }
+    };
+    window.addEventListener('keydown', keepFocusInside);
+    return () => {
+      window.removeEventListener('keydown', keepFocusInside);
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    };
+  }, [isOpen, trapFocus]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,8 +86,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
+      tabIndex={trapFocus ? -1 : undefined}
       style={{
         position: 'fixed',
         inset: 0,
@@ -91,6 +134,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {iconConfig}
             <h3
+              id={titleId}
               style={{
                 margin: 0,
                 fontSize: '15.5px',
@@ -106,7 +150,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            aria-label="Đóng"
+            aria-label={closeLabel}
             style={{
               background: 'transparent',
               border: 'none',
@@ -132,6 +176,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           }}
         >
           {message}
+          {children}
         </div>
 
         {/* Footer */}
@@ -160,6 +205,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             variant={variant === 'danger' ? 'danger' : 'primary'}
             size="sm"
             loading={isLoading}
+            disabled={confirmDisabled}
             onClick={onConfirm}
           >
             {confirmText}

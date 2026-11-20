@@ -5,7 +5,7 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { MemoryTokenStorage } from '../core/token-storage';
 import { TokenRefreshManager } from '../core/interceptors';
 import { AuthService } from '../services/auth.service';
-import { NotFoundError } from '../core/errors';
+import { NotFoundError, parseApiError, RequestCanceledError, TimeoutError } from '../core/errors';
 import { environment } from '../../config/environment';
 import { UserService } from '../services/user.service';
 import { ClassService } from '../services/class.service';
@@ -526,6 +526,73 @@ test('AssignmentService - full CRUD with correct endpoints and params', async ()
   assert.strictEqual(mockHttp.calls[5].method, 'PATCH');
   assert.strictEqual(mockHttp.calls[5].url, '/assignments/42/status');
   assert.deepStrictEqual(mockHttp.calls[5].data, { status: 'CLOSED' });
+  assert.strictEqual(mockHttp.calls[5].options, undefined);
+});
+
+test('AssignmentService - reopen without a new deadline sends only status', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { reopen: {} });
+
+  assert.deepStrictEqual(mockHttp.calls, [{
+    method: 'PATCH',
+    url: '/assignments/42/status',
+    data: { status: 'PUBLISHED' },
+    options: {},
+  }]);
+});
+
+test('AssignmentService - preserves closeAt and forwards HTTP options without reopen', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+  const closeAt = '2026-11-25T16:59:59+07:00';
+  const signal = new AbortController().signal;
+
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { signal, timeout: 1234, reopen: { closeAt } });
+  await assignmentSvc.updateAssignmentStatus(42, 'CLOSED', { signal, timeout: 4321 });
+  await assignmentSvc.updateAssignmentStatus(42, 'PUBLISHED', { reopen: { closeAt: '' } });
+
+  assert.deepStrictEqual(mockHttp.calls, [
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'PUBLISHED', closeAt }, options: { signal, timeout: 1234 } },
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'CLOSED' }, options: { signal, timeout: 4321 } },
+    { method: 'PATCH', url: '/assignments/42/status', data: { status: 'PUBLISHED', closeAt: '' }, options: {} },
+  ]);
+  assert.strictEqual(mockHttp.calls[0].options?.signal, signal);
+  assert.strictEqual(mockHttp.calls[1].options?.signal, signal);
+});
+
+test('AssignmentService - rejects a supplied deadline for DRAFT and CLOSED before HTTP', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const assignmentSvc = new AssignmentService(mockHttp);
+
+  for (const status of ['DRAFT', 'CLOSED'] as const) {
+    await assert.rejects(
+      assignmentSvc.updateAssignmentStatus(42, status, { reopen: { closeAt: '2026-11-25T16:59:59+00:00' } }),
+      TypeError,
+    );
+  }
+  assert.deepStrictEqual(mockHttp.calls, []);
+});
+
+test('AssignmentService - treats a browser XHR abort as unconfirmed and preserves explicit cancellation', async () => {
+  const mockHttp = new MockHttpClient();
+  const { AssignmentService } = await import('../services/assignment.service.js');
+  const service = new AssignmentService(mockHttp);
+  const browserAbort = new axios.AxiosError('Request aborted', axios.AxiosError.ECONNABORTED);
+  mockHttp.mockError = parseApiError(browserAbort);
+  assert.ok(mockHttp.mockError instanceof RequestCanceledError);
+  await assert.rejects(service.updateAssignmentStatus(42, 'PUBLISHED'),
+    error => error instanceof TimeoutError && error.rawError === browserAbort);
+  assert.equal(mockHttp.calls.length, 1);
+
+  const explicitCancel = parseApiError(new axios.CanceledError());
+  mockHttp.mockError = explicitCancel;
+  await assert.rejects(service.updateAssignmentStatus(42, 'CLOSED'), error => error === explicitCancel);
+  assert.equal(mockHttp.calls.length, 2);
 });
 
 test('AssignmentService - trims/clamps params and omits empty status', async () => {

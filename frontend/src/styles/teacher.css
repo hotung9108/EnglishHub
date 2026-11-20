@@ -639,7 +639,9 @@
 .teacher-assignment-card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: var(--unit);
   margin-left: auto;
 }
 

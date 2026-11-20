@@ -24,6 +24,7 @@ export const teacherVi = {
   teacherAssignments: {
     title: 'Quản lý bài tập',
     subtitle: 'Quản lý bài tập và theo dõi bài nộp của học viên.',
+    statusResponseUnconfirmed: 'Chưa nhận được phản hồi nên kết quả chưa được xác nhận. Đang đồng bộ lại danh sách bài tập.',
     classPrefix: 'Lớp: ',
     btnTemplateBank: 'Kho đề mẫu',
     btnCreate: 'Tạo bài tập mới',
@@ -260,6 +261,7 @@ export const teacherEn = {
   teacherAssignments: {
     title: 'Assignment Management',
     subtitle: 'Manage assignments and monitor student submissions.',
+    statusResponseUnconfirmed: 'No response was received, so the result is unconfirmed. The assignment list is being refreshed.',
     classPrefix: 'Class: ',
     btnTemplateBank: 'Template Library',
     btnCreate: 'Create New Assignment',
