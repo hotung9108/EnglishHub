@@ -88,7 +88,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
   it('renders Pre-Submit Review Dashboard (UC020) when there is an active in-progress attempt', async () => {
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    expect(await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)')).toBeVisible();
+    expect(await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp')).toBeVisible();
     expect(
       screen.getByText(
         'Rà soát danh sách câu trả lời của các kỹ năng. Bạn có thể nhấn "Sửa câu trả lời" để chỉnh sửa trước khi nộp chính thức.'
@@ -99,7 +99,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
   it('displays correct status badges: "Đã làm" for SUBMITTED module and "Chưa nộp" for IN_PROGRESS module', async () => {
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     expect(screen.getByText('Đã làm')).toBeVisible();
     expect(screen.getByText('Chưa nộp')).toBeVisible();
@@ -111,7 +111,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
   it('displays warning banner when some modules are incomplete (!isAllSubModulesCompleted)', async () => {
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     expect(screen.getByText('Còn phần thi chưa hoàn thành')).toBeVisible();
     expect(
@@ -129,7 +129,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
 
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     expect(screen.getByText('Đã hoàn thành các phần thi')).toBeVisible();
     expect(
@@ -143,7 +143,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
     const user = userEvent.setup();
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     const editBtn = screen.getByRole('button', { name: /Sửa câu trả lời/ });
     expect(editBtn).toBeVisible();
@@ -159,7 +159,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
     const user = userEvent.setup();
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     const submitCtaBtn = screen.getByRole('button', {
       name: /Xác nhận Nộp toàn bộ bài tập \(Lần 1\)/,
@@ -189,7 +189,7 @@ describe('StudentAssignmentOverview - Pre-Submit Review Dashboard (UC020 & UC021
     const user = userEvent.setup();
     renderPage(<StudentAssignmentOverview />, '/student/assignments/:id', '/student/assignments/12');
 
-    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp (UC020)');
+    await screen.findByText('Kiểm tra và xem lại bài làm trước khi nộp');
 
     const submitCtaBtn = screen.getByRole('button', {
       name: /Xác nhận Nộp toàn bộ bài tập \(Lần 1\)/,

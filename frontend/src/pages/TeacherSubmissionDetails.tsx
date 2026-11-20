@@ -907,8 +907,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
     if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
       showToast(
         isVi
-          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030)!'
-          : 'Please enter an audit reason note (mandatory per UC030 audit policy)!'
+          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán)!'
+          : 'Please enter an audit reason note (mandatory per audit policy)!'
       );
       return;
     }
@@ -2790,7 +2790,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground">
-                    {isVi ? 'Lý do điều chỉnh điểm số (UC030)' : 'Grade Adjustment Audit Reason (UC030)'}
+                    {isVi ? 'Lý do điều chỉnh điểm số' : 'Grade Adjustment Audit Reason'}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {isVi ? 'Quy chuẩn kiểm toán điểm số yêu cầu ghi nhận lý do thay đổi điểm' : 'Audit policy requires recording the reason for changing grades'}
@@ -2819,7 +2819,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
-                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
                 </label>
                 <textarea
                   rows={3}
