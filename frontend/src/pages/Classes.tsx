@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
 import type { ClassSummary } from '../api/services/class.service';
-import { Button, EmptyState, Pagination } from '../components/common';
+import { Button, EmptyState, Pagination, ConfirmModal, useToast } from '../components/common';
 
 export const Classes: React.FC = () => {
   const { t, language } = useLanguage();
@@ -28,6 +28,9 @@ export const Classes: React.FC = () => {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { success: toastSuccess, error: toastError } = useToast();
+  const [classToChangeStatus, setClassToChangeStatus] = useState<{ id: number; name: string; action: 'close' | 'reopen' } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -82,6 +85,38 @@ export const Classes: React.FC = () => {
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
     setCurrentPage(1);
+  };
+
+  const handleUpdateClassStatus = async () => {
+    if (!classToChangeStatus) return;
+    setIsUpdatingStatus(true);
+    const targetStatus = classToChangeStatus.action === 'close' ? 'COMPLETED' : 'ACTIVE';
+    try {
+      await classService.update(classToChangeStatus.id, { status: targetStatus });
+      setClassesData(prev => prev.map(c => {
+        if (c.id === classToChangeStatus.id) {
+          return {
+            ...c,
+            status: targetStatus === 'COMPLETED' ? 'completed' : 'active'
+          };
+        }
+        return c;
+      }));
+      toastSuccess(
+        classToChangeStatus.action === 'close'
+          ? (isVi ? 'Đóng lớp học thành công.' : 'Class closed successfully.')
+          : (isVi ? 'Mở lại lớp học thành công.' : 'Class reopened successfully.')
+      );
+      setClassToChangeStatus(null);
+    } catch (err: unknown) {
+      toastError(
+        err instanceof Error
+          ? err.message
+          : (isVi ? 'Không thể cập nhật trạng thái lớp.' : 'Failed to update class status.')
+      );
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -225,16 +260,41 @@ export const Classes: React.FC = () => {
                       : (isVi ? 'Đã hủy' : 'Cancelled')}
                   </td>
                   <td className="text-right">
-                    <Button 
-                      variant="secondary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/admin/classes/${cls.id}`);
-                      }}
-                    >
-                      {t('adminClasses.viewDetails')}
-                    </Button>
+                    <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                      <Button 
+                        variant="secondary"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/classes/${cls.id}`);
+                        }}
+                      >
+                        {t('adminClasses.viewDetails')}
+                      </Button>
+                      {cls.status === 'active' ? (
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'close' });
+                          }}
+                        >
+                          {isVi ? 'Đóng lớp' : 'Close Class'}
+                        </Button>
+                      ) : cls.status === 'completed' ? (
+                        <Button 
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setClassToChangeStatus({ id: cls.id, name: cls.name, action: 'reopen' });
+                          }}
+                        >
+                          {isVi ? 'Mở lại lớp' : 'Reopen Class'}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -258,6 +318,33 @@ export const Classes: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Modal xác nhận Đóng / Mở lại lớp học (UC008 / Issue #367) */}
+      <ConfirmModal
+        isOpen={Boolean(classToChangeStatus)}
+        title={
+          classToChangeStatus?.action === 'close'
+            ? (isVi ? 'Đóng lớp học' : 'Close Class')
+            : (isVi ? 'Mở lại lớp học' : 'Reopen Class')
+        }
+        message={
+          classToChangeStatus
+            ? classToChangeStatus.action === 'close'
+              ? (isVi
+                  ? `Bạn có chắc chắn muốn đóng lớp học "${classToChangeStatus.name}" không?`
+                  : `Are you sure you want to close class "${classToChangeStatus.name}"?`)
+              : (isVi
+                  ? `Bạn có chắc chắn muốn mở lại lớp học "${classToChangeStatus.name}" không?`
+                  : `Are you sure you want to reopen class "${classToChangeStatus.name}"?`)
+            : ''
+        }
+        confirmText={isVi ? 'Xác nhận' : 'Confirm'}
+        cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+        variant={classToChangeStatus?.action === 'close' ? 'warning' : 'primary'}
+        isLoading={isUpdatingStatus}
+        onConfirm={handleUpdateClassStatus}
+        onCancel={() => setClassToChangeStatus(null)}
+      />
     </div>
   );
 };

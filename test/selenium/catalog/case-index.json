@@ -1,0 +1,1362 @@
+{
+  "LOGIN_001": {
+    "title": "Đăng nhập thành công (email đúng, mật khẩu đúng, tài khoản hoạt động)",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4819
+  },
+  "LOGIN_002": {
+    "title": "Email đúng, mật khẩu sai",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4820
+  },
+  "LOGIN_003": {
+    "title": "Email chưa đăng ký",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4821
+  },
+  "LOGIN_004": {
+    "title": "Tài khoản bị khóa",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4822
+  },
+  "LOGIN_005": {
+    "title": "Để trống cả hai trường",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4823
+  },
+  "LOGIN_006": {
+    "title": "Chỉ trống email",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4824
+  },
+  "LOGIN_007": {
+    "title": "Chỉ trống mật khẩu",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4825
+  },
+  "LOGIN_008": {
+    "title": "Email sai định dạng - thiếu @",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4826
+  },
+  "LOGIN_009": {
+    "title": "Email sai định dạng - thiếu tên miền",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4827
+  },
+  "LOGIN_010": {
+    "title": "Email có khoảng trắng đầu/cuối",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4828
+  },
+  "LOGIN_011": {
+    "title": "Email viết hoa/thường khác nhau",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4829
+  },
+  "LOGIN_012": {
+    "title": "Mật khẩu phân biệt hoa/thường",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4830
+  },
+  "LOGIN_013": {
+    "title": "Mật khẩu rất dài (256 ký tự)",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4831
+  },
+  "LOGIN_014": {
+    "title": "Mật khẩu 1 ký tự",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4832
+  },
+  "LOGIN_015": {
+    "title": "SQL Injection tại trường email",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4833
+  },
+  "LOGIN_016": {
+    "title": "XSS tại trường email",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4834
+  },
+  "LOGIN_017": {
+    "title": "Nhấn Enter để đăng nhập",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4835
+  },
+  "LOGIN_018": {
+    "title": "Mật khẩu được che; nút hiện/ẩn mật khẩu (nếu có)",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4836
+  },
+  "LOGIN_019": {
+    "title": "Nút đăng nhập bị vô hiệu hóa khi đang xử lý",
+    "requirement": "UC001/USA02",
+    "role": "admin",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4837
+  },
+  "LOGIN_020": {
+    "title": "Trường nhập có nhãn hiển thị, placeholder không thay nhãn",
+    "requirement": "UC001/USA01",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4838
+  },
+  "LOGIN_021": {
+    "title": "Truy cập trang yêu cầu đăng nhập khi chưa xác thực",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4839
+  },
+  "LOGIN_022": {
+    "title": "Duy trì phiên sau khi tải lại trang",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4840
+  },
+  "LOGIN_023": {
+    "title": "Đăng nhập Giáo viên điều hướng đúng không gian",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4841
+  },
+  "LOGIN_024": {
+    "title": "Đăng nhập Học viên điều hướng đúng không gian",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4842
+  },
+  "LOGIN_025": {
+    "title": "Đăng nhập Quản lý điều hướng đúng không gian",
+    "requirement": "UC001",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc001/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4843
+  },
+  "LOGOUT_001": {
+    "title": "Đăng xuất thành công",
+    "requirement": "UC002",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc002/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4844
+  },
+  "LOGOUT_002": {
+    "title": "Xóa thông tin xác thực trên trình duyệt sau đăng xuất",
+    "requirement": "UC002",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc002/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4845
+  },
+  "LOGOUT_003": {
+    "title": "Nút Back sau đăng xuất không vào lại được trang nội bộ",
+    "requirement": "UC002",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc002/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4846
+  },
+  "LOGOUT_004": {
+    "title": "Phiên hết hạn tự chuyển về đăng nhập",
+    "requirement": "UC002",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc002/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4847
+  },
+  "LOGOUT_005": {
+    "title": "Đăng xuất ở tab này, tab kia gọi API",
+    "requirement": "UC002",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc002/auth.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4848
+  },
+  "PROF_001": {
+    "title": "Hiển thị thông tin cá nhân hiện tại",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4849
+  },
+  "PROF_002": {
+    "title": "Cập nhật họ tên hợp lệ",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4850
+  },
+  "PROF_003": {
+    "title": "Họ tên để trống",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4851
+  },
+  "PROF_004": {
+    "title": "Họ tên tại biên độ dài tối đa (giả định 100: 99/100/101 ký tự)",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4852
+  },
+  "PROF_005": {
+    "title": "Số điện thoại sai định dạng",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4853
+  },
+  "PROF_006": {
+    "title": "XSS trong họ tên",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4854
+  },
+  "PROF_007": {
+    "title": "Đổi mật khẩu hợp lệ",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4855
+  },
+  "PROF_008": {
+    "title": "Mật khẩu cũ sai",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4856
+  },
+  "PROF_009": {
+    "title": "Mật khẩu mới 7 ký tự (biên tối thiểu 8 - giả định)",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4857
+  },
+  "PROF_010": {
+    "title": "Mật khẩu mới 8 ký tự (biên tối thiểu 8 - giả định)",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4858
+  },
+  "PROF_011": {
+    "title": "Mật khẩu mới không khớp xác nhận",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4859
+  },
+  "PROF_012": {
+    "title": "Mật khẩu mới trùng mật khẩu cũ",
+    "requirement": "UC003",
+    "role": "shared",
+    "sourceFile": "cases/01-auth-profile/uc003/profile.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4860
+  },
+  "USER_001": {
+    "title": "Hiển thị danh sách tài khoản + ô tìm kiếm + bộ lọc",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4861
+  },
+  "USER_002": {
+    "title": "Tìm kiếm theo email có kết quả",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4862
+  },
+  "USER_003": {
+    "title": "Tìm kiếm không có kết quả → thông báo + xóa điều kiện",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4863
+  },
+  "USER_004": {
+    "title": "Lọc theo vai trò",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4864
+  },
+  "USER_005": {
+    "title": "Tạo tài khoản hợp lệ",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4865
+  },
+  "USER_006": {
+    "title": "Tạo tài khoản trùng email",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4866
+  },
+  "USER_007": {
+    "title": "Tạo tài khoản thiếu trường bắt buộc",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4867
+  },
+  "USER_008": {
+    "title": "Email sai định dạng khi tạo",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4868
+  },
+  "USER_009": {
+    "title": "Sửa thông tin tài khoản",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4869
+  },
+  "USER_010": {
+    "title": "Hủy thao tác tạo/sửa",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4870
+  },
+  "USER_011": {
+    "title": "Khóa tài khoản rồi đăng nhập bằng tài khoản đó",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4871
+  },
+  "USER_012": {
+    "title": "Mở khóa tài khoản rồi đăng nhập lại",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4872
+  },
+  "USER_013": {
+    "title": "Phân trang / dữ liệu lớn",
+    "requirement": "UC004",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc004/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4873
+  },
+  "RBAC_001": {
+    "title": "Đổi vai trò Học viên → Giáo viên",
+    "requirement": "UC005",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc005/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4874
+  },
+  "RBAC_002": {
+    "title": "Quản lý tự tước quyền quản trị của chính mình",
+    "requirement": "UC005",
+    "role": "shared",
+    "sourceFile": "cases/02-users-permissions/uc005/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4875
+  },
+  "RBAC_003": {
+    "title": "Giáo viên truy cập URL quản trị",
+    "requirement": "UC005",
+    "role": "teacher",
+    "sourceFile": "cases/02-users-permissions/uc005/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4876
+  },
+  "RBAC_004": {
+    "title": "Học viên truy cập URL giảng dạy (tạo bài tập)",
+    "requirement": "UC005",
+    "role": "student",
+    "sourceFile": "cases/02-users-permissions/uc005/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4877
+  },
+  "RBAC_005": {
+    "title": "IDOR: Học viên A xem bài làm của Học viên B qua URL/ID",
+    "requirement": "UC005",
+    "role": "student",
+    "sourceFile": "cases/02-users-permissions/uc005/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4878
+  },
+  "RBAC_006": {
+    "title": "API từ chối khi thiếu/giả token",
+    "requirement": "UC005",
+    "role": "student",
+    "sourceFile": "cases/02-users-permissions/uc005/admin-accounts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4879
+  },
+  "TCHR_001": {
+    "title": "Xem danh sách giáo viên + tìm kiếm/lọc",
+    "requirement": "UC006",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc006/admin-teachers.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4880
+  },
+  "TCHR_002": {
+    "title": "Thêm giáo viên hợp lệ",
+    "requirement": "UC006",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc006/admin-teachers.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4881
+  },
+  "TCHR_003": {
+    "title": "Thêm giáo viên thiếu dữ liệu bắt buộc / trùng liên lạc",
+    "requirement": "UC006",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc006/admin-teachers.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4882
+  },
+  "TCHR_004": {
+    "title": "Khóa/Mở khóa giáo viên",
+    "requirement": "UC006",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc006/admin-teachers.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4883
+  },
+  "STDT_001": {
+    "title": "Thêm học viên hợp lệ",
+    "requirement": "UC007",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc007/admin-students.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4884
+  },
+  "STDT_002": {
+    "title": "Trùng mã học viên hoặc email",
+    "requirement": "UC007",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc007/admin-students.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4885
+  },
+  "STDT_003": {
+    "title": "Sửa thông tin học viên",
+    "requirement": "UC007",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc007/admin-students.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4886
+  },
+  "STDT_004": {
+    "title": "Tìm kiếm học viên không có kết quả",
+    "requirement": "UC007",
+    "role": "admin",
+    "sourceFile": "cases/02-users-permissions/uc007/admin-students.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4887
+  },
+  "CLS_001": {
+    "title": "Tạo lớp mới hợp lệ và gán giáo viên phụ trách",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4888
+  },
+  "CLS_002": {
+    "title": "Tạo lớp thiếu tên",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4889
+  },
+  "CLS_003": {
+    "title": "Ngày kết thúc TRƯỚC ngày bắt đầu (ngoài biên) bị từ chối",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4890
+  },
+  "CLS_004": {
+    "title": "Ngày kết thúc BẰNG ngày bắt đầu (đúng biên)",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4891
+  },
+  "CLS_005": {
+    "title": "Ngày kết thúc SAU ngày bắt đầu 1 ngày (trong biên)",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4892
+  },
+  "CLS_006": {
+    "title": "Phân công giáo viên bị khóa/không khả dụng",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4893
+  },
+  "CLS_007": {
+    "title": "Đóng lớp rồi mở lại",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4894
+  },
+  "CLS_008": {
+    "title": "Sửa thông tin lớp",
+    "requirement": "UC008",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc008/admin-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4895
+  },
+  "MEM_001": {
+    "title": "Thêm học viên vào lớp",
+    "requirement": "UC009",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc009/admin-members.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4896
+  },
+  "MEM_002": {
+    "title": "Thêm học viên đã có trong lớp",
+    "requirement": "UC009",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc009/admin-members.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4897
+  },
+  "MEM_003": {
+    "title": "Xóa học viên có xác nhận; hủy xác nhận",
+    "requirement": "UC009",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc009/admin-members.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4898
+  },
+  "MEM_004": {
+    "title": "Sĩ số tối đa: max-1, max, max+1 (nếu có giới hạn)",
+    "requirement": "UC009",
+    "role": "admin",
+    "sourceFile": "cases/03-classes-members/uc009/admin-members.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4899
+  },
+  "MEM_005": {
+    "title": "Giáo viên chỉ quản lý lớp mình phụ trách",
+    "requirement": "UC009",
+    "role": "teacher",
+    "sourceFile": "cases/03-classes-members/uc009/teacher-members.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4900
+  },
+  "CLV_001": {
+    "title": "Học viên chỉ thấy lớp mình tham gia",
+    "requirement": "UC010",
+    "role": "student",
+    "sourceFile": "cases/03-classes-members/uc010/student-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4901
+  },
+  "CLV_002": {
+    "title": "Giáo viên chỉ thấy lớp mình phụ trách",
+    "requirement": "UC010",
+    "role": "teacher",
+    "sourceFile": "cases/03-classes-members/uc010/teacher-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4902
+  },
+  "CLV_003": {
+    "title": "Chưa thuộc lớp nào",
+    "requirement": "UC010",
+    "role": "student",
+    "sourceFile": "cases/03-classes-members/uc010/student-classes.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4903
+  },
+  "ASG_001": {
+    "title": "Lọc bài tập theo kỹ năng (Nghe/Nói/Đọc/Viết)",
+    "requirement": "UC011",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc011/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4904
+  },
+  "ASG_002": {
+    "title": "Lọc theo trạng thái mở/đóng + tìm từ khóa",
+    "requirement": "UC011",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc011/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4905
+  },
+  "ASG_003": {
+    "title": "Xóa bài tập đã có học viên nộp",
+    "requirement": "UC011",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc011/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4906
+  },
+  "ASG_004": {
+    "title": "Tạo bài tập Viết hợp lệ và lưu nháp",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4907
+  },
+  "ASG_005": {
+    "title": "Tạo bài tập Đọc trắc nghiệm có đáp án + thang điểm",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4908
+  },
+  "ASG_006": {
+    "title": "Tạo bài tập Nghe tải file âm thanh hợp lệ",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4909
+  },
+  "ASG_007": {
+    "title": "Upload tệp sai định dạng (.exe) cho bài Nghe",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4910
+  },
+  "ASG_008": {
+    "title": "Tệp âm thanh tại biên dung lượng (limit-1, limit, limit+1)",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4911
+  },
+  "ASG_009": {
+    "title": "Thiếu tiêu đề bắt buộc",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4912
+  },
+  "ASG_010": {
+    "title": "Số lần làm tối đa = -1",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4913
+  },
+  "ASG_011": {
+    "title": "Số lần làm tối đa = 0",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4914
+  },
+  "ASG_012": {
+    "title": "Số lần làm tối đa = 1",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4915
+  },
+  "ASG_013": {
+    "title": "Số lần làm tối đa = 2",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4916
+  },
+  "ASG_014": {
+    "title": "Số lần làm tối đa = 1000",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4917
+  },
+  "ASG_015": {
+    "title": "Điểm tối đa / điểm từng câu: âm, 0, thập phân, quá lớn",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4918
+  },
+  "ASG_016": {
+    "title": "Hạn nộp ở quá khứ",
+    "requirement": "UC012",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc012/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4919
+  },
+  "ASG_017": {
+    "title": "Nháp → Mở bài tập (có hộp xác nhận)",
+    "requirement": "UC013",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc013/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4920
+  },
+  "ASG_018": {
+    "title": "Mở bài khi hạn nộp đã qua",
+    "requirement": "UC013",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc013/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4921
+  },
+  "ASG_019": {
+    "title": "Mở → Khóa bài tập; HV không nộp mới được",
+    "requirement": "UC014",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc014/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4922
+  },
+  "ASG_020": {
+    "title": "Hủy xác nhận khóa",
+    "requirement": "UC014",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc014/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4923
+  },
+  "ASG_021": {
+    "title": "Khóa → Mở lại",
+    "requirement": "UC013/14",
+    "role": "teacher",
+    "sourceFile": "cases/04-assignments/uc013/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4924
+  },
+  "ASG_022": {
+    "title": "HV không thấy bài ở trạng thái Nháp",
+    "requirement": "UC011",
+    "role": "student",
+    "sourceFile": "cases/04-assignments/uc011/teacher-assignments.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4925
+  },
+  "DO_001": {
+    "title": "Xem chi tiết bài tập",
+    "requirement": "UC015",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc015/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4926
+  },
+  "DO_002": {
+    "title": "Xem bài đã khóa / chưa mở",
+    "requirement": "UC015",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc015/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4927
+  },
+  "DO_003": {
+    "title": "Làm bài Viết: nhập nội dung và lưu",
+    "requirement": "UC016",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc016/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4928
+  },
+  "DO_004": {
+    "title": "Giới hạn số từ Viết: min-1, min, max, max+1",
+    "requirement": "UC016",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc016/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4929
+  },
+  "DO_005": {
+    "title": "Tải tệp bài viết sai định dạng",
+    "requirement": "UC016",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc016/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4930
+  },
+  "DO_006": {
+    "title": "Bài Nói: ghi âm → nghe lại → lưu",
+    "requirement": "UC017",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc017/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4931
+  },
+  "DO_007": {
+    "title": "Ghi âm lại sau khi hủy bản tạm",
+    "requirement": "UC017",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc017/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4932
+  },
+  "DO_008": {
+    "title": "Từ chối quyền micro",
+    "requirement": "UC017",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc017/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4933
+  },
+  "DO_009": {
+    "title": "Bài Đọc: trả lời đủ và lưu",
+    "requirement": "UC018",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc018/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4934
+  },
+  "DO_010": {
+    "title": "Chưa trả lời hết: cảnh báo số câu trống",
+    "requirement": "UC018/19",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc018/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4935
+  },
+  "DO_011": {
+    "title": "Bài Nghe: phát audio + chọn đáp án",
+    "requirement": "UC019",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc019/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4936
+  },
+  "DO_012": {
+    "title": "Giới hạn số lượt nghe: lần 1, lần cuối, lần cuối+1",
+    "requirement": "UC019",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc019/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4937
+  },
+  "DO_013": {
+    "title": "Nộp bài: hộp thoại xác nhận → Xác nhận",
+    "requirement": "UC021",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc021/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4938
+  },
+  "DO_014": {
+    "title": "Nộp bài: Hủy xác nhận",
+    "requirement": "UC021",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc021/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4939
+  },
+  "DO_015": {
+    "title": "Nhấn nộp bài hai lần liên tiếp",
+    "requirement": "UC021",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc021/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4940
+  },
+  "DO_016": {
+    "title": "Mất mạng khi nộp",
+    "requirement": "UC021",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc021/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4941
+  },
+  "DO_017": {
+    "title": "Hết giờ tự động thu bài",
+    "requirement": "UC021",
+    "role": "shared",
+    "sourceFile": null,
+    "scope": "excluded",
+    "qaseCaseId": 4942
+  },
+  "DO_018": {
+    "title": "Sau khi nộp, số lần làm tăng 1; bài trắc nghiệm được chấm sơ bộ",
+    "requirement": "UC021",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc021/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4943
+  },
+  "DO_019": {
+    "title": "Làm lại: lần = max-1, = max (nút bị vô hiệu)",
+    "requirement": "UC022",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc022/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4944
+  },
+  "DO_020": {
+    "title": "Làm lại khi bài đã bị khóa",
+    "requirement": "UC022",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc022/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4945
+  },
+  "DO_021": {
+    "title": "Lịch sử các lần nộp hiển thị đúng",
+    "requirement": "UC022",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc022/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4946
+  },
+  "DO_022": {
+    "title": "Xem lại bài làm sau khi nộp",
+    "requirement": "UC020",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc020/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4947
+  },
+  "DO_023": {
+    "title": "Nhãn trạng thái: Chưa làm → Đang làm → Đã nộp → Đang chấm → Đã chấm",
+    "requirement": "UC023",
+    "role": "student",
+    "sourceFile": "cases/05-attempts-submissions/uc023/student-attempts.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4948
+  },
+  "GRD_001": {
+    "title": "Chấm thủ công hợp lệ",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4949
+  },
+  "GRD_002": {
+    "title": "Nhập điểm -0.1 (thang tối đa 10 - giả định)",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4950
+  },
+  "GRD_003": {
+    "title": "Nhập điểm 0 (thang tối đa 10 - giả định)",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4951
+  },
+  "GRD_004": {
+    "title": "Nhập điểm 10 (thang tối đa 10 - giả định)",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4952
+  },
+  "GRD_005": {
+    "title": "Nhập điểm 10.1 (thang tối đa 10 - giả định)",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4953
+  },
+  "GRD_006": {
+    "title": "Điểm không phải số",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4954
+  },
+  "GRD_007": {
+    "title": "Nhận xét trống",
+    "requirement": "UC024",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc024/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4955
+  },
+  "GRD_008": {
+    "title": "AI hỗ trợ chấm Viết: highlight lỗi, giải thích, điểm đề xuất",
+    "requirement": "UC025",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc025/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4956
+  },
+  "GRD_009": {
+    "title": "AI chậm/gián đoạn → cho chấm thủ công / gửi lại",
+    "requirement": "UC025",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc025/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4957
+  },
+  "GRD_010": {
+    "title": "AI với bài viết rỗng/rất ngắn/ngôn ngữ khác",
+    "requirement": "UC025",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc025/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4958
+  },
+  "GRD_011": {
+    "title": "AI hỗ trợ chấm Nói: transcript + IPA + điểm đề xuất",
+    "requirement": "UC026",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc026/teacher-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4959
+  },
+  "GRD_012": {
+    "title": "Ghi âm chất lượng kém/nhiều tạp âm",
+    "requirement": "UC026",
+    "role": "shared",
+    "sourceFile": null,
+    "scope": "excluded",
+    "qaseCaseId": 4960
+  },
+  "GRD_013": {
+    "title": "Chấm tự động Đọc: 0 đúng / một phần / tất cả đúng",
+    "requirement": "UC027",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc027/student-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4961
+  },
+  "GRD_014": {
+    "title": "Chấm tự động Nghe: điền từ khớp/ không khớp hoa-thường, khoảng trắng",
+    "requirement": "UC028",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc028/student-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4962
+  },
+  "GRD_015": {
+    "title": "Bài Đọc/Nghe chưa có đáp án chuẩn",
+    "requirement": "UC027/28",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc027/student-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4963
+  },
+  "GRD_016": {
+    "title": "GV không chấm được bài của lớp không phụ trách",
+    "requirement": "UC024",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc024/student-grading.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4964
+  },
+  "SCR_001": {
+    "title": "Học viên chỉ thấy điểm của mình",
+    "requirement": "UC029",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc029/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4965
+  },
+  "SCR_002": {
+    "title": "Giáo viên xem điểm cả lớp; lọc theo bài/khoảng thời gian",
+    "requirement": "UC029",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc029/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4966
+  },
+  "SCR_003": {
+    "title": "Bài chưa chấm hiển thị 'Đang chấm'",
+    "requirement": "UC029",
+    "role": "student",
+    "sourceFile": "cases/06-grading-scores/uc029/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4967
+  },
+  "SCR_004": {
+    "title": "Điều chỉnh điểm kèm lý do; lưu lịch sử",
+    "requirement": "UC030",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc030/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4968
+  },
+  "SCR_005": {
+    "title": "Điều chỉnh điểm ngoài khoảng / thiếu lý do",
+    "requirement": "UC030",
+    "role": "teacher",
+    "sourceFile": "cases/06-grading-scores/uc030/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4969
+  },
+  "RES_001": {
+    "title": "Học viên xem kết quả học tập (biểu đồ, TB kỹ năng, % hoàn thành)",
+    "requirement": "UC031",
+    "role": "student",
+    "sourceFile": "cases/07-results-reports/uc031/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4970
+  },
+  "RES_002": {
+    "title": "Chưa có bài được chấm",
+    "requirement": "UC031",
+    "role": "student",
+    "sourceFile": "cases/07-results-reports/uc031/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4971
+  },
+  "RES_003": {
+    "title": "Xem bài chữa: đáp án, nhận xét GV, lỗi AI",
+    "requirement": "UC032",
+    "role": "student",
+    "sourceFile": "cases/07-results-reports/uc032/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4972
+  },
+  "RES_004": {
+    "title": "Không xem được bài chữa khi chưa chấm",
+    "requirement": "UC032",
+    "role": "student",
+    "sourceFile": "cases/07-results-reports/uc032/student-results.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4973
+  },
+  "RES_005": {
+    "title": "Giáo viên đánh giá năng lực học viên",
+    "requirement": "UC033",
+    "role": "teacher",
+    "sourceFile": "cases/07-results-reports/uc033/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4974
+  },
+  "RES_006": {
+    "title": "Học viên mới thiếu dữ liệu",
+    "requirement": "UC033",
+    "role": "teacher",
+    "sourceFile": "cases/07-results-reports/uc033/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4975
+  },
+  "RES_007": {
+    "title": "Theo dõi tiến độ lớp: % hoàn thành, chưa nộp, nộp muộn",
+    "requirement": "UC034",
+    "role": "teacher",
+    "sourceFile": "cases/07-results-reports/uc034/teacher-progress.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4976
+  },
+  "RES_008": {
+    "title": "Dashboard Quản lý hiển thị chỉ số tổng",
+    "requirement": "UC035",
+    "role": "admin",
+    "sourceFile": "cases/07-results-reports/uc035/admin-reports.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4977
+  },
+  "RES_009": {
+    "title": "Lọc theo thời gian không có dữ liệu",
+    "requirement": "UC035",
+    "role": "admin",
+    "sourceFile": "cases/07-results-reports/uc035/admin-reports.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4978
+  },
+  "RES_010": {
+    "title": "Xuất báo cáo",
+    "requirement": "UC035",
+    "role": "admin",
+    "sourceFile": "cases/07-results-reports/uc035/admin-reports.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4979
+  },
+  "NFR_001": {
+    "title": "Biểu mẫu có nhãn, trường bắt buộc, thông báo lỗi bằng chữ",
+    "requirement": "USA01",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4980
+  },
+  "NFR_002": {
+    "title": "Phản hồi trạng thái thao tác (loading/thành công/lỗi)",
+    "requirement": "USA02",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4981
+  },
+  "NFR_003": {
+    "title": "Điều hướng bằng menu và nút quay lại",
+    "requirement": "USA03",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4982
+  },
+  "NFR_004": {
+    "title": "Nút hành động Lưu/Hủy/Xóa/Sửa có tên gọi thống nhất giữa các màn",
+    "requirement": "USA04",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4983
+  },
+  "NFR_005": {
+    "title": "Biểu tượng của cùng hành động giống nhau giữa các màn",
+    "requirement": "USA04",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4984
+  },
+  "NFR_006": {
+    "title": "Nhãn trạng thái nghiệp vụ cùng ý nghĩa thì hiển thị giống nhau",
+    "requirement": "USA04",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4985
+  },
+  "NFR_007": {
+    "title": "Trạng thái có chữ mô tả, không chỉ phân biệt bằng màu",
+    "requirement": "USA04",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4986
+  },
+  "NFR_008": {
+    "title": "Hiển thị đúng trên Chrome & Edge, zoom 100%",
+    "requirement": "USA05",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4987
+  },
+  "NFR_009": {
+    "title": "Danh sách rỗng có thông báo + xóa điều kiện lọc",
+    "requirement": "USA06",
+    "role": "admin",
+    "sourceFile": "cases/08-nfr/nfr.cases.js",
+    "scope": "active",
+    "qaseCaseId": 4988
+  }
+}

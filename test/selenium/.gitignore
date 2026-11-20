@@ -1,7 +1,9 @@
 node_modules/
-.env
+.env*
+!.env.example
 .cache/
 reports/
+cleanup_audit.log
 fixtures/staging.json
 fixtures/cleanup-state.json
 *.local.postman_environment.json

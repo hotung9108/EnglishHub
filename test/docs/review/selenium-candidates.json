@@ -1,0 +1,1070 @@
+{
+  "status": "review-only",
+  "method": "Static AST extraction of active definitions only; comments/disabled definitions are not imported. No legacy tests were run.",
+  "cases": [
+    {
+      "id": "ADM-001",
+      "title": "Đăng nhập đúng vai trò Admin",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 50
+    },
+    {
+      "id": "ADM-002",
+      "title": "Điều hướng các màn Admin qua sidebar",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 55
+    },
+    {
+      "id": "ADM-003",
+      "title": "Accounts tìm tài khoản QA vừa tạo",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 58
+    },
+    {
+      "id": "ADM-004",
+      "title": "Accounts tìm không có kết quả",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 61
+    },
+    {
+      "id": "ADM-005",
+      "title": "Accounts lọc Teacher",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 64
+    },
+    {
+      "id": "ADM-006",
+      "title": "Accounts hủy chỉnh sửa không lưu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 67
+    },
+    {
+      "id": "ADM-007",
+      "title": "Accounts sửa họ tên và lưu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 70
+    },
+    {
+      "id": "ADM-008",
+      "title": "Accounts khóa rồi mở lại tài khoản QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 73
+    },
+    {
+      "id": "ADM-009",
+      "title": "Teacher form chặn thiếu dữ liệu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 82
+    },
+    {
+      "id": "ADM-010",
+      "title": "Teacher tạo tài khoản qua wizard",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 83
+    },
+    {
+      "id": "ADM-011",
+      "title": "Teachers tìm và mở hồ sơ QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 84
+    },
+    {
+      "id": "ADM-012",
+      "title": "Student form chặn thiếu dữ liệu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 105
+    },
+    {
+      "id": "ADM-013",
+      "title": "Student tạo tài khoản qua wizard",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 106
+    },
+    {
+      "id": "ADM-014",
+      "title": "Students tìm học viên QA mới",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 107
+    },
+    {
+      "id": "ADM-015",
+      "title": "Classes tìm và mở đúng lớp QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 108
+    },
+    {
+      "id": "ADM-016",
+      "title": "Classes tìm không tồn tại",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 109
+    },
+    {
+      "id": "ADM-017",
+      "title": "Tạo lớp chặn thiếu tên",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 110
+    },
+    {
+      "id": "ADM-018",
+      "title": "Tạo lớp qua đủ các bước",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 115
+    },
+    {
+      "id": "ADM-019",
+      "title": "Danh sách học viên trong lớp đối chiếu API",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 122
+    },
+    {
+      "id": "ADM-020",
+      "title": "Mở hồ sơ từ học viên trong lớp",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 125
+    },
+    {
+      "id": "ADM-021",
+      "title": "Admin xem nội dung bài tập trong lớp",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 129
+    },
+    {
+      "id": "ADM-022",
+      "title": "Lưu cài đặt lớp và kiểm tra bền vững",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 136
+    },
+    {
+      "id": "ADM-023",
+      "title": "Kho lưu trữ tìm lớp COMPLETED",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 139
+    },
+    {
+      "id": "ADM-024",
+      "title": "Mở lại lớp đã hoàn thành qua UI",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 142
+    },
+    {
+      "id": "ADM-025",
+      "title": "Reports lọc chính xác lớp QA, đối chiếu số liệu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 145
+    },
+    {
+      "id": "ADM-026",
+      "title": "Reports lọc giáo viên QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 153
+    },
+    {
+      "id": "ADM-027",
+      "title": "Reports mở chi tiết tiến độ lớp QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 156
+    },
+    {
+      "id": "ADM-028",
+      "title": "Reports xóa bộ lọc",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 163
+    },
+    {
+      "id": "ADM-029",
+      "title": "Audit tìm mã chấm điểm và đối chiếu API",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 166
+    },
+    {
+      "id": "ADM-030",
+      "title": "Audit tìm mã không tồn tại",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 170
+    },
+    {
+      "id": "ADM-031",
+      "title": "Audit chi tiết và lịch sử sửa điểm",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 173
+    },
+    {
+      "id": "ADM-032",
+      "title": "Settings hồ sơ Admin chỉ đọc",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 185
+    },
+    {
+      "id": "ADM-033",
+      "title": "Settings bảo mật có trường mật khẩu",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 188
+    },
+    {
+      "id": "ADM-034",
+      "title": "Teacher từ chối tên chứa chữ số",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 192
+    },
+    {
+      "id": "ADM-035",
+      "title": "Student từ chối email sai định dạng",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 196
+    },
+    {
+      "id": "ADM-036",
+      "title": "Accounts tạo Admin phải lưu đúng vai trò ADMIN",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 242
+    },
+    {
+      "id": "ADM-037",
+      "title": "Accounts tạo Teacher phải lưu đúng vai trò TEACHER",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 243
+    },
+    {
+      "id": "ADM-038",
+      "title": "Accounts tạo Student phải lưu đúng vai trò STUDENT",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 244
+    },
+    {
+      "id": "ADM-039",
+      "title": "Accounts tìm tài khoản có sẵn độc lập bước tạo",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 259
+    },
+    {
+      "id": "ADM-040",
+      "title": "Students tìm học viên có sẵn độc lập bước tạo",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 260
+    },
+    {
+      "id": "ADM-041",
+      "title": "Students khóa rồi mở khóa QA từ danh sách",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 261
+    },
+    {
+      "id": "ADM-042",
+      "title": "Student profile khóa rồi mở khóa đúng danh tính QA",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 262
+    },
+    {
+      "id": "ADM-043",
+      "title": "Reports lọc ngày có chứa bài QA đã chấm",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 263
+    },
+    {
+      "id": "ADM-044",
+      "title": "Reports lọc ngày tương lai loại bài QA hiện tại",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 264
+    },
+    {
+      "id": "ADM-045",
+      "title": "Reports reset cả ngày Teacher và lớp",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 265
+    },
+    {
+      "id": "ADM-046",
+      "title": "Audit lọc trạng thái COMPLETED",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 266
+    },
+    {
+      "id": "ADM-047",
+      "title": "Audit lọc trạng thái PENDING",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 267
+    },
+    {
+      "id": "ADM-048",
+      "title": "Admin truy cập được cấu hình hệ thống FE23",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 268
+    },
+    {
+      "id": "ADM-049",
+      "title": "Cấu hình hệ thống lưu sau reload và reset",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 269
+    },
+    {
+      "id": "ADM-050",
+      "title": "Xác định điểm vào quản lý nội dung Admin",
+      "role": "admin",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/admin/cases/account-lifecycle.spec.js",
+      "line": 270
+    },
+    {
+      "id": "TEA-001",
+      "title": "Đăng nhập Giáo viên và xác nhận vai trò",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 3
+    },
+    {
+      "id": "TEA-002",
+      "title": "Danh sách lớp: tìm kiếm đúng lớp và không có kết quả",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 9
+    },
+    {
+      "id": "TEA-003",
+      "title": "Sổ điểm và báo cáo chi tiết học viên",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 15
+    },
+    {
+      "id": "TEA-004",
+      "title": "Mở báo cáo phân tích bốn kỹ năng của lớp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 21
+    },
+    {
+      "id": "TEA-005",
+      "title": "Tìm bài tập và mở chi tiết",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 27
+    },
+    {
+      "id": "TEA-006",
+      "title": "Giao bài: từ chối tiêu đề trống",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 33
+    },
+    {
+      "id": "TEA-009",
+      "title": "Chấm bài: từ chối điểm ngoài thang",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 52
+    },
+    {
+      "id": "TEA-010",
+      "title": "Lưu và trả điểm/nhận xét; mở lại kiểm tra",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/assignment-flow.spec.js",
+      "line": 58
+    },
+    {
+      "id": "TEA-011",
+      "title": "Giao bài Speaking và đọc lại nội dung/kỹ năng",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 2
+    },
+    {
+      "id": "TEA-012",
+      "title": "Giao bài Reading và đọc lại nội dung/kỹ năng",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 3
+    },
+    {
+      "id": "TEA-014",
+      "title": "Xem thử Writing, đóng và giữ nội dung editor",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 6
+    },
+    {
+      "id": "TEA-015",
+      "title": "Xem thử Speaking, đóng và giữ nội dung editor",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 7
+    },
+    {
+      "id": "TEA-016",
+      "title": "Xem thử Reading, đóng và giữ nội dung editor",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 8
+    },
+    {
+      "id": "TEA-018",
+      "title": "Sửa tiêu đề/nội dung Writing và xuất bản",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 11
+    },
+    {
+      "id": "TEA-019",
+      "title": "Sửa hạn nộp và đối chiếu API",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 12
+    },
+    {
+      "id": "TEA-020",
+      "title": "Không tạo bài khi hạn nộp trước thời gian mở",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 13
+    },
+    {
+      "id": "TEA-021",
+      "title": "Đóng bài tập từ UI",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 14
+    },
+    {
+      "id": "TEA-022",
+      "title": "Lọc danh sách bài theo kỹ năng Writing",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 15
+    },
+    {
+      "id": "TEA-023",
+      "title": "Lọc roster đã nộp/chưa nộp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 16
+    },
+    {
+      "id": "TEA-024",
+      "title": "Chấm điểm biên thấp 0 và đọc lại",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 17
+    },
+    {
+      "id": "TEA-025",
+      "title": "Chấm điểm biên cao 10 và đọc lại",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 18
+    },
+    {
+      "id": "TEA-026",
+      "title": "Từ chối điểm âm và giữ dữ liệu API",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 19
+    },
+    {
+      "id": "TEA-027",
+      "title": "Từ chối điểm trống và giữ dữ liệu API",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 20
+    },
+    {
+      "id": "TEA-028",
+      "title": "Sửa điểm đã chấm thành 4.5",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 21
+    },
+    {
+      "id": "TEA-029",
+      "title": "Chấm bài Reading đã nộp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 22
+    },
+    {
+      "id": "TEA-030",
+      "title": "Chấm bài Listening đã nộp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 23
+    },
+    {
+      "id": "TEA-032",
+      "title": "Kích hoạt AI Writing và chờ gợi ý",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 26
+    },
+    {
+      "id": "TEA-033",
+      "title": "AI không hợp lệ cho Reading vẫn chấm thủ công được",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 27
+    },
+    {
+      "id": "TEA-034",
+      "title": "Đối chiếu sổ điểm bốn kỹ năng với API",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 28
+    },
+    {
+      "id": "TEA-035",
+      "title": "Đối chiếu số học viên với API",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 29
+    },
+    {
+      "id": "TEA-036",
+      "title": "Tìm học viên không tồn tại và khôi phục",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 30
+    },
+    {
+      "id": "TEA-039",
+      "title": "Teacher không phụ trách không đọc được lớp QA ngoài quyền",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 35
+    },
+    {
+      "id": "TEA-040",
+      "title": "Teacher không phụ trách không đọc được assignment QA ngoài quyền",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 36
+    },
+    {
+      "id": "TEA-041",
+      "title": "Hồ sơ đúng tài khoản QA và email chỉ đọc",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 37
+    },
+    {
+      "id": "TEA-042",
+      "title": "Sửa số điện thoại hồ sơ, mở lại qua menu và khôi phục",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 38
+    },
+    {
+      "id": "TEA-043",
+      "title": "Từ chối xác nhận mật khẩu không khớp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 39
+    },
+    {
+      "id": "TEA-044",
+      "title": "Đổi mật khẩu tài khoản QA riêng và đăng nhập lại",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 40
+    },
+    {
+      "id": "TEA-045",
+      "title": "Tùy chọn thông báo lưu qua reload",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 41
+    },
+    {
+      "id": "TEA-046",
+      "title": "Tùy chọn giao diện lưu qua reload",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 42
+    },
+    {
+      "id": "TEA-047",
+      "title": "Đăng xuất về login và xóa token frontend",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 43
+    },
+    {
+      "id": "TEA-048",
+      "title": "Ngân hàng đề / modal giao nhanh",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 44
+    },
+    {
+      "id": "TEA-049",
+      "title": "Hủy tạo bài không sinh assignment",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 45
+    },
+    {
+      "id": "TEA-050",
+      "title": "Mở lộ trình/buổi học của lớp",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 46
+    },
+    {
+      "id": "TEA-051",
+      "title": "Sửa điện thoại ở Cài đặt, mở lại qua menu và khôi phục",
+      "role": "teacher",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/teacher/cases/grading-flow.spec.js",
+      "line": 47
+    },
+    {
+      "id": "STU-001",
+      "title": "Đăng nhập Học viên và dashboard",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 24
+    },
+    {
+      "id": "STU-002",
+      "title": "Xem và tìm đúng lớp đã ghi danh",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 28
+    },
+    {
+      "id": "STU-003",
+      "title": "Tìm lớp không tồn tại",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 29
+    },
+    {
+      "id": "STU-004",
+      "title": "Chi tiết lớp và danh sách bài",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 34
+    },
+    {
+      "id": "STU-005",
+      "title": "Tìm bài tập theo tiêu đề",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 38
+    },
+    {
+      "id": "STU-006",
+      "title": "Tìm bài không tồn tại",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 39
+    },
+    {
+      "id": "STU-007",
+      "title": "Tổng quan bài và số lượt",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 44
+    },
+    {
+      "id": "STU-008",
+      "title": "Bắt đầu lượt Writing",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 76
+    },
+    {
+      "id": "STU-009",
+      "title": "Validation Writing trống",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 82
+    },
+    {
+      "id": "STU-010",
+      "title": "Lưu nháp Writing và mở lại",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 89
+    },
+    {
+      "id": "STU-011",
+      "title": "Writing văn bản: kiểm tra nộp bài theo hợp đồng FE-50",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 96
+    },
+    {
+      "id": "STU-013",
+      "title": "Nộp Reading đáp án đúng",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 108
+    },
+    {
+      "id": "STU-014",
+      "title": "Nộp Reading đáp án sai",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 113
+    },
+    {
+      "id": "STU-015",
+      "title": "Nộp Listening câu trả lời ngắn",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 118
+    },
+    {
+      "id": "STU-017",
+      "title": "Mở kết quả bài đã chấm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 133
+    },
+    {
+      "id": "STU-018",
+      "title": "Điểm thô khớp thang điểm API",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 137
+    },
+    {
+      "id": "STU-019",
+      "title": "Lọc Bảng điểm theo kỹ năng Reading",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 151
+    },
+    {
+      "id": "STU-020",
+      "title": "Xem đánh giá định kỳ đúng nội dung",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 167
+    },
+    {
+      "id": "STU-021",
+      "title": "Đánh giá định kỳ: lọc giáo viên và mở lớp",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 171
+    },
+    {
+      "id": "STU-022",
+      "title": "Nhận xét chấm bài chính thức",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 182
+    },
+    {
+      "id": "STU-023",
+      "title": "Tìm nhận xét không tồn tại",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 185
+    },
+    {
+      "id": "STU-024",
+      "title": "Lịch sử lượt nộp bài đã chấm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 190
+    },
+    {
+      "id": "STU-028",
+      "title": "Bảng điểm gắn đúng tên bài, kỹ năng và trạng thái",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/exam-taking.spec.js",
+      "line": 233
+    },
+    {
+      "id": "STU-029",
+      "title": "Lọc lớp đang học và đã hoàn thành",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 9
+    },
+    {
+      "id": "STU-030",
+      "title": "Lọc bài theo lớp và trạng thái đã chấm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 17
+    },
+    {
+      "id": "STU-031",
+      "title": "Bảng điểm: tìm kiếm không có kết quả",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 33
+    },
+    {
+      "id": "STU-032",
+      "title": "Bảng điểm: lọc theo nhãn lớp",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 39
+    },
+    {
+      "id": "STU-033",
+      "title": "Nhận xét: bộ lọc kỹ năng",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 51
+    },
+    {
+      "id": "STU-034",
+      "title": "Nhận xét bài nộp: mở đúng bài làm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 73
+    },
+    {
+      "id": "STU-035",
+      "title": "Lịch sử: mở kết quả đúng lượt",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 82
+    },
+    {
+      "id": "STU-036",
+      "title": "Kết quả: tab nhận xét của giáo viên",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 86
+    },
+    {
+      "id": "STU-037",
+      "title": "Kết quả: chuyển về Bảng điểm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 101
+    },
+    {
+      "id": "STU-039",
+      "title": "Speaking: chưa ghi âm không được nộp",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 128
+    },
+    {
+      "id": "STU-040",
+      "title": "Writing: đếm từ và xóa nội dung",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 136
+    },
+    {
+      "id": "STU-041",
+      "title": "Tổng quan: nút quay về danh sách bài",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 143
+    },
+    {
+      "id": "STU-042",
+      "title": "Chi tiết lớp: nút mở đúng bài chưa làm",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 149
+    },
+    {
+      "id": "STU-043",
+      "title": "Dashboard: nút xem bài tập và lớp học",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 159
+    },
+    {
+      "id": "STU-044",
+      "title": "Reading: hủy xác nhận nộp bài trắng",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 164
+    },
+    {
+      "id": "STU-045",
+      "title": "Hết lượt: không được bắt đầu lần mới",
+      "role": "student",
+      "status": "NEEDS_SPEC_AND_DUPLICATE_REVIEW",
+      "origin": "test/archive/test-reborn-20261117/black-box/e2e/student/cases/navigation-flow.spec.js",
+      "line": 185
+    }
+  ]
+}

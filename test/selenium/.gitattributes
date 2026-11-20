@@ -1,0 +1,2 @@
+# PDF fixtures must keep byte offsets and xref whitespace unchanged.
+*.pdf binary

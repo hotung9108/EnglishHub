@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface SpringDataAnswerRepository extends JpaRepository<Answer, Long> {
 
 	List<Answer> findBySubmissionModuleId(Long submissionModuleId);
+
+	void deleteBySubmissionModuleId(Long submissionModuleId);
 }

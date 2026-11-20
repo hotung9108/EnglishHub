@@ -1,0 +1,18 @@
+{
+  "name": "englishhub-test-manual",
+  "version": "1.0.0",
+  "description": "Manual & Exploratory UI/UX Testing Suite with Selenium WebDriver for EnglishHub",
+  "main": "run_ux_audit.js",
+  "type": "commonjs",
+  "scripts": {
+    "audit": "node run_ux_audit.js",
+    "audit:watch": "node run_ux_audit.js --watch",
+    "audit:auth": "node run_ux_audit.js --role=auth",
+    "audit:student": "node run_ux_audit.js --role=student",
+    "audit:teacher": "node run_ux_audit.js --role=teacher",
+    "audit:admin": "node run_ux_audit.js --role=admin"
+  },
+  "dependencies": {
+    "selenium-webdriver": "4.35.0"
+  }
+}

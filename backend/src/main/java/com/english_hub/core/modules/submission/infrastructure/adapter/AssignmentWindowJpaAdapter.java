@@ -9,6 +9,7 @@ import com.english_hub.core.modules.submission.domain.repository.AssignmentWindo
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** JPA adapter for the {@link AssignmentWindowRepository} read port. */
@@ -25,6 +26,12 @@ public class AssignmentWindowJpaAdapter implements AssignmentWindowRepository {
 	@Transactional(readOnly = true)
 	public Optional<AssignmentWindow> findWindowById(Long assignmentId) {
 		return assignmentRepository.findById(assignmentId).map(AssignmentWindowJpaAdapter::toWindow);
+	}
+
+	@Override
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Optional<AssignmentWindow> findWindowByIdForUpdate(Long assignmentId) {
+		return assignmentRepository.findByIdForUpdate(assignmentId).map(AssignmentWindowJpaAdapter::toWindow);
 	}
 
 	private static AssignmentWindow toWindow(Assignment entity) {

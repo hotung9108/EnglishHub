@@ -206,6 +206,10 @@ public final class ApiRoutePolicy {
 					HttpMethod.POST,
 					"/api/v1/students/{id}/evaluations",
 					List.of("TEACHER")),
+				new RouteRule(
+						HttpMethod.GET,
+						"/api/v1/evaluations/students/{id}/overall",
+						List.of("ADMIN", "TEACHER")),
 			new RouteRule(
 					HttpMethod.GET,
 					"/api/v1/evaluations/{id}",

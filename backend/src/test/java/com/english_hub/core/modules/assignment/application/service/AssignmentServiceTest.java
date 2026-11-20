@@ -22,6 +22,7 @@ import com.english_hub.core.modules.assignment.domain.model.Assignment;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentModuleSummary;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentPage;
 import com.english_hub.core.modules.assignment.domain.model.AssignmentStatus;
+import com.english_hub.core.modules.assignment.domain.repository.AssignmentAttemptCountRepository;
 import com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository;
 import com.english_hub.core.modules.classroom.domain.model.ClassAccess;
 import com.english_hub.core.modules.classroom.domain.model.ClassStatus;
@@ -30,7 +31,9 @@ import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.module.domain.model.ModuleSkill;
 import com.english_hub.core.modules.user.application.port.CurrentUserProvider;
 import com.english_hub.core.modules.user.domain.model.User;
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +50,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +58,7 @@ class AssignmentServiceTest {
 
 	private static final OffsetDateTime OPEN_AT = OffsetDateTime.parse("2026-09-15T00:00:00Z");
 	private static final OffsetDateTime CLOSE_AT = OffsetDateTime.parse("2026-09-20T23:59:00Z");
+	private static final OffsetDateTime REOPEN_NOW = OPEN_AT.plusDays(2);
 
 	@Mock
 	private AssignmentRepository assignmentRepository;
@@ -64,6 +69,9 @@ class AssignmentServiceTest {
 	@Mock
 	private CurrentUserProvider currentUserProvider;
 
+	@Mock
+	private AssignmentAttemptCountRepository attemptCountRepository;
+
 	private AssignmentService assignmentService;
 
 	@BeforeEach
@@ -71,7 +79,8 @@ class AssignmentServiceTest {
 		assignmentService = new AssignmentService(
 				assignmentRepository,
 				classRepository,
-				currentUserProvider);
+				currentUserProvider,
+				attemptCountRepository);
 	}
 
 	@Test
@@ -551,7 +560,7 @@ class AssignmentServiceTest {
 	void teacherCanUpdateAssignmentOwnedByTheirClass() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
-		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -566,10 +575,24 @@ class AssignmentServiceTest {
 	}
 
 	@Test
+	void rejectsUpdateWhenAssignmentLockCannotBeAcquired() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(assignmentRepository.findByIdForUpdate(5L))
+				.thenThrow(new PessimisticLockingFailureException("Lock timeout"));
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(null, null, null, null, 1)),
+				"Tài nguyên đang được cập nhật, vui lòng thử lại.");
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+		verifyNoInteractions(attemptCountRepository);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@Test
 	void teacherCanUpdateMaxSubmissionsAndReturnsSavedValue() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
-		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -580,6 +603,73 @@ class AssignmentServiceTest {
 		assertThat(result.maxSubmissions()).isEqualTo(3);
 		assertThat(assignment.maxSubmissions()).isEqualTo(3);
 		verify(assignmentRepository).save(assignment);
+		verifyNoInteractions(attemptCountRepository);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {"3, 1, 2", "null, 1, 2"}, nullValues = "null")
+	void rejectsCapBelowHighestAttemptCountWithoutChangingAssignment(Integer currentCap, int requestedCap, long highest) {
+		Assignment assignment = assignmentWithCap(currentCap);
+		givenOwnedAssignment(assignment);
+		when(attemptCountRepository.findHighestAttemptCount(assignment.id())).thenReturn(highest);
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateAssignment(assignment.id(),
+						new UpdateAssignmentCommand("Updated", "New instructions", null, CLOSE_AT.plusDays(1), requestedCap)),
+				"Số lần nộp tối đa không được nhỏ hơn số lượt đã làm cao nhất của học viên (%d lượt).".formatted(highest));
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(assignment).usingRecursiveComparison().isEqualTo(assignmentWithCap(currentCap));
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {"3, 2, 2", "3, 1, 0", "null, 2, 2"}, nullValues = "null")
+	void savesLowerOrNewCapWhenItCoversTheHighestAttemptCount(Integer currentCap, int requestedCap, long highest) {
+		Assignment assignment = assignmentWithCap(currentCap);
+		givenOwnedAssignment(assignment);
+		when(attemptCountRepository.findHighestAttemptCount(assignment.id())).thenReturn(highest);
+		when(assignmentRepository.save(assignment)).thenReturn(assignment);
+
+		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(assignment.id(),
+				new UpdateAssignmentCommand(null, null, null, null, requestedCap));
+
+		assertThat(result.maxSubmissions()).isEqualTo(requestedCap);
+		assertThat(assignment.maxSubmissions()).isEqualTo(requestedCap);
+		verify(assignmentRepository).save(assignment);
+	}
+
+	@ParameterizedTest
+	@CsvSource(value = {"2, 2, 2", "2, 3, 3", "2, null, 2", "null, null, null"}, nullValues = "null")
+	void updatesWithoutCountingAttemptsWhenCapDoesNotDecrease(Integer currentCap, Integer requestedCap, Integer expectedCap) {
+		Assignment assignment = assignmentWithCap(currentCap);
+		givenOwnedAssignment(assignment);
+		when(assignmentRepository.save(assignment)).thenReturn(assignment);
+
+		AssignmentService.AssignmentUpdateResult result = assignmentService.updateAssignment(assignment.id(),
+				new UpdateAssignmentCommand("Updated title", null, null, null, requestedCap));
+
+		assertThat(result.maxSubmissions()).isEqualTo(expectedCap);
+		assertThat(assignment.maxSubmissions()).isEqualTo(expectedCap);
+		assertThat(assignment.title()).isEqualTo("Updated title");
+		verifyNoInteractions(attemptCountRepository);
+	}
+
+	@ParameterizedTest
+	@ValueSource(ints = {0, -1})
+	void rejectsNonPositiveCapBeforeCountingAttempts(int requestedCap) {
+		Assignment assignment = assignmentWithCap(2);
+		givenOwnedAssignment(assignment);
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateAssignment(assignment.id(),
+						new UpdateAssignmentCommand(null, null, null, null, requestedCap)),
+				"Dữ liệu thời gian hoặc số lần nộp không hợp lệ.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(assignment.maxSubmissions()).isEqualTo(2);
+		verifyNoInteractions(attemptCountRepository);
+		verify(assignmentRepository, never()).save(any());
 	}
 
 	@Test
@@ -593,7 +683,7 @@ class AssignmentServiceTest {
 				savedAssignment.openAt(),
 				savedAssignment.closeAt(),
 				5);
-		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 		when(assignmentRepository.save(assignment)).thenReturn(savedAssignment);
 
@@ -615,7 +705,7 @@ class AssignmentServiceTest {
 				() -> assignmentService.updateAssignment(5L, new UpdateAssignmentCommand(
 						"Updated", null, null, null, null)),
 				"Bạn không có quyền thực hiện thao tác này.");
-		verify(assignmentRepository, never()).findById(any());
+		verify(assignmentRepository, never()).findByIdForUpdate(any());
 	}
 
 	@Test
@@ -633,7 +723,7 @@ class AssignmentServiceTest {
 	@Test
 	void teacherCannotUpdateAssignmentOwnedByAnotherTeacher() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(assignmentRepository.findById(5L))
+		when(assignmentRepository.findByIdForUpdate(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 99L, false)));
 
@@ -646,7 +736,7 @@ class AssignmentServiceTest {
 	@Test
 	void closedAssignmentCannotBeUpdated() {
 		givenCaller(user(10L, UserRole.TEACHER));
-		when(assignmentRepository.findById(5L))
+		when(assignmentRepository.findByIdForUpdate(5L))
 				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.CLOSED)));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
@@ -661,7 +751,7 @@ class AssignmentServiceTest {
 	void teacherSoftDeletesAssignmentOwnedByTheirClass() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
-		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assignmentService.deleteAssignment(5L);
@@ -677,7 +767,7 @@ class AssignmentServiceTest {
 		assertApiException(
 				() -> assignmentService.deleteAssignment(5L),
 				"Bạn không có quyền thực hiện thao tác này.");
-		verify(assignmentRepository, never()).findById(any());
+		verify(assignmentRepository, never()).findByIdForUpdate(any());
 	}
 
 	@Test
@@ -693,31 +783,118 @@ class AssignmentServiceTest {
 	}
 
 	@Test
-	void teacherCanPublishThenCloseAssignment() {
+	void teacherCanPublishThenCloseAssignmentWithDefaultClock() {
 		givenCaller(user(10L, UserRole.TEACHER));
 		Assignment assignment = assignment(5L, 3L, AssignmentStatus.DRAFT);
-		when(assignmentRepository.findById(5L)).thenReturn(Optional.of(assignment));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
 		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
 
 		assertThat(assignmentService.updateStatus(5L,
-				new UpdateAssignmentStatusCommand("PUBLISHED"))).isEqualTo(AssignmentStatus.PUBLISHED);
+				new UpdateAssignmentStatusCommand("PUBLISHED", null))).isEqualTo(AssignmentStatus.PUBLISHED);
 		assertThat(assignment.status()).isEqualTo(AssignmentStatus.PUBLISHED);
 
 		assertThat(assignmentService.updateStatus(5L,
-				new UpdateAssignmentStatusCommand("CLOSED"))).isEqualTo(AssignmentStatus.CLOSED);
+				new UpdateAssignmentStatusCommand("CLOSED", null))).isEqualTo(AssignmentStatus.CLOSED);
 		assertThat(assignment.status()).isEqualTo(AssignmentStatus.CLOSED);
 	}
 
-	@Test
-	void teacherCannotMoveAssignmentBackwards() {
-		givenCaller(user(10L, UserRole.TEACHER));
-		when(assignmentRepository.findById(5L))
-				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.PUBLISHED)));
-		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+	@ParameterizedTest
+	@CsvSource({
+			"DRAFT, DRAFT", "DRAFT, CLOSED",
+			"PUBLISHED, DRAFT", "PUBLISHED, PUBLISHED",
+			"CLOSED, DRAFT", "CLOSED, CLOSED"
+	})
+	void rejectsInvalidAssignmentStatusTransition(AssignmentStatus current, String target) {
+		Assignment assignment = assignment(5L, 3L, current);
+		givenOwnedAssignment(assignment);
 
-		assertApiException(
-				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("DRAFT")),
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand(target, null)),
 				"Không thể chuyển sang trạng thái này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(assignment.status()).isEqualTo(current);
+		assertThat(assignment.closeAt()).isEqualTo(CLOSE_AT);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("validReopenDeadlines")
+	void reopensAssignmentAndSavesEffectiveDeadline(String scenario, OffsetDateTime storedCloseAt,
+			OffsetDateTime requestedCloseAt, OffsetDateTime expectedCloseAt) {
+		Assignment assignment = closedAssignmentWithWindow(OPEN_AT, storedCloseAt);
+		givenOwnedAssignment(assignment);
+
+		AssignmentStatus status = serviceWithFixedClock().updateStatus(
+				5L, new UpdateAssignmentStatusCommand("PUBLISHED", requestedCloseAt));
+
+		assertThat(status).isEqualTo(AssignmentStatus.PUBLISHED);
+		assertThat(assignment.status()).isEqualTo(AssignmentStatus.PUBLISHED);
+		assertThat(assignment.closeAt()).isEqualTo(expectedCloseAt);
+		assertThat(assignment.openAt()).isEqualTo(OPEN_AT);
+		verify(assignmentRepository).save(assignment);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("invalidReopenDeadlines")
+	void rejectsInvalidReopenDeadlineWithoutSaving(String scenario, OffsetDateTime openAt, OffsetDateTime storedCloseAt,
+			OffsetDateTime requestedCloseAt, String message) {
+		Assignment assignment = closedAssignmentWithWindow(openAt, storedCloseAt);
+		givenOwnedAssignment(assignment);
+		AssignmentService service = serviceWithFixedClock();
+
+		ApiException exception = assertApiException(
+				() -> service.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", requestedCloseAt)), message);
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(assignment.status()).isEqualTo(AssignmentStatus.CLOSED);
+		assertThat(assignment.closeAt()).isEqualTo(storedCloseAt);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@ParameterizedTest
+	@CsvSource({"DRAFT, PUBLISHED", "PUBLISHED, PUBLISHED", "PUBLISHED, CLOSED", "CLOSED, DRAFT"})
+	void rejectsDeadlineOnTransitionsOtherThanReopen(AssignmentStatus current, String target) {
+		Assignment assignment = assignment(5L, 3L, current);
+		givenOwnedAssignment(assignment);
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand(target, CLOSE_AT.plusDays(1))),
+				"Chỉ được cập nhật hạn nộp khi mở lại bài tập.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		assertThat(assignment.status()).isEqualTo(current);
+		assertThat(assignment.closeAt()).isEqualTo(CLOSE_AT);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@Test
+	void cannotReopenMissingAssignment() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.empty());
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", null)),
+				"Không tìm thấy bài tập.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+		verifyNoInteractions(classRepository);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	@Test
+	void teacherCannotReopenAssignmentOwnedByAnotherTeacher() {
+		givenCaller(user(10L, UserRole.TEACHER));
+		Assignment assignment = assignment(5L, 3L, AssignmentStatus.CLOSED);
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 99L, false)));
+
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", null)),
+				"Bạn không có quyền thực hiện thao tác này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		assertThat(assignment.status()).isEqualTo(AssignmentStatus.CLOSED);
 		verify(assignmentRepository, never()).save(any());
 	}
 
@@ -725,9 +902,11 @@ class AssignmentServiceTest {
 	void studentCannotChangeAssignmentStatus() {
 		givenCaller(user(41L, UserRole.STUDENT));
 
-		assertApiException(
-				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED")),
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", null)),
 				"Bạn không có quyền thực hiện thao tác này.");
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
 	@Test
@@ -735,23 +914,70 @@ class AssignmentServiceTest {
 		givenCaller(user(1L, UserRole.ADMIN));
 
 		ApiException exception = assertApiException(
-				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED")),
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", null)),
 				"Bạn không có quyền thực hiện thao tác này.");
 
 		assertThat(exception.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
 		verifyNoInteractions(classRepository, assignmentRepository);
 	}
 
-	@Test
-	void invalidStatusReturnsTheContractMessage() {
-		givenCaller(user(10L, UserRole.TEACHER));
-		when(assignmentRepository.findById(5L))
-				.thenReturn(Optional.of(assignment(5L, 3L, AssignmentStatus.DRAFT)));
-		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = {"OPEN"})
+	void invalidStatusReturnsTheContractMessage(String target) {
+		givenOwnedAssignment(assignment(5L, 3L, AssignmentStatus.DRAFT));
 
-		assertApiException(
-				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("OPEN")),
+		ApiException exception = assertApiException(
+				() -> assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand(target, null)),
 				"Không thể chuyển sang trạng thái này.");
+
+		assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+		verify(assignmentRepository, never()).save(any());
+	}
+
+	private static Stream<Arguments> validReopenDeadlines() {
+		OffsetDateTime newCloseAt = CLOSE_AT.plusDays(1);
+		OffsetDateTime nextNanosecond = REOPEN_NOW.plusNanos(1);
+		return Stream.of(
+				Arguments.of("extend expired deadline", REOPEN_NOW.minusDays(1), newCloseAt, newCloseAt),
+				Arguments.of("keep future deadline", CLOSE_AT, null, CLOSE_AT),
+				Arguments.of("deadline just after now", CLOSE_AT, nextNanosecond, nextNanosecond));
+	}
+
+	private static Stream<Arguments> invalidReopenDeadlines() {
+		String notFuture = "Hạn nộp khi mở lại phải sau thời điểm hiện tại.";
+		String notAfterOpen = "Hạn nộp phải sau thời điểm mở bài.";
+		return Stream.of(
+				Arguments.of("expired stored deadline", OPEN_AT, REOPEN_NOW.minusDays(1), null, notFuture),
+				Arguments.of("new deadline equals now", OPEN_AT, CLOSE_AT, REOPEN_NOW, notFuture),
+				Arguments.of("new deadline before now", OPEN_AT, CLOSE_AT, REOPEN_NOW.minusNanos(1), notFuture),
+				Arguments.of("new deadline equals openAt", OPEN_AT, CLOSE_AT, OPEN_AT, notAfterOpen),
+				Arguments.of("new deadline before openAt", OPEN_AT, CLOSE_AT, OPEN_AT.minusDays(1), notAfterOpen),
+				Arguments.of("new deadline after now but before future openAt",
+						REOPEN_NOW.plusDays(2), CLOSE_AT, REOPEN_NOW.plusDays(1), notAfterOpen));
+	}
+
+	private AssignmentService serviceWithFixedClock() {
+		Clock clock = Clock.fixed(REOPEN_NOW.toInstant(), ZoneOffset.UTC);
+		return new AssignmentService(assignmentRepository, classRepository, currentUserProvider, attemptCountRepository, clock);
+	}
+
+	private Assignment assignmentWithCap(Integer cap) {
+		Assignment assignment = assignment(5L, 3L, AssignmentStatus.PUBLISHED);
+		assignment.updateDetails(assignment.title(), assignment.description(), OPEN_AT, CLOSE_AT, cap);
+		return assignment;
+	}
+
+	private void givenOwnedAssignment(Assignment assignment) {
+		givenCaller(user(10L, UserRole.TEACHER));
+		when(assignmentRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(assignment));
+		when(classRepository.findAccess(3L, 10L)).thenReturn(Optional.of(new ClassAccess(3L, 10L, false)));
+	}
+
+	private Assignment closedAssignmentWithWindow(OffsetDateTime openAt, OffsetDateTime closeAt) {
+		Assignment assignment = assignment(5L, 3L, AssignmentStatus.CLOSED);
+		assignment.updateDetails(assignment.title(), assignment.description(), openAt, closeAt, assignment.maxSubmissions());
+		return assignment;
 	}
 
 	private static Stream<Arguments> listValidationCases() {

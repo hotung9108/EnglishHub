@@ -43,7 +43,14 @@ function isAcceptedResponse(input: unknown, moduleId?: number): boolean {
   } catch { return false; }
 }
 
-export function useStudentQuizSubmit(scope: StudentQuizSubmitScope): UseStudentQuizSubmitResult {
+export interface UseStudentQuizSubmitOptions {
+  isReviewMode?: boolean;
+}
+
+export function useStudentQuizSubmit(
+  scope: StudentQuizSubmitScope,
+  options?: UseStudentQuizSubmitOptions
+): UseStudentQuizSubmitResult {
   const validScope = isStudentQuizSubmitScopeValid(scope);
   const key = validScope ? `${scope.assignmentId}:${scope.submissionId}:${scope.moduleId}:${scope.submissionModuleId}:${scope.expectedModuleIds.join(',')}` : QUIZ_SUBMIT_ERROR.INVALID_SCOPE;
   const currentKey = useRef(key);
@@ -122,6 +129,9 @@ export function useStudentQuizSubmit(scope: StudentQuizSubmitScope): UseStudentQ
     const current = progress.submission.modules.find(module => module.id === scope.submissionModuleId);
     if (!current || current.status === QUIZ_STATUS.IN_PROGRESS) return unconfirmed(STAGE.PROGRESS, QUIZ_SUBMIT_ERROR.MODULE_REJECTED);
     modulePhase.current = MODULE_PHASE.ACCEPTED;
+    if (options?.isReviewMode) {
+      return { kind: QUIZ_PROGRESS.COMPLETED, submissionId: scope.submissionId };
+    }
     if (progress.kind === QUIZ_PROGRESS.NEXT_SKILL) return progress;
     return finalize(action);
   }

@@ -2,8 +2,14 @@ package com.english_hub.core.modules.assignment.presentation.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.english_hub.core.common.GlobalExceptionHandler;
 import com.english_hub.core.modules.assignment.application.command.CreateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentCommand;
 import com.english_hub.core.modules.assignment.application.command.UpdateAssignmentStatusCommand;
@@ -29,10 +35,15 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentControllerTest {
@@ -130,6 +141,31 @@ class AssignmentControllerTest {
 				new UpdateAssignmentResponse("Cập nhật bài tập thành công.", 3));
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = {"1.5", "1.0", "1e0"})
+	void rejectsFloatingPointMaxSubmissionsBeforeCallingService(String value) throws Exception {
+		assignmentMockMvc().perform(put("/api/v1/assignments/{assignmentId}", 5L)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"maxSubmissions\":" + value + "}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Dữ liệu không hợp lệ."));
+
+		verifyNoInteractions(assignmentService);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"3", "\"3\""})
+	void forwardsIntegerMaxSubmissionsToService(String value) throws Exception {
+		UpdateAssignmentCommand command = new UpdateAssignmentCommand(null, null, null, null, 3);
+		when(assignmentService.updateAssignment(5L, command)).thenReturn(new AssignmentUpdateResult(3));
+
+		assignmentMockMvc().perform(put("/api/v1/assignments/{assignmentId}", 5L)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"maxSubmissions\":" + value + "}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(3));
+	}
+
 	@Test
 	void mapsDeleteResponse() {
 		ResponseEntity<MessageResponse> response = assignmentController.deleteAssignment(5L);
@@ -141,14 +177,45 @@ class AssignmentControllerTest {
 
 	@Test
 	void mapsPublishStatusResponse() {
-		when(assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED")))
+		when(assignmentService.updateStatus(5L, new UpdateAssignmentStatusCommand("PUBLISHED", null)))
 				.thenReturn(AssignmentStatus.PUBLISHED);
 
 		ResponseEntity<MessageResponse> response = assignmentController.updateStatus(
 				5L,
-				new UpdateAssignmentStatusRequest("PUBLISHED"));
+				new UpdateAssignmentStatusRequest("PUBLISHED", null));
 
 		assertThat(response.getBody()).isEqualTo(new MessageResponse("Đã công bố bài tập."));
+	}
+
+	@Test
+	void forwardsOptionalCloseAtInStatusPatch() throws Exception {
+		UpdateAssignmentStatusCommand command = new UpdateAssignmentStatusCommand("PUBLISHED", CLOSE_AT);
+		when(assignmentService.updateStatus(5L, command)).thenReturn(AssignmentStatus.PUBLISHED);
+
+		assignmentMockMvc().perform(patch("/api/v1/assignments/{id}/status", 5L)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"status\":\"PUBLISHED\",\"closeAt\":\"" + CLOSE_AT + "\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.message").value("Đã công bố bài tập."));
+
+		verify(assignmentService).updateStatus(5L, command);
+	}
+
+	@Test
+	void rejectsInvalidCloseAtFormatInStatusPatch() throws Exception {
+		assignmentMockMvc().perform(patch("/api/v1/assignments/{id}/status", 5L)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"status\":\"PUBLISHED\",\"closeAt\":\"not-a-date\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error").value("Dữ liệu không hợp lệ."));
+
+		verifyNoInteractions(assignmentService);
+	}
+
+	private MockMvc assignmentMockMvc() {
+		return MockMvcBuilders.standaloneSetup(assignmentController)
+				.setControllerAdvice(new GlobalExceptionHandler())
+				.build();
 	}
 
 	private Assignment assignment(Long id, AssignmentStatus status) {
