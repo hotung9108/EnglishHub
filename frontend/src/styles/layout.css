@@ -533,6 +533,15 @@
   width: 100%;
 }
 
+/* Full-bleed edge-to-edge support for interactive exam workspaces */
+.page-content-exam,
+.page-content:has(.exam-page) {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
 /* === Page Header === */
 .page-header {
   margin-bottom: var(--section-gap);

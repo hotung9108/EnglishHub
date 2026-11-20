@@ -141,6 +141,71 @@ Read back the created user using `GET /api/v1/admin/users?q=<email>`; the return
 
 ---
 
+### POST `/api/v1/admin/users/{id}/reset-password`
+Reset a user's password with a SecureRandom-generated password.
+
+**Authorization:** `ROLE_ADMIN` only. The route policy allows ADMIN and the service verifies that the caller is still an active Admin.
+
+**Path Params:** `id` (int64)
+
+**Request Body:** None. The server generates the new password; any supplied body is ignored and does not affect the result.
+
+**Response:** `200 OK` — `AdminResetPasswordResponse`.
+
+The response contains exactly two fields: `message` and `newPassword`.
+
+```json
+{
+  "message": "Đặt lại mật khẩu thành công.",
+  "newPassword": "<16 characters>"
+}
+```
+
+`newPassword` is returned once in this response. There is no endpoint to retrieve it later, and it is not sent by email. The 16-character password contains at least one uppercase letter, one lowercase letter, and one digit; it excludes ambiguous characters `I`, `O`, `i`, `l`, `o`, `0`, and `1`.
+
+**Response Headers:**
+
+| Name | Value |
+|------|-------|
+| `Cache-Control` | `no-store` |
+| `Pragma` | `no-cache` |
+| `Expires` | `0` |
+
+The password is BCrypt-hashed before storage. All unrevoked refresh tokens, including expired but unrevoked tokens, for the target are revoked in the same transaction; refreshing with an old token returns `401`. For an `ACTIVE` target, the new password can be used to log in immediately and the previous password is rejected. The target may be a Teacher, Student, or another Admin. A `LOCKED` target may be reset, but reset does not unlock the account; login with the new password still returns `403` while it remains locked.
+
+The audit event is written to the application log only after the transaction commits:
+
+```text
+event=ADMIN_PASSWORD_RESET adminId=<id> targetUserId=<id> occurredAt=<time> revokedRefreshTokens=<count>
+```
+
+The log does not contain the password. This endpoint does not write an Audit Trail database record or use a database Audit Trail table; the log is not a durable audit record.
+
+| Status | Description |
+|--------|-------------|
+| 400 | Admin cannot reset their own password; use `PATCH /api/v1/users/me/password`. Error: `{"error":"Vui lòng sử dụng chức năng đổi mật khẩu của chính mình."}` |
+| 400 | `id` cannot be converted to int64 (for example, text, decimal, or a value outside the `Long` range). Error: `{"error":"Dữ liệu không hợp lệ."}` |
+| 401 | Missing, invalid, or expired token; the Admin caller is locked or deleted |
+| 403 | The authenticated caller does not have the Admin role |
+| 404 | `id` is less than or equal to zero, or the target does not exist or is soft-deleted. Error: `{"error":"Không tìm thấy người dùng."}` |
+
+Error responses use the shape `{ "error": "<message>" }` unless a known limitation below states otherwise.
+
+**Known Limitations:**
+
+1. An unexpired access token belonging to the target is not blacklisted by reset and can remain usable until it expires.
+2. A login or refresh operation already running when reset begins may still complete. Login may create a session; an in-flight refresh may still issue an access token. These concurrent cases have not been tested.
+3. JDBC commit failures have not been tested separately.
+4. The endpoint is not idempotent. Retrying after a lost response performs another reset, and the password from the earlier response no longer works.
+5. If two Admins reset the same target concurrently, the last transaction to commit determines the final password. No row lock is used.
+6. In MockMvc, an ID containing only whitespace (`%20`) is rejected by Spring Security's default `StrictHttpFirewall` with `400` and an empty body, before MVC exception handling; it has no JSON error body.
+7. In MockMvc, a locked Admin caller with a malformed ID was observed to receive `400` before `401` because MVC binds the ID before calling the service.
+8. GET, PUT, PATCH, DELETE, and HEAD on this path were observed to return `403` through the route allowlist, not `405`.
+
+**FE-92 Integration Note:** Replace the empty update call `PUT /api/v1/admin/users/{id}` with this POST endpoint and display the server-generated `newPassword`. A form for entering the new password is no longer meaningful.
+
+---
+
 ### PUT `/api/v1/admin/users/{id}`
 Update a user's information by ID.
 
@@ -196,6 +261,14 @@ Create a new class.
 
 **Response:** `CreatedClassResponse`
 
+**Status Codes:**
+
+| Status | Description |
+|--------|-------------|
+| `201 Created` | Class created successfully. |
+| `400 Bad Request` | `teacherId` belongs to a locked teacher. Error body: `{"error": "Không thể gán giáo viên đang bị khóa tài khoản vào lớp học."}` |
+| `404 Not Found` | `teacherId` does not exist or the teacher is soft-deleted. Error body: `{"error": "Không tìm thấy giáo viên (teacherId không tồn tại)."}` |
+
 ---
 
 ### GET `/api/v1/classes/{id}`
@@ -215,6 +288,14 @@ Update class information.
 **Request Body:** `UpdateClassRequest`
 
 **Response:** `MessageResponse`
+
+**Status Codes:**
+
+| Status | Description |
+|--------|-------------|
+| `200 OK` | Class updated successfully. |
+| `400 Bad Request` | `teacherId` belongs to a locked teacher. Error body: `{"error": "Không thể gán giáo viên đang bị khóa tài khoản vào lớp học."}` |
+| `404 Not Found` | `teacherId` does not exist or the teacher is soft-deleted. Error body: `{"error": "Không tìm thấy giáo viên (teacherId không tồn tại)."}` |
 
 ---
 
@@ -1260,6 +1341,14 @@ Retrieve learning progress, skill breakdown (Listening, Speaking, Reading, Writi
 |-------|------|-------------|
 | `message` | string | Message |
 | `user` | `CreatedUser` | Newly created user info |
+
+---
+
+#### `AdminResetPasswordResponse`
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | string | Confirmation message |
+| `newPassword` | string | One-time server-generated password; shown only in the reset response |
 
 ---
 

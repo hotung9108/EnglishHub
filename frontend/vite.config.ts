@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const isDocker = fs.existsSync('/.dockerenv')
 const defaultStorageTarget = isDocker ? 'http://minio:9000' : 'http://127.0.0.1:9000'
+
+const env = loadEnv(process.env.NODE_ENV || 'development', __dirname, '')
+const backendTarget = env.VITE_BACKEND_PROXY_TARGET || process.env.VITE_BACKEND_PROXY_TARGET || 'https://api-staging.hotung9108.me'
+const isStaging = backendTarget.includes('hotung9108.me')
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -40,8 +44,27 @@ export default defineConfig({
       usePolling: true, // Bắt buộc cho file change detection qua Docker volume trên Windows/WSL
     },
     proxy: {
+      '/api': {
+        target: backendTarget,
+        changeOrigin: true,
+        secure: false,
+        ...(isStaging
+          ? {
+              headers: {
+                Origin: 'https://staging.hotung9108.me',
+                Referer: 'https://staging.hotung9108.me/',
+              },
+              configure: (proxy) => {
+                proxy.on('proxyReq', (proxyReq) => {
+                  proxyReq.setHeader('Origin', 'https://staging.hotung9108.me');
+                  proxyReq.setHeader('Referer', 'https://staging.hotung9108.me/');
+                });
+              },
+            }
+          : {}),
+      },
       '/s3-upload': {
-        target: process.env.VITE_STORAGE_PROXY_TARGET || defaultStorageTarget,
+        target: env.VITE_STORAGE_PROXY_TARGET || process.env.VITE_STORAGE_PROXY_TARGET || defaultStorageTarget,
         changeOrigin: true,
         headers: {
           Host: 'minio:9000',

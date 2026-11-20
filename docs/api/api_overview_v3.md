@@ -2,7 +2,7 @@
 
 *Bản V3 = áp dụng schema V6 (V4 → V5 → V6) lên api_overview_v2. Chi tiết các thay đổi xem Changelog bên dưới. Vẫn chỉ ở mức sương sương: method + endpoint + mục đích, chưa thiết kế request/response chi tiết.*
 
-**Tổng: 63 endpoint** (V3 ban đầu có 62 sau khi bỏ PATCH class_members; bổ sung GET /admin/users/{id} cho FE-71).
+**Tổng: 64 endpoint** (V3 ban đầu có 62 sau khi bỏ PATCH class_members; bổ sung GET /admin/users/{id} cho FE-71 và POST /admin/users/{id}/reset-password cho BE-78).
 
 ---
 
@@ -45,7 +45,7 @@
 
 ---
 
-## CỤM 2 — User (9 endpoint)
+## CỤM 2 — User (10 endpoint)
 
 | # | Method + Endpoint | Mục đích |
 |---|---|---|
@@ -58,6 +58,7 @@
 | 10 | DELETE /admin/users/{id} | Admin xoá (hoặc soft-delete) user |
 | 11 | PATCH /admin/users/{id}/status | Admin khoá/mở khoá tài khoản |
 | 11a | GET /admin/users/{id} | Admin xem chi tiết user theo ID (FE-71) |
+| 11b | POST /admin/users/{id}/reset-password | Admin đặt lại mật khẩu bằng mật khẩu ngẫu nhiên do server sinh (BE-78) |
 
 ---
 
@@ -75,6 +76,8 @@
 | 17 | GET /classes/{id}/members | Danh sách học viên trong lớp |
 | 18 | POST /classes/{id}/members | Thêm học viên vào lớp (body chỉ cần `student_id`, không còn `member_type`) |
 | 19 | DELETE /classes/{id}/members/{memberId} | Học viên rời lớp — xoá cứng |
+
+**Lưu ý cho POST/PUT `/classes`:** Nếu `teacherId` thuộc giáo viên bị khóa (`LOCKED`), API trả `400`; nếu giáo viên không tồn tại hoặc đã bị xóa mềm, API trả `404`.
 
 ---
 

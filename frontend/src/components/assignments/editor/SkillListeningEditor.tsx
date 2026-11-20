@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle, UploadCloud } from 'lucide-react';
 import type { 
   ListeningConfig, ListeningQuestionItem 
 } from '../../../types/assignment-editor.types';
@@ -36,7 +36,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
       id: `lq-${Date.now()}`,
       order: newOrder,
       type,
-      prompt: isVi ? `Câu hỏi #${newOrder}: Nhập nội dung câu hỏi...` : `Question #${newOrder}: Enter question statement...`,
+      prompt: '',
       options: initialOptions,
       correctAnswer: defaultAns,
       points: 1
@@ -50,9 +50,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
       id: `lq-${Date.now()}`,
       order: targetIndex + 2,
       type,
-      prompt: isVi
-        ? (type === 'multiple_choice' ? 'Câu hỏi trắc nghiệm mới: Nhập nội dung...' : 'Câu hỏi điền từ mới: Nhập nội dung...')
-        : (type === 'multiple_choice' ? 'New MCQ: Enter question statement...' : 'New blank: Enter statement...'),
+      prompt: '',
       options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
       correctAnswer: type === 'multiple_choice' ? 'A' : '',
       points: 1
@@ -82,6 +80,15 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
   ) => {
     const updated = [...config.questions];
     updated[index] = { ...updated[index], [field]: value };
+    updateField('questions', updated);
+  };
+
+  const handleUpdateQuestionMultiple = (
+    index: number,
+    updates: Partial<ListeningQuestionItem>
+  ) => {
+    const updated = [...config.questions];
+    updated[index] = { ...updated[index], ...updates };
     updateField('questions', updated);
   };
 
@@ -175,11 +182,6 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
         <div className="edit-card-header">
           <div>
             <h2 className="edit-card-title">{isVi ? 'Tệp Âm Thanh Đề Bài' : 'Audio Track'}</h2>
-            <p className="edit-card-desc">
-              {isVi 
-                ? 'Tải lên file bài nghe (.mp3, .wav, .m4a). Học sinh sẽ nghe file này khi làm bài.' 
-                : 'Upload audio file (.mp3, .wav, .m4a). Students will listen to this track.'}
-            </p>
           </div>
         </div>
 
@@ -253,19 +255,19 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
           );
         })() : (
           <div
-            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-              isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 dark:border-slate-700 hover:border-primary'
-            }`}
+            className={`tae-audio-dropzone ${isDragging ? 'dragging' : ''}`}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="text-3xl mb-2">🎧</div>
-            <p className="font-semibold text-sm text-main mb-1">
+            <div className="tae-audio-icon-wrap">
+              <UploadCloud size={24} />
+            </div>
+            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 mb-1">
               {isVi ? 'Kéo thả tệp âm thanh vào đây hoặc bấm để chọn tệp' : 'Drag & drop audio here or click to browse'}
             </p>
-            <p className="text-xs text-muted">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {isVi ? 'Hỗ trợ .mp3, .wav, .m4a (tối đa 50MB)' : 'Supports .mp3, .wav, .m4a (up to 50MB)'}
             </p>
           </div>
@@ -295,11 +297,6 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
             <h2 className="edit-card-title">
               {isVi ? 'Danh Sách Câu Hỏi & Đáp Án' : 'Listening Questions & Answer Keys'}
             </h2>
-            <p className="edit-card-desc">
-              {isVi
-                ? 'Tạo các câu hỏi trắc nghiệm hoặc điền từ cho bài nghe.'
-                : 'Create multiple choice or short answer questions.'}
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -321,17 +318,12 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
         </div>
 
         {/* Score Summary Badge */}
-        <div className="flex flex-wrap items-center justify-between bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg p-3 text-xs mb-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={15} className="text-blue-600 dark:text-blue-400" />
-            <span className="text-slate-700 dark:text-slate-200 font-medium">
-              {isVi 
-                ? `Tổng điểm module: ${currentTotalScore} điểm • Gồm ${config.questions.length} câu hỏi • Mỗi câu: ${pointsDisplay} điểm` 
-                : `Module Total: ${currentTotalScore} pts • ${config.questions.length} questions • ${pointsDisplay} pts/question`}
-            </span>
-          </div>
-          <span className="text-muted">
-            {isVi ? '(Điểm chia đều tự động theo thang điểm tổng module)' : '(Points distributed evenly by module score)'}
+        <div className="flex items-center gap-2 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-lg px-3 py-2 text-xs mb-3">
+          <CheckCircle size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-slate-700 dark:text-slate-200 font-medium">
+            {isVi 
+              ? `Tổng: ${currentTotalScore} điểm • ${config.questions.length} câu hỏi (${pointsDisplay} điểm/câu)` 
+              : `Total: ${currentTotalScore} pts • ${config.questions.length} questions (${pointsDisplay} pts/question)`}
           </span>
         </div>
 
@@ -378,10 +370,10 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                         </button>
                       </div>
 
-                      {/* Readonly Score Pill */}
-                      <div className="flex items-center gap-1.5 text-xs text-muted bg-slate-50 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-                        <span className="font-semibold text-primary">{pointsDisplay} {isVi ? 'điểm' : 'pts'}</span>
-                      </div>
+                      {/* Score Pill */}
+                      <span className="question-score-pill">
+                        {pointsDisplay} {isVi ? 'điểm' : 'pts'}
+                      </span>
 
                       <button 
                         type="button" 
@@ -435,9 +427,13 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                                 onChange={(e) => {
                                   const newOpts = [...arr];
                                   newOpts[oIdx] = e.target.value;
-                                  handleUpdateQuestion(qIdx, 'options', newOpts);
                                   if (isCorrect) {
-                                    handleUpdateQuestion(qIdx, 'correctAnswer', e.target.value.trim() || letter);
+                                    handleUpdateQuestionMultiple(qIdx, {
+                                      options: newOpts,
+                                      correctAnswer: e.target.value.trim() || letter,
+                                    });
+                                  } else {
+                                    handleUpdateQuestion(qIdx, 'options', newOpts);
                                   }
                                 }}
                               />
@@ -483,10 +479,7 @@ export const SkillListeningEditor: React.FC<SkillListeningEditorProps> = ({ conf
                   )}
 
                   {/* Quick Insert Below Action Bar */}
-                  <div className="flex items-center justify-between pt-2.5 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
-                    <span className="text-muted font-medium">
-                      {isVi ? 'Chèn câu hỏi ngay bên dưới câu này:' : 'Insert question below this one:'}
-                    </span>
+                  <div className="flex items-center justify-end pt-2 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
                     <div className="flex items-center gap-2">
                       <button
                         type="button"

@@ -1,0 +1,13 @@
+{
+  "run": "full-rerun-20261117-r7",
+  "counts": {
+    "PASSED": 120,
+    "FAILED": 29,
+    "BLOCKED": 19,
+    "SKIPPED": 2
+  },
+  "caseCount": 170,
+  "source": "Local historical Selenium report, preserved separately",
+  "buildDeployed": "NOT_VERIFIED",
+  "currentPrExecution": false
+}

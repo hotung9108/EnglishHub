@@ -235,7 +235,12 @@ const StudentAssignmentOverview: React.FC = () => {
       }
 
       const idParam = id || '1';
-      const targetRoute = getSkillRoute(targetSkill, idParam, submissionId, targetModuleId);
+      const isTargetCompleted = inProgressSub?.modules?.some(
+        (sm) => (targetModuleId ? sm.moduleId === targetModuleId || sm.id === targetModuleId : normalizeSkill(sm.skill) === normalizeSkill(targetSkill)) &&
+                (sm.status === 'SUBMITTED' || sm.status === 'GRADED')
+      );
+      const baseRoute = getSkillRoute(targetSkill, idParam, submissionId, targetModuleId);
+      const targetRoute = isTargetCompleted ? `${baseRoute}&mode=review` : baseRoute;
       navigate(targetRoute);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
@@ -245,10 +250,20 @@ const StudentAssignmentOverview: React.FC = () => {
     }
   };
 
+  const [renderTimestamp] = useState(() => Date.now());
+  const isPastDeadline = Boolean(
+    assignment?.closeAt && new Date(assignment.closeAt).getTime() < renderTimestamp
+  );
+  const isClosedOrExpired = assignment?.status === 'CLOSED' || isPastDeadline;
+
   const handleOpenFinalSubmitModal = () => {
     if (!inProgressSub) return;
-    if (assignment?.status === 'CLOSED') {
-      setError(isVi ? 'Bài tập này đã được giáo viên đóng. Không thể nộp toàn bộ bài tập.' : 'This assignment is closed.');
+    if (isClosedOrExpired) {
+      setError(
+        assignment?.status === 'CLOSED'
+          ? (isVi ? 'Bài tập này đã được giáo viên đóng. Không thể nộp toàn bộ bài tập.' : 'This assignment is closed.')
+          : (isVi ? 'Bài tập này đã hết hạn nộp bài. Không thể nộp bài tập.' : 'This assignment submission deadline has passed.')
+      );
       return;
     }
     setShowFinalSubmitModal(true);
@@ -259,6 +274,15 @@ const StudentAssignmentOverview: React.FC = () => {
     setIsStarting(true);
     try {
       await submissionService.submitSubmission(inProgressSub.id);
+      try {
+        localStorage.removeItem(`eh_draft_writing_${numericAssignmentId}`);
+        localStorage.removeItem(`eh_last_writing_${numericAssignmentId}`);
+        if (assignment?.modules) {
+          for (const m of assignment.modules) {
+            localStorage.removeItem(`eh_draft_quiz_${numericAssignmentId}_${m.id}`);
+          }
+        }
+      } catch { /* ignore */ }
       notifyAssignmentSubmitted();
       setShowFinalSubmitModal(false);
       navigate(`/student/submissions/${inProgressSub.id}`);
@@ -275,8 +299,12 @@ const StudentAssignmentOverview: React.FC = () => {
 
   const handleStartAttempt = async () => {
     if (isStarting) return;
-    if (assignment?.status === 'CLOSED') {
-      setError('Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.');
+    if (isClosedOrExpired) {
+      setError(
+        assignment?.status === 'CLOSED'
+          ? (isVi ? 'Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.' : 'This assignment is closed.')
+          : (isVi ? 'Bài tập này đã hết hạn nộp bài. Không thể bắt đầu lượt làm mới.' : 'This assignment submission deadline has passed.')
+      );
       return;
     }
     setIsStarting(true);
@@ -404,9 +432,11 @@ const StudentAssignmentOverview: React.FC = () => {
             <div className="overview-rule-val">
               {assignment?.status === 'CLOSED'
                 ? 'Đã đóng'
-                : assignment?.closeAt
-                  ? new Date(assignment.closeAt).toLocaleDateString('vi-VN')
-                  : 'Mở trực tuyến'}
+                : isPastDeadline
+                  ? `Đã hết hạn (${assignment?.closeAt ? new Date(assignment.closeAt).toLocaleDateString('vi-VN') : ''})`
+                  : assignment?.closeAt
+                    ? new Date(assignment.closeAt).toLocaleDateString('vi-VN')
+                    : 'Mở trực tuyến'}
             </div>
           </div>
 
@@ -455,7 +485,7 @@ const StudentAssignmentOverview: React.FC = () => {
                 void handleStartSkill(skill, step.index);
               }}
               disabled={isStarting}
-              isClosed={assignment?.status === 'CLOSED'}
+              isClosed={isClosedOrExpired}
             />
           </div>
         )}
@@ -681,7 +711,7 @@ const StudentAssignmentOverview: React.FC = () => {
           </div>
 
           <div className="overview-cta-action">
-            {assignment?.status === 'CLOSED' ? (
+            {isClosedOrExpired ? (
               <button 
                 className="overview-cta-btn" 
                 onClick={() => {
@@ -695,9 +725,19 @@ const StudentAssignmentOverview: React.FC = () => {
                 }}
                 disabled={attempts.filter((a) => a.status !== 'in_progress').length === 0}
                 type="button"
-                title={attempts.filter((a) => a.status !== 'in_progress').length === 0 ? 'Bài tập đã được giáo viên đóng' : 'Xem kết quả bài nộp'}
+                title={
+                  attempts.filter((a) => a.status !== 'in_progress').length === 0
+                    ? (assignment?.status === 'CLOSED'
+                      ? (isVi ? 'Bài tập đã được giáo viên đóng' : 'Assignment has been closed')
+                      : (isVi ? 'Bài tập đã hết hạn nộp bài' : 'Assignment deadline has passed'))
+                    : (isVi ? 'Xem kết quả bài nộp' : 'View Submission Results')
+                }
               >
-                {attempts.filter((a) => a.status !== 'in_progress').length > 0 ? 'Xem kết quả bài nộp' : 'Bài tập đã đóng (Không thể làm bài)'}
+                {attempts.filter((a) => a.status !== 'in_progress').length > 0
+                  ? (isVi ? 'Xem kết quả bài nộp' : 'View Submission Results')
+                  : (assignment?.status === 'CLOSED'
+                    ? (isVi ? 'Bài tập đã đóng (Không thể làm bài)' : 'Assignment Closed')
+                    : (isVi ? 'Đã hết hạn nộp bài' : 'Deadline Passed'))}
               </button>
             ) : inProgressSub ? (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -764,7 +804,7 @@ const StudentAssignmentOverview: React.FC = () => {
         }
         confirmText={isVi ? 'Xác nhận nộp bài' : 'Confirm Submission'}
         cancelText={isVi ? 'Kiểm tra lại' : 'Review Again'}
-        variant="primary"
+        variant={!isAllSubModulesCompleted ? 'danger' : 'primary'}
         isLoading={isStarting}
         onConfirm={handleConfirmFinalSubmit}
         onCancel={() => setShowFinalSubmitModal(false)}

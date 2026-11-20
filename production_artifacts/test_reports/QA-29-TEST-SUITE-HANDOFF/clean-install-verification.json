@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-17",
+  "roleFilesMoved": 1450,
+  "historicalReportFilesMoved": 1427,
+  "allMovedHashesMatch": true,
+  "sharedSourceFiles": 214,
+  "cleanSourceInstall": "npm ci --ignore-scripts --no-audit --no-fund: PASS",
+  "cleanSourceOfflineTests": {
+    "passed": 28,
+    "failed": 0
+  },
+  "cleanSourceCatalog": {
+    "total": 170,
+    "procedures": 168,
+    "scopeExcluded": 2
+  },
+  "apiCatalogCheck": "8 collections / 623 requests, review-only validated",
+  "localCredentialCacheReportPathsInGitCandidates": 0,
+  "literalJwtPatternMatchesInCandidateText": 0,
+  "historicalAuditSourceExcluded": true,
+  "reportIndex": {
+    "supportedRuns": 84,
+    "unsupportedSummaryWarnings": 32,
+    "caseResults": 1770
+  },
+  "stagingExecuted": false,
+  "committedOrPushed": false
+}

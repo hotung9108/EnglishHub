@@ -575,6 +575,19 @@
 }
 
 /* Question Badges & Inputs */
+.question-score-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--eh-primary, #164E3E);
+  background-color: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
 .question-type-badge-mcq {
   font-size: 11px;
   font-weight: 700;
@@ -828,54 +841,222 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 14px 20px;
   background-color: var(--eh-surface, #ffffff);
   border: 1px solid var(--eh-border, #E5E8EB);
   border-radius: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .tae-meta-tag {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--eh-primary, #164E3E);
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  white-space: nowrap;
 }
 
 .tae-meta-title-input {
   border: 1px solid var(--eh-border, #E5E8EB);
   border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 7px 14px;
+  font-size: 13.5px;
   background-color: var(--eh-canvas, #F8F9FA);
   color: var(--eh-text-primary, #161B19);
-  min-width: 260px;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .tae-meta-title-input:focus {
   border-color: var(--eh-primary, #164E3E);
   background-color: var(--eh-surface, #ffffff);
+  box-shadow: 0 0 0 2px rgba(22, 78, 62, 0.1);
+}
+
+.tae-score-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--eh-canvas, #F8F9FA);
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--eh-border, #E5E8EB);
 }
 
 .tae-meta-score-input {
-  width: 60px;
+  width: 50px;
   text-align: center;
-  border: 1px solid var(--eh-border, #E5E8EB);
-  border-radius: 8px;
-  padding: 5px 8px;
+  border: 1px solid var(--eh-border, #cbd5e1);
+  border-radius: 6px;
+  padding: 3px 6px;
   font-size: 13px;
   font-weight: 700;
-  background-color: var(--eh-canvas, #F8F9FA);
+  background-color: #ffffff;
   color: var(--eh-text-primary, #161B19);
   outline: none;
+  transition: border-color 0.2s ease;
 }
 
 .tae-meta-score-input:focus {
   border-color: var(--eh-primary, #164E3E);
+  box-shadow: 0 0 0 2px rgba(22, 78, 62, 0.1);
+}
+
+/* Schedule Card & Field Styles */
+.tae-schedule-card {
+  border: 1px solid var(--eh-border, #E5E8EB);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.tae-field-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--eh-text-primary, #334155);
+  margin-bottom: 6px;
+}
+
+.tae-schedule-input {
+  width: 100%;
+  border: 1px solid var(--eh-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--eh-text-primary, #1e293b);
+  background-color: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.tae-schedule-input:hover {
+  background-color: #ffffff;
+}
+
+.tae-schedule-input:focus {
+  background-color: #ffffff;
+  border-color: var(--eh-primary, #164E3E);
+  box-shadow: 0 0 0 3px rgba(22, 78, 62, 0.12);
+}
+
+/* Stepper Control [- 1 lần +] */
+.tae-stepper-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--eh-border, #cbd5e1);
+  border-radius: 8px;
+  background-color: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.tae-stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background-color: #f8fafc;
+  border: none;
+  color: var(--eh-text-primary, #334155);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tae-stepper-btn:hover:not(:disabled) {
+  background-color: #e2e8f0;
+  color: var(--eh-primary, #164E3E);
+}
+
+.tae-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tae-stepper-value {
+  min-width: 68px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--eh-text-primary, #0f172a);
+  padding: 0 8px;
+  user-select: none;
+}
+
+.tae-stepper-input {
+  width: 44px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--eh-text-primary, #0f172a);
+  border: none;
+  background: transparent;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.tae-stepper-input::-webkit-outer-spin-button,
+.tae-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.tae-stepper-unit {
+  font-size: 12.5px;
+  color: var(--eh-text-muted, #64748b);
+  margin-right: 6px;
+  user-select: none;
+}
+
+/* Audio Dropzone Refinement */
+.tae-audio-dropzone {
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  background-color: #fafbfc;
+  transition: all 0.2s ease;
+}
+
+.tae-audio-dropzone:hover {
+  border-color: var(--eh-primary, #164E3E);
+  background-color: #f0fdf4;
+}
+
+.tae-audio-dropzone.dragging {
+  border-color: var(--eh-primary, #164E3E);
+  background-color: #ecfdf5;
+  transform: scale(0.995);
+}
+
+.tae-audio-icon-wrap {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 10px auto;
+  border-radius: 10px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--eh-primary, #164E3E);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.tae-audio-dropzone:hover .tae-audio-icon-wrap {
+  transform: translateY(-2px);
+  border-color: #a7f3d0;
+  box-shadow: 0 4px 6px -1px rgba(22, 78, 62, 0.08);
 }
 

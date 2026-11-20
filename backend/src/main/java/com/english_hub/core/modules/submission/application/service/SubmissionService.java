@@ -58,6 +58,7 @@ import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,6 +76,7 @@ public class SubmissionService {
 	private static final String ASSIGNMENT_NOT_FOUND_MESSAGE = "Không tìm thấy bài tập.";
 	private static final String ASSIGNMENT_CLOSED_MESSAGE = "Bài tập đã đóng";
 	private static final String CANNOT_START_MESSAGE = "Không thể bắt đầu làm bài tập này lúc này.";
+	private static final String LOCK_TIMEOUT_MESSAGE = "Tài nguyên đang được cập nhật, vui lòng thử lại.";
 	private static final String SUBMISSION_DEADLINE_PASSED_MESSAGE =
 			"Không thể nộp phần làm bài này vì đã quá hạn nộp bài.";
 	private static final String SUBMISSION_NOT_FOUND_MESSAGE = "Không tìm thấy lượt làm bài.";
@@ -144,8 +146,7 @@ public class SubmissionService {
 		if (caller.role() != UserRole.STUDENT) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
-		AssignmentWindow window = assignmentWindowRepository.findWindowById(assignmentId)
-				.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		AssignmentWindow window = findAssignmentWindowForStart(assignmentId);
 		if (window.deleted()) {
 			throw ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE);
 		}
@@ -264,9 +265,6 @@ public class SubmissionService {
 				.orElseThrow(() -> ApiException.notFound(MODULE_OR_QUESTION_NOT_FOUND_MESSAGE));
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
-		}
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
 		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
@@ -499,7 +497,7 @@ public class SubmissionService {
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
 		verifyReadAccess(submission, caller);
-		if (!isSubmittedOrGraded(submissionModule.getStatus()) || !isSubmittedOrGraded(submission.getStatus())) {
+		if (!isSubmittedOrGraded(submissionModule.getStatus())) {
 			throw ApiException.badRequest(NOT_SUBMITTED_YET_MESSAGE);
 		}
 
@@ -672,9 +670,6 @@ public class SubmissionService {
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
 		if (moduleInfo == null
 				|| (moduleInfo.taskType() != ModuleTaskType.RECORDING && moduleInfo.skill() != ModuleSkill.SPEAKING)) {
@@ -688,10 +683,6 @@ public class SubmissionService {
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
-		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(context.submissionModule().getModuleId());
 		/* REWRITE answers questions like QUIZ does, so a document upload is essay-only. */
 		if (moduleInfo == null || moduleInfo.taskType() != ModuleTaskType.ESSAY) {
@@ -963,6 +954,15 @@ public class SubmissionService {
 				.map(byId -> byId.get(submissionModule.getModuleId()))
 				.map(ModuleInfo::orderIndex)
 				.orElse(Integer.MAX_VALUE));
+	}
+
+	private AssignmentWindow findAssignmentWindowForStart(long assignmentId) {
+		try {
+			return assignmentWindowRepository.findWindowByIdForUpdate(assignmentId)
+					.orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND_MESSAGE));
+		} catch (PessimisticLockingFailureException exception) {
+			throw ApiException.conflict(LOCK_TIMEOUT_MESSAGE);
+		}
 	}
 
 	private boolean isWithinWindow(AssignmentWindow window) {

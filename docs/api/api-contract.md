@@ -33,7 +33,8 @@ commit. Các ví dụ là dữ liệu minh hoạ, không phải response thu đ�
   `401`. Caller không đủ quyền: `403`.
 - Response thành công **không dùng một envelope chung**: GET detail trả object
   trực tiếp; GET list trả `{ data, pagination }`; mutation trả `{ message }`,
-  riêng create trả `{ message, user }`.
+  riêng create trả `{ message, user }` và Admin reset mật khẩu trả
+  `{ message, newPassword }`.
 - Lỗi dùng `{ "error": "Thông báo lỗi" }`. FE đọc `error`, không đọc
   `message` như response thành công.
 - Role: `ADMIN | TEACHER | STUDENT`. Status: `ACTIVE | LOCKED`.
@@ -55,6 +56,7 @@ Các path dưới đây đã bao gồm prefix `/api/v1`.
 | GET | `/api/v1/admin/users/{id}` | 200 | `UserProfile` trực tiếp |
 | POST | `/api/v1/admin/users` | 201 | `{ message, user: { id, email, role } }` |
 | PUT | `/api/v1/admin/users/{id}` | 200 | `{ message }` |
+| POST | `/api/v1/admin/users/{id}/reset-password` | 200 | `{ message, newPassword }` |
 | DELETE | `/api/v1/admin/users/{id}` | 200 | `{ message }` |
 | PATCH | `/api/v1/admin/users/{id}/status` | 200 | `{ message }` |
 
@@ -67,6 +69,7 @@ ghi trong tài liệu bàn giao.
 type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT';
 type UserStatus = 'ACTIVE' | 'LOCKED';
 type MessageResponse = { message: string };
+type AdminResetPasswordResponse = { message: string; newPassword: string };
 type UserSummary = {
   id: number;
   fullName: string;
@@ -213,10 +216,78 @@ Mật khẩu mới áp dụng cùng policy với create. Sai mật khẩu hiện
 thiếu field hoặc mật khẩu mới không hợp lệ trả `400`. Thành công trả
 `{ "message": "Đổi mật khẩu thành công." }`.
 
-**Không có API admin reset mật khẩu target trong User controller hiện tại.**
-Gửi `PUT /admin/users/{id}` với `{}` hoặc `password` không reset mật khẩu.
+### Admin đặt lại mật khẩu người dùng
+
+`POST /api/v1/admin/users/{id}/reset-password` đặt lại mật khẩu target. Route
+được giới hạn cho `ROLE_ADMIN` ở `ApiRoutePolicy`; service tiếp tục gọi
+`requireAdmin()` để xác nhận caller còn hoạt động. Không có request body và
+client không gửi mật khẩu mới. Body thừa bị bỏ qua, không ảnh hưởng kết quả.
+
+Backend tự sinh mật khẩu ngẫu nhiên dài 16 ký tự: có chữ hoa, chữ thường và số;
+không dùng `I`, `O`, `i`, `l`, `o`, `0`, `1`. Mật khẩu rõ chỉ được trả trong
+response reset lần đó; trường `newPassword` chỉ xuất hiện một lần, không có API
+đọc lại và không gửi email.
+
+```json
+{
+  "message": "Đặt lại mật khẩu thành công.",
+  "newPassword": "<16 ký tự>"
+}
+```
+
+Response `200` có đúng hai field: `message` và `newPassword`.
+
+Response `200` có các header `Cache-Control: no-store`, `Pragma: no-cache` và
+`Expires: 0`. BE hash mật khẩu bằng BCrypt trước khi lưu. Sau khi reset, mọi
+refresh token chưa bị revoke của target bị thu hồi trong cùng transaction;
+dùng refresh token cũ trả `401`. Với target `ACTIVE`, mật khẩu mới đăng nhập
+được ngay và mật khẩu cũ bị từ chối. Có thể reset cho Teacher, Student, Admin
+khác và tài khoản `LOCKED`; reset không mở khoá tài khoản. Target `LOCKED` vẫn
+bị từ chối đăng nhập với `403`.
+
+Sự kiện audit chỉ được ghi vào application log sau khi transaction commit:
+
+```text
+event=ADMIN_PASSWORD_RESET adminId=<id> targetUserId=<id> occurredAt=<time> revokedRefreshTokens=<count>
+```
+
+Log không chứa mật khẩu. Endpoint không ghi bản ghi vào bảng Audit Trail trong
+database; đây là log ứng dụng, không phải audit record bền vững trong DB.
+
+| HTTP | Trường hợp | Lỗi |
+| --- | --- | --- |
+| 400 | Admin tự reset; dùng `PATCH /api/v1/users/me/password` để đổi mật khẩu của chính mình | `{"error":"Vui lòng sử dụng chức năng đổi mật khẩu của chính mình."}` |
+| 400 | ID không parse được thành `long` (chữ, số thập phân hoặc vượt giới hạn `Long`) | `{"error":"Dữ liệu không hợp lệ."}` |
+| 401 | Thiếu/sai/hết hạn token; caller Admin bị khoá hoặc đã bị xoá | `{"error":"..."}` |
+| 403 | Caller không có role Admin | `{"error":"..."}` |
+| 404 | ID không dương, target không tồn tại hoặc đã soft-delete | `{"error":"Không tìm thấy người dùng."}` |
+
+### Giới hạn đã biết
+
+1. Access token còn hạn của target không bị blacklist trong lúc reset và vẫn có
+   thể dùng đến khi hết hạn.
+2. Login đang chạy khi reset bắt đầu có thể vẫn hoàn tất và tạo phiên mới;
+   refresh đang chạy có thể vẫn hoàn tất và cấp access token. Các trường hợp
+   đồng thời này chưa được kiểm thử riêng.
+3. Lỗi xảy ra ở mức JDBC commit chưa được kiểm thử riêng.
+4. Endpoint không idempotent. Retry sau khi mất response tạo một lần reset mới;
+   mật khẩu trong response trước không còn dùng được.
+5. Hai Admin reset cùng target đồng thời: lần commit sau quyết định mật khẩu
+   cuối cùng; code không khóa dòng target.
+6. Trong MockMvc, ID chỉ gồm khoảng trắng (`%20`) bị Spring Security
+   `StrictHttpFirewall` từ chối trước MVC với `400` và body rỗng, không có JSON lỗi.
+7. Trong MockMvc, caller Admin bị khoá kèm ID sai kiểu đã được quan sát nhận
+   `400` trước `401` vì MVC bind ID trước khi gọi service.
+8. Các method GET/PUT/PATCH/DELETE/HEAD trên path này được quan sát trả `403`
+   theo allowlist, không phải `405`.
+
+**Tích hợp FE-92:** thay lời gọi update rỗng
+`PUT /api/v1/admin/users/{id}` bằng POST endpoint này và hiển thị
+`newPassword` backend trả về. Form nhập mật khẩu không còn ý nghĩa vì backend
+tự sinh mật khẩu.
+
 Luồng tự khôi phục bằng OTP thuộc Auth; xem tài liệu Auth và yêu cầu token/OTP
-của luồng đó, không dùng thay thế ngầm cho quyền admin reset.
+của luồng đó. Không dùng luồng OTP thay cho quyền Admin reset mật khẩu.
 
 ## Khoá, mở khoá và xoá
 
@@ -261,9 +332,13 @@ Ví dụ `400` khi update rỗng:
 
 - BE routes, body và response: [UserController](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/UserController.java),
   [AdminUserController](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/AdminUserController.java),
+  [ApiRoutePolicy](../../backend/src/main/java/com/english_hub/core/infrastructure/security/ApiRoutePolicy.java),
   [DTOs](../../backend/src/main/java/com/english_hub/core/modules/user/presentation/rest/dto/).
-- Validation và mutation: [UserProfileService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/UserProfileService.java),
-  [AdminUserService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/AdminUserService.java).
+- Validation, password reset và audit log: [UserProfileService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/UserProfileService.java),
+  [AdminUserService](../../backend/src/main/java/com/english_hub/core/modules/user/application/service/AdminUserService.java),
+  [SecureRandomPasswordGenerator](../../backend/src/main/java/com/english_hub/core/modules/user/infrastructure/security/SecureRandomPasswordGenerator.java),
+  [AdminUserPasswordResetListener](../../backend/src/main/java/com/english_hub/core/modules/auth/application/event/AdminUserPasswordResetListener.java),
+  [AuthService](../../backend/src/main/java/com/english_hub/core/modules/auth/application/service/AuthService.java).
 - FE hiện tại: [user.service.ts](../../frontend/src/api/services/user.service.ts),
   [useStudentDetails.ts](../../frontend/src/hooks/useStudentDetails.ts),
   [Accounts.tsx](../../frontend/src/pages/Accounts.tsx).
