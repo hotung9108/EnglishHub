@@ -500,7 +500,7 @@ const StudentAssignmentOverview: React.FC = () => {
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--on-surface)' }}>
-                    {isVi ? 'Kiểm tra và xem lại bài làm trước khi nộp (UC020)' : 'Review Answers Before Submission (UC020)'}
+                    {isVi ? 'Kiểm tra và xem lại bài làm trước khi nộp' : 'Review Answers Before Submission'}
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
                     {isVi

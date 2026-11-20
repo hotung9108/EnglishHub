@@ -228,7 +228,7 @@ export const TeacherClassProgress: React.FC = () => {
       return;
     }
     if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
-      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030).' : 'Please enter an audit reason note (mandatory per UC030 audit policy).');
+      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán).' : 'Please enter an audit reason note (mandatory per audit policy).');
       return;
     }
 
@@ -1067,7 +1067,7 @@ export const TeacherClassProgress: React.FC = () => {
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <button 
                           className="tcd-btn-action-icon"
-                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán UC031)' : 'Adjust Grade (Audit note)'}
+                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán)' : 'Adjust Grade (Audit note)'}
                           onClick={() => handleOpenAdjustGrade(std)}
                         >
                           <Edit3 size={15} />
@@ -1407,7 +1407,7 @@ export const TeacherClassProgress: React.FC = () => {
                                 currentMemberId: m.memberId,
                               })
                             }
-                            title={isVi ? 'Chuyển học viên sang lớp khác (UC009)' : 'Transfer to another class'}
+                            title={isVi ? 'Chuyển học viên sang lớp khác' : 'Transfer to another class'}
                           >
                             {isVi ? 'Chuyển lớp' : 'Transfer'}
                           </Button>
@@ -1679,7 +1679,7 @@ export const TeacherClassProgress: React.FC = () => {
 
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo kiểm toán UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
                 </label>
                 <textarea
                   rows={3}

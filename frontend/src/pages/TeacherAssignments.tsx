@@ -8,7 +8,7 @@ import {
   Plus, Mic, BookOpen, Headphones, PenTool, 
   Search, AlertCircle, FileText, 
   X, Edit2, RefreshCw, Clock, Sparkles,
-  GraduationCap, ArrowRight
+  GraduationCap, ArrowRight, Trash2
 } from 'lucide-react';
 import { Button, EmptyState, MetricCard, Pagination, LoadingState } from '../components/common';
 import { matchesSkillFilter, toSkillBadgeTypes, type AssignmentBadgeType, type AssignmentSkillFilter } from '../utils/assignmentSkills';
@@ -44,6 +44,8 @@ export const TeacherAssignments: React.FC = () => {
 
   // Assignments & Submissions
   const [assignments, setAssignments] = useState<AssignmentDisplayItem[]>([]);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<AssignmentDisplayItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [skillFilter, setSkillFilter] = useState<AssignmentSkillFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
@@ -73,6 +75,20 @@ export const TeacherAssignments: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setReloadKey((prev) => prev + 1);
+  };
+
+  const handleConfirmDeleteAssignment = async () => {
+    if (!assignmentToDelete) return;
+    try {
+      setIsDeleting(true);
+      await assignmentService.deleteAssignment(Number(assignmentToDelete.id));
+      setAssignmentToDelete(null);
+      setReloadKey((prev) => prev + 1);
+    } catch (err: unknown) {
+      console.error('Failed to delete assignment:', err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // 1. Fetch Classes on mount
@@ -606,6 +622,19 @@ export const TeacherAssignments: React.FC = () => {
 
                     <button
                       type="button"
+                      className="teacher-assignment-btn-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAssignmentToDelete(item);
+                      }}
+                      title={isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+                    >
+                      <Trash2 size={13} />
+                      <span>{isVi ? 'Xóa bài tập' : 'Delete Assignment'}</span>
+                    </button>
+
+                    <button
+                      type="button"
                       className="teacher-assignment-btn-primary"
                       onClick={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
                     >
@@ -744,6 +773,52 @@ export const TeacherAssignments: React.FC = () => {
                 onClick={() => setShowSkillModal(false)}
               >
                 {isVi ? 'Đóng' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Assignment Confirmation Modal */}
+      {assignmentToDelete && (
+        <div 
+          className="tad-modal-overlay modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="delete-assignment-modal-title"
+          onClick={() => !isDeleting && setAssignmentToDelete(null)}
+        >
+          <div 
+            className="tad-modal-box tad-modal" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-assignment-modal-title" className="tad-modal-title">
+              {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? `Bạn có chắc chắn muốn xóa bài tập "${assignmentToDelete.title}" không? Bài tập này có thể đã có bài nộp của học viên. Xóa bài tập sẽ xóa mềm và ẩn toàn bộ dữ liệu bài tập và bài nộp liên quan.`
+                : `Are you sure you want to delete "${assignmentToDelete.title}"? It may contain student submissions and associated data. Soft deleting will archive this assignment and its related submission data.`}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => setAssignmentToDelete(null)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isDeleting}
+                disabled={isDeleting}
+                onClick={handleConfirmDeleteAssignment}
+              >
+                {isVi ? 'Xác nhận' : 'Confirm'}
               </Button>
             </div>
           </div>
