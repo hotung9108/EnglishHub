@@ -75,6 +75,23 @@ class UserCrudServiceTest {
 	}
 
 	@ParameterizedTest
+	@ValueSource(strings = {"abcxyz", " 090abc123 ", "12345678", "1234567890123456"})
+	void rejectsInvalidFormatPhoneBeforeSavingAnyProvidedChanges(String phone) {
+		UserDto request = new UserDto();
+		request.setFullName("Trần Thị Mai Lan");
+		request.setPhone(phone);
+		request.setAvatarUrl("https://example.test/new-avatar.png");
+
+		assertThatThrownBy(() -> service.update(12L, request))
+				.isInstanceOfSatisfying(ApiException.class, exception ->
+						assertThat(exception.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST))
+				.hasMessage("Số điện thoại không đúng định dạng.");
+		verify(repository, never()).save(any(User.class));
+		assertThat(existing.phone()).isEqualTo("0900000000");
+		assertThat(existing.avatarUrl()).isEqualTo("https://example.test/old-avatar.png");
+	}
+
+	@ParameterizedTest
 	@MethodSource("phoneUpdates")
 	void savesNormalizedPhoneOrClearsAnExistingPhone(String phone, String expected) {
 		UserDto request = new UserDto();
@@ -143,7 +160,7 @@ class UserCrudServiceTest {
 	}
 
 	private static Stream<Arguments> phoneUpdates() {
-		String boundary = "1".repeat(20);
+		String boundary = "1".repeat(15);
 		return Stream.of(Arguments.of(boundary, boundary), Arguments.of(" " + boundary + " ", boundary),
 				Arguments.of("", null), Arguments.of("   ", null));
 	}

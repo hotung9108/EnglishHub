@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validatePhone, PHONE_PATTERN } from '../../utils/phoneValidation';
+import { validatePhone } from '../../utils/phoneValidation';
 
 test('validatePhone - accepts null, undefined and blank strings as optional', () => {
   assert.strictEqual(validatePhone(null).isValid, true);
