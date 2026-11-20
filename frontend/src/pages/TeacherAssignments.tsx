@@ -9,6 +9,8 @@ import {
   Plus, Mic, BookOpen, Headphones, PenTool, 
   Search, AlertCircle, FileText, 
   X, RefreshCw
+  X, Edit2, RefreshCw, Clock, Sparkles,
+  GraduationCap, ArrowRight, Trash2
 } from 'lucide-react';
 import { Button, ConfirmModal, EmptyState, MetricCard, Pagination, LoadingState, useToast } from '../components/common';
 import { AssignmentCard, type AssignmentDisplayItem } from '../components/assignments/AssignmentCard';
@@ -236,6 +238,8 @@ export const TeacherAssignments: React.FC = () => {
   // Assignments & Submissions
   const [assignments, setAssignments] = useState<AssignmentDisplayItem[]>([]);
   const [loadedClassId, setLoadedClassId] = useState<string | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<AssignmentDisplayItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [skillFilter, setSkillFilter] = useState<AssignmentSkillFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
@@ -294,6 +298,20 @@ export const TeacherAssignments: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setReloadKey((prev) => prev + 1);
+  };
+
+  const handleConfirmDeleteAssignment = async () => {
+    if (!assignmentToDelete) return;
+    try {
+      setIsDeleting(true);
+      await assignmentService.deleteAssignment(Number(assignmentToDelete.id));
+      setAssignmentToDelete(null);
+      setReloadKey((prev) => prev + 1);
+    } catch (err: unknown) {
+      console.error('Failed to delete assignment:', err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // 1. Fetch Classes on mount
@@ -738,6 +756,121 @@ export const TeacherAssignments: React.FC = () => {
               isUpdatingLifecycle={isUpdatingLifecycle || !isClassSnapshotCurrent}
             />
           ))}
+          {paginatedAssignments.map((item) => {
+            const submissionPercent = item.totalStudents > 0 
+              ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100)) 
+              : 0;
+
+            return (
+              <div key={item.id} className="teacher-assignment-card">
+                {/* 1. Header Line: Identity (Code, Class, Skills) & Grading Status */}
+                <div className="teacher-assignment-card-header">
+                  <div className="teacher-assignment-card-identity">
+                    <span className="teacher-assignment-code-badge">{item.code}</span>
+                    <div className="teacher-assignment-class-tag">
+                      <GraduationCap size={13} />
+                      <span>{item.className}</span>
+                    </div>
+                    {renderSkillBadges(item.skills)}
+                  </div>
+
+                  <div className="teacher-assignment-card-status">
+                    {item.submittedCount === 0 ? (
+                      <span className="teacher-assignment-upcoming-pill">
+                        <span className="teacher-assignment-status-dot" style={{ backgroundColor: '#94a3b8' }} />
+                        <span>{isVi ? 'Chưa có bài nộp' : 'No submissions'}</span>
+                      </span>
+                    ) : item.pendingGradingCount > 0 ? (
+                      <span className="teacher-assignment-pending-pill">
+                        <span className="teacher-assignment-status-dot pending" />
+                        <span>{item.pendingGradingCount} {isVi ? 'bài chờ chấm' : 'to grade'}</span>
+                      </span>
+                    ) : (
+                      <span className="teacher-assignment-done-pill">
+                        <span className="teacher-assignment-status-dot done" />
+                        <span>{isVi ? 'Đã chấm hoàn tất' : 'All graded'}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Main Title */}
+                <h3 
+                  onClick={() => navigate(`/teacher/assignments/${item.id}`)}
+                  className="teacher-assignment-title"
+                >
+                  {item.title}
+                </h3>
+
+                {/* 3. Divider */}
+                <div className="teacher-assignment-card-divider" />
+
+                {/* 4. Footer Line: Deadline & Turnout Progress (Left) + Actions (Right) */}
+                <div className="teacher-assignment-card-footer">
+                  <div className="teacher-assignment-footer-meta">
+                    {renderDeadlineTag(item)}
+
+                    <span className="teacher-assignment-meta-separator">•</span>
+
+                    <div className="teacher-assignment-turnout-group">
+                      <span className="teacher-assignment-turnout-label">
+                        {isVi ? 'Đã nộp:' : 'Turnout:'} <strong>{item.submittedCount}/{item.totalStudents}</strong> ({submissionPercent}%)
+                      </span>
+                      <div className="teacher-assignment-mini-progress">
+                        <div 
+                          className="teacher-assignment-mini-fill"
+                          style={{ width: `${submissionPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="teacher-assignment-card-actions">
+                    {item.status !== 'closed' && (
+                      <button
+                        type="button"
+                        className="teacher-assignment-btn-edit"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/teacher/assignments/${item.id}/edit`);
+                        }}
+                        title={isVi ? 'Chỉnh sửa bài tập này' : 'Edit this assignment'}
+                      >
+                        <Edit2 size={13} />
+                        <span>{isVi ? 'Chỉnh sửa' : 'Edit'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="teacher-assignment-btn-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAssignmentToDelete(item);
+                      }}
+                      title={isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+                    >
+                      <Trash2 size={13} />
+                      <span>{isVi ? 'Xóa bài tập' : 'Delete Assignment'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="teacher-assignment-btn-primary"
+                      onClick={() => navigate(`/teacher/assignments/${item.id}/submissions`)}
+                    >
+                      <span>
+                        {item.pendingGradingCount > 0 
+                          ? (isVi ? 'Chấm bài ngay' : 'Grade Now') 
+                          : (isVi ? 'Quản lý bài nộp' : 'View Submissions')}
+                      </span>
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
 
           {filteredAssignments.length === 0 && (
             <EmptyState
@@ -904,6 +1037,52 @@ export const TeacherAssignments: React.FC = () => {
                 onClick={() => setShowSkillModal(false)}
               >
                 {isVi ? 'Đóng' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Assignment Confirmation Modal */}
+      {assignmentToDelete && (
+        <div 
+          className="tad-modal-overlay modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="delete-assignment-modal-title"
+          onClick={() => !isDeleting && setAssignmentToDelete(null)}
+        >
+          <div 
+            className="tad-modal-box tad-modal" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-assignment-modal-title" className="tad-modal-title">
+              {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? `Bạn có chắc chắn muốn xóa bài tập "${assignmentToDelete.title}" không? Bài tập này có thể đã có bài nộp của học viên. Xóa bài tập sẽ xóa mềm và ẩn toàn bộ dữ liệu bài tập và bài nộp liên quan.`
+                : `Are you sure you want to delete "${assignmentToDelete.title}"? It may contain student submissions and associated data. Soft deleting will archive this assignment and its related submission data.`}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => setAssignmentToDelete(null)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isDeleting}
+                disabled={isDeleting}
+                onClick={handleConfirmDeleteAssignment}
+              >
+                {isVi ? 'Xác nhận' : 'Confirm'}
               </Button>
             </div>
           </div>

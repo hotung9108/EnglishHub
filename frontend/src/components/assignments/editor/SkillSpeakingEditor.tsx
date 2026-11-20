@@ -35,18 +35,13 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             <h2 className="edit-card-title">
               {isVi ? 'Đề Bài & Yêu Cầu Bài Nói' : 'Speaking Prompt & Instructions'}
             </h2>
-            <p className="edit-card-desc">
-              {isVi 
-                ? 'Nhập chủ đề bài nói, câu hỏi gợi ý và hướng dẫn học viên ghi âm.' 
-                : 'Enter speaking topic, guided questions, and recording instructions.'}
-            </p>
           </div>
         </div>
 
         <div className="edit-form-group" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <label className="edit-form-label" style={{ margin: 0 }}>
-              {isVi ? 'Nội dung đề bài nói' : 'Speaking Topic & Prompt'} <span style={{ color: '#ef4444' }}>*</span>
+              {isVi ? 'Chủ đề bài nói' : 'Speaking Topic & Prompt'} <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <span style={{ fontSize: '12.5px', color: '#64748b' }}>
               {isVi ? 'Độ dài đề bài:' : 'Prompt:'} <strong style={{ color: '#0f172a' }}>{promptWordCount}</strong> {isVi ? 'từ' : 'words'}
@@ -73,11 +68,6 @@ export const SkillSpeakingEditor: React.FC<SkillSpeakingEditorProps> = ({ config
             <h2 className="edit-card-title">
               {isVi ? 'Hướng Dẫn Chấm Điểm Cho AI' : 'AI Grading Instructions'}
             </h2>
-            <p className="edit-card-desc">
-              {isVi 
-                ? 'Ghi chú tiêu chí chấm điểm, từ vựng hoặc phát âm cần AI lưu ý khi phân tích bài nói.' 
-                : 'Scoring criteria, target vocabulary, or pronunciation notes for AI evaluation.'}
-            </p>
           </div>
         </div>
 

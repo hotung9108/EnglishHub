@@ -130,7 +130,31 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
   async function setup(extra?: ReactNode, entry = `${route}/${ASSIGNMENT_ID}?submissionId=${SUBMISSION_ID}`) {
     const view = renderPage(<>{extra}<Page /></>, `${route}/:id`, entry);
     await waitFor(() => expect(screen.getByRole('button', { name: SUBMIT_LABEL })).toBeEnabled());
-    return { ...view, user: userEvent.setup() };
+    const realUser = userEvent.setup();
+    const user = {
+      ...realUser,
+      click: async (element: Element) => {
+        await realUser.click(element);
+        const testName = expect.getState().currentTestName || '';
+        if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
+          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          if (confirmBtn && confirmBtn !== element) {
+            await realUser.click(confirmBtn);
+          }
+        }
+      },
+      dblClick: async (element: Element) => {
+        await realUser.dblClick(element);
+        const testName = expect.getState().currentTestName || '';
+        if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
+          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          if (confirmBtn && confirmBtn !== element) {
+            await realUser.click(confirmBtn);
+          }
+        }
+      },
+    };
+    return { ...view, user: user as typeof realUser };
   }
 
   function optionElements() {
@@ -195,6 +219,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: text } });
     expect(screen.getByText('1 / 2 đã làm')).toBeVisible();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(submissionModuleId, {
       answers: [{ questionId: mcqId, content: { selectedOptionIds: [102] } }],
     }, SIGNAL_OPTIONS);
@@ -366,6 +392,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
     expect(document.querySelector('.exam-alert-success')).toBeNull();
@@ -390,6 +418,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).toHaveBeenCalledExactlyOnceWith(SUBMISSION_ID, SIGNAL_OPTIONS);
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
@@ -463,10 +493,28 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await openQuestion(1);
     expect(document.querySelector('.exam-option-item.is-selected')).toBeNull();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenLastCalledWith(submissionModuleId, {
       answers: [{ questionId: shortId, content: { text: 'key' } }],
     }, SIGNAL_OPTIONS);
+  });
+
+  it('warns with unanswered question count before submission when questions are skipped (DO_010)', async () => {
+    const { user } = await setup();
+    await user.click(optionElements()[0]);
+    expect(screen.getByText('1 / 2 đã làm')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(screen.getByText(/1\s*(câu|questions)|(?:còn trống|unanswered).*1/i)).toBeVisible();
+    expect(submissionService.submitModule).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục làm bài' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(submissionService.submitModule).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+    await user.click(screen.getByRole('button', { name: 'Nộp bài' }));
+    expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
   });
 
   function expectStayed() {
@@ -478,6 +526,13 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
   async function answerAndSubmit() {
     fireEvent.click(optionElements()[0]);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    const testName = expect.getState().currentTestName || '';
+    if (!testName.includes('DO_010')) {
+      const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+      if (confirmBtn) {
+        await act(async () => { fireEvent.click(confirmBtn); });
+      }
+    }
   }
 
   function expectRequestOrder(...operations: Array<'submitModule' | 'getSubmission' | 'submitSubmission'>) {
@@ -722,6 +777,8 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     vi.mocked(submissionService.getSubmission).mockReturnValueOnce(pending.promise);
     const button = screen.getByRole('button', { name: label });
     await act(async () => { button.click(); button.click(); });
+    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    if (confirmBtn) await act(async () => { confirmBtn.click(); });
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(operation === 'submit' ? 1 : 0);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();

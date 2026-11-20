@@ -800,7 +800,6 @@ class GradingServiceTest {
 		Grading expectedGrading = grading(5L, bd("10.00"), bd("8.00"), GradingStatus.COMPLETED);
 		when(currentUserProvider.requireActiveUser()).thenReturn(user(1L, UserRole.ADMIN));
 		when(gradingRepository.findById(5L)).thenReturn(Optional.of(expectedGrading));
-		when(gradingContextRepository.findByGradingId(5L)).thenReturn(Optional.of(context(20L, ModuleSkill.WRITING)));
 
 		Grading result = gradingService.getById(5L);
 
