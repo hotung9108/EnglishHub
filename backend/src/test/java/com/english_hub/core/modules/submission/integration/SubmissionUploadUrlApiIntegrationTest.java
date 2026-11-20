@@ -619,6 +619,40 @@ class SubmissionUploadUrlApiIntegrationTest {
 	}
 
 	@Test
+	void documentUploadUrl_allowsSubmittedModuleWhenParentSubmissionIsInProgress() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);
+		SubmissionModule submissionModule = submissionModuleRepository.findById(essaySubmissionModuleId).orElseThrow();
+		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+		submissionModuleRepository.save(submissionModule);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/document-upload-url", essaySubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"application/pdf\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.uploadUrl").isNotEmpty())
+				.andExpect(jsonPath("$.storageKey").value("submissions/" + submissionId + "/module-" + essaySubmissionModuleId + "/essay.pdf"));
+	}
+
+	@Test
+	void audioUploadUrl_allowsSubmittedModuleWhenParentSubmissionIsInProgress() throws Exception {
+		long submissionId = startSubmissionAsStudentMember();
+		long recordingSubmissionModuleId = submissionModuleIdOf(submissionId, recordingModuleId);
+		SubmissionModule submissionModule = submissionModuleRepository.findById(recordingSubmissionModuleId).orElseThrow();
+		submissionModule.setStatus(SubmissionStatus.SUBMITTED);
+		submissionModuleRepository.save(submissionModule);
+
+		mockMvc.perform(post("/api/v1/submission-modules/{id}/audio-upload-url", recordingSubmissionModuleId)
+						.header("Authorization", bearer(studentMemberId, UserRole.STUDENT))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"mimeType\":\"audio/webm\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.uploadUrl").isNotEmpty())
+				.andExpect(jsonPath("$.storageKey").value("submissions/" + submissionId + "/module-" + recordingSubmissionModuleId + "/audio.webm"));
+	}
+
+	@Test
 	void submitModule_isRejectedWhenTheSubmissionIsAlreadySubmitted() throws Exception {
 		long submissionId = startSubmissionAsStudentMember();
 		long essaySubmissionModuleId = submissionModuleIdOf(submissionId, essayModuleId);

@@ -266,9 +266,6 @@ public class SubmissionService {
 		if (!submission.getStudentId().equals(caller.id())) {
 			throw ApiException.forbidden(FORBIDDEN_MESSAGE);
 		}
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(ALREADY_SUBMITTED_MESSAGE);
-		}
 		if (submission.getStatus() != SubmissionStatus.IN_PROGRESS) {
 			throw ApiException.badRequest(ALREADY_FINISHED_MESSAGE);
 		}
@@ -500,7 +497,7 @@ public class SubmissionService {
 		Submission submission = submissionRepository.findById(submissionModule.getSubmissionId())
 				.orElseThrow(() -> ApiException.notFound(MODULE_NOT_FOUND_MESSAGE));
 		verifyReadAccess(submission, caller);
-		if (!isSubmittedOrGraded(submissionModule.getStatus()) || !isSubmittedOrGraded(submission.getStatus())) {
+		if (!isSubmittedOrGraded(submissionModule.getStatus())) {
 			throw ApiException.badRequest(NOT_SUBMITTED_YET_MESSAGE);
 		}
 
@@ -673,9 +670,6 @@ public class SubmissionService {
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
 		if (moduleInfo == null
 				|| (moduleInfo.taskType() != ModuleTaskType.RECORDING && moduleInfo.skill() != ModuleSkill.SPEAKING)) {
@@ -689,10 +683,6 @@ public class SubmissionService {
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
-		SubmissionModule submissionModule = context.submissionModule();
-		if (submissionModule.getStatus() != SubmissionStatus.IN_PROGRESS) {
-			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
-		}
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(context.submissionModule().getModuleId());
 		/* REWRITE answers questions like QUIZ does, so a document upload is essay-only. */
 		if (moduleInfo == null || moduleInfo.taskType() != ModuleTaskType.ESSAY) {
