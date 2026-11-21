@@ -21,6 +21,15 @@ const defaultItem: AssignmentDisplayItem = {
   lifecycleStatus: 'PUBLISHED',
 };
 
+it.each([
+  { lifecycleStatus: 'ARCHIVED', isVi: true, label: 'Trạng thái không xác định' },
+  { lifecycleStatus: 'constructor', isVi: false, label: 'Unknown status' },
+])('uses a neutral lifecycle badge for $lifecycleStatus and hides lifecycle actions', ({ lifecycleStatus, isVi, label }) => {
+  renderCard({ lifecycleStatus: lifecycleStatus as AssignmentDisplayItem['lifecycleStatus'] }, isVi);
+  expect(screen.getByText(label)).toHaveClass('status-badge', 'neutral');
+  expect(screen.queryByRole('button', { name: /^(Mở bài tập|Khóa bài tập|Open assignment|Close assignment)$/ })).not.toBeInTheDocument();
+});
+
 function renderCard(overrides: Partial<AssignmentDisplayItem> = {}, isVi = true, isUpdatingLifecycle = false) {
   const onViewDetails = vi.fn();
   const onEdit = vi.fn();

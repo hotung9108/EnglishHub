@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, Check, Award, Loader2, AlertCircle
@@ -7,6 +7,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { validateFullName } from '../utils/nameValidation';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
+import { parseApiError } from '../api';
 import type { ClassSummary } from '../api/services/class.service';
 
 export const AddTeacher: React.FC = () => {
@@ -30,6 +31,8 @@ export const AddTeacher: React.FC = () => {
     assignedClassId: ''
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState<'invalid' | 'duplicate' | null>(null);
+  const emailInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -79,7 +82,12 @@ export const AddTeacher: React.FC = () => {
 
       navigate('/admin/teachers');
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.');
+      if (parseApiError(err).statusCode === 409) {
+        setEmailError('duplicate');
+        setCurrentStep(1);
+      } else {
+        setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -219,15 +227,27 @@ export const AddTeacher: React.FC = () => {
                 </div>
 
                 <div className="adm-form-group">
-                  <label className="adm-form-label">Email *</label>
+                  <label className="adm-form-label" htmlFor="teacher-email">Email *</label>
                   <input 
+                    ref={emailInput}
+                    id="teacher-email"
                     type="email"
-                    className="input"
+                    className={emailError ? 'input adm-input-error' : 'input'}
                     placeholder="teacher@center.edu.vn"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, email: e.target.value });
+                      setEmailError(null);
+                    }}
+                    aria-invalid={Boolean(emailError)}
+                    aria-describedby={emailError ? 'teacher-email-error' : undefined}
                     required
                   />
+                  {emailError && (
+                    <span id="teacher-email-error" className="adm-form-field-error" role="alert">
+                      {t(emailError === 'duplicate' ? 'addTeacher.emailDuplicate' : 'emailValidation.invalid')}
+                    </span>
+                  )}
                 </div>
 
                 <div className="adm-form-group">
@@ -248,11 +268,10 @@ export const AddTeacher: React.FC = () => {
                     disabled={!formData.name.trim() || !formData.email.trim()}
                     onClick={() => {
                       const res = validateFullName(formData.name, isVi);
-                      if (!res.isValid) {
-                        setNameError(res.errorMessage || '');
-                        return;
-                      }
-                      setNameError('');
+                      const invalidEmail = emailInput.current?.validity.typeMismatch;
+                      if (invalidEmail) setEmailError('invalid');
+                      setNameError(res.errorMessage || '');
+                      if (!res.isValid || invalidEmail) return;
                       setFormData(prev => ({ ...prev, name: res.normalized }));
                       setCurrentStep(2);
                     }}
