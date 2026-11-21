@@ -20,6 +20,12 @@ export default mergeConfig(
           'src/pages/TeacherCreateAssignment.tsx',
           'src/pages/StudentAssignmentWriting.tsx',
           'src/pages/TeacherSubmissionDetails.tsx',
+          'src/pages/TeacherAssignments.tsx',
+          'src/components/assignments/AssignmentCard.tsx',
+          'src/components/classes/DateRangeFilter.tsx',
+          'src/components/classes/StudentEvaluationAvailabilityNotice.tsx',
+          'src/utils/gradebookDateRange.utils.ts',
+          'src/utils/studentEvaluationAvailability.utils.ts',
         ],
         thresholds: {
           perFile: true,
