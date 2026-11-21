@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
   X, Check, Lock, Unlock, Shield,
-  Mail, Phone, Edit3, Loader2, AlertCircle
+  Mail, Phone, Edit3, Loader2, AlertCircle,
+  Key, Copy, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
@@ -25,6 +26,10 @@ export const Accounts: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusModalUser, setStatusModalUser] = useState<UserListItem | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserListItem | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ user: UserListItem; newPassword: string } | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
 
   const {
     users,
@@ -217,6 +222,50 @@ export const Accounts: React.FC = () => {
     }
   };
 
+  const handleConfirmResetPassword = async () => {
+    if (!resetPasswordUser) return;
+    setIsResettingPassword(true);
+    try {
+      const res = await userService.resetPassword(resetPasswordUser.id);
+      const targetUser = resetPasswordUser;
+      setResetPasswordUser(null);
+      setResetPasswordResult({
+        user: targetUser,
+        newPassword: res.newPassword,
+      });
+      toastSuccess(
+        isVi 
+          ? `Đặt lại mật khẩu cho ${targetUser.email} thành công!`
+          : `Successfully reset password for ${targetUser.email}!`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : isVi ? 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.' : 'Failed to reset password. Please try again.';
+      toastError(msg);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetPasswordResult?.newPassword) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(resetPasswordResult.newPassword);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = resetPasswordResult.newPassword;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toastError(isVi ? 'Không thể sao chép mật khẩu.' : 'Failed to copy password.');
+    }
+  };
+
   const getRoleClass = (role: string) => {
     switch (role) {
       case 'ADMIN': return 'role-admin';
@@ -373,6 +422,14 @@ export const Accounts: React.FC = () => {
                             onClick={() => handleOpenEditDrawer(user)}
                             title={t('accounts.actionEdit')}
                             icon={<Edit3 size={14} />}
+                          />
+                          <Button 
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setResetPasswordUser(user)}
+                            title={t('accounts.actionResetPassword')}
+                            aria-label={t('accounts.actionResetPassword')}
+                            icon={<Key size={14} />}
                           />
                           <Button 
                             variant="secondary"
@@ -628,6 +685,106 @@ export const Accounts: React.FC = () => {
           }}
           onCancel={() => setStatusModalUser(null)}
         />
+      )}
+
+      {/* Two-Step Confirmation Modal for Password Reset */}
+      {resetPasswordUser && (
+        <ConfirmModal
+          isOpen={Boolean(resetPasswordUser)}
+          title={t('accounts.resetPasswordConfirmTitle')}
+          message={
+            isVi
+              ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản "${resetPasswordUser.fullName || resetPasswordUser.email}"? Một mật khẩu ngẫu nhiên mới sẽ được tạo.`
+              : `Are you sure you want to reset the password for "${resetPasswordUser.fullName || resetPasswordUser.email}"? A new random password will be generated.`
+          }
+          confirmText={isVi ? 'Đặt lại mật khẩu' : 'Reset Password'}
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant="primary"
+          isLoading={isResettingPassword}
+          onConfirm={handleConfirmResetPassword}
+          onCancel={() => {
+            if (!isResettingPassword) setResetPasswordUser(null);
+          }}
+        />
+      )}
+
+      {/* Success Modal Showing Generated Temporary Password */}
+      {resetPasswordResult && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-success-title"
+        >
+          <div className="bg-surface rounded-xl shadow-xl max-w-md w-full border border-border p-6 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2 text-success">
+                <CheckCircle2 size={20} />
+                <h3 id="reset-password-success-title" className="font-semibold text-surface">
+                  {t('accounts.resetPasswordSuccessTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+                className="btn-ghost p-1 cursor-pointer text-muted hover:text-surface"
+                aria-label={isVi ? 'Đóng' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-muted">
+                {t('accounts.resetPasswordSuccessDesc')}
+              </p>
+
+              <div className="p-3 bg-surface-low rounded-lg border border-border">
+                <div className="text-xs text-muted mb-1 font-medium">
+                  {isVi ? 'Tài khoản:' : 'Account:'} {resetPasswordResult.user.fullName} ({resetPasswordResult.user.email})
+                </div>
+                <div className="flex items-center justify-between gap-2 mt-2 bg-surface p-2.5 rounded border border-border">
+                  <code className="font-mono text-base font-semibold text-primary select-all">
+                    {resetPasswordResult.newPassword}
+                  </code>
+                  <Button
+                    variant={copied ? 'primary' : 'secondary'}
+                    size="sm"
+                    icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                    onClick={handleCopyPassword}
+                    title={copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  >
+                    {copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-xs text-warning flex items-center gap-1.5 mt-2">
+                <AlertCircle size={14} className="shrink-0" />
+                <span>
+                  {isVi 
+                    ? 'Lưu ý: Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.' 
+                    : 'Notice: This temporary password is only displayed once.'}
+                </span>
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-border">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+              >
+                {isVi ? 'Đã hiểu' : 'Got it'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
