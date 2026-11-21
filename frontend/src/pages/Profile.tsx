@@ -459,7 +459,8 @@ export const Profile: React.FC = () => {
                         <input 
                           type="text" 
                           className="input profile-input-readonly"
-                          value={specialization || (isVi ? 'Chưa cập nhật' : 'Not specified')}
+                          value={specialization.trim() ? specialization : ''}
+                          placeholder={isVi ? 'Chưa cập nhật' : 'Not specified'}
                           readOnly
                         />
                       </div>
