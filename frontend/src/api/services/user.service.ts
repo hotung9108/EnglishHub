@@ -57,7 +57,10 @@ export interface UpdateUserPayload {
 }
 
 export type UserListParams = { page?: number; limit?: number; q?: string; role?: UserRole };
-export type UserListItem = Pick<UserProfile, 'id' | 'fullName' | 'email' | 'role' | 'status'>;
+export type UserListItem = Pick<UserProfile, 'id' | 'fullName' | 'email' | 'role' | 'status'> & {
+  specialization?: string;
+  phone?: string;
+};
 export type UserPagination = PaginationResponse;
 export interface UserListResponse {
   data: UserListItem[];
@@ -96,9 +99,9 @@ export class UserService {
     id: UserId,
     hint?: { fullName?: string; email?: string },
     options?: ApiRequestOptions
-  ): Promise<UserListItem | null> {
+  ): Promise<UserProfile | null> {
     try {
-      const direct = await this.http.get<UserListItem>(`${USERS_ENDPOINT}/${id}`, options);
+      const direct = await this.http.get<UserProfile>(`${USERS_ENDPOINT}/${id}`, options);
       if (direct && direct.id === id) {
         return direct;
       }

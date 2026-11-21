@@ -2,6 +2,7 @@ package com.english_hub.core.modules.user.presentation.rest.dto;
 
 import com.english_hub.core.common.application.BaseDto;
 import com.english_hub.core.modules.user.domain.model.User;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -14,13 +15,20 @@ public class AdminUserSummary extends BaseDto<Long> {
 	private final String email;
 	private final String role;
 	private final String status;
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private final String specialization;
 
 	public AdminUserSummary(Long id, String fullName, String email, String role, String status) {
+		this(id, fullName, email, role, status, null);
+	}
+
+	public AdminUserSummary(Long id, String fullName, String email, String role, String status, String specialization) {
 		setId(id);
 		this.fullName = fullName;
 		this.email = email;
 		this.role = role;
 		this.status = status;
+		this.specialization = specialization;
 	}
 
 	public static AdminUserSummary from(User user) {
@@ -29,7 +37,8 @@ public class AdminUserSummary extends BaseDto<Long> {
 				user.fullName(),
 				user.email(),
 				user.role().name(),
-				user.status().name());
+				user.status().name(),
+				user.specialization());
 	}
 
 	public Long id() {
@@ -50,5 +59,9 @@ public class AdminUserSummary extends BaseDto<Long> {
 
 	public String status() {
 		return status;
+	}
+
+	public String specialization() {
+		return specialization;
 	}
 }
