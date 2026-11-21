@@ -263,6 +263,11 @@ export const TeacherCreateAssignment: React.FC = () => {
       return;
     }
 
+    if (assignmentData.title.trim().length > 200) {
+      showToast(isVi ? 'Tiêu đề bài tập không được vượt quá 200 ký tự!' : 'Assignment title cannot exceed 200 characters!');
+      return;
+    }
+
     const openTimestamp = assignmentData.startDate 
       ? new Date(assignmentData.startDate).getTime() 
       : Date.now();
@@ -524,6 +529,7 @@ export const TeacherCreateAssignment: React.FC = () => {
           value={assignmentData.title}
           onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
           placeholder={isVi ? 'Nhập tiêu đề bài tập mới...' : 'Enter new assignment title...'}
+          maxLength={200}
         />
 
         <select 

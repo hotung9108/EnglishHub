@@ -44,9 +44,15 @@ async function reading(container: HTMLElement) {
 it.each(['vi', 'en'] as const)('validates missing title and writing prompt (%s)', async language => {
   const { user } = await setup('writing', language);
   const title = screen.getByDisplayValue('Weekly practice');
+  expect(title).toHaveAttribute('maxLength', '200');
   fireEvent.change(title, { target: { value: '  ' } });
   await user.click(screen.getByRole('button', { name: language === 'vi' ? 'Giao bài tập' : 'Create & Publish' }));
   expect(screen.getByText(language === 'vi' ? 'Tiêu đề bài tập không được để trống!' : 'Title cannot be empty!')).toBeVisible();
+
+  fireEvent.change(title, { target: { value: 'A'.repeat(201) } });
+  await user.click(screen.getByRole('button', { name: language === 'vi' ? 'Giao bài tập' : 'Create & Publish' }));
+  expect(screen.getByText(language === 'vi' ? 'Tiêu đề bài tập không được vượt quá 200 ký tự!' : 'Assignment title cannot exceed 200 characters!')).toBeVisible();
+
   fireEvent.change(title, { target: { value: 'Practice' } });
   await user.click(screen.getByRole('button', { name: language === 'vi' ? 'Giao bài tập' : 'Create & Publish' }));
   expect(screen.getByText(language === 'vi' ? 'Nội dung đề bài Writing không được để trống!' : 'Writing prompt cannot be empty!')).toBeVisible();

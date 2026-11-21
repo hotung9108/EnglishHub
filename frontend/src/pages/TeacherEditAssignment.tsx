@@ -532,6 +532,16 @@ export const TeacherEditAssignment: React.FC = () => {
   const saveAssignmentChanges = async (publishStatus?: AssignmentStatus) => {
     if (!id) return;
 
+    if (!assignmentData.title.trim()) {
+      showToast(isVi ? 'Tiêu đề bài tập không được để trống!' : 'Title cannot be empty!');
+      return;
+    }
+
+    if (assignmentData.title.trim().length > 200) {
+      showToast(isVi ? 'Tiêu đề bài tập không được vượt quá 200 ký tự!' : 'Assignment title cannot exceed 200 characters!');
+      return;
+    }
+
     // Validation for all modules
     for (let i = 0; i < assignmentData.modules.length; i++) {
       const mod = assignmentData.modules[i];
@@ -839,6 +849,7 @@ export const TeacherEditAssignment: React.FC = () => {
           value={assignmentData.title}
           onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
           placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
+          maxLength={200}
         />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
