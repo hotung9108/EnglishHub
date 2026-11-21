@@ -509,11 +509,15 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                   <label className="settings-label">{t('settings.specialization')}</label>
                   <input 
                     type="text" 
-                    className="settings-input" 
-                    value={formData.specialization}
-                    onChange={(e) => setFormData(prev => ({ ...prev, specialization: e.target.value }))}
-                    placeholder="4 Kỹ năng (Writing, Reading, Listening, Speaking)" 
+                    className="settings-input settings-input-readonly" 
+                    value={formData.specialization || (isVi ? 'Chưa cập nhật' : 'Not specified')}
+                    readOnly
+                    disabled
+                    title={isVi ? 'Chuyên môn do Quản trị viên quản lý' : 'Specialization managed by Admin'}
                   />
+                  <span className="settings-field-hint" style={{ fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '4px', display: 'block' }}>
+                    {isVi ? 'Chuyên môn giảng dạy do Quản trị viên phân công và phê duyệt.' : 'Academic specialization is managed and approved by Administrator.'}
+                  </span>
                 </div>
               </div>
             )}

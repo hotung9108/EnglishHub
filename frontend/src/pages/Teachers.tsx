@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   GraduationCap, UserPlus, Search, 
-  ArrowRight, Loader2, AlertCircle
+  ArrowRight, Loader2, AlertCircle, Award
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,7 +17,7 @@ export const Teachers: React.FC = () => {
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterExpertise, setFilterExpertise] = useState<'All' | 'TESOL' | 'Writing' | 'Speaking'>('All');
+  const [filterExpertise, setFilterExpertise] = useState<string>('All');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,10 +29,10 @@ export const Teachers: React.FC = () => {
     code: string;
     avatar: string;
     email: string;
-    status: 'Active' | 'On Leave';
+    status: 'Active' | 'Locked' | 'On Leave';
     activeClasses: number;
     rating: number;
-    qualifications: string[];
+    specialization: string;
   }>>([]);
 
   const [loading, setLoading] = useState(true);
@@ -78,16 +78,25 @@ export const Teachers: React.FC = () => {
             .join('')
             .toUpperCase() || 'GV';
 
+          let teacherStatus: 'Active' | 'Locked' | 'On Leave';
+          if (tc.status === 'LOCKED') {
+            teacherStatus = 'Locked';
+          } else if (tc.status === 'ACTIVE') {
+            teacherStatus = 'Active';
+          } else {
+            teacherStatus = 'On Leave';
+          }
+
           return {
             id: tc.id,
             name: tc.fullName,
             code: `GV-${String(tc.id).padStart(3, '0')}`,
             avatar: initials,
             email: tc.email,
-            status: (tc.status === 'ACTIVE' ? 'Active' : 'On Leave') as 'Active' | 'On Leave',
+            status: teacherStatus,
             activeClasses: teacherClasses.length,
             rating: 4.8,
-            qualifications: ['TESOL', 'IELTS 8.0+']
+            specialization: tc.specialization?.trim() || (isVi ? 'Chưa cập nhật' : 'General English')
           };
         });
 
@@ -109,13 +118,18 @@ export const Teachers: React.FC = () => {
 
   const filtered = useMemo(() => {
     return teachers.filter(tc => {
-      if (filterExpertise !== 'All' && !tc.qualifications.includes(filterExpertise)) return false;
+      if (filterExpertise !== 'All') {
+        const spec = tc.specialization.toLowerCase();
+        const target = filterExpertise.toLowerCase();
+        if (!spec.includes(target)) return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
           tc.name.toLowerCase().includes(q) ||
           tc.code.toLowerCase().includes(q) ||
-          tc.email.toLowerCase().includes(q)
+          tc.email.toLowerCase().includes(q) ||
+          tc.specialization.toLowerCase().includes(q)
         );
       }
       return true;
@@ -131,7 +145,7 @@ export const Teachers: React.FC = () => {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safeCurrentPage, pageSize]);
 
-  const handleFilterChange = (exp: 'All' | 'TESOL' | 'Writing' | 'Speaking') => {
+  const handleFilterChange = (exp: string) => {
     setFilterExpertise(exp);
     setCurrentPage(1);
   };
@@ -198,7 +212,7 @@ export const Teachers: React.FC = () => {
       {/* Filter Bar */}
       <div className="adm-filter-bar mb-6">
         <div className="adm-pills">
-          {(['All', 'TESOL', 'Writing', 'Speaking'] as const).map(exp => (
+          {(['All', 'TESOL', 'IELTS', 'Writing', 'Speaking'] as const).map(exp => (
             <button
               key={exp}
               type="button"
@@ -267,10 +281,20 @@ export const Teachers: React.FC = () => {
                       </div>
                     </div>
 
-                    <span className={`badge ${tc.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
+                    <span className={`badge ${tc.status === 'Active' ? 'badge-active' : tc.status === 'Locked' ? 'badge-blocked' : 'badge-onleave'}`}>
                       {tc.status === 'Active' 
                         ? (isVi ? 'Đang hoạt động' : 'Active') 
+                        : tc.status === 'Locked'
+                        ? (isVi ? 'Đã khóa' : 'Locked')
                         : (isVi ? 'Nghỉ phép' : 'On Leave')}
+                    </span>
+                  </div>
+
+                  {/* Specialization */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted mb-2">
+                    <Award size={14} className="text-primary flex-shrink-0" />
+                    <span className="font-medium text-surface truncate" title={tc.specialization}>
+                      {tc.specialization}
                     </span>
                   </div>
 

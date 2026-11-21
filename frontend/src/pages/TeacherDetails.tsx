@@ -3,14 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Mail, Award, BookOpen, 
   Ban, AlertTriangle, Loader2, ArrowLeft,
-  CheckCircle2
+  CheckCircle2, Edit3
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
 import { ConfirmModal } from '../components/common';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
-import type { UserListItem } from '../api/services/user.service';
+import type { UserProfile } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
 
 interface ActiveClass {
@@ -34,7 +34,7 @@ export const TeacherDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'gradings' | 'security'>('overview');
-  const [teacherUser, setTeacherUser] = useState<UserListItem | null>(null);
+  const [teacherUser, setTeacherUser] = useState<UserProfile | null>(null);
   const [teacherClasses, setTeacherClasses] = useState<ActiveClass[]>([]);
 
   const [newPassword, setNewPassword] = useState('');
@@ -43,6 +43,10 @@ export const TeacherDetails: React.FC = () => {
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const [showEditSpecModal, setShowEditSpecModal] = useState(false);
+  const [editSpecialization, setEditSpecialization] = useState('');
+  const [isSavingSpec, setIsSavingSpec] = useState(false);
 
   const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 1 : 1;
 
@@ -61,7 +65,12 @@ export const TeacherDetails: React.FC = () => {
 
         if (!isMounted) return;
 
-        const found: UserListItem | null = userRes.status === 'fulfilled' ? userRes.value : null;
+        let found: UserProfile | null = null;
+        if (userRes.status === 'fulfilled') {
+          found = userRes.value;
+        } else {
+          throw userRes.reason;
+        }
 
         if (found) {
           setTeacherUser(found);
@@ -146,6 +155,22 @@ export const TeacherDetails: React.FC = () => {
       setTimeout(() => setStatusMessage(null), 3000);
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
+    }
+  };
+
+  const handleSaveSpecialization = async () => {
+    if (!teacherUser) return;
+    try {
+      setIsSavingSpec(true);
+      const cleanSpec = editSpecialization.trim();
+      await userService.updateUser(teacherUser.id, { specialization: cleanSpec });
+      setTeacherUser(prev => prev ? { ...prev, specialization: cleanSpec } : null);
+      setShowEditSpecModal(false);
+      toastSuccess(isVi ? 'Cập nhật chuyên môn giảng viên thành công.' : 'Teacher specialization updated successfully.');
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể cập nhật chuyên môn.' : 'Failed to update specialization.');
+    } finally {
+      setIsSavingSpec(false);
     }
   };
 
@@ -235,7 +260,7 @@ export const TeacherDetails: React.FC = () => {
                   </h2>
                   <span className="badge badge-primary font-mono">{teacherCode}</span>
                   <span className={`badge ${!isSuspended ? 'badge-active' : 'badge-blocked'}`}>
-                    {!isSuspended ? (isVi ? 'Đang hoạt động' : 'Active') : (isVi ? 'Đã tạm khóa' : 'Suspended')}
+                    {!isSuspended ? (isVi ? 'Đang hoạt động' : 'Active') : (isVi ? 'Đã khóa' : 'Locked')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--on-surface-variant)' }}>
@@ -243,13 +268,26 @@ export const TeacherDetails: React.FC = () => {
                     <Mail size={15} /> {teacherEmail}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Award size={15} color="var(--primary)" /> {isVi ? 'TESOL / Chuẩn Sư Phạm' : 'TESOL Certified'}
+                    <Award size={15} color="var(--primary)" /> {teacherUser?.specialization || (isVi ? 'Chưa cập nhật chuyên môn' : 'General English')}
                   </span>
                 </div>
               </div>
 
               {/* Quick Actions */}
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setEditSpecialization(teacherUser?.specialization || '');
+                    setShowEditSpecModal(true);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Edit3 size={15} />
+                  <span>{isVi ? 'Sửa chuyên môn' : 'Edit Specialization'}</span>
+                </button>
+
                 <button 
                   type="button"
                   disabled={isUpdatingStatus}
@@ -258,7 +296,7 @@ export const TeacherDetails: React.FC = () => {
                   style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Ban size={15} />
-                  <span>{isSuspended ? (isVi ? 'Mở khóa tài khoản' : 'Reactivate') : (isVi ? 'Khóa tài khoản' : 'Suspend')}</span>
+                  <span>{isSuspended ? (isVi ? 'Mở khóa tài khoản' : 'Reactivate') : (isVi ? 'Khóa tài khoản' : 'Lock Account')}</span>
                 </button>
               </div>
             </div>
@@ -306,14 +344,30 @@ export const TeacherDetails: React.FC = () => {
               </div>
 
               <div className="card" style={{ padding: '24px' }}>
-                <h3 className="headline-md" style={{ marginBottom: '16px' }}>
-                  {isVi ? 'Chuyên Môn & Tiêu Chuẩn' : 'Academic Standards'}
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 className="headline-md" style={{ margin: 0 }}>
+                    {isVi ? 'Chuyên Môn & Tiêu Chuẩn' : 'Academic Standards'}
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setEditSpecialization(teacherUser?.specialization || '');
+                      setShowEditSpecModal(true);
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Edit3 size={14} />
+                    <span>{isVi ? 'Cập nhật' : 'Edit'}</span>
+                  </button>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13.5px' }}>
                   <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface-container-low)' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--on-surface)' }}>TESOL / CELTA Compliant</div>
+                    <div style={{ fontWeight: 600, color: 'var(--on-surface)' }}>
+                      {teacherUser?.specialization || (isVi ? 'Chưa cập nhật chuyên môn' : 'General English')}
+                    </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--on-surface-variant)', marginTop: '2px' }}>
-                      {isVi ? 'Đủ điều kiện giảng dạy toàn diện 4 kỹ năng' : 'Qualified for 4-skill instruction'}
+                      {isVi ? 'Chuyên môn giảng dạy được quản trị viên phân công và xác thực.' : 'Teaching specialization verified and approved by system administrator.'}
                     </div>
                   </div>
                 </div>
@@ -450,6 +504,90 @@ export const TeacherDetails: React.FC = () => {
               }}
               onCancel={() => setShowStatusConfirmModal(false)}
             />
+          )}
+
+          {/* Edit Specialization Modal */}
+          {showEditSpecModal && (
+            <div 
+              className="modal-backdrop"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                padding: '16px'
+              }}
+              role="dialog"
+              aria-modal="true"
+            >
+              <div 
+                className="card"
+                style={{
+                  maxWidth: '480px',
+                  width: '100%',
+                  padding: '24px',
+                  boxShadow: 'var(--shadow-xl)',
+                  borderRadius: 'var(--radius-lg, 12px)',
+                  background: 'var(--surface, #ffffff)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <Award size={20} color="var(--primary)" />
+                  <h3 className="headline-md" style={{ margin: 0 }}>
+                    {isVi ? 'Cập Nhật Chuyên Môn Giảng Viên' : 'Update Teacher Specialization'}
+                  </h3>
+                </div>
+
+                <p style={{ fontSize: '13px', color: 'var(--on-surface-variant)', marginBottom: '18px', lineHeight: 1.5 }}>
+                  {isVi 
+                    ? `Cập nhật thông tin chuyên môn giảng dạy cho giảng viên "${teacherName}". Dữ liệu này sẽ được đồng bộ trên hệ thống.`
+                    : `Update academic specialization for teacher "${teacherName}".`}
+                </p>
+
+                <div style={{ marginBottom: '22px' }}>
+                  <label className="adm-form-label" style={{ display: 'block', marginBottom: '6px', fontWeight: 600 }}>
+                    {isVi ? 'Chuyên môn / Bằng cấp' : 'Specialization'}
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={editSpecialization}
+                    onChange={(e) => setEditSpecialization(e.target.value)}
+                    placeholder={isVi ? 'VD: IELTS 8.0+, TESOL Certified, Writing Specialist...' : 'e.g. IELTS 8.0+, TESOL Certified...'}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowEditSpecModal(false)}
+                    disabled={isSavingSpec}
+                  >
+                    {isVi ? 'Hủy bỏ' : 'Cancel'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSaveSpecialization}
+                    disabled={isSavingSpec}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {isSavingSpec && <Loader2 size={14} className="animate-spin" />}
+                    <span>{isVi ? 'Lưu thay đổi' : 'Save Changes'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
