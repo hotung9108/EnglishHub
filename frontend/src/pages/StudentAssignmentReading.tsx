@@ -85,6 +85,7 @@ const StudentAssignmentReading: React.FC = () => {
   });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
   const [showUnansweredConfirm, setShowUnansweredConfirm] = useState<boolean>(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState<boolean>(false);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -358,6 +359,11 @@ const StudentAssignmentReading: React.FC = () => {
       setShowUnansweredConfirm(true);
       return;
     }
+    setShowSubmitConfirm(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowSubmitConfirm(false);
     setError(null);
     void quizSubmit.submit(quizPayload.answers);
   };
@@ -739,6 +745,45 @@ const StudentAssignmentReading: React.FC = () => {
                 onClick={handleConfirmSubmitUnanswered}
               >
                 Nộp bài
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal when all questions answered (UC021) */}
+      {showSubmitConfirm && (
+        <div 
+          className="exam-modal-overlay tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="submit-modal-title"
+          onClick={() => setShowSubmitConfirm(false)}
+        >
+          <div className="exam-modal-box tad-modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3 id="submit-modal-title" className="exam-modal-title">
+              <AlertTriangle className="text-primary" size={20} />
+              <span>Xác nhận nộp bài</span>
+            </h3>
+            <p className="exam-modal-desc">
+              Bạn có chắc chắn muốn nộp bài? Sau khi nộp, bạn sẽ không thể chỉnh sửa câu trả lời của mình.
+            </p>
+            <div className="exam-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowSubmitConfirm(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleConfirmSubmit}
+              >
+                Xác nhận
               </Button>
             </div>
           </div>
