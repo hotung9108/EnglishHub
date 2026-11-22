@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
-  TrendingDown, User, ChevronDown, Clock, Download
+  TrendingDown, User, ChevronDown, Clock, Download, Award
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { reportService } from '../api/services/report.service';
@@ -189,6 +189,35 @@ export const AdminReports: React.FC = () => {
 
   // Filtered report classes based on selected class cohort
   const filteredClasses = filterReportClasses(reportClasses, selectedClassId);
+
+  // Score distribution calculation across filtered classes (Issue #374)
+  const scoreDistribution = useMemo(() => {
+    let excellent = 0; // >= 85%
+    let good = 0;      // 70 - 84%
+    let average = 0;   // 50 - 69%
+    let poor = 0;      // < 50%
+
+    filteredClasses.forEach((cls) => {
+      const score = cls.averageScorePercent;
+      if (score >= 85) excellent++;
+      else if (score >= 70) good++;
+      else if (score >= 50) average++;
+      else poor++;
+    });
+
+    const total = filteredClasses.length;
+    return {
+      excellent,
+      good,
+      average,
+      poor,
+      total,
+      pctExcellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
+      pctGood: total > 0 ? Math.round((good / total) * 100) : 0,
+      pctAverage: total > 0 ? Math.round((average / total) * 100) : 0,
+      pctPoor: total > 0 ? Math.round((poor / total) * 100) : 0,
+    };
+  }, [filteredClasses]);
 
   // Class Progress Modal
   const [inspectingClass, setInspectingClass] = useState<ReportClassSummary | null>(null);
@@ -661,7 +690,80 @@ export const AdminReports: React.FC = () => {
           t('adminReports.retryTotalSubmissions'),
           'submitted', 'graded',
         )}
+        <MetricCard
+          title={isVi ? 'TỔNG BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}
+          value={loading ? '...' : error ? '—' : (overview?.assignedAssignmentCount ?? 0)}
+        />
       </div>
+
+      {/* Phổ Điểm Hệ Thống Theo Lớp Học (Score Distribution - Issue #374) */}
+      {!loading && !error && filteredClasses.length > 0 && (
+        <div className="eh-card p-5 mb-6 border border-border shadow-xs rounded-xl bg-surface">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div className="font-bold text-sm text-text-primary flex items-center gap-2">
+              <Award size={18} className="text-primary" />
+              <span>{isVi ? 'Phổ Điểm Thống Kê Theo Lớp Học' : 'Cohort Score Distribution'}</span>
+            </div>
+            <div className="text-xs text-text-muted">
+              {isVi ? `Dựa trên ${scoreDistribution.total} lớp học trong phạm vi lọc` : `Based on ${scoreDistribution.total} filtered class cohorts`}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mb-3">
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="font-medium text-emerald-700 dark:text-emerald-300">
+                {isVi ? 'Xuất sắc (≥ 85%)' : 'Excellent (≥ 85%)'}
+              </div>
+              <div className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 mt-0.5">
+                {scoreDistribution.excellent} <span className="text-xs font-normal">({scoreDistribution.pctExcellent}%)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="font-medium text-blue-700 dark:text-blue-300">
+                {isVi ? 'Khá - Giỏi (70% - 84%)' : 'Good (70% - 84%)'}
+              </div>
+              <div className="text-lg font-bold font-mono text-blue-700 dark:text-blue-300 mt-0.5">
+                {scoreDistribution.good} <span className="text-xs font-normal">({scoreDistribution.pctGood}%)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="font-medium text-amber-700 dark:text-amber-300">
+                {isVi ? 'Trung bình (50% - 69%)' : 'Average (50% - 69%)'}
+              </div>
+              <div className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300 mt-0.5">
+                {scoreDistribution.average} <span className="text-xs font-normal">({scoreDistribution.pctAverage}%)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
+              <div className="font-medium text-rose-700 dark:text-rose-300">
+                {isVi ? 'Cần cải thiện (< 50%)' : 'Needs Focus (< 50%)'}
+              </div>
+              <div className="text-lg font-bold font-mono text-rose-700 dark:text-rose-300 mt-0.5">
+                {scoreDistribution.poor} <span className="text-xs font-normal">({scoreDistribution.pctPoor}%)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Visual Progress Bar */}
+          <div className="w-full h-2 rounded-full overflow-hidden flex bg-surface-variant/30">
+            {scoreDistribution.pctExcellent > 0 && (
+              <div style={{ width: `${scoreDistribution.pctExcellent}%` }} className="bg-emerald-500 transition-all" title={`Xuất sắc: ${scoreDistribution.pctExcellent}%`} />
+            )}
+            {scoreDistribution.pctGood > 0 && (
+              <div style={{ width: `${scoreDistribution.pctGood}%` }} className="bg-blue-500 transition-all" title={`Khá: ${scoreDistribution.pctGood}%`} />
+            )}
+            {scoreDistribution.pctAverage > 0 && (
+              <div style={{ width: `${scoreDistribution.pctAverage}%` }} className="bg-amber-500 transition-all" title={`Trung bình: ${scoreDistribution.pctAverage}%`} />
+            )}
+            {scoreDistribution.pctPoor > 0 && (
+              <div style={{ width: `${scoreDistribution.pctPoor}%` }} className="bg-rose-500 transition-all" title={`Cần cải thiện: ${scoreDistribution.pctPoor}%`} />
+            )}
+          </div>
+        </div>
+      )}
 
       {noMatchingClasses && (
         <EmptyState
@@ -700,15 +802,42 @@ export const AdminReports: React.FC = () => {
               </Button>
             </div>
           ) : filteredClasses.length === 0 ? (
-            <EmptyState
-              icon={<BookOpen size={36} />}
-              title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
-              description={
-                selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
-                  ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
-                  : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
-              }
-            />
+            <div className="flex flex-col items-center">
+              <EmptyState
+                icon={<BookOpen size={36} />}
+                title={isVi ? 'Chưa có dữ liệu thống kê lớp học' : 'No class performance data recorded'}
+                description={
+                  selectedClassId !== undefined || selectedTeacherId !== undefined || fromDate || toDate
+                    ? (isVi ? 'Không tìm thấy dữ liệu thống kê phù hợp với bộ lọc hiện tại.' : 'No performance data matching the active filters.')
+                    : (isVi ? 'Thử mở rộng khoảng thời gian hoặc chọn lớp học khác.' : 'Try adjusting the date range or selecting another class.')
+                }
+              />
+              {(fromDate || toDate) && (
+                <div className="flex items-center gap-2 pb-6">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('30days')}
+                  >
+                    {isVi ? 'Xem 30 ngày qua' : 'View Last 30 Days'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleApplyPreset('all')}
+                  >
+                    {isVi ? 'Xem toàn thời gian' : 'View All Time'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleResetFilters}
+                  >
+                    {isVi ? 'Xóa bộ lọc' : 'Reset Filters'}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             (() => {
               const { totalPages, safeCurrentPage, startIndex, endIndex } = computeReportPagination(
