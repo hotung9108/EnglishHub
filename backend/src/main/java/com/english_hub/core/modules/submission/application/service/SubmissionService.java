@@ -96,6 +96,9 @@ public class SubmissionService {
 	private static final String UNSUPPORTED_FILE_MESSAGE = "Định dạng file không được hỗ trợ.";
 	private static final String NOT_SUBMITTED_YET_MESSAGE = "Phần làm bài chưa được nộp.";
 	private static final Duration SUBMISSION_DOWNLOAD_TTL = Duration.ofMinutes(30);
+	public static final long MAX_SUBMISSION_FILE_SIZE_BYTES = 10L * 1024 * 1024;
+	private static final String FILE_SIZE_NON_POSITIVE_MESSAGE = "Dung lượng file phải lớn hơn 0 byte.";
+	private static final String FILE_SIZE_EXCEEDED_MESSAGE = "Dung lượng file vượt quá giới hạn tối đa cho phép (10MB).";
 
 	private final SubmissionRepository submissionRepository;
 	private final SubmissionModuleRepository submissionModuleRepository;
@@ -341,6 +344,13 @@ public class SubmissionService {
 		String matchedKey = found == null
 				? null
 				: storageKey(submission.getId(), submissionModule.getId(), filename, found.extension());
+		if (found != null) {
+			Long actualSize = storageService.getObjectSize(matchedKey);
+			if (actualSize != null && actualSize > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+				storageService.deleteObject(matchedKey);
+				throw ApiException.badRequest(FILE_SIZE_EXCEEDED_MESSAGE);
+			}
+		}
 		UploadStatus uploadStatus = found == null ? UploadStatus.UPLOADING : UploadStatus.READY;
 
 		Answer persisted = answerRepository.bulkCreate(
@@ -668,6 +678,11 @@ public class SubmissionService {
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType) {
+		return getAudioUploadUrl(submissionModuleId, mimeType, null);
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getAudioUploadUrl(long submissionModuleId, String mimeType, Long fileSizeBytes) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, AUDIO_UPLOAD_MESSAGE);
 		SubmissionModule submissionModule = context.submissionModule();
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(submissionModule.getModuleId());
@@ -675,22 +690,46 @@ public class SubmissionService {
 				|| (moduleInfo.taskType() != ModuleTaskType.RECORDING && moduleInfo.skill() != ModuleSkill.SPEAKING)) {
 			throw ApiException.badRequest(AUDIO_UPLOAD_MESSAGE);
 		}
+		validateFileSizeBytes(fileSizeBytes);
 		String extension = audioExtensionOf(mimeType);
 		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "audio", extension);
+		if (fileSizeBytes != null) {
+			return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType, fileSizeBytes));
+		}
 		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
 	}
 
 	@Transactional(readOnly = true)
 	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType) {
+		return getDocumentUploadUrl(submissionModuleId, mimeType, null);
+	}
+
+	@Transactional(readOnly = true)
+	public UploadUrlResult getDocumentUploadUrl(long submissionModuleId, String mimeType, Long fileSizeBytes) {
 		OwnedModuleContext context = requireEditableModule(submissionModuleId, DOCUMENT_UPLOAD_MESSAGE);
 		ModuleInfo moduleInfo = modulesOf(context.submission().getAssignmentId()).get(context.submissionModule().getModuleId());
 		/* REWRITE answers questions like QUIZ does, so a document upload is essay-only. */
 		if (moduleInfo == null || moduleInfo.taskType() != ModuleTaskType.ESSAY) {
 			throw ApiException.badRequest(DOCUMENT_UPLOAD_MESSAGE);
 		}
+		validateFileSizeBytes(fileSizeBytes);
 		String extension = documentExtensionOf(mimeType);
 		String storageKey = storageKey(context.submission().getId(), submissionModuleId, "essay", extension);
+		if (fileSizeBytes != null) {
+			return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType, fileSizeBytes));
+		}
 		return toUploadUrlResult(storageService.generatePresignedPutUrl(storageKey, mimeType));
+	}
+
+	private void validateFileSizeBytes(Long fileSizeBytes) {
+		if (fileSizeBytes != null) {
+			if (fileSizeBytes <= 0) {
+				throw ApiException.badRequest(FILE_SIZE_NON_POSITIVE_MESSAGE);
+			}
+			if (fileSizeBytes > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+				throw ApiException.badRequest(FILE_SIZE_EXCEEDED_MESSAGE);
+			}
+		}
 	}
 
 	private OwnedModuleContext requireOwnModule(long submissionModuleId) {
