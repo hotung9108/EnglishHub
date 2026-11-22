@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ApiClientError, NetworkError, TimeoutError } from '../api/core/errors';
 import { classService, type ClassSummary } from '../api/services/class.service';
-import { assignmentService } from '../api/services/assignment.service';
+import { assignmentService, type AssignmentStatus } from '../api/services/assignment.service';
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import {
   Plus, Mic, BookOpen, Headphones, PenTool, Search, AlertCircle, FileText, X, RefreshCw,
@@ -237,6 +237,7 @@ export const TeacherAssignments: React.FC = () => {
   const [assignmentToDelete, setAssignmentToDelete] = useState<AssignmentDisplayItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [skillFilter, setSkillFilter] = useState<AssignmentSkillFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<AssignmentStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSkillModal, setShowSkillModal] = useState(false);
 
@@ -361,6 +362,7 @@ export const TeacherAssignments: React.FC = () => {
 
   const filteredAssignments = useMemo(() => {
     return assignments.filter((item) => {
+      if (statusFilter !== 'all' && item.lifecycleStatus !== statusFilter) return false;
       if (!matchesSkillFilter(item.skills, skillFilter)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -368,7 +370,7 @@ export const TeacherAssignments: React.FC = () => {
       }
       return true;
     });
-  }, [assignments, skillFilter, searchQuery]);
+  }, [assignments, statusFilter, skillFilter, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAssignments.length / pageSize));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
@@ -722,6 +724,23 @@ export const TeacherAssignments: React.FC = () => {
               Listening
             </button>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            {t('teacherAssignments.filterStatusLabel')}
+            <select
+              className="select-input font-semibold text-sm"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as AssignmentStatus | 'all');
+                setCurrentPage(1);
+              }}
+            >
+              <option value="all">{t('teacherAssignments.filterAll')}</option>
+              <option value="PUBLISHED">{t('teacherAssignments.statOpen')}</option>
+              <option value="DRAFT">{t('teacherAssignments.filterDraft')}</option>
+              <option value="CLOSED">{t('teacherAssignments.filterClosed')}</option>
+            </select>
+          </label>
 
           <div className="teacher-search-wrap">
             <Search size={15} className="teacher-search-icon" />

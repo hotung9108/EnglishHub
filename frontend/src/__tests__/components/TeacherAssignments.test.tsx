@@ -11,7 +11,7 @@ import {
   type AssignmentSummary,
 } from '../../api/services/assignment.service';
 import { classService, type ClassSummary } from '../../api/services/class.service';
-import { submissionService } from '../../api/services/submission.service';
+import { submissionService, type SubmissionListItem } from '../../api/services/submission.service';
 import { ToastProvider } from '../../components/common/ToastContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import TeacherAssignments from '../../pages/TeacherAssignments';
@@ -128,7 +128,7 @@ function deadlineOf(card: HTMLElement) {
 }
 
 function activeCount(language: 'vi' | 'en' = 'vi') {
-  return screen.getByText(language === 'vi' ? 'Đang mở' : 'Active')
+  return screen.getByText(language === 'vi' ? 'Đang mở' : 'Active', { selector: '.metric-title' })
     .closest('.metric-card')?.querySelector('.metric-value');
 }
 
@@ -160,6 +160,151 @@ beforeEach(() => {
   vi.mocked(submissionService.listSubmissions).mockReset().mockResolvedValue({
     data: [], pagination: { page: 1, limit: 100, total: 0 },
   });
+});
+
+function statusFilter(language: 'vi' | 'en' = 'vi') {
+  return screen.getByRole('combobox', { name: language === 'vi' ? 'Trạng thái bài tập' : 'Assignment status' });
+}
+
+it('filters lifecycle statuses in order and keeps the active KPI based on the deadline', async () => {
+  const statuses = [
+    ['Active published', 'PUBLISHED', future],
+    ['Expired published', 'PUBLISHED', expired],
+    ['Published without deadline', 'PUBLISHED', null],
+    ['Published with invalid deadline', 'PUBLISHED', 'not-a-date'],
+    ['Draft assignment', 'DRAFT', future],
+    ['Closed assignment', 'CLOSED', future],
+    ['Unknown assignment', 'ARCHIVED', future],
+  ] as const;
+  await showAssignments(statuses.map(([title, status, closeAt], index) => ({
+    ...defaultAssignment, id: 100 + index, title, status: status as AssignmentFixture['status'], closeAt,
+  })));
+
+  const select = statusFilter();
+  expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual([
+    'Tất cả', 'Đang mở', 'Bản nháp', 'Đã đóng',
+  ]);
+  expect(select).toHaveValue('all');
+  expect(within(cardById(106)).getByText('Trạng thái không xác định')).toHaveClass('neutral');
+  expect(within(cardById(106)).queryByRole('button', { name: /^(Mở|Khóa) bài tập$/ })).not.toBeInTheDocument();
+
+  const reads = vi.mocked(assignmentService.listAssignments).mock.calls.length;
+  for (const status of ['PUBLISHED', 'DRAFT', 'CLOSED', 'all']) {
+    fireEvent.change(select, { target: { value: status } });
+    const titles = statuses.filter(([, lifecycle]) => status === 'all' || lifecycle === status).map(([title]) => title);
+    expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(titles);
+    expect(activeCount()).toHaveTextContent('1');
+  }
+  expect(assignmentService.listAssignments).toHaveBeenCalledTimes(reads);
+});
+
+it('combines lifecycle with class, skill and search filters and restores the existing empty state', async () => {
+  vi.mocked(classService.list).mockResolvedValue(classesResponse([classA, classB]));
+  const rows = [
+    { ...defaultAssignment, title: 'Practice listening', status: 'PUBLISHED', skills: ['LISTENING'] },
+    { ...defaultAssignment, id: 43, title: 'Practice speaking', status: 'PUBLISHED', skills: ['SPEAKING'] },
+    { ...defaultAssignment, id: 44, title: 'Practice draft', skills: ['LISTENING'] },
+    { ...defaultAssignment, id: 45, title: 'Other listening', status: 'PUBLISHED', skills: ['LISTENING'] },
+  ] satisfies AssignmentFixture[];
+  vi.mocked(assignmentService.listAssignments).mockImplementation(async classId => assignmentsResponse(
+    classId === classA.id ? rows : [{ ...rows[0], title: 'Practice in other class' }],
+  ));
+  renderAssignments();
+  await screen.findByRole('heading', { name: 'Practice listening' });
+  fireEvent.change(statusFilter(), { target: { value: 'PUBLISHED' } });
+  const search = screen.getByPlaceholderText('Tìm bài tập theo tên hoặc mã HW...');
+  fireEvent.change(search, { target: { value: 'Practice' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Listening' }));
+  expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['Practice listening']);
+  fireEvent.click(screen.getByRole('button', { name: 'Speaking' }));
+  expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['Practice speaking']);
+  fireEvent.change(classFilter(), { target: { value: String(classB.id) } });
+  expect(await screen.findByText('Chưa có bài tập nào')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: /Tất cả kỹ năng/ }));
+  expect(screen.getByRole('heading', { name: 'Practice in other class' })).toBeVisible();
+  expect(statusFilter()).toHaveValue('PUBLISHED');
+  expect(search).toHaveValue('Practice');
+  expect(assignmentService.listAssignments).toHaveBeenLastCalledWith(classB.id, { limit: 50 }, { skipCache: true });
+});
+
+it('resets to page one with the same page size when changing lifecycle filters', async () => {
+  const rows: AssignmentFixture[] = Array.from({ length: 11 }, (_, index) => ({
+    ...defaultAssignment, id: 100 + index, title: `Practice ${index}`, status: index === 10 ? 'DRAFT' : 'PUBLISHED',
+  }));
+  await showAssignments(rows);
+  const pageSize = screen.getByRole('combobox', { name: 'Số mục trên mỗi trang' });
+  fireEvent.change(pageSize, { target: { value: '5' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Trang 3' }));
+  expect(screen.getByRole('heading', { name: 'Practice 10' })).toBeVisible();
+  fireEvent.change(statusFilter(), { target: { value: 'PUBLISHED' } });
+  expect(screen.getByRole('button', { name: 'Trang 1' })).toHaveAttribute('aria-current', 'page');
+  expect(pageSize).toHaveValue('5');
+  expect(screen.getByRole('heading', { name: 'Practice 0' })).toBeVisible();
+  expect(screen.queryByRole('heading', { name: 'Practice 5' })).not.toBeInTheDocument();
+});
+
+it.each([
+  { initial: 'DRAFT', next: 'PUBLISHED', action: copy.vi.open, success: copy.vi.openSuccess },
+  { initial: 'PUBLISHED', next: 'CLOSED', action: copy.vi.close, success: copy.vi.closeSuccess },
+] as const)('moves $initial to $next and clamps the filtered page after the update', async ({ initial, next, action, success }) => {
+  const rows: AssignmentFixture[] = Array.from({ length: 6 }, (_, index) => ({
+    ...defaultAssignment, id: 100 + index, title: `Practice ${index}`, status: initial,
+  }));
+  await showAssignments(rows);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Số mục trên mỗi trang' }), { target: { value: '5' } });
+  fireEvent.change(statusFilter(), { target: { value: initial } });
+  fireEvent.click(screen.getByRole('button', { name: 'Trang 2' }));
+  pressConfirm(openDialog(cardById(105), action), action);
+  expect(await screen.findByText(success)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Trang 1' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'Trang 2' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Practice 5' })).not.toBeInTheDocument();
+  fireEvent.change(statusFilter(), { target: { value: next } });
+  expect(screen.getByRole('heading', { name: 'Practice 5' })).toBeVisible();
+});
+
+it('keeps the lifecycle selection while data refreshes and relabels it on language change', async () => {
+  const updated = deferred<AssignmentListResponse>();
+  vi.mocked(assignmentService.listAssignments)
+    .mockResolvedValueOnce(assignmentsResponse([defaultAssignment]))
+    .mockReturnValueOnce(updated.promise);
+  const path = '/teacher/assignments';
+  renderPage(<AssignmentsWithLanguageSwitch />, path);
+  await screen.findByRole('heading', { name: defaultAssignment.title });
+  fireEvent.change(statusFilter(), { target: { value: 'DRAFT' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch language' }));
+  const select = statusFilter('en');
+  expect(select).toHaveValue('DRAFT');
+  expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['All', 'Open', 'Draft', 'Closed']);
+  await act(async () => updated.resolve(assignmentsResponse([{ ...defaultAssignment, status: 'PUBLISHED' }])));
+  expect(await screen.findByText('No assignments found')).toBeVisible();
+  fireEvent.change(select, { target: { value: 'PUBLISHED' } });
+  expect(screen.getByRole('heading', { name: defaultAssignment.title })).toBeVisible();
+});
+
+it('keeps the grading KPI from the loaded submissions when lifecycle filtering hides the assignment', async () => {
+  const submission: SubmissionListItem = {
+    id: 1, assignmentId: defaultAssignment.id, studentId: 1, attemptNumber: 1,
+    status: 'SUBMITTED', submittedAt: future, modules: [],
+  };
+  vi.mocked(submissionService.listSubmissions).mockResolvedValue({
+    data: [
+      submission,
+      { ...submission, id: 2, status: 'IN_PROGRESS' },
+      { ...submission, id: 3, status: 'GRADED' },
+      { ...submission, id: 4, modules: [{
+        id: 1, moduleId: 1, skill: 'WRITING', taskType: null, status: 'GRADED',
+        grading: { status: 'COMPLETED', finalScore: 0, maxScoreSnapshot: 10 },
+      }] },
+    ],
+    pagination: { page: 1, limit: 100, total: 4 },
+  });
+  await showAssignments([{ ...defaultAssignment, status: 'PUBLISHED' }]);
+  const pending = screen.getByText('Chờ chấm điểm').closest('.metric-card')?.querySelector('.metric-value');
+  expect(pending).toHaveTextContent('1');
+  fireEvent.change(statusFilter(), { target: { value: 'CLOSED' } });
+  expect(screen.getByText('Chưa có bài tập nào')).toBeVisible();
+  expect(pending).toHaveTextContent('1');
 });
 
 it('keeps one card and preserves delete confirmation alongside lifecycle actions', async () => {
@@ -547,6 +692,7 @@ it('renders load errors and active retry loading without lifecycle buttons', asy
 
   expect(await screen.findByText('Không thể tải danh sách bài tập. Vui lòng thử lại.')).toBeVisible();
   expectNoLifecycleButtons();
+  expect(screen.queryByRole('combobox', { name: 'Trạng thái bài tập' })).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
   expect(screen.getByText('Đang tải danh sách bài tập...')).toBeVisible();
@@ -554,6 +700,7 @@ it('renders load errors and active retry loading without lifecycle buttons', asy
   await act(async () => next.resolve(assignmentsResponse([])));
   expect(await screen.findByText('Chưa có bài tập nào')).toBeVisible();
   expectNoLifecycleButtons();
+  expect(statusFilter()).toHaveValue('all');
 });
 
 const storedDeadline = '2026-11-25T16:59:59+00:00';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   BookOpen, Loader2, Calendar,
   Filter, RotateCcw, AlertCircle, X,
@@ -8,6 +8,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { reportService } from '../api/services/report.service';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
+import { submissionService } from '../api/services/submission.service';
 import type { 
   ReportOverviewResponse, 
   ReportClassSummary, 
@@ -23,6 +24,23 @@ import {
   computeReportPagination,
 } from '../utils/reportFilters.utils';
 
+type TotalState = 'loading' | 'error' | number;
+
+const totalRequests = {
+  users: (signal: AbortSignal) => userService.listUsers({ page: 1, limit: 1 }, { signal }),
+  submitted: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'SUBMITTED' }, { signal }),
+  graded: (signal: AbortSignal) =>
+    submissionService.listSubmissions({ page: 1, limit: 1, status: 'GRADED' }, { signal }),
+};
+type TotalSource = keyof typeof totalRequests;
+
+function getSubmissionTotal(submitted: TotalState, graded: TotalState): TotalState {
+  if (submitted === 'error' || graded === 'error') return 'error';
+  if (submitted === 'loading' || graded === 'loading') return 'loading';
+  return submitted + graded;
+}
+
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
@@ -30,6 +48,45 @@ export const AdminReports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableError, setTableError] = useState<string | null>(null);
+  const [totals, setTotals] = useState<Record<TotalSource, TotalState>>({
+    users: 'loading', submitted: 'loading', graded: 'loading',
+  });
+  const totalsRequest = useRef<AbortController | null>(null);
+
+  const loadTotal = useCallback(async (source: TotalSource, signal: AbortSignal) => {
+    let result: TotalState;
+    try {
+      const response = await totalRequests[source](signal);
+      const total = response.pagination?.total;
+      result = typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : 'error';
+    } catch {
+      result = 'error';
+    }
+    if (!signal.aborted) setTotals(previous => ({ ...previous, [source]: result }));
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    totalsRequest.current = controller;
+    // StrictMode can clean up the first effect before starting its replacement.
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      void loadTotal('users', controller.signal);
+      void loadTotal('submitted', controller.signal);
+      void loadTotal('graded', controller.signal);
+    });
+    return () => controller.abort();
+  }, [loadTotal]);
+
+  const retryTotal = (...sources: TotalSource[]) => {
+    const controller = totalsRequest.current;
+    if (!controller) return;
+    for (const source of sources) {
+      if (totals[source] !== 'error') continue;
+      setTotals(previous => ({ ...previous, [source]: 'loading' }));
+      void loadTotal(source, controller.signal);
+    }
+  };
 
   // Filters
   const [fromDate, setFromDate] = useState('');
@@ -119,6 +176,13 @@ export const AdminReports: React.FC = () => {
   const [reportClasses, setReportClasses] = useState<ReportClassSummary[]>([]);
   const [teachers, setTeachers] = useState<UserListItem[]>([]);
   const [allClasses, setAllClasses] = useState<ClassSummary[]>([]);
+  const showOverview = !loading && !error && overview;
+  const noMatchingClasses = showOverview && overview.classCount === 0;
+  const noAssignedWork = showOverview
+    && overview.classCount > 0
+    && overview.assignedAssignmentCount === 0
+    && overview.pendingGradingCount === 0
+    && (overview.averageScorePercent ?? 0) === 0;
 
   // Available classes for dropdown based on selected teacher
   const availableClasses = filterAvailableClasses(allClasses, selectedTeacherId);
@@ -319,6 +383,18 @@ export const AdminReports: React.FC = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const totalCard = (title: string, value: TotalState, retryLabel: string, ...sources: TotalSource[]) => (
+    <MetricCard
+      title={title}
+      value={typeof value === 'number' ? value : t(`adminReports.total.${value}`)}
+      footerText={value === 'error' && (
+        <Button variant="secondary" size="sm" aria-label={retryLabel} onClick={() => retryTotal(...sources)}>
+          {t('adminReports.totalRetry')}
+        </Button>
+      )}
+    />
+  );
 
   return (
     <div className="adm-container">
@@ -578,7 +654,29 @@ export const AdminReports: React.FC = () => {
           title={isVi ? 'BÀI TẬP CHỜ CHẤM' : 'PENDING GRADING'}
           value={loading ? '...' : error ? '—' : (overview?.pendingGradingCount ?? 0)}
         />
+        {totalCard(t('adminReports.totalUsers'), totals.users, t('adminReports.retryTotalUsers'), 'users')}
+        {totalCard(
+          t('adminReports.totalSubmissions'),
+          getSubmissionTotal(totals.submitted, totals.graded),
+          t('adminReports.retryTotalSubmissions'),
+          'submitted', 'graded',
+        )}
       </div>
+
+      {noMatchingClasses && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noMatchingClasses')}
+          description={t('adminReports.noMatchingClassesDescription')}
+        />
+      )}
+      {noAssignedWork && (
+        <EmptyState
+          icon={<BookOpen size={36} />}
+          title={t('adminReports.noAssignedWork')}
+          description={t('adminReports.noAssignedWorkDescription')}
+        />
+      )}
 
       {loading ? (
         <div className="p-8 text-center text-muted">
