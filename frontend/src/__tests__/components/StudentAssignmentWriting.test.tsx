@@ -510,3 +510,169 @@ it('rejects empty 0-byte file upload (FE-102)', async () => {
   fireEvent.drop(container.querySelector('.writing-dropzone')!, { dataTransfer: { files: [emptyFile] } });
   expect(screen.getByText(/Tệp tải lên không được rỗng \(0 bytes\)/)).toBeVisible();
 });
+
+describe('FE-94: Rich Text Toolbar and Editor Formatting', () => {
+  it('applies bold formatting via bold button and hotkey (Ctrl+B)', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'Important topic' } });
+
+    // Select "Important"
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 9);
+    const boldBtn = screen.getByRole('button', { name: /In đậm/ });
+    await user.click(boldBtn);
+
+    expect(editor).toHaveValue('**Important** topic');
+
+    // Un-wrap bold
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 13);
+    await user.click(boldBtn);
+    expect(editor).toHaveValue('Important topic');
+
+    // Test Ctrl+B hotkey
+    (editor as HTMLTextAreaElement).setSelectionRange(10, 15);
+    fireEvent.keyDown(editor, { key: 'b', ctrlKey: true });
+    expect(editor).toHaveValue('Important **topic**');
+  });
+
+  it('applies italic and underline formatting via buttons and hotkeys', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'Hello world' } });
+
+    // Italic
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 5);
+    const italicBtn = screen.getByRole('button', { name: /In nghiêng/ });
+    await user.click(italicBtn);
+    expect(editor).toHaveValue('*Hello* world');
+
+    // Italic hotkey Ctrl+I
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 7);
+    fireEvent.keyDown(editor, { key: 'i', ctrlKey: true });
+    expect(editor).toHaveValue('Hello world');
+
+    // Underline
+    editor.focus();
+    (editor as HTMLTextAreaElement).setSelectionRange(6, 11);
+    const underlineBtn = screen.getByRole('button', { name: /Gạch chân/ });
+    fireEvent.click(underlineBtn);
+    expect(editor).toHaveValue('Hello <u>world</u>');
+
+    // Underline hotkey Ctrl+U
+    (editor as HTMLTextAreaElement).setSelectionRange(6, 18);
+    fireEvent.keyDown(editor, { key: 'u', ctrlKey: true });
+    expect(editor).toHaveValue('Hello world');
+  });
+
+  it('toggles bullet list and numbered list on selected text lines', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'Point one\nPoint two' } });
+
+    // Bullet list
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 19);
+    const bulletBtn = screen.getByRole('button', { name: /Danh sách dấu đầu dòng/ });
+    await user.click(bulletBtn);
+    expect(editor).toHaveValue('- Point one\n- Point two');
+
+    // Toggle off bullet list
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 23);
+    await user.click(bulletBtn);
+    expect(editor).toHaveValue('Point one\nPoint two');
+
+    // Numbered list
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 19);
+    const numberBtn = screen.getByRole('button', { name: /Danh sách số/ });
+    await user.click(numberBtn);
+    expect(editor).toHaveValue('1. Point one\n2. Point two');
+
+    // Toggle off numbered list
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 25);
+    await user.click(numberBtn);
+    expect(editor).toHaveValue('Point one\nPoint two');
+  });
+
+  it('applies center alignment and left alignment', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'Centered title' } });
+
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 14);
+    const centerBtn = screen.getByRole('button', { name: /Căn giữa/ });
+    await user.click(centerBtn);
+    expect(editor).toHaveValue('<div align="center">\nCentered title\n</div>');
+
+    const leftBtn = screen.getByRole('button', { name: /Căn trái/ });
+    await user.click(leftBtn);
+    expect(editor).toHaveValue('Centered title');
+  });
+
+  it('supports undo and redo operations via buttons and keyboard shortcuts', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: 'First draft' } });
+
+    (editor as HTMLTextAreaElement).setSelectionRange(0, 5);
+    const boldBtn = screen.getByRole('button', { name: /In đậm/ });
+    await user.click(boldBtn);
+    expect(editor).toHaveValue('**First** draft');
+
+    // Undo button
+    const undoBtn = screen.getByRole('button', { name: /Hoàn tác/ });
+    await user.click(undoBtn);
+    expect(editor).toHaveValue('First draft');
+
+    // Redo button
+    const redoBtn = screen.getByRole('button', { name: /^Làm lại/ });
+    await user.click(redoBtn);
+    expect(editor).toHaveValue('**First** draft');
+
+    // Undo via Ctrl+Z
+    fireEvent.keyDown(editor, { key: 'z', ctrlKey: true });
+    expect(editor).toHaveValue('First draft');
+
+    // Redo via Ctrl+Y
+    fireEvent.keyDown(editor, { key: 'y', ctrlKey: true });
+    expect(editor).toHaveValue('**First** draft');
+
+    // Redo via Ctrl+Shift+Z
+    fireEvent.keyDown(editor, { key: 'z', ctrlKey: true });
+    expect(editor).toHaveValue('First draft');
+    fireEvent.keyDown(editor, { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(editor).toHaveValue('**First** draft');
+  });
+
+  it('switches between edit and preview tabs, rendering markdown in preview mode', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: '### Section Title\n\nThis is **bold** and *italic* content.' } });
+
+    const previewTab = screen.getByRole('button', { name: /Chế độ xem trước định dạng/ });
+    await user.click(previewTab);
+
+    // In preview mode, textarea should not be rendered
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText('Section Title')).toBeVisible();
+
+    // Toolbar formatting buttons should be disabled in preview mode
+    expect(screen.getByRole('button', { name: /In đậm/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /In nghiêng/ })).toBeDisabled();
+
+    // Switch back to edit tab
+    const editTab = screen.getByRole('button', { name: /Chế độ soạn thảo/ });
+    await user.click(editTab);
+    expect(screen.getByRole('textbox')).toBeVisible();
+    expect(screen.getByRole('button', { name: /In đậm/ })).not.toBeDisabled();
+  });
+
+  it('renders preview empty state when there is no text', async () => {
+    const { editor, user } = await setup();
+    fireEvent.change(editor, { target: { value: '' } });
+
+    const previewTab = screen.getByRole('button', { name: /Chế độ xem trước định dạng/ });
+    await user.click(previewTab);
+
+    expect(screen.getByText(/Chưa có nội dung để xem trước định dạng/)).toBeVisible();
+  });
+
+  it('accurately counts words ignoring markdown tokens and html tags', async () => {
+    const { editor } = await setup();
+    fireEvent.change(editor, { target: { value: '**Hello** *world* <u>test</u>\n- item one\n- item two' } });
+    // Total words: Hello, world, test, item, one, item, two -> 7 words
+    expect(screen.getByText(/Đếm từ:/)).toHaveTextContent('Đếm từ: 7 / tối thiểu 150 từ');
+  });
+});
