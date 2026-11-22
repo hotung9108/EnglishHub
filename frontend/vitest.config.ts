@@ -27,17 +27,14 @@ export default mergeConfig(
           'src/pages/TeacherCreateAssignment.tsx',
           'src/pages/StudentAssignmentWriting.tsx',
           'src/pages/TeacherSubmissionDetails.tsx',
-<<<<<<< HEAD
           'src/pages/TeacherAssignments.tsx',
           'src/components/assignments/AssignmentCard.tsx',
           'src/components/classes/DateRangeFilter.tsx',
           'src/components/classes/StudentEvaluationAvailabilityNotice.tsx',
           'src/utils/gradebookDateRange.utils.ts',
           'src/utils/studentEvaluationAvailability.utils.ts',
-=======
           'src/pages/Teachers.tsx',
           'src/components/admin/AdminUserProfileDrawer.tsx',
->>>>>>> origin/develop
         ],
         thresholds: {
           perFile: true,
