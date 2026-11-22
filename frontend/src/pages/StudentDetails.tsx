@@ -1,28 +1,33 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   User, Mail, 
   Award, ShieldCheck, 
   CheckCircle2, FileText,
-  KeyRound, ArrowLeft, Loader2, UserX
+  KeyRound, ArrowLeft, Loader2, UserX, Pencil
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useStudentDetails, type StudentIdentityHint } from '../hooks/useStudentDetails';
+import { useStudentDetails } from '../hooks/useStudentDetails';
+import { AdminUserProfileDrawer } from '../components/admin/AdminUserProfileDrawer';
 import { Button, EmptyState, ConfirmModal } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const parsedId = id && /^\d+$/.test(id) ? Number(id) : 0;
+  const studentId = Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : 0;
+  return <StudentDetailsPage key={studentId} studentId={studentId} />;
+};
+
+function StudentDetailsPage({ studentId }: { studentId: number }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
-
-  const routeState = (location.state as StudentIdentityHint) || null;
-  const numericId = id ? parseInt(id.replace(/\D/g, ''), 10) || 0 : 0;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'evaluations' | 'security'>('overview');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [hasSavedProfile, setHasSavedProfile] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
@@ -37,14 +42,19 @@ export const StudentDetails: React.FC = () => {
     isTogglingStatus,
     toggleSuspend,
     resetPassword,
+    refetch,
   } = useStudentDetails({
-    studentId: numericId,
-    initialHint: routeState,
+    studentId,
     isVi,
   });
 
   const handleToggleSuspend = async () => {
     await toggleSuspend();
+  };
+
+  const handleProfileSaved = () => {
+    setHasSavedProfile(true);
+    void refetch();
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -61,11 +71,29 @@ export const StudentDetails: React.FC = () => {
     }
   };
 
-  const studentName = studentUser?.fullName || (isVi ? 'Học viên' : 'Student');
-  const studentCode = studentUser?.id ? `HV-${String(studentUser.id).padStart(4, '0')}` : `HV-${numericId}`;
+  const studentName = studentUser?.fullName ?? '';
+  const studentCode = studentUser ? `HV-${String(studentUser.id).padStart(4, '0')}` : '';
   const studentInitials = studentName.trim().split(/\s+/).map(n => n[0]).slice(-2).join('').toUpperCase();
   const studentEmail = studentUser?.email || '—';
+  const errorTitle = hasSavedProfile
+    ? (isVi ? 'Đã lưu, chưa tải lại được hồ sơ' : 'Saved, but the profile could not be reloaded')
+    : (isVi ? 'Hồ sơ học viên không khả dụng' : 'Student profile unavailable');
   const isActive = studentUser?.status === 'ACTIVE';
+  const isLocked = studentUser?.status === 'LOCKED';
+  const canChangeStatus = isActive || isLocked;
+  const statusClass = isActive ? 'badge-active' : isLocked ? 'badge-blocked' : 'badge-neutral';
+  const statusBadge = (
+    <span className={`badge ${statusClass}`}>
+      {isActive && (isVi ? 'Hoạt động' : 'Active')}
+      {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+      {!canChangeStatus && (
+        <>
+          <span aria-hidden="true">—</span>
+          <span className="sr-only">{isVi ? 'Chưa xác định' : 'Unknown'}</span>
+        </>
+      )}
+    </span>
+  );
   const completedTimelineCount = progressData?.scoreTimeline?.length ?? 0;
   const avgSkillScore = progressData?.skillAverages?.length
     ? Math.round(progressData.skillAverages.reduce((acc, s) => acc + s.averageScorePercent, 0) / progressData.skillAverages.length)
@@ -103,16 +131,18 @@ export const StudentDetails: React.FC = () => {
       )}
 
       {isError && !studentUser && !isLoading && (
-        <EmptyState
-          icon={<UserX size={48} />}
-          title={isVi ? 'Không tìm thấy học viên' : 'Student Not Found'}
-          description={errorMessage || (isVi ? 'Không tìm thấy thông tin học viên cho mã định danh này.' : 'Student identity could not be verified.')}
-          action={
-            <Button variant="secondary" size="sm" onClick={() => navigate('/admin/students')}>
-              {isVi ? 'Quay lại danh sách' : 'Back to Students'}
-            </Button>
-          }
-        />
+        <div role="alert">
+          <EmptyState
+            icon={<UserX size={48} />}
+            title={errorTitle}
+            description={errorMessage ?? undefined}
+            action={studentId !== 0 && (
+              <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+                {isVi ? 'Thử lại' : 'Retry'}
+              </Button>
+            )}
+          />
+        </div>
       )}
 
       {isLoading ? (
@@ -150,18 +180,27 @@ export const StudentDetails: React.FC = () => {
                     {studentName}
                   </h2>
                   <span className="badge badge-primary font-mono">{studentCode}</span>
-                  <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
-                    {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Locked')}
-                  </span>
-                  <button 
-                    type="button"
-                    disabled={isTogglingStatus}
-                    className={`btn ${!isActive ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                    onClick={() => setShowStatusConfirmModal(true)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  {statusBadge}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<Pencil size={14} />}
+                    disabled={showStatusConfirmModal || showPasswordModal}
+                    onClick={() => setIsProfileDrawerOpen(true)}
                   >
-                    <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
-                  </button>
+                    {isVi ? 'Sửa' : 'Edit'}
+                  </Button>
+                  {canChangeStatus && (
+                    <button
+                      type="button"
+                      disabled={isTogglingStatus || isProfileDrawerOpen}
+                      className={`btn ${isLocked ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                      onClick={() => setShowStatusConfirmModal(true)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <span>{isActive ? (isVi ? 'Khóa tài khoản' : 'Lock Account') : (isVi ? 'Mở khóa' : 'Unlock')}</span>
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', fontSize: '13.5px', color: 'var(--eh-text-secondary)' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -253,11 +292,19 @@ export const StudentDetails: React.FC = () => {
                     <span style={{ color: 'var(--eh-text-secondary)' }}>Email</span>
                     <span className="font-semibold">{studentEmail}</span>
                   </div>
+                  <dl className="adm-form-grid m-0">
+                    <div>
+                      <dt className="text-muted">{isVi ? 'Số điện thoại' : 'Phone'}</dt>
+                      <dd className="m-0 font-semibold">{studentUser.phone || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted">{isVi ? 'Ngày sinh' : 'Date of birth'}</dt>
+                      <dd className="m-0 font-semibold">{studentUser.dateOfBirth || '—'}</dd>
+                    </div>
+                  </dl>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--eh-text-secondary)' }}>{isVi ? 'Trạng thái học vụ' : 'Academic Status'}</span>
-                    <span className={`badge ${isActive ? 'badge-active' : 'badge-blocked'}`}>
-                      {isActive ? (isVi ? 'Hoạt động' : 'Active') : (isVi ? 'Bị khóa' : 'Locked')}
-                    </span>
+                    {statusBadge}
                   </div>
                 </div>
               </div>
@@ -434,8 +481,15 @@ export const StudentDetails: React.FC = () => {
               </div>
             </div>
           )}
+          <AdminUserProfileDrawer
+            profile={studentUser}
+            isOpen={isProfileDrawerOpen}
+            onClose={() => setIsProfileDrawerOpen(false)}
+            onSaved={handleProfileSaved}
+          />
+
           {/* Two-Step Confirmation Modal for Student Status Change */}
-          {showStatusConfirmModal && studentUser && (
+          {showStatusConfirmModal && canChangeStatus && (
             <ConfirmModal
               isOpen={showStatusConfirmModal}
               title={
@@ -471,6 +525,6 @@ export const StudentDetails: React.FC = () => {
       ) : null}
     </div>
   );
-};
+}
 
 export default StudentDetails;

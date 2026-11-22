@@ -534,8 +534,9 @@ test('SubmissionService - audio and document upload URLs', async () => {
   };
   http.mockResponse = audioResponse;
 
-  const audioResult = await new SubmissionService(http).getAudioUploadUrl(44, 'audio/webm');
+  const audioResult = await new SubmissionService(http).getAudioUploadUrl(44, 'audio/webm', 1024);
   assert.strictEqual(audioResult, audioResponse);
+  assert.deepStrictEqual(http.calls[0].data, { mimeType: 'audio/webm', fileSizeBytes: 1024 });
 
   const docResponse = {
     uploadUrl: 'https://s3.example.com/essay.pdf',
@@ -544,8 +545,39 @@ test('SubmissionService - audio and document upload URLs', async () => {
   };
   http.mockResponse = docResponse;
 
-  const docResult = await new SubmissionService(http).getDocumentUploadUrl(44, 'application/pdf');
+  const docResult = await new SubmissionService(http).getDocumentUploadUrl(44, 'application/pdf', 2048);
   assert.strictEqual(docResult, docResponse);
+  assert.deepStrictEqual(http.calls[1].data, { mimeType: 'application/pdf', fileSizeBytes: 2048 });
+});
+
+test('SubmissionService - uploadAudio and uploadDocument enforce 10MB max size', async () => {
+  const http = new MockHttpClient();
+  const service = new SubmissionService(http);
+
+  // Mock large blob > 10MB
+  const largeBlob = {
+    size: 10 * 1024 * 1024 + 1,
+    type: 'audio/webm',
+  } as unknown as Blob;
+
+  await assert.rejects(
+    async () => {
+      await service.uploadAudio(44, largeBlob);
+    },
+    /vượt quá giới hạn tối đa cho phép \(10MB\)/
+  );
+
+  const largeDoc = {
+    size: 10 * 1024 * 1024 + 1,
+    type: 'application/pdf',
+  } as unknown as File;
+
+  await assert.rejects(
+    async () => {
+      await service.uploadDocument(44, largeDoc);
+    },
+    /vượt quá giới hạn tối đa cho phép \(10MB\)/
+  );
 });
 
 test('SubmissionService - audio and document download URLs', async () => {
