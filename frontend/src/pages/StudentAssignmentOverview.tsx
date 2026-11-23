@@ -62,6 +62,7 @@ const StudentAssignmentOverview: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [attempts, setAttempts] = useState<AttemptRecord[]>([]);
+  const [attemptsUsed, setAttemptsUsed] = useState<number | null>(null);
   const [inProgressSub, setInProgressSub] = useState<SubmissionListItem | null>(null);
   const [latestCompletedSub, setLatestCompletedSub] = useState<SubmissionListItem | null>(null);
 
@@ -79,6 +80,10 @@ const StudentAssignmentOverview: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
+      setAttemptsUsed(null);
+      setAttempts([]);
+      setInProgressSub(null);
+      setLatestCompletedSub(null);
       try {
         // Fetch assignment detail and student attempts in parallel
         const [assignmentRes, subRes] = await Promise.allSettled([
@@ -115,6 +120,7 @@ const StudentAssignmentOverview: React.FC = () => {
           const latestCompleted = completedAttemptsList[0] || null;
 
           if (isMounted) {
+            setAttemptsUsed(subRes.value.pagination.total);
             setInProgressSub(activeAttempt);
             setLatestCompletedSub(latestCompleted);
           }
@@ -143,8 +149,8 @@ const StudentAssignmentOverview: React.FC = () => {
           });
 
           if (isMounted) setAttempts(records);
-        } else {
-          if (isMounted) setAttempts([]);
+        } else if (isMounted) {
+          setError('Không thể tải số lượt làm bài. Vui lòng thử lại.');
         }
       } catch (err: unknown) {
         if (!isMounted) return;
@@ -168,10 +174,11 @@ const StudentAssignmentOverview: React.FC = () => {
   const maxSubmissions = assignment?.maxSubmissions !== undefined && assignment?.maxSubmissions !== null
     ? assignment.maxSubmissions
     : 1;
-  const completedAttemptsCount = attempts.filter((a) => a.status !== 'in_progress').length;
-  const remainingAttempts = isUnlimited
+  const remainingAttempts = attemptsUsed === null
     ? null
-    : (getRemainingAttempts(maxSubmissions, completedAttemptsCount) ?? Math.max(0, maxSubmissions - completedAttemptsCount));
+    : getRemainingAttempts(isUnlimited ? null : maxSubmissions, attemptsUsed);
+  const canStartNewAttempt = attemptsUsed !== null && (isUnlimited || (remainingAttempts ?? 0) > 0);
+  const nextAttemptNumber = attemptsUsed === null ? null : attemptsUsed + 1;
 
   const displaySub = inProgressSub || latestCompletedSub;
   const hasActiveAttempt = Boolean(inProgressSub);
@@ -201,6 +208,7 @@ const StudentAssignmentOverview: React.FC = () => {
 
   const handleStartSkill = async (targetSkill: string, targetIndex?: number) => {
     if (isStarting) return;
+    if (!inProgressSub && !canStartNewAttempt) return;
     if (assignment?.status === 'CLOSED') {
       const subMod = inProgressSub?.modules?.find(
         (sm) => sm.skill?.toUpperCase() === targetSkill.toUpperCase()
@@ -307,6 +315,7 @@ const StudentAssignmentOverview: React.FC = () => {
       );
       return;
     }
+    if (!inProgressSub && !canStartNewAttempt) return;
     setIsStarting(true);
     setError(null);
     try {
@@ -443,9 +452,8 @@ const StudentAssignmentOverview: React.FC = () => {
           <div className="overview-rule-card">
             <div className="overview-rule-label">Số lượt nộp cho phép</div>
             <div className="overview-rule-val">
-              {isUnlimited 
-                ? `Không giới hạn (Đã nộp ${completedAttemptsCount} lần)` 
-                : `Tối đa ${maxSubmissions} lần (Đã nộp ${completedAttemptsCount}/${maxSubmissions})`}
+              {isUnlimited ? 'Không giới hạn' : `Tối đa ${maxSubmissions} lần`}
+              {attemptsUsed !== null && ` (Đã dùng ${attemptsUsed} lượt)`}
             </div>
           </div>
         </div>
@@ -697,11 +705,13 @@ const StudentAssignmentOverview: React.FC = () => {
                 ? isAllSubModulesCompleted
                   ? `Bạn đã hoàn thành tất cả các phần thi (Lần ${inProgressSub.attemptNumber}). Bạn có thể nộp toàn bộ bài tập ngay bây giờ.`
                   : `Bạn đang làm bài (Lần ${inProgressSub.attemptNumber}). Bạn có thể tiếp tục hoàn thành.`
-                : isUnlimited
-                  ? `Bắt đầu làm bài (Lần ${completedAttemptsCount + 1}).`
-                  : remainingAttempts !== null && remainingAttempts > 0 
-                    ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
-                    : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
+                : attemptsUsed === null
+                  ? (isLoading ? 'Đang tải số lượt làm bài...' : 'Chưa xác định được số lượt làm bài.')
+                  : isUnlimited
+                    ? `Bắt đầu làm bài (Lần ${nextAttemptNumber}).`
+                    : canStartNewAttempt
+                      ? `Bạn còn ${remainingAttempts} lượt nộp bài nữa cho đề thi này.`
+                      : 'Bạn đã sử dụng hết số lần nộp bài cho phép.'}
             </div>
             <div className="overview-cta-desc">
               {assignment?.status === 'CLOSED'
@@ -763,16 +773,16 @@ const StudentAssignmentOverview: React.FC = () => {
                   </Button>
                 )}
               </div>
-            ) : isUnlimited || (remainingAttempts !== null && remainingAttempts > 0) ? (
+            ) : canStartNewAttempt ? (
               <button 
                 className="overview-cta-btn" 
                 onClick={handleStartAttempt}
                 disabled={isStarting}
                 type="button"
               >
-                {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${completedAttemptsCount + 1})`}
+                {isStarting ? 'Đang khởi tạo bài làm...' : `Bắt đầu làm bài (Lần ${nextAttemptNumber})`}
               </button>
-            ) : (
+            ) : attemptsUsed !== null && (
               <button 
                 className="overview-cta-btn" 
                 onClick={() => {
