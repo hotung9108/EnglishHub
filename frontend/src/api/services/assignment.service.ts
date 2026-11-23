@@ -172,6 +172,24 @@ export class AssignmentService {
       throw error;
     }
   }
+
+  async exportSubmissionsExcel(
+    assignmentId: AssignmentId,
+    options?: ApiRequestOptions
+  ): Promise<Blob> {
+    return this.http.get<Blob>(
+      `/assignments/${assignmentId}/submissions/export`,
+      {
+        responseType: 'blob',
+        timeout: 15000,
+        headers: {
+          Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv',
+          ...(options?.headers || {})
+        },
+        ...options,
+      }
+    );
+  }
 }
 
 export const assignmentService = new AssignmentService();
