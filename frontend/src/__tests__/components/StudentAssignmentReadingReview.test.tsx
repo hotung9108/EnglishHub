@@ -302,6 +302,20 @@ describe('StudentAssignmentReading - Review Mode and Highlighter Integration', (
   }
 
   it('renders Reading Passage and questions with highlight toolbar', async () => {
+    const inProgressSub = {
+      ...mockSubmission,
+      status: 'IN_PROGRESS',
+      modules: [
+        { ...mockSubmission.modules[0], status: 'IN_PROGRESS', grading: null },
+        { ...mockSubmission.modules[1], status: 'IN_PROGRESS', grading: null },
+      ],
+    };
+    vi.mocked(submissionService.listSubmissions).mockResolvedValue({
+      data: [inProgressSub],
+      pagination: { page: 1, limit: 10, total: 1 },
+    } as unknown as SubmissionListResponse);
+    vi.mocked(submissionService.getSubmission).mockResolvedValue(inProgressSub as unknown as SubmissionDetail);
+
     renderComponent('/student/assignments/100/reading?moduleId=201');
 
     await waitFor(() => {
