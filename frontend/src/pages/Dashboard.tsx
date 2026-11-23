@@ -163,20 +163,15 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="adm-container space-y-6">
       {/* 1. Header Banner - Clean Minimalist Academic Design */}
-      <div className="adm-header mb-2">
+      <div className="adm-header mb-3">
         <div className="adm-title-group">
           <h1 className="adm-title font-serif tracking-tight">
             {t('adminDashboard.title') || (isVi ? 'Tổng quan hệ thống' : 'System Overview')}
           </h1>
-          <p className="text-xs text-on-surface-variant mt-1 font-sans">
-            {isVi 
-              ? 'Theo dõi số liệu thời gian thực và quản trị các hoạt động đào tạo trên EnglishHub' 
-              : 'Real-time telemetry and management across the entire EnglishHub academy'}
-          </p>
         </div>
 
-        {/* Action Group: Spaced buttons */}
-        <div className="flex flex-wrap items-center gap-3.5 pt-2 sm:pt-0">
+        {/* Action Group: Generously Spaced buttons */}
+        <div className="adm-header-actions">
           <Button 
             variant="primary" 
             size="md" 
@@ -219,7 +214,7 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Bento 4 KPI Cards */}
+      {/* 2. Bento 4 KPI Cards - Minimalist & Focused */}
       <div className="adm-kpi-grid">
         <div className="adm-kpi-card group cursor-pointer" onClick={() => navigate('/admin/students')}>
           <div className="adm-kpi-header">
@@ -229,8 +224,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalStudents.toLocaleString()}</div>
-          <div className="adm-kpi-footer">
-            <span className="text-on-surface-variant">{isVi ? 'Học viên đã ghi danh' : 'Enrolled learners'}</span>
+          <div className="adm-kpi-footer" style={{ justifyContent: 'flex-end' }}>
             <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
               {isVi ? 'Chi tiết' : 'Details'} <ArrowUpRight size={13} />
             </span>
@@ -245,8 +239,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalTeachers.toLocaleString()}</div>
-          <div className="adm-kpi-footer">
-            <span className="text-on-surface-variant">{isVi ? 'Đội ngũ giảng dạy' : 'Faculty members'}</span>
+          <div className="adm-kpi-footer" style={{ justifyContent: 'flex-end' }}>
             <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
               {isVi ? 'Chi tiết' : 'Details'} <ArrowUpRight size={13} />
             </span>
@@ -261,8 +254,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalClasses.toLocaleString()}</div>
-          <div className="adm-kpi-footer">
-            <span className="text-on-surface-variant">{isVi ? 'Khóa học đang hoạt động' : 'Running cohorts'}</span>
+          <div className="adm-kpi-footer" style={{ justifyContent: 'flex-end' }}>
             <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
               {isVi ? 'Quản lý' : 'Manage'} <ArrowUpRight size={13} />
             </span>
@@ -277,8 +269,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalAssignments.toLocaleString()}</div>
-          <div className="adm-kpi-footer">
-            <span className="text-on-surface-variant">{isVi ? 'Quiz, Writing & Speaking' : 'Total modules'}</span>
+          <div className="adm-kpi-footer" style={{ justifyContent: 'flex-end' }}>
             <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
               {isVi ? 'Báo cáo' : 'Reports'} <ArrowUpRight size={13} />
             </span>
@@ -294,16 +285,11 @@ export const Dashboard: React.FC = () => {
           <div>
             {/* Standard Table Card Header */}
             <div className="adm-table-card-header">
-              <div>
-                <div className="flex items-center gap-2">
-                  <BarChart3 size={18} className="text-primary" />
-                  <h2 className="adm-table-title">
-                    {isVi ? 'So sánh hiệu suất & Hoàn thành theo lớp học' : 'Cohort Performance & Completion'}
-                  </h2>
-                </div>
-                <p className="text-[12px] text-on-surface-variant mt-0.5">
-                  {isVi ? 'Đối chiếu điểm trung bình và tỷ lệ nộp bài giữa các lớp' : 'Comparative score & completion metrics'}
-                </p>
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-primary" />
+                <h2 className="adm-table-title">
+                  {isVi ? 'So sánh hiệu suất & Hoàn thành theo lớp học' : 'Cohort Performance & Completion'}
+                </h2>
               </div>
 
               {/* Legend Indicators */}
@@ -385,8 +371,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="adm-table-card-footer flex items-center justify-between">
-            <span>{isVi ? `Hiển thị ${Math.min(6, recentClasses.length)} lớp học năng động nhất` : `Showing top ${Math.min(6, recentClasses.length)} active cohorts`}</span>
+          <div className="adm-table-card-footer flex items-center justify-end">
             <button 
               type="button"
               onClick={() => navigate('/admin/reports')}
@@ -402,16 +387,11 @@ export const Dashboard: React.FC = () => {
           <div>
             {/* Standard Table Card Header */}
             <div className="adm-table-card-header">
-              <div>
-                <div className="flex items-center gap-2">
-                  <PieChartIcon size={18} style={{ color: palette.gold }} />
-                  <h2 className="adm-table-title">
-                    {isVi ? 'Phân bổ năng lực & Hoàn thành' : 'Academic Outcomes & Completion'}
-                  </h2>
-                </div>
-                <p className="text-[12px] text-on-surface-variant mt-0.5">
-                  {isVi ? 'Đánh giá tỷ lệ hoàn tất và phân loại phổ điểm' : 'Evaluation tiers and completion rate'}
-                </p>
+              <div className="flex items-center gap-2">
+                <PieChartIcon size={18} style={{ color: palette.gold }} />
+                <h2 className="adm-table-title">
+                  {isVi ? 'Phân bổ năng lực & Hoàn thành' : 'Academic Outcomes & Completion'}
+                </h2>
               </div>
               <span className="badge badge-warning font-mono text-xs font-bold px-2.5 py-0.5">
                 {stats.completionRate}%
@@ -587,8 +567,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="adm-table-card-footer flex items-center justify-between">
-            <span>{isVi ? 'Tổng hợp từ dữ liệu chấm điểm' : 'Aggregated assessment telemetry'}</span>
+          <div className="adm-table-card-footer flex items-center justify-end">
             <button 
               type="button"
               onClick={() => navigate('/admin/audit/gradings')}

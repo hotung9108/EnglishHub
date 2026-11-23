@@ -34,6 +34,13 @@
   }
 }
 
+.adm-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
 .adm-title-group {
   display: flex;
   flex-direction: column;
