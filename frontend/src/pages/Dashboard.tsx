@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   AlertCircle, Loader2, Users, GraduationCap, School, 
-  FileText, BarChart3, PlusCircle, ArrowUpRight, CheckCircle2,
-  Clock, ChevronRight, BookOpen, Award
+  FileText, BarChart3, PlusCircle, ArrowUpRight,
+  BookOpen, Award, PieChart as PieChartIcon, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { userService, classService, reportService } from '../api/services';
 import type { ReportClassSummary } from '../types/report.types';
 import { Button, EmptyState } from '../components/common';
@@ -13,7 +14,9 @@ import { Button, EmptyState } from '../components/common';
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const { theme } = useTheme();
   const isVi = language === 'vi';
+  const isDark = theme === 'dark';
 
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -120,20 +123,51 @@ export const Dashboard: React.FC = () => {
     };
   }, [isVi, reloadKey]);
 
+  // Phân bổ năng lực học thuật
+  const distributionData = useMemo(() => {
+    let excellent = 0; // >= 80%
+    let good = 0;      // 65 - 79%
+    let standard = 0;  // 50 - 64%
+    let below = 0;     // < 50%
+
+    recentClasses.forEach((c) => {
+      const score = c.averageScorePercent || 0;
+      if (score >= 80) excellent++;
+      else if (score >= 65) good++;
+      else if (score >= 50) standard++;
+      else below++;
+    });
+
+    const total = recentClasses.length || 1;
+    return {
+      excellent,
+      good,
+      standard,
+      below,
+      total: recentClasses.length,
+      pctExcellent: Math.round((excellent / total) * 100),
+      pctGood: Math.round((good / total) * 100),
+      pctStandard: Math.round((standard / total) * 100),
+      pctBelow: Math.round((below / total) * 100),
+    };
+  }, [recentClasses]);
+
+  // Luxury theme palette constants
+  const palette = {
+    emerald: isDark ? '#34d399' : '#059669',
+    gold: isDark ? '#fbbf24' : '#d97706',
+    sky: isDark ? '#38bdf8' : '#0284c7',
+    rose: isDark ? '#fb7185' : '#e11d48',
+  };
+
   return (
-    <div className="adm-container">
-      {/* 1. Header Banner */}
-      <div className="adm-header mb-6">
+    <div className="adm-container space-y-6">
+      {/* 1. Header Banner - Clean Minimalist Academic Design */}
+      <div className="adm-header mb-2">
         <div className="adm-title-group">
-          <div className="flex items-center gap-3">
-            <h1 className="adm-title font-serif tracking-tight">
-              {t('adminDashboard.title') || (isVi ? 'Tổng quan hệ thống' : 'System Overview')}
-            </h1>
-            <span className="adm-title-badge flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span>LIVE</span>
-            </span>
-          </div>
+          <h1 className="adm-title font-serif tracking-tight">
+            {t('adminDashboard.title') || (isVi ? 'Tổng quan hệ thống' : 'System Overview')}
+          </h1>
           <p className="text-xs text-on-surface-variant mt-1 font-sans">
             {isVi 
               ? 'Theo dõi số liệu thời gian thực và quản trị các hoạt động đào tạo trên EnglishHub' 
@@ -141,24 +175,29 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Quick Action Buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Action Group: Spaced buttons */}
+        <div className="flex flex-wrap items-center gap-3.5 pt-2 sm:pt-0">
           <Button 
-            variant="primary"
+            variant="primary" 
+            size="md" 
             icon={<PlusCircle size={16} />}
-            onClick={() => navigate('/admin/classes/create')}
+            onClick={() => navigate('/admin/classes?action=create')}
           >
-            {isVi ? 'Tạo lớp học mới' : 'Create Class'}
+            {isVi ? 'Tạo lớp học mới' : 'New Cohort'}
           </Button>
+
           <Button 
-            variant="secondary"
+            variant="secondary" 
+            size="md" 
             icon={<Users size={16} />}
-            onClick={() => navigate('/admin/accounts')}
+            onClick={() => navigate('/admin/users')}
           >
             {isVi ? 'Quản lý tài khoản' : 'Accounts'}
           </Button>
+
           <Button 
-            variant="secondary"
+            variant="secondary" 
+            size="md" 
             icon={<BarChart3 size={16} />}
             onClick={() => navigate('/admin/reports')}
           >
@@ -167,360 +206,500 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Error state */}
+      {/* Error alert with retry */}
       {error && (
-        <div className="adm-alert-error justify-between mb-6 flex items-center">
-          <div className="flex items-center gap-2">
-            <AlertCircle size={18} />
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle size={18} className="shrink-0" />
             <span>{error}</span>
           </div>
-          <Button 
-            variant="secondary"
-            size="sm"
-            onClick={handleRetry}
-          >
+          <Button variant="secondary" size="sm" onClick={handleRetry}>
             {isVi ? 'Thử lại' : 'Retry'}
           </Button>
         </div>
       )}
 
-      {/* 2. Primary 4 Bento KPI Cards - Quiet Academic & Royal Emerald/Gold Theme */}
-      <div className="adm-kpi-grid mb-6">
-        {/* Total Students */}
-        <div 
-          className="adm-kpi-card cursor-pointer hover:border-primary transition-all group"
-          onClick={() => navigate('/admin/students')}
-        >
+      {/* 2. Bento 4 KPI Cards */}
+      <div className="adm-kpi-grid">
+        <div className="adm-kpi-card group cursor-pointer" onClick={() => navigate('/admin/students')}>
           <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'TỔNG HỌC VIÊN' : 'TOTAL STUDENTS'}</div>
-              <div className="adm-kpi-value text-2xl font-bold mt-1 text-on-surface font-mono">
-                {loading ? '...' : stats.totalStudents.toLocaleString()}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-105">
-              <GraduationCap size={20} />
+            <span className="adm-kpi-label">{isVi ? 'TỔNG HỌC VIÊN' : 'TOTAL STUDENTS'}</span>
+            <div className="adm-kpi-icon">
+              <GraduationCap size={16} />
             </div>
           </div>
-          <div className="adm-kpi-footer flex items-center justify-between text-xs text-on-surface-variant">
-            <span>{isVi ? 'Học viên đã ghi danh' : 'Enrolled students'}</span>
-            <span className="flex items-center text-primary font-semibold group-hover:translate-x-0.5 transition-transform">
-              {isVi ? 'Chi tiết' : 'View'} <ArrowUpRight size={13} />
+          <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalStudents.toLocaleString()}</div>
+          <div className="adm-kpi-footer">
+            <span className="text-on-surface-variant">{isVi ? 'Học viên đã ghi danh' : 'Enrolled learners'}</span>
+            <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
+              {isVi ? 'Chi tiết' : 'Details'} <ArrowUpRight size={13} />
             </span>
           </div>
         </div>
 
-        {/* Active Teachers */}
-        <div 
-          className="adm-kpi-card cursor-pointer hover:border-primary transition-all group"
-          onClick={() => navigate('/admin/teachers')}
-        >
+        <div className="adm-kpi-card group cursor-pointer" onClick={() => navigate('/admin/teachers')}>
           <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'GIẢNG VIÊN HOẠT ĐỘNG' : 'ACTIVE TEACHERS'}</div>
-              <div className="adm-kpi-value text-2xl font-bold mt-1 text-on-surface font-mono">
-                {loading ? '...' : stats.totalTeachers.toLocaleString()}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center transition-transform group-hover:scale-105">
-              <Users size={20} />
+            <span className="adm-kpi-label">{isVi ? 'GIẢNG VIÊN HOẠT ĐỘNG' : 'ACTIVE TEACHERS'}</span>
+            <div className="adm-kpi-icon">
+              <Users size={16} />
             </div>
           </div>
-          <div className="adm-kpi-footer flex items-center justify-between text-xs text-on-surface-variant">
-            <span>{isVi ? 'Đội ngũ giảng dạy' : 'Teaching faculty'}</span>
-            <span className="flex items-center text-primary font-semibold group-hover:translate-x-0.5 transition-transform">
-              {isVi ? 'Chi tiết' : 'View'} <ArrowUpRight size={13} />
+          <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalTeachers.toLocaleString()}</div>
+          <div className="adm-kpi-footer">
+            <span className="text-on-surface-variant">{isVi ? 'Đội ngũ giảng dạy' : 'Faculty members'}</span>
+            <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
+              {isVi ? 'Chi tiết' : 'Details'} <ArrowUpRight size={13} />
             </span>
           </div>
         </div>
 
-        {/* Active Classes */}
-        <div 
-          className="adm-kpi-card cursor-pointer hover:border-primary transition-all group"
-          onClick={() => navigate('/admin/classes')}
-        >
+        <div className="adm-kpi-card group cursor-pointer" onClick={() => navigate('/admin/classes')}>
           <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'LỚP HỌC ĐANG MỞ' : 'ACTIVE CLASSES'}</div>
-              <div className="adm-kpi-value text-2xl font-bold mt-1 text-on-surface font-mono">
-                {loading ? '...' : stats.totalClasses.toLocaleString()}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-gold/15 text-gold flex items-center justify-center transition-transform group-hover:scale-105">
-              <School size={20} />
+            <span className="adm-kpi-label">{isVi ? 'LỚP HỌC ĐANG MỞ' : 'ACTIVE CLASSES'}</span>
+            <div className="adm-kpi-icon">
+              <School size={16} />
             </div>
           </div>
-          <div className="adm-kpi-footer flex items-center justify-between text-xs text-on-surface-variant">
-            <span>{isVi ? 'Khóa học đang hoạt động' : 'Ongoing cohorts'}</span>
-            <span className="flex items-center text-primary font-semibold group-hover:translate-x-0.5 transition-transform">
+          <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalClasses.toLocaleString()}</div>
+          <div className="adm-kpi-footer">
+            <span className="text-on-surface-variant">{isVi ? 'Khóa học đang hoạt động' : 'Running cohorts'}</span>
+            <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
               {isVi ? 'Quản lý' : 'Manage'} <ArrowUpRight size={13} />
             </span>
           </div>
         </div>
 
-        {/* Total Assignments */}
-        <div 
-          className="adm-kpi-card cursor-pointer hover:border-primary transition-all group"
-          onClick={() => navigate('/admin/reports')}
-        >
+        <div className="adm-kpi-card group cursor-pointer" onClick={() => navigate('/admin/reports')}>
           <div className="adm-kpi-header">
-            <div>
-              <div className="adm-kpi-label">{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'TOTAL ASSIGNMENTS'}</div>
-              <div className="adm-kpi-value text-2xl font-bold mt-1 text-on-surface font-mono">
-                {loading ? '...' : stats.totalAssignments.toLocaleString()}
-              </div>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-gold/15 text-gold flex items-center justify-center transition-transform group-hover:scale-105">
-              <FileText size={20} />
+            <span className="adm-kpi-label">{isVi ? 'BÀI TẬP ĐÃ GIAO' : 'ASSIGNMENTS'}</span>
+            <div className="adm-kpi-icon">
+              <FileText size={16} />
             </div>
           </div>
-          <div className="adm-kpi-footer flex items-center justify-between text-xs text-on-surface-variant">
-            <span>{isVi ? 'Quiz, Writing & Speaking' : '4-skill assignments'}</span>
-            <span className="flex items-center text-primary font-semibold group-hover:translate-x-0.5 transition-transform">
-              {isVi ? 'Báo cáo' : 'Report'} <ArrowUpRight size={13} />
+          <div className="adm-kpi-val font-mono">{loading ? '...' : stats.totalAssignments.toLocaleString()}</div>
+          <div className="adm-kpi-footer">
+            <span className="text-on-surface-variant">{isVi ? 'Quiz, Writing & Speaking' : 'Total modules'}</span>
+            <span className="adm-kpi-sub flex items-center gap-0.5 group-hover:underline">
+              {isVi ? 'Báo cáo' : 'Reports'} <ArrowUpRight size={13} />
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Asymmetric 8:4 Academic Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (8/12): Main Cohorts Progress Table */}
-        <div className="lg:col-span-8">
-          <div className="adm-table-card">
-            <div className="adm-table-header">
-              <div className="flex items-center gap-2">
-                <BookOpen size={18} className="text-primary" />
-                <h2 className="adm-table-title">
-                  {isVi ? 'Tiến độ lớp học trọng điểm' : 'Key Cohort Progress'}
-                </h2>
-                {recentClasses.length > 0 && (
-                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {recentClasses.length} {isVi ? 'lớp' : 'classes'}
-                  </span>
-                )}
+      {/* 3. Middle Bento Visualizations (Minimalist & Luxury Academic Charts) */}
+      <div className="adm-dashboard-bento-grid">
+        
+        {/* Biểu đồ 1: So sánh hiệu suất & Hoàn thành theo lớp học */}
+        <div className="adm-table-card flex flex-col justify-between">
+          <div>
+            {/* Standard Table Card Header */}
+            <div className="adm-table-card-header">
+              <div>
+                <div className="flex items-center gap-2">
+                  <BarChart3 size={18} className="text-primary" />
+                  <h2 className="adm-table-title">
+                    {isVi ? 'So sánh hiệu suất & Hoàn thành theo lớp học' : 'Cohort Performance & Completion'}
+                  </h2>
+                </div>
+                <p className="text-[12px] text-on-surface-variant mt-0.5">
+                  {isVi ? 'Đối chiếu điểm trung bình và tỷ lệ nộp bài giữa các lớp' : 'Comparative score & completion metrics'}
+                </p>
               </div>
-              <Button 
-                variant="ghost"
-                size="sm"
-                icon={<ChevronRight size={14} />}
-                onClick={() => navigate('/admin/classes')}
-              >
-                {isVi ? 'Xem tất cả lớp' : 'View all'}
-              </Button>
+
+              {/* Legend Indicators */}
+              <div className="flex items-center gap-2 text-xs font-medium shrink-0">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono text-[11px] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>{isVi ? 'Điểm TB' : 'Avg Score'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 font-mono text-[11px] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span>{isVi ? 'Hoàn thành' : 'Completion'}</span>
+                </div>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="adm-loading-state py-12 flex flex-col items-center justify-center gap-2">
-                <Loader2 size={24} className="animate-spin text-primary" />
-                <span className="text-sm text-on-surface-variant">{isVi ? 'Đang nạp dữ liệu tiến độ...' : 'Loading cohorts...'}</span>
-              </div>
-            ) : recentClasses.length === 0 ? (
-              <EmptyState
-                title={isVi ? 'Chưa có dữ liệu lớp học' : 'No cohort data available'}
-                description={isVi ? 'Tạo lớp học mới để bắt đầu theo dõi tiến độ đào tạo.' : 'Create your first class to track progress.'}
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="adm-table">
-                  <thead>
-                    <tr>
-                      <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
-                      <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                      <th className="text-center">{isVi ? 'BÀI TẬP' : 'ASSIGNMENTS'}</th>
-                      <th className="text-center">{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
-                      <th>{isVi ? 'HOÀN THÀNH' : 'COMPLETION'}</th>
-                      <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTION'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentClasses.map((cls) => (
-                      <tr key={cls.classId} className="hover:bg-surface-hover/60 transition-colors">
-                        <td>
-                          <span className="badge badge-primary font-mono text-xs font-bold">
-                            ENG-{cls.classId}
-                          </span>
-                        </td>
-                        <td className="font-semibold text-on-surface">
-                          {cls.className}
-                        </td>
-                        <td className="text-center font-mono font-medium">
-                          {cls.assignedAssignmentCount}
-                        </td>
-                        <td className="text-center">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
-                            cls.averageScorePercent >= 80 
-                              ? 'bg-primary/10 text-primary border border-primary/20' 
-                              : cls.averageScorePercent >= 65 
-                              ? 'bg-gold/15 text-gold border border-gold/25' 
-                              : 'bg-surface-variant text-on-surface-variant'
-                          }`}>
-                            {cls.averageScorePercent}%
-                          </span>
-                        </td>
-                        <td style={{ minWidth: '150px' }}>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 rounded-full bg-surface-low overflow-hidden">
-                              <div 
-                                className="h-full bg-primary rounded-full transition-all"
-                                style={{ width: `${Math.min(100, Math.max(0, cls.completionRatePercent))}%` }}
-                              />
-                            </div>
-                            <span className="text-xs font-mono font-bold text-on-surface-variant w-10 text-right">
-                              {cls.completionRatePercent}%
+            {/* Comparative Cohorts View */}
+            <div className="p-4 sm:p-5">
+              {loading ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                  <span className="text-xs text-on-surface-variant">{isVi ? 'Đang nạp dữ liệu phân tích...' : 'Loading analytics...'}</span>
+                </div>
+              ) : recentClasses.length === 0 ? (
+                <div className="py-14 text-center text-xs text-on-surface-variant">
+                  {isVi ? 'Chưa có đủ dữ liệu lớp học để hiển thị' : 'No cohort data for comparative display'}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {recentClasses.slice(0, 6).map((c) => {
+                    const score = Math.round(c.averageScorePercent || 0);
+                    const completion = Math.round(c.completionRatePercent || 0);
+                    return (
+                      <div 
+                        key={c.classId}
+                        onClick={() => navigate(`/admin/classes/${c.classId}`)}
+                        className="adm-dash-cohort-item group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="badge badge-primary font-mono text-[10px] font-bold py-0.5 px-2">
+                              ENG-{c.classId}
+                            </span>
+                            <span className="text-xs font-semibold text-on-surface truncate group-hover:text-primary transition-colors">
+                              {c.className}
                             </span>
                           </div>
-                        </td>
-                        <td className="text-right">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => navigate(`/admin/classes/${cls.classId}`)}
-                          >
-                            {isVi ? 'Chi tiết' : 'Details'}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <div className="flex items-center gap-2 shrink-0 text-xs font-mono font-bold">
+                            <span className="text-emerald-500" title={isVi ? 'Điểm trung bình' : 'Average score'}>
+                              {score}%
+                            </span>
+                            <span className="text-on-surface-variant/30">/</span>
+                            <span className="text-amber-500" title={isVi ? 'Tỷ lệ hoàn thành' : 'Completion rate'}>
+                              {completion}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dual Progress Track */}
+                        <div className="space-y-1">
+                          <div className="adm-dash-track">
+                            <div 
+                              className="adm-dash-bar-emerald"
+                              style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+                            />
+                          </div>
+                          <div className="adm-dash-track">
+                            <div 
+                              className="adm-dash-bar-gold"
+                              style={{ width: `${Math.min(100, Math.max(0, completion))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="adm-table-card-footer flex items-center justify-between">
+            <span>{isVi ? `Hiển thị ${Math.min(6, recentClasses.length)} lớp học năng động nhất` : `Showing top ${Math.min(6, recentClasses.length)} active cohorts`}</span>
+            <button 
+              type="button"
+              onClick={() => navigate('/admin/reports')}
+              className="text-primary font-semibold hover:underline flex items-center gap-0.5"
+            >
+              {isVi ? 'Báo cáo chi tiết' : 'Detailed analytics'} <ChevronRight size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Biểu đồ 2: Donut Chart & Tier Breakdown */}
+        <div className="adm-table-card flex flex-col justify-between">
+          <div>
+            {/* Standard Table Card Header */}
+            <div className="adm-table-card-header">
+              <div>
+                <div className="flex items-center gap-2">
+                  <PieChartIcon size={18} style={{ color: palette.gold }} />
+                  <h2 className="adm-table-title">
+                    {isVi ? 'Phân bổ năng lực & Hoàn thành' : 'Academic Outcomes & Completion'}
+                  </h2>
+                </div>
+                <p className="text-[12px] text-on-surface-variant mt-0.5">
+                  {isVi ? 'Đánh giá tỷ lệ hoàn tất và phân loại phổ điểm' : 'Evaluation tiers and completion rate'}
+                </p>
               </div>
+              <span className="badge badge-warning font-mono text-xs font-bold px-2.5 py-0.5">
+                {stats.completionRate}%
+              </span>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="p-4 sm:p-5">
+              {loading ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                  <span className="text-xs text-on-surface-variant">{isVi ? 'Đang xử lý dữ liệu...' : 'Processing telemetry...'}</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Donut and Center Summary */}
+                  <div className="flex items-center justify-between gap-4 py-1">
+                    {/* SVG Radial Gauge */}
+                    <div className="adm-dash-gauge-container">
+                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke="currentColor"
+                          strokeWidth="8"
+                          fill="none"
+                          className="text-surface-variant/40"
+                        />
+                        <defs>
+                          <linearGradient id="academicGaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor={palette.emerald} />
+                            <stop offset="100%" stopColor={palette.gold} />
+                          </linearGradient>
+                        </defs>
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke="url(#academicGaugeGrad)"
+                          strokeWidth="8"
+                          strokeDasharray={238.76}
+                          strokeDashoffset={238.76 * (1 - Math.min(100, Math.max(0, stats.completionRate)) / 100)}
+                          strokeLinecap="round"
+                          fill="none"
+                          className="transition-all duration-1000 ease-out"
+                        />
+                      </svg>
+                      {/* Centered Typography */}
+                      <div className="adm-dash-gauge-center">
+                        <span className="text-base font-mono font-bold text-on-surface leading-none tracking-tight">
+                          {stats.completionRate}%
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant mt-1">
+                          {isVi ? 'Hoàn tất' : 'Done'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick Metric Pills */}
+                    <div className="flex-1 space-y-2">
+                      <div className="adm-dash-metric-tile">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Award size={15} style={{ color: palette.gold }} />
+                          <span className="text-on-surface-variant font-medium">{isVi ? 'Điểm TB toàn khóa' : 'Avg Score'}</span>
+                        </div>
+                        <span className="text-sm font-bold font-mono text-on-surface">{stats.averageScore}%</span>
+                      </div>
+
+                      <div className="adm-dash-metric-tile">
+                        <div className="flex items-center gap-2 text-xs">
+                          <FileText size={15} style={{ color: palette.emerald }} />
+                          <span className="text-on-surface-variant font-medium">{isVi ? 'Bài đợi chấm' : 'Pending'}</span>
+                        </div>
+                        <span className="text-sm font-bold font-mono text-on-surface">{stats.pendingGradings}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tier Progress Bars */}
+                  <div className="space-y-2.5 pt-2 border-t border-outline-variant/30">
+                    {/* Xuất sắc */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.emerald }} />
+                          <span>{isVi ? 'Xuất sắc (≥ 80%)' : 'Excellent (≥ 80%)'}</span>
+                        </span>
+                        <span className="font-mono font-bold" style={{ color: palette.emerald }}>
+                          {distributionData.excellent} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctExcellent}%)
+                        </span>
+                      </div>
+                      <div className="adm-dash-track" style={{ height: '5px' }}>
+                        <div 
+                          className="h-full rounded-full transition-all" 
+                          style={{ 
+                            width: `${distributionData.pctExcellent}%`,
+                            backgroundColor: palette.emerald 
+                          }} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Khá giỏi */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.sky }} />
+                          <span>{isVi ? 'Khá giỏi (65% - 79%)' : 'Good (65% - 79%)'}</span>
+                        </span>
+                        <span className="font-mono font-bold" style={{ color: palette.sky }}>
+                          {distributionData.good} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctGood}%)
+                        </span>
+                      </div>
+                      <div className="adm-dash-track" style={{ height: '5px' }}>
+                        <div 
+                          className="h-full rounded-full transition-all" 
+                          style={{ 
+                            width: `${distributionData.pctGood}%`,
+                            backgroundColor: palette.sky 
+                          }} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tiêu chuẩn */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.gold }} />
+                          <span>{isVi ? 'Tiêu chuẩn (50% - 64%)' : 'Standard (50% - 64%)'}</span>
+                        </span>
+                        <span className="font-mono font-bold" style={{ color: palette.gold }}>
+                          {distributionData.standard} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctStandard}%)
+                        </span>
+                      </div>
+                      <div className="adm-dash-track" style={{ height: '5px' }}>
+                        <div 
+                          className="h-full rounded-full transition-all" 
+                          style={{ 
+                            width: `${distributionData.pctStandard}%`,
+                            backgroundColor: palette.gold 
+                          }} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Cần chú ý */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.rose }} />
+                          <span>{isVi ? 'Cần cải thiện (< 50%)' : 'Needs Focus (< 50%)'}</span>
+                        </span>
+                        <span className="font-mono font-bold" style={{ color: palette.rose }}>
+                          {distributionData.below} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctBelow}%)
+                        </span>
+                      </div>
+                      <div className="adm-dash-track" style={{ height: '5px' }}>
+                        <div 
+                          className="h-full rounded-full transition-all" 
+                          style={{ 
+                            width: `${distributionData.pctBelow}%`,
+                            backgroundColor: palette.rose 
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="adm-table-card-footer flex items-center justify-between">
+            <span>{isVi ? 'Tổng hợp từ dữ liệu chấm điểm' : 'Aggregated assessment telemetry'}</span>
+            <button 
+              type="button"
+              onClick={() => navigate('/admin/audit/gradings')}
+              className="text-primary font-semibold hover:underline flex items-center gap-0.5"
+            >
+              {isVi ? 'Kiểm toán bài thi' : 'Audit logs'} <ChevronRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Full-Width Key Cohort Progress Table - Rộng rãi, thoáng đãng, sắc nét */}
+      <div className="adm-table-card">
+        <div className="adm-table-header">
+          <div className="flex items-center gap-2">
+            <BookOpen size={18} className="text-primary" />
+            <h2 className="adm-table-title">
+              {isVi ? 'Tiến độ lớp học trọng điểm' : 'Key Cohort Progress'}
+            </h2>
+            {recentClasses.length > 0 && (
+              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                {recentClasses.length} {isVi ? 'lớp' : 'classes'}
+              </span>
             )}
           </div>
+          <Button 
+            variant="ghost"
+            size="sm"
+            icon={<ChevronRight size={14} />}
+            onClick={() => navigate('/admin/classes')}
+          >
+            {isVi ? 'Xem tất cả lớp' : 'View all'}
+          </Button>
         </div>
 
-        {/* Right Column (4/12): Academic Telemetry & Quick Console */}
-        <div className="lg:col-span-4 flex flex-col gap-5">
-          {/* Performance Telemetry Card */}
-          <div className="adm-table-card p-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-on-surface-variant mb-4 flex items-center justify-between">
-              <span>{isVi ? 'Chỉ số chất lượng học thuật' : 'Academic Quality Index'}</span>
-              <BarChart3 size={15} className="text-primary" />
-            </h3>
-
-            {/* Completion Rate Item */}
-            <div 
-              className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 mb-3.5 cursor-pointer hover:border-primary/50 transition-all"
-              onClick={() => navigate('/admin/reports')}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-on-surface-variant flex items-center gap-1.5">
-                  <CheckCircle2 size={14} className="text-primary" />
-                  {isVi ? 'Tỉ lệ nộp bài toàn khóa' : 'Avg Completion Rate'}
-                </span>
-                <span className="text-base font-extrabold text-on-surface font-mono">
-                  {loading ? '...' : `${stats.completionRate}%`}
-                </span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-surface-variant/40 overflow-hidden mb-1">
-                <div 
-                  className="h-full bg-primary rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, Math.max(0, stats.completionRate))}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-on-surface-variant">
-                {isVi ? 'Học viên nộp bài tập đúng hạn trên hệ thống' : 'On-time submissions across all cohorts'}
-              </div>
-            </div>
-
-            {/* Average Score Item */}
-            <div 
-              className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 mb-3.5 cursor-pointer hover:border-primary/50 transition-all"
-              onClick={() => navigate('/admin/reports')}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-on-surface-variant flex items-center gap-1.5">
-                  <Award size={14} className="text-gold" />
-                  {isVi ? 'Điểm trung bình tích lũy' : 'Aggregated Grade Score'}
-                </span>
-                <span className="text-base font-extrabold text-on-surface font-mono">
-                  {loading ? '...' : `${stats.averageScore}%`}
-                </span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-surface-variant/40 overflow-hidden mb-1">
-                <div 
-                  className="h-full bg-gold rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, Math.max(0, stats.averageScore))}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-on-surface-variant flex items-center justify-between">
-                <span>{isVi ? 'Quy đổi theo thang điểm chuẩn hóa' : 'Aggregated cohort grade average'}</span>
-                <span className="font-semibold text-primary">
-                  {stats.averageScore >= 80 ? (isVi ? 'Xuất sắc' : 'Band 8.0+') : stats.averageScore >= 65 ? (isVi ? 'Khá giỏi' : 'Band 6.5+') : (isVi ? 'Tiêu chuẩn' : 'Band 5.0+')}
-                </span>
-              </div>
-            </div>
-
-            {/* Pending Grading Item */}
-            <div 
-              className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 cursor-pointer hover:border-primary/50 transition-all"
-              onClick={() => navigate('/admin/reports')}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-on-surface-variant flex items-center gap-1.5">
-                  <Clock size={14} className="text-primary" />
-                  {isVi ? 'Khối lượng bài chờ chấm' : 'Pending Grading Workload'}
-                </span>
-                <span className="text-base font-extrabold text-on-surface font-mono">
-                  {loading ? '...' : stats.pendingGradings}
-                </span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-surface-variant/40 overflow-hidden mb-1">
-                <div 
-                  className="h-full bg-primary/80 rounded-full transition-all duration-500" 
-                  style={{ width: `${stats.pendingGradings > 0 ? Math.min(100, stats.pendingGradings * 10) : 0}%` }}
-                />
-              </div>
-              <div className="text-[11px] text-on-surface-variant">
-                {stats.pendingGradings > 0 
-                  ? (isVi ? 'Bài luận & Speaking đang đợi giảng viên phản hồi' : 'Submissions awaiting faculty review') 
-                  : (isVi ? 'Tất cả bài tập đã được chấm điểm hoàn tất' : 'All submissions evaluated')}
-              </div>
-            </div>
+        {loading ? (
+          <div className="adm-loading-state py-12 flex flex-col items-center justify-center gap-2">
+            <Loader2 size={24} className="animate-spin text-primary" />
+            <span className="text-sm text-on-surface-variant">{isVi ? 'Đang nạp dữ liệu tiến độ...' : 'Loading cohorts...'}</span>
           </div>
-
-          {/* Quick Operations Console */}
-          <div className="adm-table-card p-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-on-surface-variant mb-3 flex items-center justify-between">
-              <span>{isVi ? 'Lối tắt quản trị' : 'Operations Console'}</span>
-            </h3>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                className="w-full text-left p-2.5 rounded-lg border border-outline-variant/30 hover:border-primary/40 hover:bg-surface-hover transition-all flex items-center justify-between text-xs font-semibold text-on-surface"
-                onClick={() => navigate('/admin/students')}
-              >
-                <span className="flex items-center gap-2">
-                  <Users size={15} className="text-primary" />
-                  <span>{isVi ? 'Danh sách học viên toàn trường' : 'Student Registry'}</span>
-                </span>
-                <ChevronRight size={14} className="text-on-surface-variant" />
-              </button>
-              <button
-                type="button"
-                className="w-full text-left p-2.5 rounded-lg border border-outline-variant/30 hover:border-primary/40 hover:bg-surface-hover transition-all flex items-center justify-between text-xs font-semibold text-on-surface"
-                onClick={() => navigate('/admin/teachers')}
-              >
-                <span className="flex items-center gap-2">
-                  <GraduationCap size={15} className="text-primary" />
-                  <span>{isVi ? 'Quản lý đội ngũ giảng viên' : 'Faculty Management'}</span>
-                </span>
-                <ChevronRight size={14} className="text-on-surface-variant" />
-              </button>
-              <button
-                type="button"
-                className="w-full text-left p-2.5 rounded-lg border border-outline-variant/30 hover:border-primary/40 hover:bg-surface-hover transition-all flex items-center justify-between text-xs font-semibold text-on-surface"
-                onClick={() => navigate('/admin/audit/gradings')}
-              >
-                <span className="flex items-center gap-2">
-                  <BarChart3 size={15} className="text-gold" />
-                  <span>{isVi ? 'Nhật ký kiểm tra chấm điểm' : 'Grading Audit Trail'}</span>
-                </span>
-                <ChevronRight size={14} className="text-on-surface-variant" />
-              </button>
-            </div>
+        ) : recentClasses.length === 0 ? (
+          <EmptyState
+            title={isVi ? 'Chưa có dữ liệu lớp học' : 'No cohort data available'}
+            description={isVi ? 'Tạo lớp học mới để bắt đầu theo dõi tiến độ đào tạo.' : 'Create your first class to track progress.'}
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                  <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
+                  <th className="text-center">{isVi ? 'BÀI TẬP' : 'ASSIGNMENTS'}</th>
+                  <th className="text-center">{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
+                  <th>{isVi ? 'HOÀN THÀNH' : 'COMPLETION'}</th>
+                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTION'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentClasses.map((cls) => (
+                  <tr key={cls.classId} className="hover:bg-surface-hover/60 transition-colors">
+                    <td>
+                      <span className="badge badge-primary font-mono text-xs font-bold">
+                        ENG-{cls.classId}
+                      </span>
+                    </td>
+                    <td className="font-semibold text-on-surface">
+                      {cls.className}
+                    </td>
+                    <td className="text-center font-mono font-medium">
+                      {cls.assignedAssignmentCount}
+                    </td>
+                    <td className="text-center">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
+                        cls.averageScorePercent >= 80 
+                          ? 'bg-primary/10 text-primary border border-primary/20' 
+                          : cls.averageScorePercent >= 65 
+                          ? 'bg-gold/15 text-gold border border-gold/25' 
+                          : 'bg-surface-variant text-on-surface-variant'
+                      }`}>
+                        {cls.averageScorePercent}%
+                      </span>
+                    </td>
+                    <td style={{ minWidth: '180px' }}>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${Math.min(100, Math.max(0, cls.completionRatePercent))}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-mono font-bold text-on-surface-variant w-10 text-right">
+                          {cls.completionRatePercent}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/admin/classes/${cls.classId}`)}
+                      >
+                        {isVi ? 'Chi tiết' : 'Details'}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
