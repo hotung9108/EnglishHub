@@ -50,6 +50,22 @@
    - Click vào từng dòng hiển thị Drawer thông tin bài chấm, lời phê giáo viên, nhận xét AI.
    - Bảng **Nhật Ký Các Lần Sửa Điểm (Change Logs Audit)** hiển thị đầy đủ: Người điều chỉnh, Điểm cũ, Điểm mới, Lý do / Ghi chú, Thời gian sửa.
 
+### 1.4. Phân hệ Bảng Điều Khiển Quản Trị (`/admin/dashboard` - `Dashboard.tsx` & `admin-modern.css`)
+1. **Phổ điểm chi tiết theo lớp học (Histogram Bento)**:
+   - Sắp xếp nhãn phân tầng và dải điểm thành 2 dòng dọc gọn gàng (`Xuất sắc` + `≥80%`, `Khá giỏi` + `65–79%`, `Tiêu chuẩn` + `50–64%`, `Cần chú ý` + `<50%`). Loại bỏ hoàn toàn lỗi tràn chữ ra khỏi cột.
+   - Thẻ hiển thị cao 195px chuẩn xác, cân bằng tuyệt đối với thẻ So sánh hiệu suất bên trái.
+2. **Format Vòm đo tốc độ 180° (Executive Cockpit Speedometer Gauge)**:
+   - Thay thế graph tròn bằng Vòm đo bán nguyệt kép: Vòm ngoài màu Hổ phách (Tỷ lệ hoàn thành $R=108$), vòm trong màu Ngọc lục bảo (Điểm trung bình $R=90$).
+   - Ray trượt nền bán trong suốt trang nhã ở cả Dark và Light mode, không bị vệt đen.
+   - Bỏ dòng tiêu đề phụ lặp lại giúp khung nhìn rộng rãi, tinh giản và thanh lịch.
+3. **Bảng Tiến độ lớp học trọng điểm**:
+   - Căn giữa các cột số liệu `BÀI TẬP`, `ĐIỂM TB`. Thanh tiến độ `HOÀN THÀNH` hiển thị rõ ray nền và phần trăm.
+   - Nút `Xem tất cả lớp >` cố định góc trên cùng bên phải không bị gãy dòng.
+
+### 1.5. Gỡ bỏ trang Cài đặt toàn cục theo yêu cầu sản phẩm
+- Gỡ bỏ hoàn toàn route `/admin/settings`, chuyển hướng tự động về `/admin`.
+- Gỡ bỏ mục "Cài đặt hệ thống" trên Sidebar.
+
 ---
 
 ## 2. KẾT QUẢ KIỂM THỬ TỰ ĐỘNG & QUALITY GATES

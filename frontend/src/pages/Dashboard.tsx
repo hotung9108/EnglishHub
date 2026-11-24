@@ -32,6 +32,7 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [activeVisualizer, setActiveVisualizer] = useState<'histogram' | 'gauge'>('histogram');
 
   const handleRetry = () => {
     setReloadKey((prev) => prev + 1);
@@ -382,10 +383,10 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Biểu đồ 2: Donut Chart & Tier Breakdown */}
+        {/* Biểu đồ 2: Phân bổ năng lực & Hoàn thành (Grand Prominent Academic Visualizer) */}
         <div className="adm-table-card flex flex-col justify-between">
           <div>
-            {/* Standard Table Card Header */}
+            {/* Table Card Header with View Switcher */}
             <div className="adm-table-card-header">
               <div className="flex items-center gap-2">
                 <PieChartIcon size={18} style={{ color: palette.gold }} />
@@ -393,172 +394,265 @@ export const Dashboard: React.FC = () => {
                   {isVi ? 'Phân bổ năng lực & Hoàn thành' : 'Academic Outcomes & Completion'}
                 </h2>
               </div>
-              <span className="badge badge-warning font-mono text-xs font-bold px-2.5 py-0.5">
-                {stats.completionRate}%
-              </span>
+
+              {/* View Toggle Pill */}
+              <div className="flex items-center gap-2">
+                <div className="adm-dash-view-toggle">
+                  <button
+                    type="button"
+                    className={`adm-dash-view-btn ${activeVisualizer === 'histogram' ? 'active' : ''}`}
+                    onClick={() => setActiveVisualizer('histogram')}
+                  >
+                    <BarChart3 size={13} />
+                    <span>{isVi ? 'Phổ điểm' : 'Distribution'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`adm-dash-view-btn ${activeVisualizer === 'gauge' ? 'active' : ''}`}
+                    onClick={() => setActiveVisualizer('gauge')}
+                  >
+                    <PieChartIcon size={13} />
+                    <span>{isVi ? 'Vòng đo' : 'Gauge'}</span>
+                  </button>
+                </div>
+                <span className="badge badge-warning font-mono text-xs font-bold px-2 py-0.5">
+                  {stats.completionRate}%
+                </span>
+              </div>
             </div>
 
-            {/* Main Content Area */}
+            {/* Main Visualizer Area */}
             <div className="p-4 sm:p-5">
               {loading ? (
-                <div className="py-16 flex flex-col items-center justify-center gap-2">
-                  <Loader2 size={24} className="animate-spin text-primary" />
+                <div className="py-20 flex flex-col items-center justify-center gap-2">
+                  <Loader2 size={26} className="animate-spin text-primary" />
                   <span className="text-xs text-on-surface-variant">{isVi ? 'Đang xử lý dữ liệu...' : 'Processing telemetry...'}</span>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Donut and Center Summary */}
-                  <div className="flex items-center justify-between gap-4 py-1">
-                    {/* SVG Radial Gauge */}
-                    <div className="adm-dash-gauge-container">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke="currentColor"
-                          strokeWidth="8"
-                          fill="none"
-                          className="text-surface-variant/40"
-                        />
-                        <defs>
-                          <linearGradient id="academicGaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor={palette.emerald} />
-                            <stop offset="100%" stopColor={palette.gold} />
-                          </linearGradient>
-                        </defs>
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="38"
-                          stroke="url(#academicGaugeGrad)"
-                          strokeWidth="8"
-                          strokeDasharray={238.76}
-                          strokeDashoffset={238.76 * (1 - Math.min(100, Math.max(0, stats.completionRate)) / 100)}
-                          strokeLinecap="round"
-                          fill="none"
-                          className="transition-all duration-1000 ease-out"
-                        />
-                      </svg>
-                      {/* Centered Typography */}
-                      <div className="adm-dash-gauge-center">
-                        <span className="text-base font-mono font-bold text-on-surface leading-none tracking-tight">
-                          {stats.completionRate}%
+                  {activeVisualizer === 'histogram' ? (
+                    /* HERO VIEW 1: Grand Prominent 4-Tier Column Histogram */
+                    <div className="adm-dash-histogram-prominent">
+                      {/* Pillar 1: Xuất sắc */}
+                      <div className="adm-dash-histogram-col group">
+                        <span className="adm-dash-histogram-val">
+                          {distributionData.pctExcellent}%
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant mt-1">
-                          {isVi ? 'Hoàn tất' : 'Done'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick Metric Pills */}
-                    <div className="flex-1 space-y-2">
-                      <div className="adm-dash-metric-tile">
-                        <div className="flex items-center gap-2 text-xs">
-                          <Award size={15} style={{ color: palette.gold }} />
-                          <span className="text-on-surface-variant font-medium">{isVi ? 'Điểm TB toàn khóa' : 'Avg Score'}</span>
+                        <div className="adm-dash-histogram-bar-wrap">
+                          <div 
+                            className="adm-dash-histogram-bar" 
+                            style={{ 
+                              height: distributionData.pctExcellent > 0 ? `${Math.max(10, distributionData.pctExcellent)}%` : '0%',
+                              background: `linear-gradient(180deg, ${palette.emerald} 0%, rgba(16, 185, 129, 0.35) 100%)`,
+                              boxShadow: distributionData.pctExcellent > 0 ? `0 0 12px ${palette.emerald}50` : 'none'
+                            }} 
+                          />
                         </div>
-                        <span className="text-sm font-bold font-mono text-on-surface">{stats.averageScore}%</span>
-                      </div>
-
-                      <div className="adm-dash-metric-tile">
-                        <div className="flex items-center gap-2 text-xs">
-                          <FileText size={15} style={{ color: palette.emerald }} />
-                          <span className="text-on-surface-variant font-medium">{isVi ? 'Bài đợi chấm' : 'Pending'}</span>
+                        <span className="adm-dash-histogram-sub">{distributionData.excellent} {isVi ? 'lớp' : 'cls'}</span>
+                        <div className="adm-dash-histogram-footer">
+                          <span className="adm-dash-histogram-tier-name">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.emerald }} />
+                            {isVi ? 'Xuất sắc' : 'Excellent'}
+                          </span>
+                          <span className="adm-dash-histogram-tier-range">≥80%</span>
                         </div>
-                        <span className="text-sm font-bold font-mono text-on-surface">{stats.pendingGradings}</span>
+                      </div>
+
+                      {/* Pillar 2: Khá giỏi */}
+                      <div className="adm-dash-histogram-col group">
+                        <span className="adm-dash-histogram-val">
+                          {distributionData.pctGood}%
+                        </span>
+                        <div className="adm-dash-histogram-bar-wrap">
+                          <div 
+                            className="adm-dash-histogram-bar" 
+                            style={{ 
+                              height: distributionData.pctGood > 0 ? `${Math.max(10, distributionData.pctGood)}%` : '0%',
+                              background: `linear-gradient(180deg, ${palette.sky} 0%, rgba(56, 189, 248, 0.35) 100%)`,
+                              boxShadow: distributionData.pctGood > 0 ? `0 0 12px ${palette.sky}50` : 'none'
+                            }} 
+                          />
+                        </div>
+                        <span className="adm-dash-histogram-sub">{distributionData.good} {isVi ? 'lớp' : 'cls'}</span>
+                        <div className="adm-dash-histogram-footer">
+                          <span className="adm-dash-histogram-tier-name">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.sky }} />
+                            {isVi ? 'Khá giỏi' : 'Good'}
+                          </span>
+                          <span className="adm-dash-histogram-tier-range">65–79%</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 3: Tiêu chuẩn */}
+                      <div className="adm-dash-histogram-col group">
+                        <span className="adm-dash-histogram-val">
+                          {distributionData.pctStandard}%
+                        </span>
+                        <div className="adm-dash-histogram-bar-wrap">
+                          <div 
+                            className="adm-dash-histogram-bar" 
+                            style={{ 
+                              height: distributionData.pctStandard > 0 ? `${Math.max(10, distributionData.pctStandard)}%` : '0%',
+                              background: `linear-gradient(180deg, ${palette.gold} 0%, rgba(245, 158, 11, 0.35) 100%)`,
+                              boxShadow: distributionData.pctStandard > 0 ? `0 0 12px ${palette.gold}50` : 'none'
+                            }} 
+                          />
+                        </div>
+                        <span className="adm-dash-histogram-sub">{distributionData.standard} {isVi ? 'lớp' : 'cls'}</span>
+                        <div className="adm-dash-histogram-footer">
+                          <span className="adm-dash-histogram-tier-name">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.gold }} />
+                            {isVi ? 'Tiêu chuẩn' : 'Standard'}
+                          </span>
+                          <span className="adm-dash-histogram-tier-range">50–64%</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 4: Cần chú ý */}
+                      <div className="adm-dash-histogram-col group">
+                        <span className="adm-dash-histogram-val">
+                          {distributionData.pctBelow}%
+                        </span>
+                        <div className="adm-dash-histogram-bar-wrap">
+                          <div 
+                            className="adm-dash-histogram-bar" 
+                            style={{ 
+                              height: distributionData.pctBelow > 0 ? `${Math.max(10, distributionData.pctBelow)}%` : '0%',
+                              background: `linear-gradient(180deg, ${palette.rose} 0%, rgba(244, 63, 94, 0.35) 100%)`,
+                              boxShadow: distributionData.pctBelow > 0 ? `0 0 12px ${palette.rose}50` : 'none'
+                            }} 
+                          />
+                        </div>
+                        <span className="adm-dash-histogram-sub">{distributionData.below} {isVi ? 'lớp' : 'cls'}</span>
+                        <div className="adm-dash-histogram-footer">
+                          <span className="adm-dash-histogram-tier-name">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: palette.rose }} />
+                            {isVi ? 'Cần chú ý' : 'Focus'}
+                          </span>
+                          <span className="adm-dash-histogram-tier-range">&lt;50%</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* HERO VIEW 2: Grand Prominent Arch Speedometer Gauge (Bán Nguyệt 180°) */
+                    <div className="adm-dash-arch-gauge">
+                      <div className="adm-dash-arch-wrap">
+                        <svg className="w-full h-full" viewBox="0 0 280 145">
+                          <defs>
+                            <linearGradient id="completionArchGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#f59e0b" />
+                              <stop offset="100%" stopColor={palette.gold} />
+                            </linearGradient>
+                            <linearGradient id="scoreArchGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#10b981" />
+                              <stop offset="100%" stopColor={palette.emerald} />
+                            </linearGradient>
+                          </defs>
 
-                  {/* Tier Progress Bars */}
-                  <div className="space-y-2.5 pt-2 border-t border-outline-variant/30">
-                    {/* Xuất sắc */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.emerald }} />
-                          <span>{isVi ? 'Xuất sắc (≥ 80%)' : 'Excellent (≥ 80%)'}</span>
-                        </span>
-                        <span className="font-mono font-bold" style={{ color: palette.emerald }}>
-                          {distributionData.excellent} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctExcellent}%)
-                        </span>
-                      </div>
-                      <div className="adm-dash-track" style={{ height: '5px' }}>
-                        <div 
-                          className="h-full rounded-full transition-all" 
-                          style={{ 
-                            width: `${distributionData.pctExcellent}%`,
-                            backgroundColor: palette.emerald 
-                          }} 
-                        />
+                          {/* Outer Arch Background (Completion Rate R=108) */}
+                          <path
+                            d="M 32,132 A 108,108 0 0,1 248,132"
+                            strokeWidth="9"
+                            strokeLinecap="round"
+                            fill="none"
+                            className="adm-dash-arch-bg"
+                          />
+                          {/* Outer Arch Active (Completion) */}
+                          <path
+                            d="M 32,132 A 108,108 0 0,1 248,132"
+                            stroke="url(#completionArchGrad)"
+                            strokeWidth="9"
+                            strokeLinecap="round"
+                            fill="none"
+                            strokeDasharray={339.29}
+                            strokeDashoffset={339.29 * (1 - Math.min(100, Math.max(0, stats.completionRate)) / 100)}
+                            className="transition-all duration-1000 ease-out"
+                          />
+
+                          {/* Inner Arch Background (Average Score R=90) */}
+                          <path
+                            d="M 50,132 A 90,90 0 0,1 230,132"
+                            strokeWidth="7"
+                            strokeLinecap="round"
+                            fill="none"
+                            className="adm-dash-arch-bg"
+                          />
+                          {/* Inner Arch Active (Average Score) */}
+                          <path
+                            d="M 50,132 A 90,90 0 0,1 230,132"
+                            stroke="url(#scoreArchGrad)"
+                            strokeWidth="7"
+                            strokeLinecap="round"
+                            fill="none"
+                            strokeDasharray={282.74}
+                            strokeDashoffset={282.74 * (1 - Math.min(100, Math.max(0, stats.averageScore)) / 100)}
+                            className="transition-all duration-1000 ease-out"
+                          />
+                        </svg>
+
+                        {/* Center Readout with Grand Typography */}
+                        <div className="adm-dash-arch-center">
+                          <div className="adm-dash-arch-score font-mono">
+                            {stats.completionRate}%
+                          </div>
+                          <div className="adm-dash-arch-label">
+                            {isVi ? 'Tỷ lệ nộp bài toàn trường' : 'System Completion Rate'}
+                          </div>
+                          <div className="adm-dash-arch-sub">
+                            <span className="adm-dash-arch-pill">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              {isVi ? 'Điểm TB:' : 'Avg Score:'} <strong>{stats.averageScore}%</strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Gauge Ticks */}
+                        <div className="adm-dash-arch-ticks">
+                          <span>0%</span>
+                          <span>100%</span>
+                        </div>
                       </div>
                     </div>
+                  )}
 
-                    {/* Khá giỏi */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.sky }} />
-                          <span>{isVi ? 'Khá giỏi (65% - 79%)' : 'Good (65% - 79%)'}</span>
-                        </span>
-                        <span className="font-mono font-bold" style={{ color: palette.sky }}>
-                          {distributionData.good} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctGood}%)
-                        </span>
+                  {/* Operational Telemetry Strip - 3 Balanced Cards */}
+                  <div className="adm-dash-telemetry-row">
+                    <div className="adm-dash-telemetry-card">
+                      <div className="adm-dash-telemetry-head">
+                        <span className="adm-dash-telemetry-title">{isVi ? 'Hoàn thành' : 'Completion'}</span>
+                        <Award size={14} style={{ color: palette.gold }} />
                       </div>
-                      <div className="adm-dash-track" style={{ height: '5px' }}>
-                        <div 
-                          className="h-full rounded-full transition-all" 
-                          style={{ 
-                            width: `${distributionData.pctGood}%`,
-                            backgroundColor: palette.sky 
-                          }} 
-                        />
+                      <div className="adm-dash-telemetry-value text-amber-500 font-mono">
+                        {stats.completionRate}%
                       </div>
+                      <span className="adm-dash-telemetry-sub">{isVi ? 'Tỷ lệ nộp bài' : 'Submission rate'}</span>
                     </div>
 
-                    {/* Tiêu chuẩn */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.gold }} />
-                          <span>{isVi ? 'Tiêu chuẩn (50% - 64%)' : 'Standard (50% - 64%)'}</span>
-                        </span>
-                        <span className="font-mono font-bold" style={{ color: palette.gold }}>
-                          {distributionData.standard} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctStandard}%)
-                        </span>
+                    <div className="adm-dash-telemetry-card">
+                      <div className="adm-dash-telemetry-head">
+                        <span className="adm-dash-telemetry-title">{isVi ? 'Điểm TB' : 'Avg Score'}</span>
+                        <BarChart3 size={14} style={{ color: palette.emerald }} />
                       </div>
-                      <div className="adm-dash-track" style={{ height: '5px' }}>
-                        <div 
-                          className="h-full rounded-full transition-all" 
-                          style={{ 
-                            width: `${distributionData.pctStandard}%`,
-                            backgroundColor: palette.gold 
-                          }} 
-                        />
+                      <div className="adm-dash-telemetry-value text-emerald-500 font-mono">
+                        {stats.averageScore}%
                       </div>
+                      <span className="adm-dash-telemetry-sub">
+                        {stats.averageScore >= 80 ? (isVi ? 'Xuất sắc' : 'Excellent') : stats.averageScore >= 50 ? (isVi ? 'Đạt chuẩn' : 'On Target') : (isVi ? 'Cần cải thiện' : 'Needs Focus')}
+                      </span>
                     </div>
 
-                    {/* Cần chú ý */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-on-surface font-medium">
-                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: palette.rose }} />
-                          <span>{isVi ? 'Cần cải thiện (< 50%)' : 'Needs Focus (< 50%)'}</span>
-                        </span>
-                        <span className="font-mono font-bold" style={{ color: palette.rose }}>
-                          {distributionData.below} {isVi ? 'lớp' : 'cohorts'} ({distributionData.pctBelow}%)
-                        </span>
+                    <div className="adm-dash-telemetry-card">
+                      <div className="adm-dash-telemetry-head">
+                        <span className="adm-dash-telemetry-title">{isVi ? 'Chờ chấm' : 'Pending'}</span>
+                        <FileText size={14} style={{ color: palette.rose }} />
                       </div>
-                      <div className="adm-dash-track" style={{ height: '5px' }}>
-                        <div 
-                          className="h-full rounded-full transition-all" 
-                          style={{ 
-                            width: `${distributionData.pctBelow}%`,
-                            backgroundColor: palette.rose 
-                          }} 
-                        />
+                      <div className="adm-dash-telemetry-value text-on-surface font-mono">
+                        {stats.pendingGradings}
                       </div>
+                      <span className="adm-dash-telemetry-sub flex items-center gap-1 text-amber-500 font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                        {isVi ? 'Hàng đợi' : 'In queue'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -581,26 +675,26 @@ export const Dashboard: React.FC = () => {
 
       {/* 4. Full-Width Key Cohort Progress Table - Rộng rãi, thoáng đãng, sắc nét */}
       <div className="adm-table-card">
-        <div className="adm-table-header">
+        <div className="adm-table-card-header">
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-primary" />
             <h2 className="adm-table-title">
               {isVi ? 'Tiến độ lớp học trọng điểm' : 'Key Cohort Progress'}
             </h2>
             {recentClasses.length > 0 && (
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-primary/10 text-primary">
                 {recentClasses.length} {isVi ? 'lớp' : 'classes'}
               </span>
             )}
           </div>
-          <Button 
-            variant="ghost"
-            size="sm"
-            icon={<ChevronRight size={14} />}
+          <button 
+            type="button"
             onClick={() => navigate('/admin/classes')}
+            className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
           >
-            {isVi ? 'Xem tất cả lớp' : 'View all'}
-          </Button>
+            <span>{isVi ? 'Xem tất cả lớp' : 'View all'}</span>
+            <ChevronRight size={14} />
+          </button>
         </div>
 
         {loading ? (
@@ -618,63 +712,70 @@ export const Dashboard: React.FC = () => {
             <table className="adm-table">
               <thead>
                 <tr>
-                  <th>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
+                  <th style={{ width: '110px' }}>{isVi ? 'MÃ LỚP' : 'CODE'}</th>
                   <th>{isVi ? 'TÊN LỚP HỌC' : 'CLASS NAME'}</th>
-                  <th className="text-center">{isVi ? 'BÀI TẬP' : 'ASSIGNMENTS'}</th>
-                  <th className="text-center">{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
-                  <th>{isVi ? 'HOÀN THÀNH' : 'COMPLETION'}</th>
-                  <th className="text-right">{isVi ? 'THAO TÁC' : 'ACTION'}</th>
+                  <th className="text-center" style={{ width: '110px' }}>{isVi ? 'BÀI TẬP' : 'ASSIGNMENTS'}</th>
+                  <th className="text-center" style={{ width: '130px' }}>{isVi ? 'ĐIỂM TB' : 'AVG SCORE'}</th>
+                  <th style={{ width: '220px' }}>{isVi ? 'HOÀN THÀNH' : 'COMPLETION'}</th>
+                  <th className="text-right" style={{ width: '110px' }}>{isVi ? 'THAO TÁC' : 'ACTION'}</th>
                 </tr>
               </thead>
               <tbody>
-                {recentClasses.map((cls) => (
-                  <tr key={cls.classId} className="hover:bg-surface-hover/60 transition-colors">
-                    <td>
-                      <span className="badge badge-primary font-mono text-xs font-bold">
-                        ENG-{cls.classId}
-                      </span>
-                    </td>
-                    <td className="font-semibold text-on-surface">
-                      {cls.className}
-                    </td>
-                    <td className="text-center font-mono font-medium">
-                      {cls.assignedAssignmentCount}
-                    </td>
-                    <td className="text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold font-mono ${
-                        cls.averageScorePercent >= 80 
-                          ? 'bg-primary/10 text-primary border border-primary/20' 
-                          : cls.averageScorePercent >= 65 
-                          ? 'bg-gold/15 text-gold border border-gold/25' 
-                          : 'bg-surface-variant text-on-surface-variant'
-                      }`}>
-                        {cls.averageScorePercent}%
-                      </span>
-                    </td>
-                    <td style={{ minWidth: '180px' }}>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${Math.min(100, Math.max(0, cls.completionRatePercent))}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-mono font-bold text-on-surface-variant w-10 text-right">
-                          {cls.completionRatePercent}%
+                {recentClasses.map((cls) => {
+                  const score = Math.round(cls.averageScorePercent || 0);
+                  const completion = Math.round(cls.completionRatePercent || 0);
+                  return (
+                    <tr key={cls.classId}>
+                      <td>
+                        <span className="badge badge-primary font-mono text-xs font-bold py-0.5 px-2">
+                          ENG-{cls.classId}
                         </span>
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigate(`/admin/classes/${cls.classId}`)}
-                      >
-                        {isVi ? 'Chi tiết' : 'Details'}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="font-semibold text-on-surface">
+                        <span 
+                          onClick={() => navigate(`/admin/classes/${cls.classId}`)}
+                          className="cursor-pointer hover:text-primary transition-colors"
+                        >
+                          {cls.className}
+                        </span>
+                      </td>
+                      <td className="text-center font-mono font-bold text-on-surface">
+                        {cls.assignedAssignmentCount}
+                      </td>
+                      <td className="text-center">
+                        <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md inline-block" style={{
+                          background: score >= 80 ? 'rgba(52, 211, 153, 0.12)' : score >= 65 ? 'rgba(56, 189, 248, 0.12)' : score >= 50 ? 'rgba(251, 191, 36, 0.12)' : 'rgba(251, 113, 133, 0.12)',
+                          color: score >= 80 ? '#34d399' : score >= 65 ? '#38bdf8' : score >= 50 ? '#fbbf24' : '#fb7185',
+                          border: `1px solid ${score >= 80 ? 'rgba(52, 211, 153, 0.3)' : score >= 65 ? 'rgba(56, 189, 248, 0.3)' : score >= 50 ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 113, 133, 0.3)'}`
+                        }}>
+                          {cls.averageScorePercent}%
+                        </span>
+                      </td>
+                      <td>
+                        <div className="adm-table-progress-wrap">
+                          <div className="adm-table-progress-track">
+                            <div 
+                              className="adm-table-progress-fill"
+                              style={{ width: `${Math.min(100, Math.max(0, completion))}%` }}
+                            />
+                          </div>
+                          <span className="adm-table-progress-val">
+                            {completion}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="text-right">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/admin/classes/${cls.classId}`)}
+                        >
+                          {isVi ? 'Chi tiết' : 'Details'}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
