@@ -65,7 +65,6 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
 
   const handleProfileSaved = () => {
     setHasSavedProfile(true);
-    toast.success(isVi ? 'Cập nhật thông tin học viên thành công!' : 'Student profile updated successfully!');
     void refetch();
   };
 

@@ -132,7 +132,6 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
 
   const handleProfileSaved = () => {
     setHasSavedProfile(true);
-    toastSuccess(isVi ? 'Cập nhật thông tin giảng viên thành công!' : 'Teacher profile updated successfully!');
     retryProfile();
   };
 

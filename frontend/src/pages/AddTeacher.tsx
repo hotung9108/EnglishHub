@@ -65,7 +65,6 @@ export const AddTeacher: React.FC = () => {
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
       setNameError(valResult.errorMessage || '');
-      toast.warning(valResult.errorMessage || '');
       setCurrentStep(1);
       return;
     }
@@ -88,12 +87,10 @@ export const AddTeacher: React.FC = () => {
     } catch (err: unknown) {
       if (parseApiError(err).statusCode === 409) {
         setEmailError('duplicate');
-        toast.error(isVi ? 'Email này đã được sử dụng.' : 'This email is already in use.');
         setCurrentStep(1);
       } else {
         const msg = err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.';
         setSubmitError(msg);
-        toast.error(msg);
       }
     } finally {
       setSubmitting(false);

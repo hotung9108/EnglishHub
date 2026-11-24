@@ -91,7 +91,7 @@ const StudentAssignmentListening: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { warning: toastWarning, error: toastError, success: toastSuccess } = useToast();
+  const { warning: toastWarning, error: toastError } = useToast();
   const isReviewMode = searchParams.get('mode') === 'review';
 
   const [isLoading, setIsLoading] = useState(true);
@@ -529,7 +529,6 @@ const StudentAssignmentListening: React.FC = () => {
       : (submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
           : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id));
     if (submitState.kind === 'completed' && !isReviewMode) notifyAssignmentSubmitted();
-    if (successMessage) toastSuccess(successMessage);
     const timer = setTimeout(() => {
       if (viewGeneration.current === generation) navigate(destination, { replace: true });
     }, NAVIGATION_DELAY_MS);
@@ -674,6 +673,13 @@ const StudentAssignmentListening: React.FC = () => {
             disabled={isSubmitting || isLoading || assignment?.status === 'CLOSED'}>
             Thử nộp lại bài
           </Button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="exam-alert-success">
+          <AlertCircle size={20} />
+          <span>{successMessage}</span>
         </div>
       )}
 

@@ -155,7 +155,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return (
             <div
               key={t.id}
-              role="alert"
+              role={t.type === 'error' ? 'alert' : 'status'}
               className="eh-toast-item"
               style={{
                 pointerEvents: 'auto',
