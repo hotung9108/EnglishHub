@@ -18,9 +18,12 @@ export function useStudentSubmissionPolling({
   enabled = true,
   onGraded,
 }: UseStudentSubmissionPollingOptions) {
-  const [isPolling, setIsPolling] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
   const onGradedRef = useRef(onGraded);
-  onGradedRef.current = onGraded;
+
+  useEffect(() => {
+    onGradedRef.current = onGraded;
+  }, [onGraded]);
 
   const checkGradedCondition = useCallback((sub: SubmissionDetail): boolean => {
     if (sub.status === 'GRADED') return true;
@@ -37,7 +40,6 @@ export function useStudentSubmissionPolling({
 
   useEffect(() => {
     if (!submissionId || isGraded || !enabled) {
-      setIsPolling(false);
       return;
     }
 
@@ -45,13 +47,11 @@ export function useStudentSubmissionPolling({
     let timerId: ReturnType<typeof setTimeout> | null = null;
     const startTime = Date.now();
 
-    setIsPolling(true);
-
     const poll = async () => {
       if (!isMounted) return;
 
       if (Date.now() - startTime >= timeoutMs) {
-        setIsPolling(false);
+        if (isMounted) setHasCompleted(true);
         return;
       }
 
@@ -60,7 +60,7 @@ export function useStudentSubmissionPolling({
         if (!isMounted) return;
 
         if (checkGradedCondition(fresh)) {
-          setIsPolling(false);
+          setHasCompleted(true);
           onGradedRef.current?.(fresh);
           return;
         }
@@ -71,7 +71,7 @@ export function useStudentSubmissionPolling({
       if (isMounted && Date.now() - startTime < timeoutMs) {
         timerId = setTimeout(poll, intervalMs);
       } else if (isMounted) {
-        setIsPolling(false);
+        setHasCompleted(true);
       }
     };
 
@@ -82,6 +82,8 @@ export function useStudentSubmissionPolling({
       if (timerId) clearTimeout(timerId);
     };
   }, [submissionId, isGraded, enabled, intervalMs, timeoutMs, checkGradedCondition]);
+
+  const isPolling = Boolean(submissionId && !isGraded && enabled && !hasCompleted);
 
   return { isPolling };
 }
