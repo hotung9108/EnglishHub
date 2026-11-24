@@ -209,6 +209,14 @@
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+.writing-tool-btn svg,
+.writing-tool-btn svg * {
+  pointer-events: none;
 }
 
 .writing-tool-btn:hover:not(:disabled) {
@@ -219,6 +227,7 @@
 .writing-tool-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .writing-tool-btn.is-active {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, FileText, 
@@ -59,11 +59,13 @@ const StudentAssignmentWriting: React.FC = () => {
     return localStorage.getItem(`eh_draft_writing_${id}`) || localStorage.getItem(`eh_last_writing_${id}`) || '';
   });
   const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
-  const [history, setHistory] = useState<string[]>(() => {
+  const [historyState, setHistoryState] = useState<{ entries: string[]; index: number }>(() => {
     const init = localStorage.getItem(`eh_draft_writing_${id}`) || localStorage.getItem(`eh_last_writing_${id}`) || '';
-    return [init];
+    return { entries: [init], index: 0 };
   });
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
+  const history = historyState.entries;
+  const historyIndex = historyState.index;
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -368,19 +370,44 @@ const StudentAssignmentWriting: React.FC = () => {
 
   const wordCount = useMemo(() => countWritingWords(editorText), [editorText]);
 
-  const updateTextWithHistory = (newText: string, newCursorStart?: number, newCursorEnd?: number) => {
-    setEditorText(newText);
-    setHistory((prev) => {
-      const trimmed = prev.slice(0, historyIndex + 1);
-      if (trimmed.length === 0 || trimmed[trimmed.length - 1] !== editorText) {
-        return [...trimmed, editorText, newText];
+  const pushHistoryEntry = useCallback((newText: string, baseText?: string) => {
+    setHistoryState((prev) => {
+      const trimmed = prev.entries.slice(0, prev.index + 1);
+      const next = [...trimmed];
+      if (baseText !== undefined && (next.length === 0 || next[next.length - 1] !== baseText)) {
+        next.push(baseText);
       }
-      return [...trimmed, newText];
+      if (next.length === 0 || next[next.length - 1] !== newText) {
+        next.push(newText);
+      }
+      return {
+        entries: next,
+        index: next.length - 1,
+      };
     });
-    setHistoryIndex(() => {
-      const currentIsTop = history.length > historyIndex && history[historyIndex] === editorText;
-      return currentIsTop ? historyIndex + 1 : historyIndex + 2;
-    });
+  }, []);
+
+  const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const target = e.target;
+    selectionRef.current = { start: target.selectionStart, end: target.selectionEnd };
+    const currentBase = editorText;
+    setEditorText(val);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    typingTimerRef.current = setTimeout(() => {
+      pushHistoryEntry(val, currentBase);
+    }, 400);
+  };
+
+  const updateTextWithHistory = (newText: string, newCursorStart?: number, newCursorEnd?: number) => {
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    const currentBase = editorText;
+    setEditorText(newText);
+    pushHistoryEntry(newText, currentBase);
 
     const targetStart = newCursorStart !== undefined ? newCursorStart : newText.length;
     const targetEnd = newCursorEnd !== undefined ? newCursorEnd : targetStart;
@@ -397,26 +424,51 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      const nextIdx = historyIndex - 1;
-      setHistoryIndex(nextIdx);
-      setEditorText(history[nextIdx]);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
     }
+    setHistoryState((prev) => {
+      if (prev.index <= 0) return prev;
+      const nextIdx = prev.index - 1;
+      setEditorText(prev.entries[nextIdx]);
+      return { ...prev, index: nextIdx };
+    });
   };
 
   const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextIdx = historyIndex + 1;
-      setHistoryIndex(nextIdx);
-      setEditorText(history[nextIdx]);
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
     }
+    setHistoryState((prev) => {
+      if (prev.index >= prev.entries.length - 1) return prev;
+      const nextIdx = prev.index + 1;
+      setEditorText(prev.entries[nextIdx]);
+      return { ...prev, index: nextIdx };
+    });
+  };
+
+  const getActiveSelection = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return { start: 0, end: 0 };
+    let start = textarea.selectionStart;
+    let end = textarea.selectionEnd;
+
+    if (
+      (start === undefined || (start === 0 && end === 0)) &&
+      (selectionRef.current.start > 0 || selectionRef.current.end > 0)
+    ) {
+      start = selectionRef.current.start;
+      end = selectionRef.current.end;
+    }
+
+    const textLen = editorText.length;
+    const safeStart = Math.max(0, Math.min(start ?? 0, textLen));
+    const safeEnd = Math.max(safeStart, Math.min(end ?? safeStart, textLen));
+    return { start: safeStart, end: safeEnd };
   };
 
   const applyWrap = (before: string, after: string, placeholder = 'nội dung') => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
+    const { start, end } = getActiveSelection();
     const selected = editorText.substring(start, end);
 
     // Check if selection is already wrapped with before/after
@@ -449,16 +501,21 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const applyList = (ordered: boolean) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
+    const { start, end } = getActiveSelection();
 
     const lineStart = editorText.lastIndexOf('\n', start - 1) + 1;
     const nextNewline = editorText.indexOf('\n', end);
     const lineEnd = nextNewline === -1 ? editorText.length : nextNewline;
 
-    const lines = editorText.substring(lineStart, lineEnd).split('\n');
+    const targetText = editorText.substring(lineStart, lineEnd);
+    if (!targetText.trim()) {
+      const placeholder = ordered ? '1. ' : '- ';
+      const nextText = editorText.substring(0, lineStart) + placeholder + editorText.substring(lineEnd);
+      updateTextWithHistory(nextText, lineStart + placeholder.length, lineStart + placeholder.length);
+      return;
+    }
+
+    const lines = targetText.split('\n');
     const isAlreadyBullet = lines.every((l) => l.trim().startsWith('- '));
     const isAlreadyOrdered = lines.every((l) => /^\d+\.\s/.test(l.trim()));
 
@@ -478,10 +535,7 @@ const StudentAssignmentWriting: React.FC = () => {
   };
 
   const applyAlignment = (alignment: 'left' | 'center') => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? 0;
+    const { start, end } = getActiveSelection();
     const selected = editorText.substring(start, end) || editorText;
 
     if (alignment === 'left') {
@@ -559,9 +613,12 @@ const StudentAssignmentWriting: React.FC = () => {
       clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
     }
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
     setEditorText('');
-    setHistory(['']);
-    setHistoryIndex(0);
+    setHistoryState({ entries: [''], index: 0 });
     localStorage.removeItem(`eh_draft_writing_${id}`);
   };
 
@@ -982,10 +1039,7 @@ const StudentAssignmentWriting: React.FC = () => {
               <textarea 
                 ref={textareaRef}
                 value={editorText}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setEditorText(val);
-                }}
+                onChange={handleEditorChange}
                 onSelect={(e) => {
                   const el = e.currentTarget;
                   selectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
