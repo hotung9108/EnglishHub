@@ -410,6 +410,8 @@ export const TeacherCreateAssignment: React.FC = () => {
         listening: 'QUIZ'
       };
 
+      let moduleCreationFailure: { index: number; skill: AssignmentSkill; error: unknown } | null = null;
+
       for (let sIdx = 0; sIdx < assignmentData.modules.length; sIdx++) {
         const mod = assignmentData.modules[sIdx];
         const orderIndex = sIdx + 1;
@@ -421,58 +423,68 @@ export const TeacherCreateAssignment: React.FC = () => {
           aiInstruction = (mod.config as SpeakingConfig).aiInstruction || undefined;
         }
 
-        const modRes = await moduleService.createModule(newAssignmentId, {
-          skill: apiSkillMap[mod.skill],
-          taskType: taskTypeMap[mod.skill],
-          orderIndex,
-          instructions,
-          aiInstruction,
-          maxScore: mod.maxScore || 10
-        });
-        const createdModuleId = modRes.id;
+        try {
+          const modRes = await moduleService.createModule(newAssignmentId, {
+            skill: apiSkillMap[mod.skill],
+            taskType: taskTypeMap[mod.skill],
+            orderIndex,
+            instructions,
+            aiInstruction,
+            maxScore: mod.maxScore || 10
+          });
+          const createdModuleId = modRes.id;
 
-        // Upload audio file if skill is listening and file is present
-        if (createdModuleId && mod.skill === 'listening') {
-          const lConfig = mod.config as ListeningConfig;
-          if (lConfig.audioFile) {
-            try {
+          // Upload audio file if skill is listening and file is present
+          if (createdModuleId && mod.skill === 'listening') {
+            const lConfig = mod.config as ListeningConfig;
+            if (lConfig.audioFile) {
               await moduleService.uploadAudio(createdModuleId, lConfig.audioFile);
-            } catch (audioErr) {
-              console.error('Failed to upload audio file:', audioErr);
-              showToast(isVi ? 'Không thể tải lên tệp âm thanh bài nghe. Vui lòng thử lại!' : 'Failed to upload audio file!');
-              throw audioErr;
             }
           }
-        }
 
-        // Create questions for reading / listening in parallel with Promise.all
-        if (createdModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
-          const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
-          if (qList.length > 0) {
-            const moduleTotalScore = mod.maxScore || 10;
-            const scorePerQ = moduleTotalScore / qList.length;
-            const questionPromises = qList.map((q, i) => {
-              const payload = q.type === 'multiple_choice'
-                ? buildMcqPayload({
-                    content: q.prompt,
-                    options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
-                      ? ((q as { options?: string[] }).options || [])
-                      : [],
-                    correctOptionIndexOrText: q.correctAnswer,
-                    score: scorePerQ,
-                    orderIndex: i + 1,
-                  })
-                : buildShortAnswerPayload({
-                    content: q.prompt,
-                    answerText: q.correctAnswer,
-                    score: scorePerQ,
-                    orderIndex: i + 1,
-                  });
-              return questionService.createQuestion(createdModuleId, payload);
-            });
-            await Promise.all(questionPromises);
+          // Create questions for reading / listening in parallel with Promise.all
+          if (createdModuleId && (mod.skill === 'reading' || mod.skill === 'listening')) {
+            const qList = (mod.config as (ReadingConfig | ListeningConfig)).questions || [];
+            if (qList.length > 0) {
+              const moduleTotalScore = mod.maxScore || 10;
+              const scorePerQ = moduleTotalScore / qList.length;
+              const questionPromises = qList.map((q, i) => {
+                const payload = q.type === 'multiple_choice'
+                  ? buildMcqPayload({
+                      content: q.prompt,
+                      options: 'options' in q && Array.isArray((q as { options?: string[] }).options)
+                        ? ((q as { options?: string[] }).options || [])
+                        : [],
+                      correctOptionIndexOrText: q.correctAnswer,
+                      score: scorePerQ,
+                      orderIndex: i + 1,
+                    })
+                  : buildShortAnswerPayload({
+                      content: q.prompt,
+                      answerText: q.correctAnswer,
+                      score: scorePerQ,
+                      orderIndex: i + 1,
+                    });
+                return questionService.createQuestion(createdModuleId, payload);
+              });
+              await Promise.all(questionPromises);
+            }
           }
+        } catch (moduleErr) {
+          console.error(`Failed to create module #${orderIndex} (${mod.skill}):`, moduleErr);
+          moduleCreationFailure = { index: sIdx, skill: mod.skill, error: moduleErr };
+          break; // Stop immediately to guard against incomplete assignment publishing
         }
+      }
+
+      if (moduleCreationFailure) {
+        setActiveModuleIndex(moduleCreationFailure.index);
+        const skillLabel = getSkillName(moduleCreationFailure.skill);
+        const failMsg = isVi
+          ? `Lỗi khi tạo phần thi ${skillLabel}. Tiến trình phát hành đã bị chặn để bảo vệ dữ liệu, bài tập được lưu ở trạng thái bản nháp (DRAFT)!`
+          : `Error creating ${skillLabel} module. Publishing was blocked to protect data, assignment is saved as DRAFT!`;
+        showToast(failMsg);
+        return; // HALT: Never proceed to updateAssignmentStatus('PUBLISHED')
       }
 
       // If status is PUBLISHED, publish assignment
