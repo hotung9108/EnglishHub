@@ -509,8 +509,9 @@ it('P3 Teachers keeps identical search sets in flight, replaces changed sets, an
     .mockReturnValueOnce(next.promise);
   mountTeachers([teacher, otherTeacher]);
   await findTeacherCard(teacher);
+  await waitFor(() => expect(detail).toHaveBeenCalled());
   const search = screen.getByPlaceholderText('Search teachers...');
-  const firstSignal = detail.mock.calls[0][1]?.signal;
+  const firstSignal = detail.mock.calls[0]?.[1]?.signal;
 
   fireEvent.change(search, { target: { value: 'GV-' } });
   fireEvent.change(search, { target: { value: 'GV-00' } });
