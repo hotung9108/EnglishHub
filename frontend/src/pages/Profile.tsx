@@ -12,6 +12,7 @@ import { userService } from '../api/services/user.service';
 import type { UserProfile } from '../api/services/user.service';
 import { validateFullName } from '../utils/nameValidation';
 import { validatePhone } from '../utils/phoneValidation';
+import { useToast } from '../components/common/ToastContext';
 import '../styles/settings.css';
 
 const PRESET_AVATARS = [
@@ -24,6 +25,7 @@ const PRESET_AVATARS = [
 export const Profile: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
   const { user, updateUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -162,10 +164,12 @@ export const Profile: React.FC = () => {
       });
 
       setSaveSuccess(true);
+      toast.success(isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!');
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Không thể cập nhật hồ sơ' : 'Failed to update profile');
       setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -176,17 +180,23 @@ export const Profile: React.FC = () => {
     setPasswordError('');
 
     if (newPassword.length < 8) {
-      setPasswordError(isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.');
+      const msg = isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.';
+      setPasswordError(msg);
+      toast.error(msg);
       return;
     }
 
     if (currentPassword && newPassword === currentPassword) {
-      setPasswordError(isVi ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.' : 'New password must not be identical to current password.');
+      const msg = isVi ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.' : 'New password must not be identical to current password.';
+      setPasswordError(msg);
+      toast.error(msg);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError(isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.');
+      const msg = isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.';
+      setPasswordError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -198,6 +208,7 @@ export const Profile: React.FC = () => {
       });
 
       setSaveSuccess(true);
+      toast.success(isVi ? 'Cập nhật mật khẩu thành công!' : 'Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -205,6 +216,7 @@ export const Profile: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.' : 'Failed to change password. Please check your current password.');
       setPasswordError(msg);
+      toast.error(msg);
     } finally {
       setChangingPassword(false);
     }
