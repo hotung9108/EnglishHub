@@ -132,6 +132,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
   const countAiGraded = useMemo(() => gradings.filter(i => i.status === 'AI_GRADED').length, [gradings]);
   const countPending = useMemo(() => gradings.filter(i => i.status === 'PENDING').length, [gradings]);
   const countFailed = useMemo(() => gradings.filter(i => i.status === 'FAILED').length, [gradings]);
+  const selectedSummary = useMemo(() => gradings.find(i => i.id === selectedGradingId), [gradings, selectedGradingId]);
 
   const filteredGradings = useMemo(() => {
     return gradings.filter(item => {
@@ -156,6 +157,11 @@ export const AdminGradingAuditLogs: React.FC = () => {
         const rawStatus = item.status.toLowerCase();
         const scoreStr = item.finalScore !== null && item.finalScore !== undefined ? String(item.finalScore) : '';
 
+        const matchesAssignment = item.assignmentTitle?.toLowerCase().includes(q) ?? false;
+        const matchesTeacher = item.teacherName?.toLowerCase().includes(q) ?? false;
+        const matchesStudent = item.studentName?.toLowerCase().includes(q) ?? false;
+        const matchesClass = item.className?.toLowerCase().includes(q) ?? false;
+
         // Friendly keyword matching for status
         let statusMatches = rawStatus.includes(q);
         if (item.status === 'COMPLETED' && (q.includes('hoàn tất') || q.includes('hoàn thành') || q.includes('xong') || q.includes('complete'))) {
@@ -177,6 +183,10 @@ export const AdminGradingAuditLogs: React.FC = () => {
         return (
           code.includes(q) ||
           idStr === q ||
+          matchesAssignment ||
+          matchesTeacher ||
+          matchesStudent ||
+          matchesClass ||
           statusMatches ||
           scoreMatches
         );
@@ -200,12 +210,17 @@ export const AdminGradingAuditLogs: React.FC = () => {
       return;
     }
 
-    const headers = ['ID', 'Grading Code', 'Status', 'Final Score'];
+    const headers = ['ID', 'Grading Code', 'Assignment', 'Class', 'Teacher', 'Student', 'Status', 'Final Score', 'Graded At'];
     const rows = filteredGradings.map((item) => [
       item.id,
       `GR-${item.id}`,
+      item.assignmentTitle || 'N/A',
+      item.className || 'N/A',
+      item.teacherName || 'N/A',
+      item.studentName || 'N/A',
       item.status,
       item.finalScore !== null && item.finalScore !== undefined ? item.finalScore : 'N/A',
+      item.gradedAt || 'N/A',
     ]);
 
     const csvContent =
@@ -351,7 +366,7 @@ export const AdminGradingAuditLogs: React.FC = () => {
             <input 
               type="text" 
               className="adm-search-input"
-              placeholder={isVi ? 'Tìm mã GR-..., điểm, trạng thái...' : 'Search GR-... ID, score, status...'}
+              placeholder={isVi ? 'Tìm mã GR-..., bài tập, giáo viên, học sinh...' : 'Search GR-... ID, assignment, teacher, student...'}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
             />
@@ -408,6 +423,9 @@ export const AdminGradingAuditLogs: React.FC = () => {
               <thead>
                 <tr>
                   <th>{isVi ? 'MÃ CHẤM' : 'GRADING ID'}</th>
+                  <th>{isVi ? 'BÀI TẬP & LỚP HỌC' : 'ASSIGNMENT & CLASS'}</th>
+                  <th>{isVi ? 'GIÁO VIÊN' : 'INSTRUCTOR'}</th>
+                  <th>{isVi ? 'HỌC VIÊN' : 'STUDENT'}</th>
                   <th>{isVi ? 'TRẠNG THÁI' : 'STATUS'}</th>
                   <th>{isVi ? 'ĐIỂM CHỐT' : 'FINAL SCORE'}</th>
                   <th className="text-right">{isVi ? 'NHẬT KÝ SỬA ĐIỂM' : 'AUDIT ACTION'}</th>
@@ -421,6 +439,22 @@ export const AdminGradingAuditLogs: React.FC = () => {
                     className="cursor-pointer"
                   >
                     <td className="font-mono font-semibold text-primary">GR-{item.id}</td>
+                    <td>
+                      <div className="font-medium text-on-surface line-clamp-1" title={item.assignmentTitle}>
+                        {item.assignmentTitle || <span className="text-on-surface-variant italic">{isVi ? 'Chưa xác định' : 'Unknown'}</span>}
+                      </div>
+                      {item.className && (
+                        <div className="text-xs text-on-surface-variant font-mono mt-0.5">
+                          {item.className}
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-sm">
+                      {item.teacherName || <span className="text-on-surface-variant italic">-</span>}
+                    </td>
+                    <td className="text-sm">
+                      {item.studentName || <span className="text-on-surface-variant italic">-</span>}
+                    </td>
                     <td>{formatStatusBadge(item.status)}</td>
                     <td>
                       <span className={`font-bold font-mono text-[15px] ${item.finalScore !== null ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -501,6 +535,28 @@ export const AdminGradingAuditLogs: React.FC = () => {
                 </div>
               ) : gradingDetail ? (
                 <>
+                  {/* Context Card: Assignment, Class, Teacher, Student */}
+                  {(selectedSummary?.assignmentTitle || selectedSummary?.teacherName || selectedSummary?.studentName) && (
+                    <div className="card p-4 bg-surface-container-low border border-outline-variant/40 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Bài tập' : 'Assignment'}</div>
+                        <div className="font-semibold text-sm text-on-surface mt-0.5">{selectedSummary.assignmentTitle || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Lớp học' : 'Class'}</div>
+                        <div className="font-semibold text-sm text-on-surface mt-0.5">{selectedSummary.className || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Giáo viên phụ trách' : 'Instructor'}</div>
+                        <div className="font-medium text-on-surface mt-0.5">{selectedSummary.teacherName || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-on-surface-variant font-medium">{isVi ? 'Học viên làm bài' : 'Student'}</div>
+                        <div className="font-medium text-on-surface mt-0.5">{selectedSummary.studentName || '-'}</div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Status & Scores Strip */}
                   <div className="adm-drawer-metrics-grid">
                     <div className="adm-drawer-metric-item">

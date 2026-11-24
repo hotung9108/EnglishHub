@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, FileText, 
   RefreshCw, AlertCircle, CheckCircle2, HelpCircle, Lock, Headphones,
-  Users, Clock, PenTool, Mic, BookOpen
+  Users, Clock, PenTool, Mic, BookOpen, Trash2, Download
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -17,7 +17,8 @@ import {
 } from '../api/services/submission.service';
 import { moduleService } from '../api/services/module.service';
 import { questionService, extractMcqOptions, extractShortAnswerText, type QuestionResponse } from '../api/services/question.service';
-import { Button, MetricCard, LoadingState } from '../components/common';
+import { Button, MetricCard, LoadingState, useToast } from '../components/common';
+import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
 
 export interface AssignmentModuleData {
   id: number;
@@ -51,8 +52,11 @@ export const TeacherAssignmentDetails: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
   const [isClosing, setIsClosing] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const { user } = useAuth();
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
@@ -83,9 +87,11 @@ export const TeacherAssignmentDetails: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
   };
 
   const handleOpenCloseModal = () => {
@@ -119,6 +125,76 @@ export const TeacherAssignmentDetails: React.FC = () => {
       showToast(errorMsg);
     } finally {
       setIsClosing(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!assignment || !isOwner) return;
+
+    setIsDeleting(true);
+    try {
+      await assignmentService.deleteAssignment(assignment.id);
+      setShowDeleteModal(false);
+      showToast(isVi ? 'Đã xóa bài tập thành công.' : 'Assignment deleted successfully.');
+      navigate('/teacher/assignments');
+    } catch (err: unknown) {
+      console.error('Failed to delete assignment:', err);
+      let errorMsg = isVi ? 'Không thể xóa bài tập. Vui lòng thử lại.' : 'Failed to delete assignment. Please retry.';
+      if (err && typeof err === 'object') {
+        const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+        if (apiErr.response?.data?.message) {
+          errorMsg = apiErr.response.data.message;
+        } else if (apiErr.message) {
+          errorMsg = apiErr.message;
+        }
+      }
+      showToast(errorMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleExportSubmissions = async () => {
+    if (isExporting || !id) return;
+    if (students.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu bài nộp để xuất file.' : 'No submission data to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      try {
+        const blob = await assignmentService.exportSubmissionsExcel(Number(id));
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateStr = new Date().toISOString().slice(0, 10);
+          link.download = `submissions-assignment-${id}-${dateStr}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+          return;
+        }
+      } catch {
+        // Fallback to client-side CSV export
+      }
+
+      exportSubmissionsToCsv({
+        assignmentId: id,
+        assignmentTitle: assignment?.title,
+        className,
+        students,
+        isVi
+      });
+      showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+    } catch (err) {
+      console.error('Export submissions failed:', err);
+      showToast(isVi ? 'Không thể xuất danh sách bài nộp. Vui lòng thử lại!' : 'Failed to export submissions. Please try again!');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -409,14 +485,6 @@ export const TeacherAssignmentDetails: React.FC = () => {
 
   return (
     <div className="teacher-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="tad-toast">
-          <CheckCircle2 size={16} className="text-secondary" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Unified Hero Header Card */}
       <section className="teacher-page-hero">
         <div className="teacher-hero-content">
@@ -469,6 +537,18 @@ export const TeacherAssignmentDetails: React.FC = () => {
               {metrics.pendingCount > 0 ? ` (${metrics.pendingCount} ${isVi ? 'chờ chấm' : 'pending'})` : ''}
             </Button>
 
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              disabled={isLoading || isExporting || students.length === 0}
+              loading={isExporting}
+              onClick={handleExportSubmissions}
+              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
+            >
+              {t('assignmentDetails.btnExport')}
+            </Button>
+
             {isOwner && assignment.status !== 'CLOSED' && (
               <Button 
                 variant="secondary"
@@ -491,6 +571,19 @@ export const TeacherAssignmentDetails: React.FC = () => {
                 title={assignment.status === 'CLOSED' ? (isVi ? 'Bài tập này đã đóng' : 'Assignment is already closed') : undefined}
               >
                 {t('assignmentDetails.btnClose')}
+              </Button>
+            )}
+
+            {isOwner && (
+              <Button 
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                disabled={isDeleting}
+                loading={isDeleting}
+                onClick={() => setShowDeleteModal(true)}
+              >
+                {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
               </Button>
             )}
           </div>
@@ -849,6 +942,52 @@ export const TeacherAssignmentDetails: React.FC = () => {
                 onClick={handleConfirmClose}
               >
                 {isVi ? 'Đóng bài tập' : 'Close Assignment'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Deleting Assignment */}
+      {showDeleteModal && (
+        <div 
+          className="tad-modal-overlay" 
+          role="dialog" 
+          aria-modal="true" 
+          aria-labelledby="delete-modal-title"
+          onClick={() => !isDeleting && setShowDeleteModal(false)}
+        >
+          <div 
+            className="tad-modal-box tad-modal" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-modal-title" className="tad-modal-title">
+              {isVi ? 'Xóa bài tập' : 'Delete Assignment'}
+            </h3>
+            <p className="tad-modal-description">
+              {isVi 
+                ? 'Bạn có chắc chắn muốn xóa bài tập này không? Bài tập này có thể đã có bài nộp của học viên. Xóa bài tập sẽ xóa mềm và ẩn toàn bộ dữ liệu bài tập và bài nộp liên quan.'
+                : 'Are you sure you want to delete this assignment? It may contain student submissions and associated data. Soft deleting will archive this assignment and its related submission data.'}
+            </p>
+            <div className="tad-modal-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+              >
+                {isVi ? 'Hủy' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={isDeleting}
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+              >
+                {isVi ? 'Xác nhận' : 'Confirm'}
               </Button>
             </div>
           </div>

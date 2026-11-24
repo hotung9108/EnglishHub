@@ -266,6 +266,29 @@ class GradingApiIntegrationTest {
 	}
 
 	@Test
+	void adminCanReadGradingChangeLogsSuccessfully() throws Exception {
+		Grading target = gradingRepository.findAll().stream().findFirst().orElseThrow();
+		long adminId = createUser(UserRole.ADMIN, "Grading API change-log admin");
+
+		mockMvc.perform(get("/api/v1/gradings/{id}/change-logs", target.getId())
+					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray());
+	}
+
+	@Test
+	void listGradingsReturnsEnrichedAssignmentAndClassInfo() throws Exception {
+		long adminId = createUser(UserRole.ADMIN, "Grading list admin");
+
+		mockMvc.perform(get("/api/v1/gradings")
+					.header("Authorization", bearer(adminId, UserRole.ADMIN)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data").isArray())
+				.andExpect(jsonPath("$.data[0].id").isNumber())
+				.andExpect(jsonPath("$.data[0].assignmentTitle").exists());
+	}
+
+	@Test
 	void aiAnalysisAcceptsPendingWritingAndSpeakingWithoutChangingPersistedData() throws Exception {
 		List<Grading> pendingGradings = gradingRepository.findAll().stream()
 				.filter(grading -> grading.getStatus() == GradingStatus.PENDING)

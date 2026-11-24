@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { 
   User, Shield, 
   Check, Eye, EyeOff, 
-  CheckCircle2, Copy, AlertCircle, Loader2,
+  Copy, Loader2,
   Calendar, Phone, BookOpen
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -12,6 +12,7 @@ import { userService } from '../api/services/user.service';
 import type { UserProfile } from '../api/services/user.service';
 import { validateFullName } from '../utils/nameValidation';
 import { validatePhone } from '../utils/phoneValidation';
+import { useToast } from '../components/common/ToastContext';
 import '../styles/settings.css';
 
 const PRESET_AVATARS = [
@@ -24,6 +25,7 @@ const PRESET_AVATARS = [
 export const Profile: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
   const { user, updateUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -39,9 +41,6 @@ export const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [copiedId, setCopiedId] = useState(false);
 
   // Form states
@@ -127,19 +126,18 @@ export const Profile: React.FC = () => {
 
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage('');
 
     const valResult = validateFullName(fullName, isVi);
     if (!valResult.isValid) {
       setNameError(valResult.errorMessage || '');
-      setErrorMessage(valResult.errorMessage || '');
+      toast.warning(valResult.errorMessage || '');
       return;
     }
 
     const phoneResult = validatePhone(phone, isVi);
     if (!phoneResult.isValid) {
       setPhoneError(phoneResult.errorMessage || '');
-      setErrorMessage(phoneResult.errorMessage || '');
+      toast.warning(phoneResult.errorMessage || '');
       return;
     }
 
@@ -161,11 +159,10 @@ export const Profile: React.FC = () => {
         avatar: avatarUrl,
       });
 
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      toast.success(isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Không thể cập nhật hồ sơ' : 'Failed to update profile');
-      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -173,15 +170,22 @@ export const Profile: React.FC = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError('');
 
     if (newPassword.length < 8) {
-      setPasswordError(isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.');
+      const msg = isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.';
+      toast.error(msg);
+      return;
+    }
+
+    if (currentPassword && newPassword === currentPassword) {
+      const msg = isVi ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.' : 'New password must not be identical to current password.';
+      toast.error(msg);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError(isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.');
+      const msg = isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.';
+      toast.error(msg);
       return;
     }
 
@@ -192,14 +196,13 @@ export const Profile: React.FC = () => {
         newPassword,
       });
 
-      setSaveSuccess(true);
+      toast.success(isVi ? 'Cập nhật mật khẩu thành công!' : 'Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.' : 'Failed to change password. Please check your current password.');
-      setPasswordError(msg);
+      toast.error(msg);
     } finally {
       setChangingPassword(false);
     }
@@ -247,20 +250,6 @@ export const Profile: React.FC = () => {
           )}
         </div>
       </div>
-
-      {saveSuccess && (
-        <div className="settings-alert-success">
-          <CheckCircle2 size={18} />
-          <span>{isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!'}</span>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="settings-alert-error">
-          <AlertCircle size={18} />
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       {/* Settings Navigation Tabs */}
       <div className="adm-filter-bar">
@@ -459,7 +448,8 @@ export const Profile: React.FC = () => {
                         <input 
                           type="text" 
                           className="input profile-input-readonly"
-                          value={specialization || (isVi ? 'Chưa cập nhật' : 'Not specified')}
+                          value={specialization.trim() ? specialization : ''}
+                          placeholder={isVi ? 'Chưa cập nhật' : 'Not specified'}
                           readOnly
                         />
                       </div>
@@ -535,18 +525,14 @@ export const Profile: React.FC = () => {
                   {isVi ? 'Đổi mật khẩu định kỳ giúp bảo vệ tài khoản khỏi truy cập trái phép.' : 'Update your password regularly to prevent unauthorized access.'}
                 </p>
 
-                {passwordError && (
-                  <div className="settings-alert-error">
-                    <AlertCircle size={15} />
-                    <span>{passwordError}</span>
-                  </div>
-                )}
-
                 <form onSubmit={handleUpdatePassword} className="profile-password-form">
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mật khẩu hiện tại' : 'Current Password'} *</label>
+                    <label htmlFor="profile-current-password" className="adm-form-label">
+                      {isVi ? 'Mật khẩu hiện tại' : 'Current Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-current-password"
                         type={showCurrentPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={currentPassword}
@@ -565,9 +551,12 @@ export const Profile: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mật khẩu mới' : 'New Password'} *</label>
+                    <label htmlFor="profile-new-password" className="adm-form-label">
+                      {isVi ? 'Mật khẩu mới' : 'New Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-new-password"
                         type={showNewPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={newPassword}
@@ -587,9 +576,12 @@ export const Profile: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} *</label>
+                    <label htmlFor="profile-confirm-password" className="adm-form-label">
+                      {isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-confirm-password"
                         type={showConfirmPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={confirmPassword}

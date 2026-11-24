@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   GraduationCap, UserPlus, Search, 
   ArrowRight, Loader2, AlertCircle
@@ -11,13 +11,30 @@ import type { UserListItem } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
 
+const SPECIALIZATION_REQUEST_LIMIT = 4;
+
+type SpecializationResult =
+  | { state: 'ready'; value: string }
+  | { state: 'missing' }
+  | { state: 'error' };
+
+async function readSpecialization(id: number, signal: AbortSignal): Promise<SpecializationResult> {
+  try {
+    const profile = await userService.getAdminUserDetail(id, { signal });
+    if (profile?.id !== id || profile.role !== 'TEACHER') return { state: 'error' };
+    const value = profile.specialization?.trim();
+    return value ? { state: 'ready', value } : { state: 'missing' };
+  } catch {
+    return { state: 'error' };
+  }
+}
+
 export const Teachers: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterExpertise, setFilterExpertise] = useState<'All' | 'TESOL' | 'Writing' | 'Speaking'>('All');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -29,15 +46,17 @@ export const Teachers: React.FC = () => {
     code: string;
     avatar: string;
     email: string;
-    status: 'Active' | 'On Leave';
+    status: UserListItem['status'];
     activeClasses: number;
     rating: number;
-    qualifications: string[];
   }>>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalClassesCount, setTotalClassesCount] = useState(0);
+  const [specializations, setSpecializations] = useState(new Map<number, SpecializationResult>());
+  const specializationCache = useRef(new Map<number, SpecializationResult>());
+  const inFlightDetails = useRef(new Set<Promise<void>>());
 
   useEffect(() => {
     let isMounted = true;
@@ -84,10 +103,9 @@ export const Teachers: React.FC = () => {
             code: `GV-${String(tc.id).padStart(3, '0')}`,
             avatar: initials,
             email: tc.email,
-            status: (tc.status === 'ACTIVE' ? 'Active' : 'On Leave') as 'Active' | 'On Leave',
+            status: tc.status,
             activeClasses: teacherClasses.length,
             rating: 4.8,
-            qualifications: ['TESOL', 'IELTS 8.0+']
           };
         });
 
@@ -109,7 +127,6 @@ export const Teachers: React.FC = () => {
 
   const filtered = useMemo(() => {
     return teachers.filter(tc => {
-      if (filterExpertise !== 'All' && !tc.qualifications.includes(filterExpertise)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -120,7 +137,7 @@ export const Teachers: React.FC = () => {
       }
       return true;
     });
-  }, [teachers, filterExpertise, searchQuery]);
+  }, [teachers, searchQuery]);
 
   const totalItems = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -131,10 +148,46 @@ export const Teachers: React.FC = () => {
     return filtered.slice(start, start + pageSize);
   }, [filtered, safeCurrentPage, pageSize]);
 
-  const handleFilterChange = (exp: 'All' | 'TESOL' | 'Writing' | 'Speaking') => {
-    setFilterExpertise(exp);
-    setCurrentPage(1);
-  };
+  const visibleIds = [...new Set(paginatedTeachers.map(teacher => teacher.id))];
+  const visibleIdsKey = visibleIds.sort((a, b) => a - b).join(',');
+
+  useEffect(() => {
+    if (!visibleIdsKey) return;
+    const cache = specializationCache.current;
+    const inFlight = inFlightDetails.current;
+    const currentIds = visibleIdsKey.split(',').map(Number);
+    const pendingIds = currentIds.filter(id => !cache.has(id));
+    if (pendingIds.length === 0) return;
+
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    const load = async (id: number) => {
+      const result = await readSpecialization(id, signal);
+      if (signal.aborted) return;
+      cache.set(id, result);
+      setSpecializations(new Map(cache));
+    };
+
+    const schedule = async () => {
+      let index = 0;
+      while (!signal.aborted && index < pendingIds.length) {
+        // Aborted requests keep their slots until they settle.
+        if (inFlight.size >= SPECIALIZATION_REQUEST_LIMIT) {
+          await Promise.race(inFlight);
+          continue;
+        }
+
+        const request = load(pendingIds[index]);
+        inFlight.add(request);
+        void request.then(() => inFlight.delete(request));
+        index += 1;
+      }
+    };
+
+    void schedule();
+    return () => controller.abort();
+  }, [visibleIdsKey]);
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -146,7 +199,7 @@ export const Teachers: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const activeTeachersCount = teachers.filter(t => t.status === 'Active').length;
+  const activeTeachersCount = teachers.filter(teacher => teacher.status === 'ACTIVE').length;
 
   return (
     <div className="adm-container">
@@ -195,21 +248,8 @@ export const Teachers: React.FC = () => {
         />
       </div>
 
-      {/* Filter Bar */}
+      {/* Search */}
       <div className="adm-filter-bar mb-6">
-        <div className="adm-pills">
-          {(['All', 'TESOL', 'Writing', 'Speaking'] as const).map(exp => (
-            <button
-              key={exp}
-              type="button"
-              onClick={() => handleFilterChange(exp)}
-              className={`adm-pill ${filterExpertise === exp ? 'active' : ''}`}
-            >
-              <span>{exp === 'All' ? (isVi ? 'Tất cả chuyên môn' : 'All Qualifications') : exp}</span>
-            </button>
-          ))}
-        </div>
-
         <div className="adm-search-wrap">
           <Search size={16} className="adm-search-icon" />
           <input 
@@ -249,58 +289,86 @@ export const Teachers: React.FC = () => {
       ) : (
         <div className="flex flex-col gap-6">
           <div className="adm-cards-grid">
-            {paginatedTeachers.map(tc => (
-              <div 
-                key={tc.id} 
-                className="eh-card p-6 flex flex-col justify-between gap-4"
-              >
-                <div>
-                  {/* Header with Avatar and Status */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="adm-avatar role-teacher w-12 h-12 text-lg">
-                        {tc.avatar}
+            {paginatedTeachers.map(tc => {
+              const isActive = tc.status === 'ACTIVE';
+              const isLocked = tc.status === 'LOCKED';
+              const statusClass = isActive ? 'badge-active' : isLocked ? 'badge-blocked' : 'badge-neutral';
+              const specialization = specializations.get(tc.id);
+
+              let specializationText = isVi ? 'Đang tải chuyên môn...' : 'Loading specialization...';
+              if (specialization?.state === 'ready') {
+                specializationText = specialization.value;
+              } else if (specialization?.state === 'missing') {
+                specializationText = isVi ? 'Chưa cập nhật' : 'Not specified';
+              } else if (specialization?.state === 'error') {
+                specializationText = isVi ? 'Không thể tải chuyên môn' : 'Could not load specialization';
+              }
+
+              return (
+                <div
+                  key={tc.id}
+                  className="eh-card min-w-0 p-6 flex flex-col justify-between gap-4"
+                >
+                  <div>
+                    {/* Header with Avatar and Status */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="adm-avatar role-teacher w-12 h-12 text-lg">
+                          {tc.avatar}
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold m-0 mb-1 text-surface">{tc.name}</h3>
+                          <span className="font-mono text-primary font-semibold text-xs">{tc.code}</span>
+                        </div>
                       </div>
+
+                      <span className={`badge ${statusClass}`}>
+                        {isActive && (isVi ? 'Đang hoạt động' : 'Active')}
+                        {isLocked && (isVi ? 'Đã khóa' : 'Locked')}
+                        {!isActive && !isLocked && (
+                          <>
+                            <span aria-hidden="true">—</span>
+                            <span className="sr-only">{isVi ? 'Chưa xác định' : 'Unknown'}</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Email */}
+                    <div className="text-sm text-muted mb-3">
+                      {tc.email}
+                    </div>
+
+                    <div className="mb-3">
+                      <span className="text-xs text-muted">{isVi ? 'Chuyên môn' : 'Specialization'}</span>
+                      <div className="adm-rep-student-sub" title={specializationText}>
+                        {specializationText}
+                      </div>
+                    </div>
+
+                    {/* Workload Stats */}
+                    <div className="p-3 rounded-md bg-surface-low border-subtle text-xs">
                       <div>
-                        <h3 className="text-base font-bold m-0 mb-1 text-surface">{tc.name}</h3>
-                        <span className="font-mono text-primary font-semibold text-xs">{tc.code}</span>
+                        <span className="text-muted">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
+                        <strong className="text-surface">{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
                       </div>
                     </div>
-
-                    <span className={`badge ${tc.status === 'Active' ? 'badge-active' : 'badge-onleave'}`}>
-                      {tc.status === 'Active' 
-                        ? (isVi ? 'Đang hoạt động' : 'Active') 
-                        : (isVi ? 'Nghỉ phép' : 'On Leave')}
-                    </span>
                   </div>
 
-                  {/* Email */}
-                  <div className="text-sm text-muted mb-3">
-                    {tc.email}
-                  </div>
-
-                  {/* Workload Stats */}
-                  <div className="p-3 rounded-md bg-surface-low border-subtle text-xs">
-                    <div>
-                      <span className="text-muted">{isVi ? 'Lớp phụ trách: ' : 'Active Classes: '}</span>
-                      <strong className="text-surface">{tc.activeClasses} {isVi ? 'lớp' : 'classes'}</strong>
-                    </div>
+                  {/* Footer Action */}
+                  <div className="pt-3 border-t-subtle flex gap-2">
+                    <Button
+                      variant="secondary"
+                      className="flex-1 text-sm justify-between"
+                      onClick={() => navigate(`/admin/teachers/${tc.id}`)}
+                    >
+                      <span>{t('teachers.viewProfile')}</span>
+                      <ArrowRight size={14} />
+                    </Button>
                   </div>
                 </div>
-
-                {/* Footer Action */}
-                <div className="pt-3 border-t-subtle flex gap-2">
-                  <Button 
-                    variant="secondary"
-                    className="flex-1 text-sm justify-between"
-                    onClick={() => navigate(`/admin/teachers/${tc.id}`)}
-                  >
-                    <span>{t('teachers.viewProfile')}</span>
-                    <ArrowRight size={14} />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <Pagination

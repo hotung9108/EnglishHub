@@ -1,26 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { userService } from '../api/services/user.service';
+import { userService, type UserProfile } from '../api/services/user.service';
 import { reportService } from '../api/services/report.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
-import type { UserListItem } from '../api/services/user.service';
 import type { ReportStudentProgressResponse } from '../types/report.types';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
 
-export interface StudentIdentityHint {
-  studentId?: number;
-  fullName?: string;
-  studentCode?: string;
-  email?: string;
-}
-
 export interface UseStudentDetailsOptions {
   studentId: number;
-  initialHint?: StudentIdentityHint | null;
   isVi?: boolean;
 }
 
+type StudentProfile = UserProfile & { role: 'STUDENT' };
+
 export interface UseStudentDetailsResult {
-  studentUser: UserListItem | null;
+  studentUser: StudentProfile | null;
   progressData: ReportStudentProgressResponse | null;
   evaluations: StudentEvaluationListItem[];
   isLoading: boolean;
@@ -30,32 +23,33 @@ export interface UseStudentDetailsResult {
   isTogglingStatus: boolean;
   isResettingPassword: boolean;
   toggleSuspend: () => Promise<boolean>;
-  resetPassword: (newPassword: string) => Promise<boolean>;
+  resetPassword: () => Promise<string | null>;
   refetch: () => Promise<void>;
+}
+
+interface StudentProfileResult {
+  studentId: number;
+  user: StudentProfile | null;
+  errorMessage?: string;
 }
 
 export function useStudentDetails({
   studentId,
-  initialHint,
   isVi = true,
 }: UseStudentDetailsOptions): UseStudentDetailsResult {
-  const hintFullName = initialHint?.fullName;
-  const hintEmail = initialHint?.email;
+  const isInvalidId = !Number.isSafeInteger(studentId) || studentId <= 0;
 
-  const isInvalidId = !studentId || isNaN(studentId) || studentId <= 0;
-
-  const [studentUser, setStudentUser] = useState<UserListItem | null>(null);
+  const [profile, setProfile] = useState<StudentProfileResult | null>(null);
+  const currentProfile = profile?.studentId === studentId ? profile : null;
+  const studentUser = currentProfile?.user ?? null;
   const [progressData, setProgressData] = useState<ReportStudentProgressResponse | null>(null);
   const [evaluations, setEvaluations] = useState<StudentEvaluationListItem[]>([]);
-  const [isLoading, setIsLoading] = useState(!isInvalidId);
-  const [isError, setIsError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [refetchCounter, setRefetchCounter] = useState(0);
 
   const mountedRef = useRef(true);
+  const profileRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -64,96 +58,51 @@ export function useStudentDetails({
     };
   }, []);
 
+  const loadProfile = useCallback(() => {
+    if (isInvalidId) return Promise.resolve();
+    profileRequest.current?.abort();
+    const controller = new AbortController();
+    profileRequest.current = controller;
+    const { signal } = controller;
+
+    return userService.getAdminUserDetail(studentId, { signal }).then(
+      user => {
+        if (signal.aborted) return;
+        const student = user?.id === studentId && user.role === 'STUDENT' ? { ...user, role: user.role } : null;
+        setProfile({ studentId, user: student });
+      },
+      (error: unknown) => {
+        if (!signal.aborted) {
+          setProfile({ studentId, user: null, errorMessage: error instanceof Error ? error.message : undefined });
+        }
+      },
+    );
+  }, [studentId, isInvalidId]);
+
   useEffect(() => {
+    void loadProfile();
+    return () => profileRequest.current?.abort();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (isInvalidId) return;
     let ignore = false;
 
-    if (isInvalidId) {
-      return;
-    }
-
-    const loadData = async () => {
-      try {
-        // Call reports, evaluations, and user lookup all in parallel
-        const initialLookupHint = {
-          fullName: hintFullName,
-          email: hintEmail,
-        };
-
-        const [progressRes, evalRes, initialUserRes] = await Promise.allSettled([
-          reportService.getStudentProgress(studentId),
-          studentEvaluationService.list(studentId),
-          userService.getUserById(studentId, initialLookupHint),
-        ]);
-
-        if (ignore) return;
-
-        let resolvedProgress: ReportStudentProgressResponse | null = null;
-        if (progressRes.status === 'fulfilled') {
-          resolvedProgress = progressRes.value;
-          setProgressData(resolvedProgress);
-        } else {
-          setProgressData(null);
-        }
-
-        if (evalRes.status === 'fulfilled') {
-          setEvaluations(evalRes.value.data || []);
-        } else {
-          setEvaluations([]);
-        }
-
-        let resolvedUser: UserListItem | null =
-          initialUserRes.status === 'fulfilled' ? initialUserRes.value : null;
-
-        // Fallback with progress studentName only if direct lookup was null and hint was missing
-        if (!resolvedUser && !hintFullName && resolvedProgress?.studentName) {
-          const secondaryHint = {
-            fullName: resolvedProgress.studentName,
-            email: hintEmail,
-          };
-          resolvedUser = await userService.getUserById(studentId, secondaryHint);
-        }
-
-        if (ignore) return;
-
-        if (resolvedUser && resolvedUser.id === studentId) {
-          setStudentUser(resolvedUser);
-          setIsError(false);
-          setErrorMessage(null);
-        } else {
-          // Absolutely NEVER fallback to users[0]
-          setStudentUser(null);
-          setIsError(true);
-          setErrorMessage(
-            isVi
-              ? 'Không tìm thấy thông tin học viên tương ứng với mã định danh này.'
-              : 'Student identity could not be found for this ID.'
-          );
-        }
-      } catch (err: unknown) {
-        if (!ignore) {
-          setIsError(true);
-          setErrorMessage(
-            err instanceof Error
-              ? err.message
-              : isVi
-              ? 'Không thể tải thông tin học viên.'
-              : 'Failed to load student details.'
-          );
-          setStudentUser(null);
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoading(false);
-        }
-      }
+    const loadStudentActivity = async () => {
+      const [progress, evaluationList] = await Promise.allSettled([
+        reportService.getStudentProgress(studentId),
+        studentEvaluationService.list(studentId),
+      ]);
+      if (ignore) return;
+      setProgressData(progress.status === 'fulfilled' ? progress.value : null);
+      setEvaluations(evaluationList.status === 'fulfilled' ? evaluationList.value.data || [] : []);
     };
 
-    void loadData();
-
+    void loadStudentActivity();
     return () => {
       ignore = true;
     };
-  }, [studentId, hintFullName, hintEmail, isVi, isInvalidId, refetchCounter]);
+  }, [studentId, isInvalidId]);
 
   const toggleSuspend = useCallback(async (): Promise<boolean> => {
     if (!studentUser || studentUser.id !== studentId) return false;
@@ -162,7 +111,10 @@ export function useStudentDetails({
       setIsTogglingStatus(true);
       await userService.updateStatus(studentUser.id, nextStatus);
       if (mountedRef.current) {
-        setStudentUser(prev => (prev ? { ...prev, status: nextStatus } : null));
+        setProfile(current => {
+          if (current?.studentId !== studentId || !current.user) return current;
+          return { ...current, user: { ...current.user, status: nextStatus } };
+        });
         setStatusMessage(
           nextStatus === 'LOCKED'
             ? isVi
@@ -193,12 +145,12 @@ export function useStudentDetails({
     }
   }, [studentUser, studentId, isVi]);
 
-  const resetPassword = useCallback(async (newPassword: string): Promise<boolean> => {
-    if (!newPassword.trim() || !studentUser || studentUser.id !== studentId) return false;
+  const resetPassword = useCallback(async (): Promise<string | null> => {
+    if (!studentUser || studentUser.id !== studentId) return null;
     try {
       setIsResettingPassword(true);
-      await userService.updateUser(studentUser.id, {});
-      return true;
+      const res = await userService.resetPassword(studentUser.id);
+      return res.newPassword;
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -207,7 +159,7 @@ export function useStudentDetails({
           ? 'Không thể đổi mật khẩu.'
           : 'Failed to reset password.';
       if (mountedRef.current) setStatusMessage(msg);
-      return false;
+      return null;
     } finally {
       if (mountedRef.current) {
         setIsResettingPassword(false);
@@ -216,19 +168,29 @@ export function useStudentDetails({
   }, [studentUser, studentId, isVi]);
 
   const refetch = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
-    setRefetchCounter(prev => prev + 1);
-  }, []);
+    if (isInvalidId) return;
+    setProfile(null);
+    await loadProfile();
+  }, [isInvalidId, loadProfile]);
+
+  const isLoading = !isInvalidId && !currentProfile;
+  const isError = isInvalidId || (!isLoading && !studentUser);
+  let errorMessage: string | null = null;
+  if (isInvalidId) {
+    errorMessage = isVi ? 'Mã học viên không hợp lệ.' : 'Invalid student ID.';
+  } else if (isError) {
+    errorMessage = currentProfile?.errorMessage || (isVi
+      ? 'Không thể xác minh hồ sơ học viên cho mã này.'
+      : 'Student identity could not be verified for this ID.');
+  }
 
   return {
-    studentUser: isInvalidId ? null : studentUser,
-    progressData: isInvalidId ? null : progressData,
-    evaluations: isInvalidId ? [] : evaluations,
-    isLoading: isInvalidId ? false : isLoading,
-    isError: isInvalidId ? true : isError,
-    errorMessage: isInvalidId
-      ? (isVi ? 'Mã học viên không hợp lệ.' : 'Invalid student ID.')
-      : errorMessage,
+    studentUser,
+    progressData: studentUser ? progressData : null,
+    evaluations: studentUser ? evaluations : [],
+    isLoading,
+    isError,
+    errorMessage,
     statusMessage,
     isTogglingStatus,
     isResettingPassword,

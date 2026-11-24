@@ -88,14 +88,22 @@ public class SubmissionController {
 	public ResponseEntity<UploadUrlResponse> getAudioUploadUrl(
 			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
 		String mimeType = request == null ? null : request.mimeType();
-		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getAudioUploadUrl(id, mimeType)));
+		Long fileSizeBytes = request == null ? null : request.fileSizeBytes();
+		var result = fileSizeBytes != null
+				? submissionService.getAudioUploadUrl(id, mimeType, fileSizeBytes)
+				: submissionService.getAudioUploadUrl(id, mimeType);
+		return ResponseEntity.ok(UploadUrlResponse.from(result));
 	}
 
 	@PostMapping("/submission-modules/{id}/document-upload-url")
 	public ResponseEntity<UploadUrlResponse> getDocumentUploadUrl(
 			@PathVariable long id, @RequestBody(required = false) UploadUrlRequest request) {
 		String mimeType = request == null ? null : request.mimeType();
-		return ResponseEntity.ok(UploadUrlResponse.from(submissionService.getDocumentUploadUrl(id, mimeType)));
+		Long fileSizeBytes = request == null ? null : request.fileSizeBytes();
+		var result = fileSizeBytes != null
+				? submissionService.getDocumentUploadUrl(id, mimeType, fileSizeBytes)
+				: submissionService.getDocumentUploadUrl(id, mimeType);
+		return ResponseEntity.ok(UploadUrlResponse.from(result));
 	}
 
 	@GetMapping("/submission-modules/{id}/audio-download-url")

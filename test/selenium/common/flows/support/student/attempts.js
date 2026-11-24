@@ -60,6 +60,7 @@ async function saveQuizAnswers(ctx,ui,item,attempt){
   const buttons=await ctx.driver.findElements(By.css('main button'));let save;
   for(const button of buttons)if(await button.isDisplayed()&&/^(Lưu câu trả lời|Lưu bài Đọc|Lưu bài Nghe|Save Answers|Save Reading|Save Listening)$/i.test((await button.getText()).trim())){save=button;break;}
   if(save)await save.click();else await ui.button(/^Hoàn thành & Nộp phần (Đọc|Nghe)|^Submit (Reading|Listening)/i);
+  if(!save&&item.skill==='READING')await ui.confirm(true);
   const moduleId=attempt.modules.find(m=>m.moduleId===item.moduleId).id;let stored;
   await ctx.driver.wait(async()=>{const response=await ctx.pool.request('student','GET',`/submission-modules/${moduleId}`,undefined,{allowError:true});if(response.status!==200)return false;stored=response.data;return stored.answers?.some(a=>a.questionId===item.questions[0].id&&a.content?.text==='apple');},15000,'The exact quiz answer must persist, regardless of the save button wording');
   await ctx.evidence('quiz-answer-readback',{assignmentId:item.id,submissionId:attempt.id,module:stored,submission:await ctx.pool.get('student',`/submissions/${attempt.id}`)});

@@ -29,7 +29,6 @@ const Students = React.lazy(() => import('./pages/Students'));
 const AddStudent = React.lazy(() => import('./pages/AddStudent'));
 const StudentDetails = React.lazy(() => import('./pages/StudentDetails'));
 const Profile = React.lazy(() => import('./pages/Profile'));
-const AdminSettings = React.lazy(() => import('./pages/AdminSettings'));
 const AdminReports = React.lazy(() => import('./pages/AdminReports'));
 const AdminGradingAuditLogs = React.lazy(() => import('./pages/AdminGradingAuditLogs'));
 const AdminClassArchive = React.lazy(() => import('./pages/AdminClassArchive'));
@@ -119,7 +118,7 @@ function App() {
                   <Route path="students/:id" element={<StudentDetails />} />
                   <Route path="reports" element={<AdminReports />} />
                   <Route path="audit/gradings" element={<AdminGradingAuditLogs />} />
-                  <Route path="settings" element={<AdminSettings />} />
+                  <Route path="settings" element={<Navigate to="/admin/profile" replace />} />
                 </Route>
               </Route>
 

@@ -1,7 +1,7 @@
 package com.english_hub.core.modules.assignment.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -22,7 +22,6 @@ import com.english_hub.core.infrastructure.persistence.repository.AssignmentRepo
 import com.english_hub.core.infrastructure.persistence.repository.SubmissionRepository;
 import com.english_hub.core.infrastructure.security.JwtTokenService;
 import com.english_hub.core.modules.assignment.application.service.AssignmentService;
-import com.english_hub.core.modules.assignment.domain.repository.AssignmentAttemptCountRepository;
 import com.english_hub.core.modules.classroom.domain.repository.ClassRepository;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassEntity;
 import com.english_hub.core.modules.classroom.infrastructure.persistence.entity.ClassMemberEntity;
@@ -36,20 +35,25 @@ import com.english_hub.core.infrastructure.persistence.repository.StudentProfile
 import com.english_hub.core.infrastructure.persistence.repository.TeacherProfileRepository;
 import com.english_hub.core.infrastructure.persistence.repository.UserRepository;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+import org.aopalliance.intercept.MethodInterceptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -60,6 +64,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.aop.framework.Advised;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -68,7 +73,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.transaction.TestTransaction;
@@ -490,11 +494,10 @@ class AssignmentApiIntegrationTest {
 
 	@ParameterizedTest
 	@CsvSource(value = {
-			"2, 1, 400, 2", "3, 1, 400, 3", "null, 1, 400, null",
-			"3, 2, 200, 2", "2, 2, 200, 2", "2, null, 200, 2", "null, 2, 200, 2"
+			"2, 1, 1", "3, 1, 1", "null, 1, 1",
+			"3, 2, 2", "2, 2, 2", "2, null, 2", "null, 2, 2"
 	}, nullValues = "null")
-	void appliesMaxSubmissionsPolicy(Integer currentCap, Integer requestedCap, int expectedStatus, Integer expectedCap)
-			throws Exception {
+	void appliesMaxSubmissionsPolicy(Integer currentCap, Integer requestedCap, Integer expectedCap) throws Exception {
 		Assignment before = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, currentCap, false);
 		classMemberRepository.save(new ClassMemberEntity(classId, otherStudentId));
 		OffsetDateTime submittedAt = TEST_NOW.minusHours(1);
@@ -504,20 +507,14 @@ class AssignmentApiIntegrationTest {
 				new Submission(before.getId(), otherStudentId, 1, submittedAt, SubmissionStatus.SUBMITTED)));
 
 		String body = "{\"maxSubmissions\":" + requestedCap + ",\"title\":\"Updated cap policy\"}";
-		var result = mockMvc.perform(putAssignment(before.getId(), body)
+		mockMvc.perform(putAssignment(before.getId(), body)
 					.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER)))
-				.andExpect(status().is(expectedStatus));
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.maxSubmissions").value(expectedCap));
 
 		Assignment stored = reloadAssignment(before.getId());
 		assertThat(stored.getMaxSubmissions()).isEqualTo(expectedCap);
-		if (expectedStatus == 400) {
-			result.andExpect(jsonPath("$.error").value(
-					"Số lần nộp tối đa không được nhỏ hơn số lượt đã làm cao nhất của học viên (2 lượt)."));
-			assertThat(stored).usingRecursiveComparison().isEqualTo(before);
-		} else {
-			result.andExpect(jsonPath("$.maxSubmissions").value(expectedCap));
-			assertThat(stored.getTitle()).isEqualTo("Updated cap policy");
-		}
+		assertThat(stored.getTitle()).isEqualTo("Updated cap policy");
 	}
 
 	@Test
@@ -567,24 +564,28 @@ class AssignmentApiIntegrationTest {
 	void serializesCapReductionAndStartingNextAttempt(boolean startFirst) throws Exception {
 		Long id = saveBe84Assignment(AssignmentStatus.PUBLISHED, FUTURE_CLOSE_AT, 2, false).getId();
 		submissionRepository.save(new Submission(id, studentId, 1, TEST_NOW.minusHours(1), SubmissionStatus.SUBMITTED));
+		String teacherAuthorization = bearer(teacherId, UserRole.TEACHER);
 		var start = post("/api/v1/assignments/{id}/submissions", id)
 				.header(HttpHeaders.AUTHORIZATION, bearer(studentId, UserRole.STUDENT));
 		var reduce = putAssignment(id, "{\"maxSubmissions\":1}")
-				.header(HttpHeaders.AUTHORIZATION, bearer(teacherId, UserRole.TEACHER));
+				.header(HttpHeaders.AUTHORIZATION, teacherAuthorization);
 
 		if (startFirst) {
-			MvcResult blockedUpdate = performOverlappingWrites(start, 201, reduce);
-			assertThat(blockedUpdate.getResponse().getStatus()).isEqualTo(400);
-			assertThat(blockedUpdate.getResponse().getContentAsString()).contains("2 lượt");
+			MvcResult blockedUpdate = performOverlappingWrites(id, start, 201, reduce);
+			status().isOk().match(blockedUpdate);
+			jsonPath("$.maxSubmissions").value(1).match(blockedUpdate);
 		} else {
-			MvcResult blockedStart = performOverlappingWrites(reduce, 200, start);
-			assertThat(blockedStart.getResponse().getStatus()).isEqualTo(400);
+			MvcResult blockedStart = performOverlappingWrites(id, reduce, 200, start);
+			status().isBadRequest().match(blockedStart);
+			jsonPath("$.error").value("Không thể bắt đầu làm bài tập này lúc này.").match(blockedStart);
 		}
 
-		int expected = startFirst ? 2 : 1;
-		assertThat(assignmentRepository.findById(id).orElseThrow().getMaxSubmissions()).isEqualTo(expected);
-		assertThat(submissionRepository.findAttemptCountsByAssignmentId(id, PageRequest.of(0, 1)))
-				.containsExactly((long) expected);
+		assertThat(assignmentRepository.findById(id).orElseThrow().getMaxSubmissions()).isEqualTo(1);
+		mockMvc.perform(get("/api/v1/submissions")
+					.param("assignmentId", id.toString())
+					.header(HttpHeaders.AUTHORIZATION, teacherAuthorization))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.pagination.total").value(startFirst ? 2 : 1));
 	}
 
 	@Test
@@ -598,7 +599,7 @@ class AssignmentApiIntegrationTest {
 		var close = patchStatus(id, statusBody(AssignmentStatus.CLOSED, null))
 				.header(HttpHeaders.AUTHORIZATION, authorization);
 
-		assertThat(performOverlappingWrites(edit, 200, close).getResponse().getStatus()).isEqualTo(200);
+		assertThat(performOverlappingWrites(id, edit, 200, close).getResponse().getStatus()).isEqualTo(200);
 
 		Assignment stored = assignmentRepository.findById(id).orElseThrow();
 		assertThat(stored.getStatus()).isEqualTo(AssignmentStatus.CLOSED);
@@ -606,13 +607,30 @@ class AssignmentApiIntegrationTest {
 		assertThat(stored.getCloseAt().toInstant()).isEqualTo(newCloseAt.toInstant());
 	}
 
-	private MvcResult performOverlappingWrites(MockHttpServletRequestBuilder firstRequest, int expectedFirstStatus,
-			MockHttpServletRequestBuilder secondRequest) throws Exception {
+	private MvcResult performOverlappingWrites(Long id, MockHttpServletRequestBuilder firstRequest,
+			int expectedFirstStatus, MockHttpServletRequestBuilder secondRequest) throws Exception {
+		assertThat(assignmentRepository).isInstanceOf(Advised.class);
+		Advised repositoryProxy = (Advised) assignmentRepository;
+		assertThat(repositoryProxy.isFrozen()).isFalse();
+
 		// The disposable database is required because both request threads need committed fixtures.
 		TestTransaction.flagForCommit();
 		TestTransaction.end();
 		CountDownLatch firstWriteApplied = new CountDownLatch(1);
 		CountDownLatch allowCommit = new CountDownLatch(1);
+		CountDownLatch secondReachedRepository = new CountDownLatch(1);
+		CountDownLatch firstCommitted = new CountDownLatch(1);
+		AtomicReference<Thread> secondWorker = new AtomicReference<>();
+		MethodInterceptor observeSecondWrite = invocation -> {
+			if (Thread.currentThread() == secondWorker.get()
+					&& invocation.getMethod().getName().equals("findByIdForUpdate")
+					&& id.equals(invocation.getArguments()[0])) {
+				secondReachedRepository.countDown();
+				assertThat(firstCommitted.await(10, TimeUnit.SECONDS)).isTrue();
+			}
+			return invocation.proceed();
+		};
+		repositoryProxy.addAdvice(0, observeSecondWrite);
 		ExecutorService executor = Executors.newFixedThreadPool(2);
 		try {
 			Future<?> first = executor.submit(() -> raceTransaction.executeWithoutResult(transaction -> {
@@ -627,14 +645,30 @@ class AssignmentApiIntegrationTest {
 				}
 			}));
 			assertThat(firstWriteApplied.await(10, TimeUnit.SECONDS)).isTrue();
-			Future<MvcResult> second = executor.submit(() -> performRequest(secondRequest));
-			assertThrows(TimeoutException.class, () -> second.get(250, TimeUnit.MILLISECONDS));
+			Future<MvcResult> second = executor.submit(() -> {
+				secondWorker.set(Thread.currentThread());
+				return performRequest(secondRequest);
+			});
+			assertThat(secondReachedRepository.await(10, TimeUnit.SECONDS))
+					.as("second request reached the assignment lock repository").isTrue();
+			assertThatThrownBy(() -> raceTransaction.executeWithoutResult(transaction ->
+					entityManager.find(Assignment.class, id, LockModeType.PESSIMISTIC_WRITE,
+							Map.of("jakarta.persistence.lock.timeout", 0))))
+					.as("first request holds the assignment row lock")
+					.isInstanceOfAny(LockTimeoutException.class, PessimisticLockException.class);
 			allowCommit.countDown();
 			first.get(10, TimeUnit.SECONDS);
+			firstCommitted.countDown();
 			return second.get(10, TimeUnit.SECONDS);
 		} finally {
 			allowCommit.countDown();
+			firstCommitted.countDown();
 			executor.shutdownNow();
+			try {
+				assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+			} finally {
+				repositoryProxy.removeAdvice(observeSecondWrite);
+			}
 		}
 	}
 
@@ -1054,14 +1088,12 @@ class AssignmentApiIntegrationTest {
 		@Primary
 		AssignmentService assignmentServiceWithFixedClock(
 				com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository assignmentRepository,
-				ClassRepository classRepository, CurrentUserProvider currentUserProvider,
-				AssignmentAttemptCountRepository attemptCountRepository) throws NoSuchMethodException {
+				ClassRepository classRepository, CurrentUserProvider currentUserProvider) throws NoSuchMethodException {
 			var constructor = AssignmentService.class.getDeclaredConstructor(
 					com.english_hub.core.modules.assignment.domain.repository.AssignmentRepository.class,
-					ClassRepository.class, CurrentUserProvider.class, AssignmentAttemptCountRepository.class, Clock.class);
+					ClassRepository.class, CurrentUserProvider.class, Clock.class);
 			Clock clock = Clock.fixed(TEST_NOW.toInstant(), ZoneOffset.UTC);
-			return BeanUtils.instantiateClass(constructor, assignmentRepository, classRepository, currentUserProvider,
-					attemptCountRepository, clock);
+			return BeanUtils.instantiateClass(constructor, assignmentRepository, classRepository, currentUserProvider, clock);
 		}
 	}
 }

@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Users, UserPlus, Search, 
   X, Check, Lock, Unlock, Shield,
-  Mail, Phone, Edit3, Loader2, AlertCircle
+  Mail, Phone, Edit3, Loader2, AlertCircle,
+  Key, Copy, CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
@@ -25,6 +26,10 @@ export const Accounts: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusModalUser, setStatusModalUser] = useState<UserListItem | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserListItem | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ user: UserListItem; newPassword: string } | null>(null);
+  const [copied, setCopied] = useState<boolean>(false);
 
   const {
     users,
@@ -67,6 +72,7 @@ export const Accounts: React.FC = () => {
     status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -108,6 +114,7 @@ export const Accounts: React.FC = () => {
   const handleOpenCreateDrawer = () => {
     setEditingUser(null);
     setNameError('');
+    setEmailError('');
     setActionError('');
     setFormData({
       name: '',
@@ -123,6 +130,7 @@ export const Accounts: React.FC = () => {
   const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
+    setEmailError('');
     setActionError('');
     setFormData({
       name: user.fullName,
@@ -138,7 +146,10 @@ export const Accounts: React.FC = () => {
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
-    if (!editingUser && !formData.email.trim()) return;
+    if (!editingUser && !formData.email.trim()) {
+      setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+      return;
+    }
 
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -194,9 +205,15 @@ export const Accounts: React.FC = () => {
       }
       await refetch();
       setIsDrawerOpen(false);
+      toastSuccess(
+        editingUser
+          ? (isVi ? 'Cập nhật tài khoản thành công!' : 'Account updated successfully!')
+          : (isVi ? 'Tạo tài khoản thành công!' : 'Account created successfully!')
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi lưu tài khoản.' : 'Failed to save account.';
       setActionError(msg);
+      toastError(msg);
     } finally {
       setActionLoading(false);
     }
@@ -214,6 +231,50 @@ export const Accounts: React.FC = () => {
       );
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : isVi ? 'Không thể thay đổi trạng thái tài khoản.' : 'Failed to update account status.');
+    }
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!resetPasswordUser) return;
+    setIsResettingPassword(true);
+    try {
+      const res = await userService.resetPassword(resetPasswordUser.id);
+      const targetUser = resetPasswordUser;
+      setResetPasswordUser(null);
+      setResetPasswordResult({
+        user: targetUser,
+        newPassword: res.newPassword,
+      });
+      toastSuccess(
+        isVi 
+          ? `Đặt lại mật khẩu cho ${targetUser.email} thành công!`
+          : `Successfully reset password for ${targetUser.email}!`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : isVi ? 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.' : 'Failed to reset password. Please try again.';
+      toastError(msg);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetPasswordResult?.newPassword) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(resetPasswordResult.newPassword);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = resetPasswordResult.newPassword;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toastError(isVi ? 'Không thể sao chép mật khẩu.' : 'Failed to copy password.');
     }
   };
 
@@ -377,6 +438,23 @@ export const Accounts: React.FC = () => {
                           <Button 
                             variant="secondary"
                             size="sm"
+                            disabled={currentUser?.id === user.id}
+                            onClick={() => {
+                              if (currentUser?.id === user.id) {
+                                toastError(isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình.' : 'Please use your personal profile to change your own password.');
+                                return;
+                              }
+                              setResetPasswordUser(user);
+                            }}
+                            title={currentUser?.id === user.id 
+                              ? (isVi ? 'Vui lòng sử dụng chức năng đổi mật khẩu của chính mình' : 'Please use your personal profile to change your password')
+                              : t('accounts.actionResetPassword')}
+                            aria-label={t('accounts.actionResetPassword')}
+                            icon={<Key size={14} />}
+                          />
+                          <Button 
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setStatusModalUser(user)}
                             title={isActive ? t('accounts.actionLock') : t('accounts.actionUnlock')}
                             className={isActive ? 'text-error' : 'text-success'}
@@ -475,14 +553,27 @@ export const Accounts: React.FC = () => {
                     <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''}`}
+                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''} ${emailError ? 'border-error' : ''}`}
                       placeholder="user@center.edu.vn"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        if (emailError) setEmailError('');
+                      }}
+                      onBlur={() => {
+                        if (!editingUser && !formData.email.trim()) {
+                          setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+                        }
+                      }}
                       disabled={!!editingUser}
                       required
                     />
                   </div>
+                  {emailError && (
+                    <span className="text-error text-xs mt-1 block">
+                      {emailError}
+                    </span>
+                  )}
                 </div>
 
                 {!editingUser && (
@@ -628,6 +719,138 @@ export const Accounts: React.FC = () => {
           }}
           onCancel={() => setStatusModalUser(null)}
         />
+      )}
+
+      {/* Two-Step Confirmation Modal for Password Reset */}
+      {resetPasswordUser && (
+        <ConfirmModal
+          isOpen={Boolean(resetPasswordUser)}
+          title={t('accounts.resetPasswordConfirmTitle')}
+          message={
+            isVi
+              ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho tài khoản "${resetPasswordUser.fullName || resetPasswordUser.email}"? Một mật khẩu ngẫu nhiên mới sẽ được tạo và hiển thị để bạn sao chép gửi cho người dùng.`
+              : `Are you sure you want to reset the password for "${resetPasswordUser.fullName || resetPasswordUser.email}"? A new random password will be generated and displayed for you to copy and send to the user.`
+          }
+          confirmText={isVi ? 'Đặt lại mật khẩu' : 'Reset Password'}
+          cancelText={isVi ? 'Hủy bỏ' : 'Cancel'}
+          variant="primary"
+          isLoading={isResettingPassword}
+          onConfirm={handleConfirmResetPassword}
+          onCancel={() => {
+            if (!isResettingPassword) setResetPasswordUser(null);
+          }}
+        />
+      )}
+
+      {/* Success Modal Showing Generated Temporary Password */}
+      {resetPasswordResult && (
+        <div 
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-success-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99990,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            padding: '16px',
+            animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+          onClick={() => {
+            setResetPasswordResult(null);
+            setCopied(false);
+          }}
+        >
+          <div 
+            style={{
+              background: 'var(--surface, #FFFFFF)',
+              color: 'var(--text-primary, #171412)',
+              borderRadius: '12px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--border-color, #EAE6DF)',
+              width: '100%',
+              maxWidth: '460px',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color, #EAE6DF)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success, #16A34A)' }}>
+                <CheckCircle2 size={20} />
+                <h3 id="reset-password-success-title" style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #171412)' }}>
+                  {t('accounts.resetPasswordSuccessTitle')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+                className="btn-ghost"
+                style={{ padding: '4px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-secondary, #736B63)' }}
+                aria-label={isVi ? 'Đóng' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #736B63)', lineHeight: 1.5 }}>
+                {t('accounts.resetPasswordSuccessDesc')}
+              </p>
+
+              <div style={{ padding: '12px', background: 'var(--surface-dim, #F5F5F4)', borderRadius: '8px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary, #736B63)', marginBottom: '8px', fontWeight: 500 }}>
+                  {isVi ? 'Tài khoản:' : 'Account:'} {resetPasswordResult.user.fullName} ({resetPasswordResult.user.email})
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--surface, #FFFFFF)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                  <code style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-primary, #0284C7)', userSelect: 'all', letterSpacing: '0.5px' }}>
+                    {resetPasswordResult.newPassword}
+                  </code>
+                  <Button
+                    variant={copied ? 'primary' : 'secondary'}
+                    size="sm"
+                    icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                    onClick={handleCopyPassword}
+                    title={copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  >
+                    {copied ? t('accounts.copiedPassword') : t('accounts.copyPassword')}
+                  </Button>
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-warning, #D97706)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                <span>
+                  {isVi 
+                    ? 'Lưu ý: Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.' 
+                    : 'Notice: This temporary password is only displayed once.'}
+                </span>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color, #EAE6DF)', paddingTop: '14px' }}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setResetPasswordResult(null);
+                  setCopied(false);
+                }}
+              >
+                {isVi ? 'Đã hiểu' : 'Got it'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

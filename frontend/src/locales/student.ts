@@ -1,4 +1,12 @@
 export const studentVi = {
+  readingSubmit: {
+    title: 'Xác nhận nộp bài',
+    message: 'Bạn có chắc chắn muốn nộp phần Đọc không?',
+    unanswered: 'Bạn còn {count} câu chưa trả lời. Các câu chưa trả lời sẽ nhận 0 điểm. Bạn có chắc chắn muốn nộp phần Đọc không?',
+    confirm: 'Xác nhận',
+    cancel: 'Hủy',
+    close: 'Đóng',
+  },
   studentAssignments: {
     title: 'Bài tập của tôi',
     classPrefix: 'Lớp: ',
@@ -207,6 +215,14 @@ export const studentVi = {
 };
 
 export const studentEn = {
+  readingSubmit: {
+    title: 'Confirm submission',
+    message: 'Are you sure you want to submit the Reading section?',
+    unanswered: 'Unanswered questions: {count}. Each unanswered question will receive zero points. Are you sure you want to submit the Reading section?',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+    close: 'Close',
+  },
   studentAssignments: {
     title: 'My Assignments',
     classPrefix: 'Class: ',

@@ -688,9 +688,96 @@ it('refreshes speaking grading after the AI request completes', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
   await act(() => vi.advanceTimersByTimeAsync(3500));
-  expect(gradingService.getAiSuggestion).toHaveBeenCalledTimes(2);
+  expect(gradingService.getAiSuggestion).toHaveBeenCalledTimes(3);
   expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('polls multiple times until AI grading status transitions to AI_GRADED', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  let pollCount = 0;
+  vi.mocked(gradingService.getAiSuggestion).mockImplementation(async () => {
+    pollCount += 1;
+    if (pollCount === 1) {
+      // First poll: still analyzing
+      return { ...ai, status: 'PENDING', aiFeedback: null, suggestedScore: null };
+    }
+    // Second poll: completed
+    return { ...ai, status: 'AI_GRADED', aiFeedback: 'Excellent speaking test!', suggestedScore: 9.0 };
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  // First poll at 2500ms
+  await act(() => vi.advanceTimersByTimeAsync(2500));
+  expect(screen.queryByText('AI đã hoàn thành chấm điểm!')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Đang chấm điểm...' })).toBeDisabled();
+
+  // Second poll at 5000ms
+  await act(() => vi.advanceTimersByTimeAsync(2500));
+  expect(screen.getByText('AI đã hoàn thành chấm điểm!')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('handles AI grading failure during polling', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({
+    ...ai,
+    status: 'FAILED',
+    fallbackMessage: '',
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+  await act(() => vi.advanceTimersByTimeAsync(2500));
+
+  expect(screen.getByText('AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Chấm lại bằng AI' })).toBeEnabled();
+});
+
+it('handles AI grading polling timeout and error retry', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  // Always return PENDING to test max attempts timeout
+  vi.mocked(gradingService.getAiSuggestion).mockResolvedValue({
+    ...ai,
+    status: 'PENDING',
+    aiFeedback: null,
+  });
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  // Advance through 24 attempts (24 * 2500 = 60000ms)
+  for (let i = 0; i < 24; i++) {
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+  }
+
+  expect(screen.getByText('Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.')).toBeVisible();
+  expect(screen.getByRole('button', { name: /Chấm.*bằng AI/ })).toBeEnabled();
+});
+
+it('retries on polling error and eventually reports error if max attempts reached', async () => {
+  vi.mocked(submissionService.getSubmission).mockResolvedValue({ ...submission, modules: [{ ...submission.modules[0], skill: 'SPEAKING' }] });
+  await setup();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+  vi.mocked(gradingService.getAiSuggestion).mockRejectedValue(new Error('Network drop'));
+
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' })); });
+
+  for (let i = 0; i < 24; i++) {
+    await act(() => vi.advanceTimersByTimeAsync(2500));
+  }
+
+  expect(screen.getByText('Lỗi khi kiểm tra kết quả AI. Vui lòng thử lại.')).toBeVisible();
+  expect(screen.getByRole('button', { name: /Chấm.*bằng AI/ })).toBeEnabled();
 });
 it.each(['assigned', 'fallback', 'error', 'route', 'route-error'] as const)('resolves student identity from %s', async mode => {
   if (mode === 'error' || mode === 'route-error') vi.mocked(classService.list).mockRejectedValue(new Error('Offline'));
@@ -1864,7 +1951,7 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
     // Verify Audit Reason modal is opened
-    expect(await screen.findByText('Lý do điều chỉnh điểm số (UC030)')).toBeVisible();
+    expect(await screen.findByText('Lý do điều chỉnh điểm số')).toBeVisible();
     expect(
       screen.getByText(
         'Bài nộp này đã có điểm trước đó (7 điểm). Bạn đang điều chỉnh thành 8.5 điểm. Vui lòng cung cấp lý do điều chỉnh để lưu vào lịch sử kiểm toán.'
@@ -1877,7 +1964,7 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     fireEvent.change(score, { target: { value: '8.5' } });
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
-    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    await screen.findByText('Lý do điều chỉnh điểm số');
     const confirmBtn = screen.getByRole('button', { name: 'Xác nhận & Cập nhật điểm' });
     expect(confirmBtn).toBeDisabled();
 
@@ -1900,7 +1987,7 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     fireEvent.change(score, { target: { value: '8.5' } });
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
-    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    await screen.findByText('Lý do điều chỉnh điểm số');
     const textarea = screen.getByPlaceholderText(
       'Nhập lý do thay đổi điểm (ví dụ: Chấm lại theo phúc khảo, cộng điểm chuyên cần, điều chỉnh theo rubric...)'
     );
@@ -1917,7 +2004,7 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
       });
     });
 
-    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lý do điều chỉnh điểm số')).not.toBeInTheDocument();
   });
 
   it('does not require audit modal when saving the same score without changes', async () => {
@@ -1928,7 +2015,7 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
     // Audit modal must NOT appear
-    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lý do điều chỉnh điểm số')).not.toBeInTheDocument();
     expect(gradingService.submitGrade).toHaveBeenCalledWith(80, {
       finalScore: 7,
       finalFeedback: expect.any(String),
@@ -1941,11 +2028,11 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     fireEvent.change(score, { target: { value: '8.5' } });
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
-    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    await screen.findByText('Lý do điều chỉnh điểm số');
     const cancelBtn = screen.getByRole('button', { name: 'Hủy bỏ' });
     await user.click(cancelBtn);
 
-    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lý do điều chỉnh điểm số')).not.toBeInTheDocument();
     expect(gradingService.submitGrade).not.toHaveBeenCalled();
   });
 
@@ -1954,11 +2041,11 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     fireEvent.change(score, { target: { value: '8.5' } });
     await user.click(screen.getByRole('button', { name: 'Lưu & Gửi điểm cho học sinh' }));
 
-    await screen.findByText('Lý do điều chỉnh điểm số (UC030)');
+    await screen.findByText('Lý do điều chỉnh điểm số');
     const closeBtn = screen.getByRole('button', { name: 'Đóng modal điều chỉnh điểm' });
     await user.click(closeBtn);
 
-    expect(screen.queryByText('Lý do điều chỉnh điểm số (UC030)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lý do điều chỉnh điểm số')).not.toBeInTheDocument();
     expect(gradingService.submitGrade).not.toHaveBeenCalled();
   });
 
@@ -1970,8 +2057,8 @@ describe('UC030 / AD30 - Grade Adjustment Audit Reason Modal', () => {
     fireEvent.change(score, { target: { value: '9.0' } });
     await user.click(screen.getByRole('button', { name: 'Save & Send score' }));
 
-    expect(await screen.findByText('Grade Adjustment Audit Reason (UC030)')).toBeVisible();
-    expect(screen.getByText('Audit Reason Note (Mandatory per UC030)')).toBeVisible();
+    expect(await screen.findByText('Grade Adjustment Audit Reason')).toBeVisible();
+    expect(screen.getByText('Audit Reason Note (Mandatory)')).toBeVisible();
 
     const textarea = screen.getByPlaceholderText('Enter audit note explaining the score change...');
     await user.type(textarea, 'English remark for audit');

@@ -9,13 +9,14 @@ import {
 } from 'lucide-react';
 
 const LoginForm: React.FC = () => {
-  const { language, toggleLanguage } = useLanguage();
+  const { language, toggleLanguage, t } = useLanguage();
   const isVi = language === 'vi';
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<'required' | 'invalid' | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -103,31 +104,46 @@ const LoginForm: React.FC = () => {
         <form onSubmit={handleLogin} className="login-form">
           {/* Email */}
           <div className="login-input-group">
-            <label className="login-input-label" htmlFor="login-email">
-              Email
-            </label>
+            <div className="inline-flex items-center gap-1">
+              <label className="login-input-label" htmlFor="login-email">Email</label>
+              <span className="text-error" aria-hidden="true">*</span>
+            </div>
             <div className="login-input-wrapper">
               <Mail size={16} className="login-input-icon" />
               <input
                 id="login-email"
                 type="email"
-                className="login-input-field"
+                className={emailError ? 'login-input-field adm-input-error' : 'login-input-field'}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                }}
+                onInvalid={(e) => setEmailError(e.currentTarget.validity.valueMissing ? 'required' : 'invalid')}
+                aria-invalid={Boolean(emailError)}
+                aria-describedby={emailError ? 'login-email-error' : undefined}
                 placeholder="name@eh.com"
                 required
                 autoComplete="email"
                 autoFocus
               />
             </div>
+            {emailError && (
+              <span id="login-email-error" className="adm-form-field-error" role="alert">
+                {t(`emailValidation.${emailError}`)}
+              </span>
+            )}
           </div>
 
           {/* Password */}
           <div className="login-input-group">
             <div className="login-label-row">
-              <label className="login-input-label" htmlFor="login-password">
-                {isVi ? 'Mật khẩu' : 'Password'}
-              </label>
+              <div className="inline-flex items-center gap-1">
+                <label className="login-input-label" htmlFor="login-password">
+                  {isVi ? 'Mật khẩu' : 'Password'}
+                </label>
+                <span className="text-error" aria-hidden="true">*</span>
+              </div>
               <Link 
                 to="/forgot-password" 
                 className="login-forgot-link"

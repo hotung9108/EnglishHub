@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { 
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
-  CheckCircle2, AlertCircle, Users, Calendar, 
+  AlertCircle, Users, Calendar, 
   Plus, Download, X, 
   ArrowUpRight, Award, FileText, Send, Eye,
   Sparkles, RefreshCw, BarChart3,
@@ -15,8 +15,10 @@ import { assignmentService, type AssignmentSummary } from '../api/services/assig
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
-import { Pagination, LoadingState, Button, ConfirmModal } from '../components/common';
+import { Pagination, LoadingState, Button, ConfirmModal, useToast } from '../components/common';
+import { DateRangeFilter } from '../components/classes/DateRangeFilter';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
+import { StudentEvaluationAvailabilityNotice } from '../components/classes/StudentEvaluationAvailabilityNotice';
 import { TransferStudentModal } from '../components/classes/TransferStudentModal';
 import { parseApiError } from '../api';
 import type { 
@@ -25,7 +27,17 @@ import type {
   ClassAssignmentItem, 
   SkillAnalyticsItem
 } from '../types/teacher-class.types';
+import {
+  filterGradebookSubmissions, getGradebookDateRangeStatus, type GradebookDateRange,
+} from '../utils/gradebookDateRange.utils';
 import '../styles/teacher-class-details.css';
+
+interface GradebookData {
+  members: ClassMember[];
+  rawAssignments: AssignmentSummary[];
+  submissions: SubmissionListItem[] | null;
+  loadedAt: number;
+}
 
 const normalizeSkillName = (s: string): ClassSkill => {
   const lower = s.toLowerCase();
@@ -76,8 +88,12 @@ export const TeacherClassProgress: React.FC = () => {
 
   // Enriched Class Data
   const [enrolledMembers, setEnrolledMembers] = useState<ClassMember[]>([]);
-  const [classAssignments, setClassAssignments] = useState<ClassAssignmentItem[]>([]);
-  const [studentsRoster, setStudentsRoster] = useState<StudentGradeRow[]>([]);
+  const [gradebookData, setGradebookData] = useState<GradebookData>({
+    members: [], rawAssignments: [], submissions: null, loadedAt: 0,
+  });
+  const [dateRange, setDateRange] = useState<GradebookDateRange>({ from: '', to: '' });
+  const dateRangeStatus = getGradebookDateRangeStatus(dateRange);
+  const hasDateFilter = dateRangeStatus === 'active';
 
   // Tab State
   const initialTab = searchParams.get('tab') === 'members' ? 'members' : 'roster';
@@ -96,6 +112,7 @@ export const TeacherClassProgress: React.FC = () => {
 
   // Grade Adjustment State with Audit Reason (FE-90 / UC030 / UC031)
   const [studentToAdjustGrade, setStudentToAdjustGrade] = useState<StudentGradeRow | null>(null);
+  const [adjustedScores, setAdjustedScores] = useState<Partial<Record<string, StudentGradeRow['scores']>>>({});
   const [adjustGradeSkill, setAdjustGradeSkill] = useState<'overall' | 'writing' | 'speaking' | 'reading' | 'listening'>('overall');
   const [newAdjustedScore, setNewAdjustedScore] = useState<string>('8.0');
   const [auditReasonNote, setAuditReasonNote] = useState<string>('');
@@ -128,12 +145,17 @@ export const TeacherClassProgress: React.FC = () => {
     setCurrentPage(1);
   };
 
+  const handleDateRangeChange = (range: GradebookDateRange) => {
+    setDateRange(range);
+    if (getGradebookDateRangeStatus(range) === 'active') setStudentToAdjustGrade(null);
+  };
+
   const [selectedStudent, setSelectedStudent] = useState<StudentGradeRow | null>(null);
   const [directMessageText, setDirectMessageText] = useState('');
   const [evaluationHistory, setEvaluationHistory] = useState<StudentEvaluationListItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSendingEvaluation, setIsSendingEvaluation] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   const handleCloseStudentModal = () => {
     setSelectedStudent(null);
@@ -170,9 +192,11 @@ export const TeacherClassProgress: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
   };
 
   // Helper score color
@@ -218,55 +242,6 @@ export const TeacherClassProgress: React.FC = () => {
     setNewAdjustedScore(std.scores.overall > 0 ? String(std.scores.overall) : '8.0');
     setAuditReasonNote('');
     setAdjustGradeError(null);
-  };
-
-  const handleSaveGradeAdjustment = () => {
-    if (!studentToAdjustGrade) return;
-    const scoreNum = parseFloat(newAdjustedScore.trim().replace(',', '.'));
-    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
-      setAdjustGradeError(isVi ? 'Điểm số phải nằm trong khoảng từ 0 đến 10.' : 'Score must be between 0 and 10.');
-      return;
-    }
-    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
-      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030).' : 'Please enter an audit reason note (mandatory per UC030 audit policy).');
-      return;
-    }
-
-    setStudentsRoster((prev) =>
-      prev.map((row) => {
-        if (row.id === studentToAdjustGrade.id) {
-          const updatedScores = { ...row.scores };
-          if (adjustGradeSkill === 'overall') {
-            updatedScores.overall = Math.round(scoreNum * 10) / 10;
-          } else {
-            updatedScores[adjustGradeSkill] = Math.round(scoreNum * 10) / 10;
-            const validScores = [
-              updatedScores.writing,
-              updatedScores.speaking,
-              updatedScores.reading,
-              updatedScores.listening,
-            ].filter((s) => s > 0);
-            if (validScores.length > 0) {
-              updatedScores.overall = Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10;
-            }
-          }
-          return {
-            ...row,
-            scores: updatedScores,
-          };
-        }
-        return row;
-      })
-    );
-
-    const skillLabel = adjustGradeSkill === 'overall' ? (isVi ? 'Điểm trung bình (Overall)' : 'Overall Score') : adjustGradeSkill.toUpperCase();
-    showToast(
-      isVi
-        ? `Đã điều chỉnh ${skillLabel} cho ${studentToAdjustGrade.name} thành ${scoreNum} (Lý do: ${auditReasonNote.trim()})`
-        : `Updated ${skillLabel} for ${studentToAdjustGrade.name} to ${scoreNum} (Reason: ${auditReasonNote.trim()})`
-    );
-
-    setStudentToAdjustGrade(null);
   };
 
   // Filtered members for Tab 4
@@ -337,151 +312,13 @@ export const TeacherClassProgress: React.FC = () => {
         const members: ClassMember[] = membersRes.status === 'fulfilled' ? membersRes.value : [];
         setEnrolledMembers(members);
 
-        const rawAssignments: AssignmentSummary[] = assignmentsRes.status === 'fulfilled' ? (assignmentsRes.value.data || []) : [];
-
-        const classSubmissions: SubmissionListItem[] = subsRes.status === 'fulfilled' ? subsRes.value : [];
-        const assignmentIds = new Set(rawAssignments.map((assignment) => assignment.id));
-        const allSubmissions = classSubmissions.filter((submission) => assignmentIds.has(submission.assignmentId));
-        const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
-        for (const submission of allSubmissions) {
-          (allSubmissionsByAssignId[submission.assignmentId] ??= []).push(submission);
-        }
-
-        // Map class assignments items (clean, real fields)
-        const mappedAssignments: ClassAssignmentItem[] = rawAssignments.map((a) => {
-          const subs = allSubmissionsByAssignId[a.id] || [];
-          const distinctStudentIds = new Set(subs.map((s) => s.studentId));
-          const submittedCount = distinctStudentIds.size;
-          const pendingStudentIds = new Set(
-            subs
-              .filter((s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
-              .map((s) => s.studentId)
-          );
-          const pendingGrading = pendingStudentIds.size;
-
-          const gradedScores = subs
-            .flatMap((s) => s.modules)
-            .map((m) => m.grading?.finalScore)
-            .filter((sc): sc is number => sc !== null && sc !== undefined);
-
-          const avgScore = gradedScores.length > 0 
-            ? Math.round((gradedScores.reduce((x, y) => x + y, 0) / gradedScores.length) * 10) / 10 
-            : 0;
-
-          const closeDate = a.closeAt ? new Date(a.closeAt) : null;
-          let daysLeft = 0;
-          let status: 'open' | 'closed' | 'upcoming' = 'open';
-
-          if (closeDate) {
-            const diffMs = closeDate.getTime() - Date.now();
-            daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-            if (diffMs < 0) status = 'closed';
-            else if (a.status === 'DRAFT') status = 'upcoming';
-            else status = 'open';
-          }
-
-          const detectedSkills = detectAllSkills(a, subs);
-          const primarySkill = detectedSkills[0] || 'writing';
-
-          return {
-            id: String(a.id),
-            title: a.title,
-            skill: primarySkill,
-            skills: detectedSkills,
-            dueDate: closeDate ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '—',
-            daysLeft,
-            submittedCount,
-            totalStudents: Math.max(1, members.length),
-            pendingGrading,
-            avgScore,
-            status
-          };
+        setGradebookData({
+          members,
+          rawAssignments: assignmentsRes.status === 'fulfilled' ? assignmentsRes.value.data || [] : [],
+          submissions: subsRes.status === 'fulfilled' ? subsRes.value : null,
+          loadedAt: Date.now(),
         });
-        if (!isMounted) return;
-        setClassAssignments(mappedAssignments);
-
-        // 7. Build Student Grade Roster
-        const rosterRows: StudentGradeRow[] = members.map((member) => {
-          const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
-          const distinctCompletedAssignIds = new Set(studentSubs.map((s) => s.assignmentId));
-          const completedCount = distinctCompletedAssignIds.size;
-
-          const writingScores: number[] = [];
-          const speakingScores: number[] = [];
-          const readingScores: number[] = [];
-          const listeningScores: number[] = [];
-
-          for (const sub of studentSubs) {
-            for (const mod of sub.modules) {
-              const score = mod.grading?.finalScore;
-              if (score !== null && score !== undefined) {
-                const skill = normalizeSkillName(mod.skill || 'writing');
-                if (skill === 'writing') writingScores.push(score);
-                else if (skill === 'speaking') speakingScores.push(score);
-                else if (skill === 'reading') readingScores.push(score);
-                else if (skill === 'listening') listeningScores.push(score);
-              }
-            }
-          }
-
-          const avgOf = (arr: number[]) => {
-            if (arr.length === 0) return 0;
-            return Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10;
-          };
-
-          const w = avgOf(writingScores);
-          const sp = avgOf(speakingScores);
-          const r = avgOf(readingScores);
-          const l = avgOf(listeningScores);
-          const scoredSkills = [w, sp, r, l].filter((sc) => sc > 0);
-          const overall = scoredSkills.length > 0 
-            ? Math.round((scoredSkills.reduce((x, y) => x + y, 0) / scoredSkills.length) * 10) / 10 
-            : 0;
-
-          let status: 'exceed' | 'ontime' | 'support' = 'ontime';
-          let statusLabel = isVi ? 'Đạt chuẩn' : 'On-track';
-
-          if (overall >= 8.0 && completedCount >= rawAssignments.length * 0.8) {
-            status = 'exceed';
-            statusLabel = isVi ? 'Vượt trội' : 'Exceeding';
-          } else if ((overall > 0 && overall < 6.0) || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
-            status = 'support';
-            statusLabel = isVi ? 'Cần hỗ trợ' : 'Needs Support';
-          }
-
-          const sortedSubs = [...studentSubs].sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
-          const latestSub = sortedSubs[0];
-          const lastActive = latestSub?.submittedAt 
-            ? new Date(latestSub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US') 
-            : '—';
-
-          const recentFeedback = completedCount > 0 
-            ? (isVi ? `Đã hoàn thành ${completedCount} bài nộp.` : `Submitted ${completedCount} assignments.`)
-            : (isVi ? 'Chưa có bài nộp nào.' : 'No submissions yet.');
-
-          return {
-            id: `std-${member.studentId}`,
-            code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
-            name: member.fullName,
-            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.fullName)}`,
-            assignmentsCompleted: completedCount,
-            totalAssignments: rawAssignments.length,
-            scores: {
-              writing: w,
-              speaking: sp,
-              reading: r,
-              listening: l,
-              overall
-            },
-            status,
-            statusLabel,
-            lastActive,
-            recentFeedback
-          };
-        });
-
-        if (!isMounted) return;
-        setStudentsRoster(rosterRows);
+        setAdjustedScores({});
       } catch (err) {
         console.error('Failed to load class progress data:', err);
         if (isMounted) {
@@ -500,6 +337,195 @@ export const TeacherClassProgress: React.FC = () => {
       isMounted = false;
     };
   }, [id, isVi, reloadKey]);
+
+  const { classAssignments, rosterRows } = useMemo(() => {
+    const { members, rawAssignments, submissions, loadedAt } = gradebookData;
+    const assignmentIds = new Set(rawAssignments.map((assignment) => assignment.id));
+    const allSubmissions = filterGradebookSubmissions(submissions ?? [], dateRange)
+      .filter(submission => assignmentIds.has(submission.assignmentId));
+    const allSubmissionsByAssignId: Record<number, SubmissionListItem[]> = {};
+    for (const submission of allSubmissions) {
+      (allSubmissionsByAssignId[submission.assignmentId] ??= []).push(submission);
+    }
+
+    // Map class assignments items (clean, real fields)
+    const mappedAssignments: ClassAssignmentItem[] = rawAssignments.map((a) => {
+      const subs = allSubmissionsByAssignId[a.id] || [];
+      const distinctStudentIds = new Set(subs.map((s) => s.studentId));
+      const submittedCount = distinctStudentIds.size;
+      const pendingStudentIds = new Set(
+        subs
+          .filter((s) => s.status === 'SUBMITTED' || s.modules.some((m) => m.grading?.status === 'PENDING'))
+          .map((s) => s.studentId)
+      );
+      const pendingGrading = pendingStudentIds.size;
+
+      const gradedScores = subs
+        .flatMap((s) => s.modules)
+        .map((m) => m.grading?.finalScore)
+        .filter((sc): sc is number => sc !== null && sc !== undefined);
+
+      const avgScore = gradedScores.length > 0
+        ? Math.round((gradedScores.reduce((x, y) => x + y, 0) / gradedScores.length) * 10) / 10
+        : 0;
+
+      const closeDate = a.closeAt ? new Date(a.closeAt) : null;
+      let daysLeft = 0;
+      let status: 'open' | 'closed' | 'upcoming' = 'open';
+
+      if (closeDate) {
+        const diffMs = closeDate.getTime() - loadedAt;
+        daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        if (diffMs < 0) status = 'closed';
+        else if (a.status === 'DRAFT') status = 'upcoming';
+        else status = 'open';
+      }
+
+      const detectedSkills = detectAllSkills(a, subs);
+      const primarySkill = detectedSkills[0] || 'writing';
+
+      return {
+        id: String(a.id),
+        title: a.title,
+        skill: primarySkill,
+        skills: detectedSkills,
+        dueDate: closeDate ? closeDate.toLocaleDateString(isVi ? 'vi-VN' : 'en-US') : '—',
+        daysLeft,
+        submittedCount,
+        totalStudents: Math.max(1, members.length),
+        pendingGrading,
+        avgScore,
+        status
+      };
+    });
+
+    const rosterRows: StudentGradeRow[] = members.map((member) => {
+      const studentSubs = allSubmissions.filter((s) => s.studentId === member.studentId);
+      const distinctCompletedAssignIds = new Set(studentSubs.map((s) => s.assignmentId));
+      const completedCount = distinctCompletedAssignIds.size;
+
+      const writingScores: number[] = [];
+      const speakingScores: number[] = [];
+      const readingScores: number[] = [];
+      const listeningScores: number[] = [];
+
+      for (const sub of studentSubs) {
+        for (const mod of sub.modules) {
+          const score = mod.grading?.finalScore;
+          if (score !== null && score !== undefined) {
+            const skill = normalizeSkillName(mod.skill || 'writing');
+            if (skill === 'writing') writingScores.push(score);
+            else if (skill === 'speaking') speakingScores.push(score);
+            else if (skill === 'reading') readingScores.push(score);
+            else if (skill === 'listening') listeningScores.push(score);
+          }
+        }
+      }
+
+      const avgOf = (arr: number[]) => {
+        if (arr.length === 0) return 0;
+        return Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10;
+      };
+
+      const w = avgOf(writingScores);
+      const sp = avgOf(speakingScores);
+      const r = avgOf(readingScores);
+      const l = avgOf(listeningScores);
+      const scoredSkills = [w, sp, r, l].filter((sc) => sc > 0);
+      const overall = scoredSkills.length > 0
+        ? Math.round((scoredSkills.reduce((x, y) => x + y, 0) / scoredSkills.length) * 10) / 10
+        : 0;
+
+      let status: 'exceed' | 'ontime' | 'support' = 'ontime';
+      let statusLabel = isVi ? 'Đạt chuẩn' : 'On-track';
+
+      if (overall >= 8.0 && completedCount >= rawAssignments.length * 0.8) {
+        status = 'exceed';
+        statusLabel = isVi ? 'Vượt trội' : 'Exceeding';
+      } else if ((overall > 0 && overall < 6.0) || (rawAssignments.length > 0 && completedCount < rawAssignments.length * 0.5)) {
+        status = 'support';
+        statusLabel = isVi ? 'Cần hỗ trợ' : 'Needs Support';
+      }
+
+      const sortedSubs = [...studentSubs].sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime());
+      const latestSub = sortedSubs[0];
+      const lastActive = latestSub?.submittedAt
+        ? new Date(latestSub.submittedAt).toLocaleDateString(isVi ? 'vi-VN' : 'en-US')
+        : '—';
+
+      const recentFeedback = completedCount > 0
+        ? (isVi ? `Đã hoàn thành ${completedCount} bài nộp.` : `Submitted ${completedCount} assignments.`)
+        : (isVi ? 'Chưa có bài nộp nào.' : 'No submissions yet.');
+
+      return {
+        id: `std-${member.studentId}`,
+        code: member.studentCode || `HV-${member.studentId.toString().padStart(4, '0')}`,
+        name: member.fullName,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(member.fullName)}`,
+        assignmentsCompleted: completedCount,
+        totalAssignments: rawAssignments.length,
+        scores: {
+          writing: w,
+          speaking: sp,
+          reading: r,
+          listening: l,
+          overall
+        },
+        status,
+        statusLabel,
+        lastActive,
+        recentFeedback
+      };
+    });
+
+
+    return { classAssignments: mappedAssignments, rosterRows };
+  }, [gradebookData, dateRange, isVi]);
+
+  const studentsRoster = useMemo(() => rosterRows.map(row => {
+    const scores = hasDateFilter ? undefined : adjustedScores[row.id];
+    return scores ? { ...row, scores } : row;
+  }), [rosterRows, hasDateFilter, adjustedScores]);
+
+  const handleSaveGradeAdjustment = () => {
+    if (!studentToAdjustGrade) return;
+    const scoreNum = parseFloat(newAdjustedScore.trim().replace(',', '.'));
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 10) {
+      setAdjustGradeError(isVi ? 'Điểm số phải nằm trong khoảng từ 0 đến 10.' : 'Score must be between 0 and 10.');
+      return;
+    }
+    if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
+      setAdjustGradeError(isVi ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán).' : 'Please enter an audit reason note (mandatory per audit policy).');
+      return;
+    }
+
+    const row = studentsRoster.find(student => student.id === studentToAdjustGrade.id);
+    if (row) {
+      const updatedScores = { ...row.scores };
+      updatedScores[adjustGradeSkill] = Math.round(scoreNum * 10) / 10;
+      if (adjustGradeSkill !== 'overall') {
+        const validScores = [
+          updatedScores.writing,
+          updatedScores.speaking,
+          updatedScores.reading,
+          updatedScores.listening,
+        ].filter((s) => s > 0);
+        if (validScores.length > 0) {
+          updatedScores.overall = Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10;
+        }
+      }
+      setAdjustedScores(previous => ({ ...previous, [row.id]: updatedScores }));
+    }
+
+    const skillLabel = adjustGradeSkill === 'overall' ? (isVi ? 'Điểm trung bình (Overall)' : 'Overall Score') : adjustGradeSkill.toUpperCase();
+    showToast(
+      isVi
+        ? `Đã điều chỉnh ${skillLabel} cho ${studentToAdjustGrade.name} thành ${scoreNum} (Lý do: ${auditReasonNote.trim()})`
+        : `Updated ${skillLabel} for ${studentToAdjustGrade.name} to ${scoreNum} (Reason: ${auditReasonNote.trim()})`
+    );
+
+    setStudentToAdjustGrade(null);
+  };
 
   // Overall Class KPI Metrics (clean, real calculations)
   const classKpis = useMemo(() => {
@@ -705,14 +731,6 @@ export const TeacherClassProgress: React.FC = () => {
 
   return (
     <div className="tcd-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="tcd-toast-alert">
-          <CheckCircle2 size={16} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* 1. Breadcrumbs */}
       <nav className="tcd-breadcrumbs">
         <Link to="/teacher/classes" className="tcd-breadcrumb-link">
@@ -810,6 +828,12 @@ export const TeacherClassProgress: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <DateRangeFilter
+        range={dateRange}
+        reversed={dateRangeStatus === 'reversed'}
+        onChange={handleDateRangeChange}
+      />
 
       {/* 3. 4 KPI Metrics */}
       <section className="tcd-kpi-grid">
@@ -1067,7 +1091,8 @@ export const TeacherClassProgress: React.FC = () => {
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <button 
                           className="tcd-btn-action-icon"
-                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán UC031)' : 'Adjust Grade (Audit note)'}
+                          title={isVi ? 'Điều chỉnh điểm (Kèm lý do kiểm toán)' : 'Adjust Grade (Audit note)'}
+                          disabled={hasDateFilter}
                           onClick={() => handleOpenAdjustGrade(std)}
                         >
                           <Edit3 size={15} />
@@ -1407,7 +1432,7 @@ export const TeacherClassProgress: React.FC = () => {
                                 currentMemberId: m.memberId,
                               })
                             }
-                            title={isVi ? 'Chuyển học viên sang lớp khác (UC009)' : 'Transfer to another class'}
+                            title={isVi ? 'Chuyển học viên sang lớp khác' : 'Transfer to another class'}
                           >
                             {isVi ? 'Chuyển lớp' : 'Transfer'}
                           </Button>
@@ -1573,6 +1598,10 @@ export const TeacherClassProgress: React.FC = () => {
                 <h4 className="text-sm font-bold text-main mb-2 mt-3">
                   {isVi ? 'Nhận xét mới cho học viên' : 'New Evaluation'}
                 </h4>
+                <StudentEvaluationAvailabilityNotice
+                  submissions={gradebookData.submissions}
+                  studentId={Number(selectedStudent.id.replace('std-', ''))}
+                />
                 <textarea
                   className="tcd-drawer-eval-input"
                   rows={3}
@@ -1605,7 +1634,7 @@ export const TeacherClassProgress: React.FC = () => {
       )}
 
       {/* 9. Modal Điều chỉnh điểm kèm Audit reason note (FE-90 / UC030 / UC031) */}
-      {studentToAdjustGrade && (
+      {studentToAdjustGrade && !hasDateFilter && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md bg-surface rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/50 dark:bg-slate-800/50">
@@ -1679,7 +1708,7 @@ export const TeacherClassProgress: React.FC = () => {
 
               <div>
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo kiểm toán UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
                 </label>
                 <textarea
                   rows={3}

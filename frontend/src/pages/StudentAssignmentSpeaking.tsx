@@ -592,7 +592,9 @@ const StudentAssignmentSpeaking: React.FC = () => {
       }
     } catch (err: unknown) {
       const apiErr = parseApiError(err);
-      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+      const msg = apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+      toastError(msg);
     } finally {
       setIsSubmitting(false);
     }

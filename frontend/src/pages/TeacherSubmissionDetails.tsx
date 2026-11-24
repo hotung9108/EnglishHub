@@ -796,17 +796,18 @@ export const TeacherSubmissionDetails: React.FC = () => {
       if (!isCurrentAction(context)) return;
       showToast(isVi ? 'AI đang phân tích và chấm điểm bài nói...' : 'AI is analyzing and grading the speaking submission...');
 
-      aiPollTimerRef.current = setTimeout(async () => {
-        aiPollTimerRef.current = null;
-        if (!isCurrentAction(context)) return;
+      const POLL_INTERVAL_MS = 2500;
+      const MAX_ATTEMPTS = 24;
+
+      const finishAiPolling = async (message: string) => {
         const loading = loadModuleData(targetModuleId);
         const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
         try {
           await loading;
-          if (!isCurrentAction(pollContext)) return;
-          showToast(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+          if (isCurrentAction(pollContext)) {
+            showToast(message);
+          }
         } catch (pollErr) {
-          if (!isCurrentAction(pollContext)) return;
           console.error('Error refreshing grading after AI:', pollErr);
         } finally {
           if (isCurrentAction(pollContext)) {
@@ -814,7 +815,49 @@ export const TeacherSubmissionDetails: React.FC = () => {
             setIsAnalyzingAi(false);
           }
         }
-      }, 3500);
+      };
+
+      const pollAiSuggestion = (attempt: number) => {
+        aiPollTimerRef.current = setTimeout(async () => {
+          aiPollTimerRef.current = null;
+          if (!isCurrentAction(context)) return;
+
+          try {
+            const suggestion = await gradingService.getAiSuggestion(targetModuleId);
+            if (!isCurrentAction(context)) return;
+
+            if (suggestion.status === 'FAILED') {
+              const fallbackMsg = suggestion.fallbackMessage || (isVi ? 'AI chấm điểm không thành công. Giáo viên có thể chấm thủ công.' : 'AI grading failed. You can grade manually.');
+              return finishAiPolling(fallbackMsg);
+            }
+
+            if (suggestion.status === 'AI_GRADED' || suggestion.status === 'COMPLETED') {
+              return finishAiPolling(isVi ? 'AI đã hoàn thành chấm điểm!' : 'AI grading completed!');
+            }
+
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              const timeoutMsg = isVi ? 'Quá trình phân tích AI đang mất nhiều thời gian hơn dự kiến. Vui lòng kiểm tra lại sau giây lát.' : 'AI analysis is taking longer than expected. Please check back shortly.';
+              return finishAiPolling(timeoutMsg);
+            }
+          } catch (pollErr) {
+            console.error('Error polling AI suggestion:', pollErr);
+            if (attempt < MAX_ATTEMPTS) {
+              pollAiSuggestion(attempt + 1);
+            } else {
+              const pollContext = { ...context, generation: moduleLoadGenerationRef.current };
+              if (isCurrentAction(pollContext)) {
+                aiRequestRef.current = null;
+                setIsAnalyzingAi(false);
+                showToast(isVi ? 'Lỗi khi kiểm tra kết quả AI. Vui lòng thử lại.' : 'Failed to retrieve AI grading result. Please try again.');
+              }
+            }
+          }
+        }, POLL_INTERVAL_MS);
+      };
+
+      pollAiSuggestion(1);
     } catch (err) {
       if (!isCurrentAction(context)) return;
       aiRequestRef.current = null;
@@ -907,8 +950,8 @@ export const TeacherSubmissionDetails: React.FC = () => {
     if (!auditReasonNote.trim() || auditReasonNote.trim().length < 3) {
       showToast(
         isVi
-          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán UC030)!'
-          : 'Please enter an audit reason note (mandatory per UC030 audit policy)!'
+          ? 'Vui lòng nhập lý do điều chỉnh điểm (bắt buộc theo quy chuẩn kiểm toán)!'
+          : 'Please enter an audit reason note (mandatory per audit policy)!'
       );
       return;
     }
@@ -2790,7 +2833,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground">
-                    {isVi ? 'Lý do điều chỉnh điểm số (UC030)' : 'Grade Adjustment Audit Reason (UC030)'}
+                    {isVi ? 'Lý do điều chỉnh điểm số' : 'Grade Adjustment Audit Reason'}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {isVi ? 'Quy chuẩn kiểm toán điểm số yêu cầu ghi nhận lý do thay đổi điểm' : 'Audit policy requires recording the reason for changing grades'}
@@ -2819,7 +2862,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
-                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo UC030)' : 'Audit Reason Note (Mandatory per UC030)'}
+                  {isVi ? 'Lý do điều chỉnh (Bắt buộc theo quy chuẩn kiểm toán)' : 'Audit Reason Note (Mandatory)'}
                 </label>
                 <textarea
                   rows={3}

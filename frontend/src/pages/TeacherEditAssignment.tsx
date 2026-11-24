@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Minus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown, AlertCircle, RefreshCw, Calendar
+  Layers, ChevronDown, AlertCircle, RefreshCw, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
@@ -64,10 +64,8 @@ export const TeacherEditAssignment: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
 
-  // Preview Modal state & toast
+  // Preview Modal state
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<string>('');
 
   // Class & Stats
   const [classes, setClasses] = useState<ClassSummary[]>([]);
@@ -82,6 +80,7 @@ export const TeacherEditAssignment: React.FC = () => {
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   // Assignment Editor state
+  const [savedCap, setSavedCap] = useState<{ assignmentId: number; value: number | undefined } | null>(null);
   const [assignmentData, setAssignmentData] = useState<AssignmentEditorData>(() => ({
     id: id || '1',
     code: `HW-${(id || '1').padStart(2, '0')}`,
@@ -95,7 +94,6 @@ export const TeacherEditAssignment: React.FC = () => {
     status: 'active',
     targetAudience: 'all',
     notifyStudents: true,
-    maxSubmissions: 3,
     modules: [createDefaultModuleItem('writing', 1)]
   }));
 
@@ -116,11 +114,15 @@ export const TeacherEditAssignment: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    toastWarning(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  }, [toastWarning]);
+  const showToast = useCallback((msg: string, type: 'warning' | 'error' | 'success' = 'warning') => {
+    if (type === 'error') {
+      toastError(msg);
+    } else if (type === 'success') {
+      toastSuccess(msg);
+    } else {
+      toastWarning(msg);
+    }
+  }, [toastWarning, toastError, toastSuccess]);
 
   useEffect(() => {
     let isMounted = true;
@@ -365,6 +367,9 @@ export const TeacherEditAssignment: React.FC = () => {
           loadedModules.push(createDefaultModuleItem('writing', 1));
         }
 
+        if (!isMounted) return;
+        const savedValue = detail.maxSubmissions ?? undefined;
+        setSavedCap({ assignmentId: assignmentIdNum, value: savedValue });
         setAssignmentData({
           id: String(detail.id),
           code: `HW-${String(detail.id).padStart(2, '0')}`,
@@ -378,7 +383,7 @@ export const TeacherEditAssignment: React.FC = () => {
           status: detail.status === 'PUBLISHED' ? 'active' : 'draft',
           targetAudience: 'all',
           notifyStudents: true,
-          maxSubmissions: detail.maxSubmissions ?? 1,
+          maxSubmissions: savedValue,
           modules: loadedModules
         });
       } catch (err) {
@@ -628,13 +633,19 @@ export const TeacherEditAssignment: React.FC = () => {
         .join('\n\n');
 
       // 1. Update assignment basics
+      const draftCap = assignmentData.maxSubmissions;
+      const capChanged = savedCap?.assignmentId === assignmentIdNum
+        && draftCap !== undefined && draftCap !== savedCap.value;
       await assignmentService.updateAssignment(assignmentIdNum, {
         title: assignmentData.title,
         description: mainDescription,
         openAt: openDate,
         closeAt: closeDate,
-        maxSubmissions: assignmentData.maxSubmissions ?? 1
+        ...(capChanged ? { maxSubmissions: draftCap } : {}),
       });
+      if (capChanged) {
+        setSavedCap((current) => current === savedCap ? { assignmentId: assignmentIdNum, value: draftCap } : current);
+      }
 
       // 2. Update status if changed
       if (publishStatus && publishStatus !== currentDbStatus) {
@@ -767,15 +778,12 @@ export const TeacherEditAssignment: React.FC = () => {
       }
 
       setAssignmentData((prev) => ({ ...prev, modules: updatedModulesList }));
-      setLastSavedTime(new Date().toLocaleTimeString('vi-VN'));
       const successMsg = isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!';
       toastSuccess(successMsg);
-      setToastMessage(successMsg);
     } catch (err) {
       console.error('Failed to save assignment changes:', err);
       const errorMsg = isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!';
       toastError(errorMsg);
-      setToastMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -833,13 +841,19 @@ export const TeacherEditAssignment: React.FC = () => {
 
       {/* Header */}
       <div className="assignment-edit-header">
-        <input 
-          type="text" 
-          className="assignment-edit-title-input"
-          value={assignmentData.title}
-          onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
-          placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          <label htmlFor="assignment-title" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--eh-text-secondary, #736B63)' }}>
+            {isVi ? 'Tiêu đề bài tập' : 'Assignment Title'} <span className="text-error" style={{ color: '#DC2626' }}>*</span>
+          </label>
+          <input 
+            id="assignment-title"
+            type="text" 
+            className="assignment-edit-title-input"
+            value={assignmentData.title}
+            onChange={(e) => setAssignmentData({ ...assignmentData, title: e.target.value })}
+            placeholder={isVi ? 'Nhập tiêu đề bài tập...' : 'Enter assignment title...'}
+          />
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select 
@@ -1005,10 +1019,11 @@ export const TeacherEditAssignment: React.FC = () => {
           {activeModule && (
             <div className="tae-active-mod-meta-card">
               <div className="flex items-center gap-4 flex-1 min-w-[280px]">
-                <span className="tae-meta-tag">
+                <label htmlFor="active-module-title" className="tae-meta-tag cursor-pointer">
                   {isVi ? `Phần ${activeModuleIndex + 1}` : `Part ${activeModuleIndex + 1}`}
-                </span>
+                </label>
                 <input
+                  id="active-module-title"
                   type="text"
                   className="tae-meta-title-input flex-1"
                   value={activeModule.title || ''}
@@ -1132,20 +1147,17 @@ export const TeacherEditAssignment: React.FC = () => {
                     min="1"
                     max="10"
                     className="tae-stepper-input"
-                    value={assignmentData.maxSubmissions === 0 ? '' : (assignmentData.maxSubmissions ?? 1)}
-                    placeholder="1"
+                    aria-label={isVi ? 'Số lần nộp tối đa' : 'Maximum submissions'}
+                    value={assignmentData.maxSubmissions ?? ''}
+                    placeholder={isVi ? 'Không giới hạn' : 'Unlimited'}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (raw === '') {
-                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
-                        return;
-                      }
-                      const clean = raw.replace(/^0+/, '');
-                      setAssignmentData({ ...assignmentData, maxSubmissions: clean === '' ? 1 : Math.max(1, Number(clean)) });
+                      const value = raw === '' ? undefined : Math.max(1, Number(raw));
+                      setAssignmentData({ ...assignmentData, maxSubmissions: value });
                     }}
                     onBlur={() => {
-                      if (!assignmentData.maxSubmissions || assignmentData.maxSubmissions <= 0) {
-                        setAssignmentData({ ...assignmentData, maxSubmissions: 1 });
+                      if (assignmentData.maxSubmissions === undefined) {
+                        setAssignmentData({ ...assignmentData, maxSubmissions: savedCap?.value });
                       }
                     }}
                   />
@@ -1154,7 +1166,7 @@ export const TeacherEditAssignment: React.FC = () => {
                     type="button"
                     className="tae-stepper-btn"
                     disabled={(assignmentData.maxSubmissions ?? 1) >= 10}
-                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.min(10, (assignmentData.maxSubmissions || 1) + 1) })}
+                    onClick={() => setAssignmentData({ ...assignmentData, maxSubmissions: Math.min(10, (assignmentData.maxSubmissions ?? 0) + 1) })}
                     title={isVi ? 'Tăng số lần nộp' : 'Increase max submissions'}
                   >
                     <Plus size={14} />
@@ -1274,14 +1286,7 @@ export const TeacherEditAssignment: React.FC = () => {
         />
       )}
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-24 right-8 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-forest text-white shadow-xl animate-fade-in font-medium text-sm">
-          <CheckCircle2 size={16} />
-          <span>{toastMessage}</span>
-          {lastSavedTime && <span className="text-xs opacity-80">• {lastSavedTime}</span>}
-        </div>
-      )}
+
     </div>
   );
 };

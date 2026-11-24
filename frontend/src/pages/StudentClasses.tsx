@@ -288,17 +288,19 @@ const StudentClasses: React.FC = () => {
       {filteredClasses.length === 0 ? (
         <EmptyState
           icon={<BookOpen size={40} />}
-          title={classesList.length === 0 ? 'Bạn chưa tham gia lớp học nào' : 'Không tìm thấy lớp học phù hợp'}
+          title={classesList.length === 0 
+            ? (isVi ? 'Bạn chưa tham gia lớp học nào' : 'You have not joined any classes yet')
+            : (isVi ? 'Không tìm thấy lớp học phù hợp' : 'No matching classes found')}
           description={classesList.length === 0 
-            ? 'Khi bạn được ghi danh vào lớp học, thông tin lớp và bài tập sẽ xuất hiện tại đây.' 
-            : 'Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.'}
+            ? (isVi ? 'Bạn chưa tham gia lớp học nào. Vui lòng liên hệ Quản trị viên để được phân lớp.' : 'You have not joined any classes yet. Please contact an Administrator to be enrolled.')
+            : (isVi ? 'Hãy thử thay đổi trạng thái lọc hoặc từ khóa tìm kiếm.' : 'Try changing your search term or filter status.')}
           action={classesList.length > 0 ? (
             <Button 
               variant="secondary"
               size="sm"
               onClick={() => { setSearchTerm(''); setFilter('all'); }}
             >
-              Đặt lại bộ lọc
+              {isVi ? 'Đặt lại bộ lọc' : 'Reset filters'}
             </Button>
           ) : undefined}
         />

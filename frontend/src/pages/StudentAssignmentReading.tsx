@@ -3,16 +3,19 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, ChevronRight, BookOpen, 
   Bookmark, Highlighter, 
-  ChevronLeft, AlertCircle, RefreshCw
+  ChevronLeft, AlertCircle, RefreshCw,
+  CheckCircle2, XCircle, Lightbulb, Trash2
 } from 'lucide-react';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
 import { moduleService, type ModuleDetailResponse } from '../api/services/module.service';
 import { questionService } from '../api/services/question.service';
-import { submissionService, type SubmissionDetail } from '../api/services/submission.service';
+import { submissionService, type SubmissionDetail, type SubmissionModuleDetailResponse } from '../api/services/submission.service';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
 import { Button } from '../components/common/Button';
+import { ConfirmModal } from '../components/common/ConfirmModal';
 import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
@@ -28,6 +31,16 @@ import {
   classifyStudentQuizProgress, isStudentQuizPendingFinalization, isStudentQuizSubmitScopeValid,
   type StudentQuizAnswer, type StudentQuizAnswers, type StudentQuizSubmitScope,
 } from '../utils/studentQuiz.utils';
+import {
+  type HighlightItem,
+  type HighlightColor,
+  loadHighlights,
+  saveHighlights,
+  clearHighlights,
+  renderHighlightedParagraph,
+  extractReadingMcqOptions,
+  extractReadingShortAnswerText,
+} from '../utils/readingHighlight.utils';
 import '../styles/student-exam.css';
 
 const NAVIGATION_DELAY_MS = 1200;
@@ -52,6 +65,7 @@ const StudentAssignmentReading: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { warning: toastWarning, error: toastError } = useToast();
   const isReviewMode = searchParams.get('mode') === 'review';
 
@@ -78,12 +92,26 @@ const StudentAssignmentReading: React.FC = () => {
   const [questions, setQuestions] = useState<unknown>([]);
   const [submission, setSubmission] = useState<SubmissionDetail | null>(null);
 
+  // Review mode & Highlight state
+  const [reviewFilter, setReviewFilter] = useState<'ALL' | 'CORRECT' | 'INCORRECT' | 'UNANSWERED'>('ALL');
+  const [submissionModuleDetail, setSubmissionModuleDetail] = useState<SubmissionModuleDetailResponse | null>(null);
+  const [highlights, setHighlights] = useState<HighlightItem[]>([]);
+  const [floatingPalette, setFloatingPalette] = useState<{
+    x: number;
+    y: number;
+    paragraphIndex: number;
+    startOffset: number;
+    endOffset: number;
+    selectedText: string;
+  } | null>(null);
+
   const [activeQuestion, setActiveQuestion] = useState(1);
   const [selectedAnswers, setSelectedAnswers] = useState<StudentQuizAnswers>({});
   const answerScope = useRef<{ assignmentId: number | null; submissionId: number | null; moduleId: number | null }>({
     assignmentId: null, submissionId: null, moduleId: null,
   });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -100,7 +128,7 @@ const StudentAssignmentReading: React.FC = () => {
       const scope = createSubmitScope(currentAssignment, sub, moduleId, expectedSubmissionId);
       const progress = classifyStudentQuizProgress(sub, scope);
       if (progress.kind === 'unconfirmed') throw new Error(UNCONFIRMED_MESSAGE);
-      if (!isStudentQuizPendingFinalization(sub, scope)) {
+      if (!isStudentQuizPendingFinalization(sub, scope) && !isReviewMode) {
         const redirectRoute = getExamPageRedirectRoute(sub, 'READING', numericId, currentAssignment.modules, moduleId, isReviewMode);
         if (redirectRoute) {
           navigate(redirectRoute, { replace: true });
@@ -122,11 +150,51 @@ const StudentAssignmentReading: React.FC = () => {
       }
       setSubmission(sub);
       setLoadedScope({ key: viewKey, scope });
+
+      if (isReviewMode && scope.submissionModuleId) {
+        submissionService.getSubmissionModuleDetail(scope.submissionModuleId)
+          .then((subModRes) => {
+            if (!isMounted || !subModRes) return;
+            setSubmissionModuleDetail(subModRes);
+            if (Array.isArray(subModRes.questions) && subModRes.questions.length > 0) {
+              setQuestions(subModRes.questions);
+            }
+            if (Array.isArray(subModRes.answers) && subModRes.answers.length > 0) {
+              setSelectedAnswers((prev) => {
+                const restored: Record<number, StudentQuizAnswer> = {};
+                Object.entries(prev).forEach(([k, v]) => {
+                  if (v) restored[Number(k)] = v;
+                });
+                for (const ans of subModRes.answers) {
+                  if (ans.questionId) {
+                    const c = ans.content as Record<string, unknown>;
+                    if (c && typeof c === 'object') {
+                      if (typeof c.selectedOptionId === 'number') {
+                        restored[ans.questionId] = { questionType: 'MULTIPLE_CHOICE', selectedOptionId: c.selectedOptionId };
+                      } else if (Array.isArray(c.selectedOptionIds) && typeof c.selectedOptionIds[0] === 'number') {
+                        restored[ans.questionId] = { questionType: 'MULTIPLE_CHOICE', selectedOptionId: c.selectedOptionIds[0] };
+                      } else if (typeof c.text === 'string') {
+                        restored[ans.questionId] = { questionType: 'SHORT_ANSWER', text: c.text };
+                      } else if (typeof c.answer === 'string') {
+                        restored[ans.questionId] = { questionType: 'SHORT_ANSWER', text: c.answer };
+                      }
+                    }
+                  }
+                }
+                return restored;
+              });
+            }
+          })
+          .catch((err) => {
+            console.warn('Could not load submission module detail in review mode:', err);
+          });
+      }
     };
 
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
+      setShowSubmitConfirm(false);
       setLoadedScope({ key: viewKey, scope: UNAVAILABLE_SCOPE });
       setSubmission(null);
       const requestedId = searchParams.get('submissionId');
@@ -179,6 +247,7 @@ const StudentAssignmentReading: React.FC = () => {
 
           if (modRes.status === 'fulfilled') {
             setModuleDetail(modRes.value);
+            setHighlights(loadHighlights(numericId, moduleId));
           }
           if (qRes.status === 'fulfilled') {
             const qList = qRes.value.questions ?? qRes.value.data;
@@ -337,6 +406,8 @@ const StudentAssignmentReading: React.FC = () => {
     setBookmarkedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const unansweredCount = validQuestionCount - answeredCount;
+
   const handleSubmit = () => {
     if (assignment?.status === 'CLOSED') {
       toastError('Bài tập này đã được giáo viên đóng. Không thể nộp bài.');
@@ -351,6 +422,11 @@ const StudentAssignmentReading: React.FC = () => {
       toastWarning('Vui lòng trả lời ít nhất một câu hỏi trước khi nộp phần thi này.');
       return;
     }
+    setShowSubmitConfirm(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowSubmitConfirm(false);
     setError(null);
     void quizSubmit.submit(quizPayload.answers);
   };
@@ -359,6 +435,206 @@ const StudentAssignmentReading: React.FC = () => {
     if (!scopeReady || isLoading || assignment?.status === 'CLOSED') return;
     setError(null);
     void quizSubmit.retryFinal();
+  };
+
+  interface QuestionReviewInfo {
+    questionId: number;
+    questionNumber: number;
+    questionType: string;
+    isAnswered: boolean;
+    isCorrect: boolean | null;
+    studentAnswerText: string;
+    correctAnswerText: string;
+    correctOptionId: number | null;
+    correctOptionIndex: number;
+    explanation: string;
+    evidence: string;
+  }
+
+  const reviewQuestionsInfo = useMemo<Record<number, QuestionReviewInfo>>(() => {
+    const map: Record<number, QuestionReviewInfo> = {};
+    if (!Array.isArray(questions)) return map;
+
+    const rawQuestionsMap = new Map<number, unknown>();
+    questions.forEach((q: unknown) => {
+      if (q && typeof (q as { id?: unknown }).id === 'number') {
+        rawQuestionsMap.set((q as { id: number }).id, q);
+      }
+    });
+
+    validatedQuestions.forEach((result, idx) => {
+      const q = result.question;
+      if (!q) return;
+      const rawQ = (rawQuestionsMap.get(q.id) || q) as Record<string, unknown>;
+      const qNum = typeof rawQ.orderIndex === 'number' ? rawQ.orderIndex : idx + 1;
+      const qType = q.questionType;
+      const currentAns = selectedAnswers[q.id];
+      const isMcq = qType === 'MULTIPLE_CHOICE';
+
+      let isAnswered = false;
+      let studentAnswerText = '--';
+      let correctAnswerText: string;
+      let correctOptionId: number | null = null;
+      let correctOptionIndex = 0;
+      let isCorrect: boolean | null = null;
+
+      if (isMcq) {
+        const mcq = extractReadingMcqOptions(
+          rawQ.correctAnswer as Record<string, unknown> | null,
+          Array.isArray(rawQ.options) ? rawQ.options : q.options
+        );
+        correctOptionIndex = mcq.correctOptionIndex;
+        correctAnswerText = mcq.correctOptionContent
+          ? `${String.fromCharCode(65 + mcq.correctOptionIndex)}. ${mcq.correctOptionContent}`
+          : '--';
+
+        const opts = (Array.isArray(rawQ.options) ? rawQ.options : q.options) as Array<{ id: number; content: string }>;
+        if (Array.isArray(opts) && opts.length > mcq.correctOptionIndex) {
+          correctOptionId = opts[mcq.correctOptionIndex]?.id ?? null;
+        }
+
+        if (currentAns?.questionType === 'MULTIPLE_CHOICE' && currentAns.selectedOptionId) {
+          isAnswered = true;
+          const optIdx = opts?.findIndex((o) => o.id === currentAns.selectedOptionId);
+          if (optIdx !== undefined && optIdx >= 0) {
+            studentAnswerText = `${String.fromCharCode(65 + optIdx)}. ${opts[optIdx].content}`;
+            isCorrect = (correctOptionId !== null && currentAns.selectedOptionId === correctOptionId) || optIdx === mcq.correctOptionIndex;
+          } else {
+            studentAnswerText = `Lựa chọn #${currentAns.selectedOptionId}`;
+            isCorrect = false;
+          }
+        }
+      } else {
+        const shortAns = extractReadingShortAnswerText(rawQ.correctAnswer as Record<string, unknown> | null);
+        correctAnswerText = shortAns || '--';
+        if (currentAns?.questionType === 'SHORT_ANSWER' && typeof currentAns.text === 'string' && currentAns.text.trim()) {
+          isAnswered = true;
+          studentAnswerText = currentAns.text.trim();
+          if (shortAns) {
+            isCorrect = studentAnswerText.toLowerCase() === shortAns.trim().toLowerCase();
+          }
+        }
+      }
+
+      // If submissionModuleDetail.answers provided isCorrect directly, adopt it
+      const subAns = submissionModuleDetail?.answers?.find((a) => a.questionId === q.id);
+      if (subAns?.content && typeof subAns.content === 'object') {
+        const c = subAns.content as Record<string, unknown>;
+        if (typeof c.isCorrect === 'boolean') isCorrect = c.isCorrect;
+        else if (typeof c.is_correct === 'boolean') isCorrect = c.is_correct;
+      }
+
+      const cAnsObj = (rawQ.correctAnswer && typeof rawQ.correctAnswer === 'object') ? (rawQ.correctAnswer as Record<string, unknown>) : null;
+      const explanation = (rawQ.explanation || cAnsObj?.explanation || cAnsObj?.note || 'Đối chiếu với dẫn chứng trong bài đọc và đáp án chuẩn của bài thi.') as string;
+      const evidence = (rawQ.evidence || cAnsObj?.evidence || '') as string;
+
+      map[q.id] = {
+        questionId: q.id,
+        questionNumber: qNum,
+        questionType: qType,
+        isAnswered,
+        isCorrect: isAnswered ? isCorrect : null,
+        studentAnswerText,
+        correctAnswerText,
+        correctOptionId,
+        correctOptionIndex,
+        explanation,
+        evidence
+      };
+    });
+
+    return map;
+  }, [questions, validatedQuestions, selectedAnswers, submissionModuleDetail]);
+
+  const reviewStats = useMemo(() => {
+    const list = Object.values(reviewQuestionsInfo);
+    const total = list.length || validQuestionCount || 0;
+    const correctCount = list.filter((item) => item.isCorrect === true).length;
+    const incorrectCount = list.filter((item) => item.isAnswered && item.isCorrect === false).length;
+    const unansweredCount = list.filter((item) => !item.isAnswered).length;
+    const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+
+    return {
+      total,
+      correctCount,
+      incorrectCount,
+      unansweredCount,
+      scorePercent
+    };
+  }, [reviewQuestionsInfo, validQuestionCount]);
+
+  const handleParagraphMouseUp = (paragraphIndex: number, paragraphText: string, event: React.MouseEvent) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      setFloatingPalette(null);
+      return;
+    }
+    const selectedText = selection.toString().trim();
+    if (!selectedText) {
+      setFloatingPalette(null);
+      return;
+    }
+
+    let startOffset = paragraphText.indexOf(selectedText);
+    if (startOffset === -1) {
+      const range = selection.getRangeAt(0);
+      startOffset = Math.max(0, range.startOffset);
+    }
+    const endOffset = startOffset + selectedText.length;
+
+    let x = event.clientX;
+    let y = event.clientY - 40;
+    try {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        x = rect.left + rect.width / 2;
+        y = rect.top - 45 + (window.scrollY || window.pageYOffset || 0);
+      }
+    } catch {
+      // fallback
+    }
+
+    setFloatingPalette({
+      x: Math.max(10, x),
+      y: Math.max(10, y),
+      paragraphIndex,
+      startOffset,
+      endOffset,
+      selectedText
+    });
+  };
+
+  const handleApplyHighlight = (color: HighlightColor) => {
+    if (!floatingPalette || !numericId || !moduleDetail?.id) return;
+    const newHighlight: HighlightItem = {
+      id: `hl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      paragraphIndex: floatingPalette.paragraphIndex,
+      startOffset: floatingPalette.startOffset,
+      endOffset: floatingPalette.endOffset,
+      color,
+      text: floatingPalette.selectedText,
+      createdAt: Date.now()
+    };
+    const updated = [...highlights, newHighlight];
+    setHighlights(updated);
+    saveHighlights(numericId, moduleDetail.id, updated);
+    setFloatingPalette(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const handleRemoveHighlight = (highlightId: string) => {
+    if (!numericId || !moduleDetail?.id) return;
+    const updated = highlights.filter(h => h.id !== highlightId);
+    setHighlights(updated);
+    saveHighlights(numericId, moduleDetail.id, updated);
+  };
+
+  const handleClearAllHighlights = () => {
+    if (!numericId || !moduleDetail?.id) return;
+    clearHighlights(numericId, moduleDetail.id);
+    setHighlights([]);
+    setFloatingPalette(null);
   };
 
   const currentQuestionResult = validatedQuestions[activeQuestion - 1] || validatedQuestions[0];
@@ -464,14 +740,33 @@ const StudentAssignmentReading: React.FC = () => {
               <BookOpen size={18} />
               <span>READING PASSAGE</span>
             </div>
-            <div>
+            <div className="reading-highlight-toolbar">
+              {highlights.length > 0 && (
+                <span className="reading-highlight-count-pill" title={`${highlights.length} đoạn đã highlight`}>
+                  {highlights.length} highlight
+                </span>
+              )}
               <Button 
                 variant="secondary"
                 size="sm"
                 icon={Highlighter}
+                onClick={() => {
+                  toastWarning('Bôi đen văn bản trong đoạn đọc để mở bảng màu highlight.');
+                }}
               >
                 Highlight
               </Button>
+              {highlights.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={handleClearAllHighlights}
+                  title="Xóa tất cả highlight"
+                >
+                  Xóa tất cả
+                </Button>
+              )}
             </div>
           </div>
 
@@ -495,8 +790,11 @@ const StudentAssignmentReading: React.FC = () => {
                           PARAGRAPH {index + 1}
                         </span>
                       </div>
-                      <p className="exam-paragraph-text">
-                        {paragraph}
+                      <p 
+                        className="exam-paragraph-text"
+                        onMouseUp={(e) => handleParagraphMouseUp(index, paragraph, e)}
+                      >
+                        {renderHighlightedParagraph(paragraph, index, highlights, handleRemoveHighlight)}
                       </p>
                     </div>
                   ))
@@ -508,22 +806,153 @@ const StudentAssignmentReading: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Floating Highlight Palette */}
+            {floatingPalette && (
+              <div
+                className="reading-floating-palette"
+                role="toolbar"
+                aria-label="Bảng màu highlight"
+                style={{
+                  left: `${floatingPalette.x}px`,
+                  top: `${floatingPalette.y}px`,
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                <button
+                  type="button"
+                  className="reading-palette-color-btn yellow"
+                  title="Highlight màu Vàng (Ý chính)"
+                  aria-label="Highlight màu Vàng"
+                  onClick={() => handleApplyHighlight('yellow')}
+                />
+                <button
+                  type="button"
+                  className="reading-palette-color-btn green"
+                  title="Highlight màu Xanh lá (Dẫn chứng đáp án)"
+                  aria-label="Highlight màu Xanh lá"
+                  onClick={() => handleApplyHighlight('green')}
+                />
+                <button
+                  type="button"
+                  className="reading-palette-color-btn pink"
+                  title="Highlight màu Hồng (Từ vựng quan trọng)"
+                  aria-label="Highlight màu Hồng"
+                  onClick={() => handleApplyHighlight('pink')}
+                />
+                <div className="reading-palette-divider" />
+                <button
+                  type="button"
+                  className="reading-palette-action-btn"
+                  onClick={() => setFloatingPalette(null)}
+                  title="Đóng bảng màu"
+                >
+                  Đóng
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Questions */}
         <div className="exam-pane-right">
+          {/* Review Mode Banner */}
+          {isReviewMode && (
+            <div className="exam-review-banner" role="region" aria-label="Review Mode">
+              <div className="exam-review-banner-left">
+                <div className="exam-review-banner-icon">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h3 className="exam-review-banner-title">
+                    Chế độ xem lại bài làm &amp; Đối chiếu đáp án (UC020, UC032)
+                  </h3>
+                  <p className="exam-review-banner-desc">
+                    Đối chiếu trực quan câu trả lời của bạn với đáp án chuẩn, giải thích chi tiết và dẫn chứng bài đọc.
+                  </p>
+                </div>
+              </div>
+              <div className="exam-review-stats">
+                <span className="exam-review-stat-pill correct">
+                  ✓ Đúng: {reviewStats.correctCount} / {reviewStats.total}
+                </span>
+                <span className="exam-review-stat-pill incorrect">
+                  ✗ Sai: {reviewStats.incorrectCount}
+                </span>
+                <span className="exam-review-stat-pill score">
+                  Điểm: {reviewStats.scorePercent}%
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="exam-questions-header">
+            {/* Review Filter Tabs */}
+            {isReviewMode && totalQuestions > 0 && (
+              <div className="exam-review-filter-tabs" role="tablist" aria-label="Lọc câu hỏi">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={reviewFilter === 'ALL'}
+                  className={`exam-review-filter-btn ${reviewFilter === 'ALL' ? 'is-active' : ''}`}
+                  onClick={() => setReviewFilter('ALL')}
+                >
+                  Tất cả ({totalQuestions})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={reviewFilter === 'CORRECT'}
+                  className={`exam-review-filter-btn ${reviewFilter === 'CORRECT' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setReviewFilter('CORRECT');
+                    const first = validatedQuestions.findIndex((r) => r.question && reviewQuestionsInfo[r.question.id]?.isCorrect === true);
+                    if (first !== -1) setActiveQuestion(first + 1);
+                  }}
+                >
+                  Đúng ({reviewStats.correctCount})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={reviewFilter === 'INCORRECT'}
+                  className={`exam-review-filter-btn ${reviewFilter === 'INCORRECT' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setReviewFilter('INCORRECT');
+                    const first = validatedQuestions.findIndex((r) => r.question && reviewQuestionsInfo[r.question.id]?.isAnswered && reviewQuestionsInfo[r.question.id]?.isCorrect === false);
+                    if (first !== -1) setActiveQuestion(first + 1);
+                  }}
+                >
+                  Sai ({reviewStats.incorrectCount})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={reviewFilter === 'UNANSWERED'}
+                  className={`exam-review-filter-btn ${reviewFilter === 'UNANSWERED' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setReviewFilter('UNANSWERED');
+                    const first = validatedQuestions.findIndex((r) => r.question && !reviewQuestionsInfo[r.question.id]?.isAnswered);
+                    if (first !== -1) setActiveQuestion(first + 1);
+                  }}
+                >
+                  Chưa làm ({reviewStats.unansweredCount})
+                </button>
+              </div>
+            )}
+
             <div className="exam-questions-meta">
               <div>
                 <h2 className="exam-questions-title">
                   Danh sách câu hỏi {totalQuestions > 0 ? `(1 - ${totalQuestions})` : ''}
                 </h2>
                 <span className="exam-questions-hint">
-                  {totalQuestions > 0 ? 'Chọn đáp án đúng nhất cho từng câu' : 'Chưa có câu hỏi nào được gán'}
+                  {isReviewMode
+                    ? 'Xem lại câu trả lời và đối chiếu với đáp án chuẩn bên dưới'
+                    : (totalQuestions > 0 ? 'Chọn đáp án đúng nhất cho từng câu' : 'Chưa có câu hỏi nào được gán')}
                 </span>
               </div>
-              {totalQuestions > 0 && (
+              {totalQuestions > 0 && !isReviewMode && (
                 <div className="exam-progress-badge">
                   {answeredCount} / {validQuestionCount} đã làm{invalidQuestionNumbers.length > 0 ? ' (câu hợp lệ)' : ''}
                 </div>
@@ -535,15 +964,23 @@ const StudentAssignmentReading: React.FC = () => {
               <div className="exam-nav-grid">
                 {validatedQuestions.map((result, i) => {
                   const qId = i + 1;
-                  const isAnswered = result.question !== null && answeredQuestionIds.has(result.question.id);
+                  const qItem = result.question;
+                  const isAnswered = qItem !== null && answeredQuestionIds.has(qItem.id);
                   const isBookmarked = bookmarkedQuestions[qId];
                   const isActive = activeQuestion === qId;
+                  const revInfo = qItem ? reviewQuestionsInfo[qItem.id] : null;
                   
                   const btnClasses = [
                     'exam-nav-btn',
                     isActive ? 'is-active' : '',
                     isBookmarked ? 'is-bookmarked' : '',
-                    !isActive && !isBookmarked && isAnswered ? 'is-answered' : ''
+                    isReviewMode && revInfo
+                      ? revInfo.isCorrect === true
+                        ? 'is-correct'
+                        : revInfo.isAnswered && revInfo.isCorrect === false
+                          ? 'is-incorrect'
+                          : 'is-unanswered'
+                      : (!isActive && !isBookmarked && isAnswered ? 'is-answered' : '')
                   ].filter(Boolean).join(' ');
 
                   return (
@@ -581,6 +1018,7 @@ const StudentAssignmentReading: React.FC = () => {
             ) : currentQuestionItem ? (() => {
               const isShortAnswer = currentQuestionItem.questionType === 'SHORT_ANSWER';
               const currentAnswer = selectedAnswers[currentQuestionItem.id];
+              const revInfo = reviewQuestionsInfo[currentQuestionItem.id];
               return (
                 <div className="exam-question-card">
                   <div className="exam-question-top">
@@ -591,6 +1029,11 @@ const StudentAssignmentReading: React.FC = () => {
                       <span className="exam-question-type-badge">
                         {isShortAnswer ? 'Trả lời ngắn' : 'Trắc nghiệm'}
                       </span>
+                      {isReviewMode && revInfo && (
+                        <span className={`exam-review-stat-pill ${revInfo.isCorrect ? 'correct' : revInfo.isAnswered ? 'incorrect' : ''}`}>
+                          {revInfo.isCorrect ? '✓ Đúng' : revInfo.isAnswered ? '✗ Sai' : 'Chưa làm'}
+                        </span>
+                      )}
                     </div>
                     <button 
                       type="button"
@@ -615,39 +1058,104 @@ const StudentAssignmentReading: React.FC = () => {
                         >
                           Điền đáp án cho ô trống [{activeQuestion}]:
                         </label>
-                        <span className="text-xs text-muted">
-                          (Không quá 3 từ / Chữ số)
-                        </span>
+                        {!isReviewMode && (
+                          <span className="text-xs text-muted">
+                            (Không quá 3 từ / Chữ số)
+                          </span>
+                        )}
                       </div>
                       <input
                         id={`short-answer-${currentQuestionItem.id || activeQuestion}`}
                         type="text"
-                        className="exam-short-answer-input"
-                        disabled={!canSubmitModule}
-                        placeholder={`Nhập từ/cụm từ điền vào ô trống #${activeQuestion}...`}
+                        className={`exam-short-answer-input ${isReviewMode ? (revInfo?.isCorrect ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50') : ''}`}
+                        disabled={!canSubmitModule || isReviewMode}
+                        placeholder={isReviewMode ? '(Chưa có câu trả lời)' : `Nhập từ/cụm từ điền vào ô trống #${activeQuestion}...`}
                         value={currentAnswer?.questionType === 'SHORT_ANSWER' ? currentAnswer.text : ''}
                         onChange={(e) => handleSelectAnswer(currentQuestionItem.id, { questionType: 'SHORT_ANSWER', text: e.target.value })}
                         autoComplete="off"
                       />
+                      {isReviewMode && revInfo && (
+                        <div className="exam-short-answer-correct-box mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm">
+                          <span className="font-bold text-emerald-800">Đáp án chuẩn: </span>
+                          <strong className="text-emerald-950">{revInfo.correctAnswerText || '--'}</strong>
+                        </div>
+                      )}
                     </div>
                   ) : currentQuestionItem.questionType === 'MULTIPLE_CHOICE' ? (
                     /* Options */
                     <div className="exam-options-group">
                       {currentQuestionItem.options?.map((option, optIdx) => {
                         const isSelected = currentAnswer?.questionType === 'MULTIPLE_CHOICE' && currentAnswer.selectedOptionId === option.id;
+                        const isCorrectOpt = isReviewMode && revInfo && (revInfo.correctOptionId === option.id || optIdx === revInfo.correctOptionIndex);
+
+                        let optClass = 'exam-option-item';
+                        if (isReviewMode) {
+                          if (isCorrectOpt) {
+                            optClass += ' is-correct-answer';
+                          } else if (isSelected && !isCorrectOpt) {
+                            optClass += ' is-student-wrong';
+                          } else {
+                            optClass += ' is-dimmed';
+                          }
+                        } else if (isSelected) {
+                          optClass += ' is-selected';
+                        }
+
                         return (
                           <label 
                             key={option.id}
-                            onClick={() => handleSelectAnswer(currentQuestionItem.id, { questionType: 'MULTIPLE_CHOICE', selectedOptionId: option.id })}
-                            className={`exam-option-item ${isSelected ? 'is-selected' : ''}`}
+                            onClick={() => {
+                              if (!isReviewMode) {
+                                handleSelectAnswer(currentQuestionItem.id, { questionType: 'MULTIPLE_CHOICE', selectedOptionId: option.id });
+                              }
+                            }}
+                            className={optClass}
+                            style={{ cursor: isReviewMode ? 'default' : 'pointer' }}
                           >
                             <span className="exam-option-key">{String.fromCharCode(65 + optIdx)}</span>
                             <span className="exam-option-content">{option.content}</span>
+
+                            {isReviewMode && isCorrectOpt && (
+                              <span className="exam-option-status-badge correct">
+                                <CheckCircle2 size={13} />
+                                <span>Đáp án đúng</span>
+                              </span>
+                            )}
+                            {isReviewMode && isSelected && !isCorrectOpt && (
+                              <span className="exam-option-status-badge wrong">
+                                <XCircle size={13} />
+                                <span>Bạn đã chọn</span>
+                              </span>
+                            )}
+                            {isReviewMode && isSelected && isCorrectOpt && (
+                              <span className="exam-option-status-badge correct" style={{ marginLeft: 4 }}>
+                                <span>(Lựa chọn của bạn)</span>
+                              </span>
+                            )}
                           </label>
                         );
                       })}
                     </div>
                   ) : null}
+
+                  {/* Explanation Card */}
+                  {isReviewMode && revInfo && (
+                    <div className="exam-explanation-card">
+                      <div className="exam-explanation-header">
+                        <Lightbulb size={16} />
+                        <span>Giải thích chi tiết &amp; Dẫn chứng</span>
+                      </div>
+                      <p className="exam-explanation-text">
+                        {revInfo.explanation}
+                      </p>
+                      {revInfo.evidence ? (
+                        <div className="exam-explanation-quote">
+                          <strong>Dẫn chứng bài đọc: </strong>
+                          &ldquo;{revInfo.evidence}&rdquo;
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               );
             })() : null}
@@ -678,20 +1186,46 @@ const StudentAssignmentReading: React.FC = () => {
             </div>
 
             <div className="exam-pane-footer-submit">
-              <Button 
-                variant="primary"
-                size="md"
-                loading={isSubmitting}
-                disabled={!canSubmitModule || isSubmitting}
-                onClick={handleSubmit}
-                className="w-full"
-              >
-                Hoàn thành & Nộp phần Đọc
-              </Button>
+              {isReviewMode ? (
+                <Button 
+                  variant="primary"
+                  size="md"
+                  onClick={() => navigate(`/student/assignments/${id}/overview`)}
+                  className="w-full"
+                >
+                  Quay lại tổng quan bài thi
+                </Button>
+              ) : (
+                <Button 
+                  variant="primary"
+                  size="md"
+                  loading={isSubmitting}
+                  disabled={!canSubmitModule || isSubmitting}
+                  onClick={handleSubmit}
+                  className="w-full"
+                >
+                  Hoàn thành & Nộp phần Đọc
+                </Button>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showSubmitConfirm && canSubmitModule}
+        title={t('readingSubmit.title')}
+        message={unansweredCount > 0
+          ? t('readingSubmit.unanswered').replace('{count}', String(unansweredCount))
+          : t('readingSubmit.message')}
+        confirmText={t('readingSubmit.confirm')}
+        cancelText={t('readingSubmit.cancel')}
+        closeLabel={t('readingSubmit.close')}
+        variant={unansweredCount > 0 ? 'warning' : 'primary'}
+        trapFocus
+        onConfirm={handleConfirmSubmit}
+        onCancel={() => setShowSubmitConfirm(false)}
+      />
     </div>
   );
 };

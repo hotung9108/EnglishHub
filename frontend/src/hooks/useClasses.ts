@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseApiError } from '@/api/core/errors';
+import { isRequestCanceled, parseApiError } from '@/api/core/errors';
 import { classService } from '@/api/services/class.service';
 import type {
   AddedClassMemberResponse,
@@ -53,7 +53,7 @@ export function useClasses(options: UseClassesOptions = {}): UseClassesResult {
   }));
   const requestId = useRef(0);
   const controller = useRef<AbortController | null>(null);
-  const mounted = useRef(false);
+  const mounted = useRef(true);
   const enabledRef = useRef(enabled);
   const query = useRef<ClassesQuery>({ page, limit, status });
   const skipEffectFor = useRef<string | null>(null);
@@ -115,6 +115,9 @@ export function useClasses(options: UseClassesOptions = {}): UseClassesResult {
         }));
         return result.data;
       } catch (cause) {
+        if (isRequestCanceled(cause)) {
+          return null;
+        }
         if (mounted.current && enabledRef.current && id === requestId.current) {
           setList(state => ({
             ...state,
