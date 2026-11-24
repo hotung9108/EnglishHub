@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Login from '../../pages/Login';
 import { renderPage } from './renderPage';
@@ -117,4 +117,50 @@ it('toggles password visibility, remember-me and language', async () => {
   await user.click(screen.getByRole('checkbox')); expect(screen.getByRole('checkbox')).not.toBeChecked();
   await user.click(screen.getByRole('button', { name: 'Tiếng Việt' }));
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeVisible();
+});
+
+it('đặt dấu bắt buộc bên cạnh nhãn Selenium kiểm tra và chỉ báo lỗi email inline', async () => {
+  const { user, email, password } = setup();
+  for (const [input, text] of [[email, 'Email'], [password, 'Mật khẩu']] as const) {
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    expect(label?.textContent?.trim()).toBe(text);
+    expect(label?.nextElementSibling).toHaveTextContent('*');
+    expect(label?.nextElementSibling).toHaveAttribute('aria-hidden', 'true');
+    expect(input).toBeRequired();
+  }
+  await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Vui lòng nhập email.');
+  expect(email).toHaveAccessibleDescription('Vui lòng nhập email.');
+  expect(email).toHaveAttribute('aria-invalid', 'true');
+  expect(password).not.toHaveAttribute('aria-describedby');
+  expect(login).not.toHaveBeenCalled();
+});
+
+it('hiện lỗi định dạng theo ngôn ngữ đang chọn và xóa lỗi khi sửa email', async () => {
+  const { user, email, password } = setup();
+  await user.click(screen.getByRole('button', { name: 'Tiếng Việt' }));
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  expect(email).toHaveAccessibleDescription('Please enter your email.');
+  fireEvent.change(email, { target: { value: 'missing-at-sign' } });
+  fireEvent.change(password, { target: { value: 'test-password' } });
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  expect(email).toHaveAccessibleDescription('Enter a valid email address.');
+  await user.click(screen.getByRole('button', { name: 'English' }));
+  expect(email).toHaveAccessibleDescription('Email không đúng định dạng.');
+  expect(login).not.toHaveBeenCalled();
+});
+
+it('để ô email native xử lý khoảng trắng đầu cuối và gửi giá trị của ô', async () => {
+  acceptRole('teacher');
+  const { user, email, password } = setup();
+  expect(email).toHaveAttribute('type', 'email');
+  fireEvent.change(email, { target: { value: ` ${identity.email} ` } });
+  expect(email).toHaveValue(identity.email);
+  fireEvent.change(password, { target: { value: 'test-password' } });
+  await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+  expect(login).toHaveBeenCalledExactlyOnceWith('/auth/login', {
+    email: identity.email,
+    password: 'test-password',
+  }, { skipAuth: true });
 });

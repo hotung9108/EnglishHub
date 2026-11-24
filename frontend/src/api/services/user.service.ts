@@ -96,6 +96,10 @@ export class UserService {
     return this.http.patch<UserProfile>(`${USERS_ENDPOINT}/${id}/status`, { status });
   }
 
+  async getAdminUserDetail(id: UserId, options?: ApiRequestOptions): Promise<UserProfile> {
+    return this.http.get<UserProfile>(`${USERS_ENDPOINT}/${id}`, options);
+  }
+
   async getUserById(
     id: UserId,
     hint?: { fullName?: string; email?: string },

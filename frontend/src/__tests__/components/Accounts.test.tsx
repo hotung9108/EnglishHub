@@ -27,7 +27,6 @@ const mockUsers: UserListItem[] = [
     email: 'hoa.le@example.com',
     role: 'TEACHER',
     status: 'ACTIVE',
-    specialization: 'IELTS Speaking',
   },
 ];
 
@@ -37,7 +36,6 @@ const mockListResponse: UserListResponse = {
     page: 1,
     limit: 10,
     total: 2,
-    totalPages: 1,
   },
 };
 

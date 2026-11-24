@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
@@ -10,6 +10,7 @@ import { moduleService } from '../../api/services/module.service';
 import { questionService, type QuestionListResponse } from '../../api/services/question.service';
 import { submissionService, type SubmissionDetail } from '../../api/services/submission.service';
 import { ApiClientError } from '../../api/core/errors';
+import { useLanguage } from '../../contexts/LanguageContext';
 import * as assignmentEvents from '../../utils/assignmentEvents.utils';
 import { renderPage } from './renderPage';
 import { deferred } from '../deferred';
@@ -50,8 +51,14 @@ const scenarios = [
     contents: ['At a library', 'At a bakery', 'At an airport gate', 'At a petrol station'], nextRoute: '/student/assignments/writing/4' },
 ];
 
+function ChangeQuizLanguage() {
+  const { toggleLanguage } = useLanguage();
+  return <button type="button" onClick={toggleLanguage}>Switch language</button>;
+}
+
 describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
   const { Page, route, skill, moduleId, mcqId, shortId, submissionModuleId } = scenario;
+  const confirmName = skill === 'READING' ? 'Xác nhận' : 'Nộp bài';
 
   function options(ids = [101, 102, 103, 104]) {
     return ids.map((id, index) => ({ id, content: scenario.contents[index] }));
@@ -137,7 +144,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
         await realUser.click(element);
         const testName = expect.getState().currentTestName || '';
         if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
-          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          const confirmBtn = screen.queryByRole('button', { name: confirmName });
           if (confirmBtn && confirmBtn !== element) {
             await realUser.click(confirmBtn);
           }
@@ -147,7 +154,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
         await realUser.dblClick(element);
         const testName = expect.getState().currentTestName || '';
         if (!testName.includes('DO_010') && element.textContent && /Hoàn thành & Nộp/i.test(element.textContent)) {
-          const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+          const confirmBtn = screen.queryByRole('button', { name: confirmName });
           if (confirmBtn && confirmBtn !== element) {
             await realUser.click(confirmBtn);
           }
@@ -219,7 +226,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: text } });
     expect(screen.getByText('1 / 2 đã làm')).toBeVisible();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
-    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    const confirmBtn = screen.queryByRole('button', { name: confirmName });
     if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(submissionModuleId, {
       answers: [{ questionId: mcqId, content: { selectedOptionIds: [102] } }],
@@ -232,6 +239,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: text } });
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
     expect(screen.getByText(BLANK_MESSAGE)).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByText('0 / 2 đã làm')).toBeVisible();
     expectNotSubmitted();
   });
@@ -376,6 +384,14 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.type(screen.getByRole('textbox'), ' key ');
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
+    if (skill === 'READING') {
+      const dialog = screen.getByRole('dialog', { name: 'Xác nhận nộp bài' });
+      expect(within(dialog).getByText('Bạn có chắc chắn muốn nộp phần Đọc không?')).toBeVisible();
+      expect(submissionService.submitModule).not.toHaveBeenCalled();
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: confirmName })); });
+    } else {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    }
     expect(submissionService.submitModule).toHaveBeenCalledExactlyOnceWith(submissionModuleId, { answers: [
       { questionId: mcqId, content: { selectedOptionIds: [101] } },
       { questionId: shortId, content: { text: 'key' } },
@@ -392,7 +408,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
-    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    const confirmBtn1 = screen.queryByRole('button', { name: confirmName });
     if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).not.toHaveBeenCalled();
@@ -418,7 +434,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await user.click(optionElements()[0]);
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
-    const confirmBtn1 = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    const confirmBtn1 = screen.queryByRole('button', { name: confirmName });
     if (confirmBtn1) await act(async () => { fireEvent.click(confirmBtn1); });
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
     expect(submissionService.submitSubmission).toHaveBeenCalledExactlyOnceWith(SUBMISSION_ID, SIGNAL_OPTIONS);
@@ -493,7 +509,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await openQuestion(1);
     expect(document.querySelector('.exam-option-item.is-selected')).toBeNull();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
-    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    const confirmBtn = screen.queryByRole('button', { name: confirmName });
     if (confirmBtn) await user.click(confirmBtn);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenLastCalledWith(submissionModuleId, {
@@ -509,13 +525,59 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     expect(screen.getByRole('dialog')).toBeVisible();
     expect(screen.getByText(/1\s*(câu|questions)|(?:còn trống|unanswered).*1/i)).toBeVisible();
     expect(submissionService.submitModule).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Tiếp tục làm bài' }));
+    await user.click(screen.getByRole('button', { name: skill === 'READING' ? 'Hủy' : 'Tiếp tục làm bài' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(submissionService.submitModule).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
-    await user.click(screen.getByRole('button', { name: 'Nộp bài' }));
+    await user.click(screen.getByRole('button', { name: confirmName }));
     expect(submissionService.submitModule).toHaveBeenCalledTimes(1);
   });
+
+  if (skill === 'READING') {
+    it('xác nhận nộp Reading đủ câu, hủy không gửi và bấm đúp chỉ gửi một lần', async () => {
+      onlyCurrentModule();
+      mockQuestions([mcq()]);
+      const { user } = await setup();
+      await user.click(optionElements()[0]);
+      const submit = screen.getByRole('button', { name: SUBMIT_LABEL });
+      fireEvent.click(submit);
+      const dialog = screen.getByRole('dialog');
+      expect(submissionService.submitModule).not.toHaveBeenCalled();
+      expect(submissionService.submitSubmission).not.toHaveBeenCalled();
+      await user.click(within(dialog).getByRole('button', { name: 'Hủy' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(submissionService.submitModule).not.toHaveBeenCalled();
+      expect(submissionService.submitSubmission).not.toHaveBeenCalled();
+      expect(optionElements()[0]).toHaveClass('is-selected');
+
+      fireEvent.click(submit);
+      const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: confirmName });
+      await act(async () => { fireEvent.click(confirm); fireEvent.click(confirm); });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(submissionService.submitModule).toHaveBeenCalledOnce();
+      expect(submissionService.submitSubmission).toHaveBeenCalledOnce();
+    });
+
+    it('hiện nội dung modal Reading theo ngôn ngữ, giữ cảnh báo số câu còn lại và điểm 0', async () => {
+      const { user } = await setup(<ChangeQuizLanguage />);
+      await user.click(optionElements()[0]);
+      fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+      expect(within(screen.getByRole('dialog', { name: 'Xác nhận nộp bài' })).getByText(/1 câu chưa trả lời.*0 điểm/))
+        .toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: 'Switch language' }));
+      let dialog = within(screen.getByRole('dialog', { name: 'Confirm submission' }));
+      expect(dialog.getByText(/Unanswered questions: 1.*zero points/)).toBeVisible();
+      expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
+      fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+      await openQuestion(2);
+      await user.type(screen.getByRole('textbox'), 'key');
+      fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL }));
+      dialog = within(screen.getByRole('dialog', { name: 'Confirm submission' }));
+      expect(dialog.getByText('Are you sure you want to submit the Reading section?')).toBeVisible();
+      expect(dialog.getByRole('button', { name: 'Confirm' })).toBeVisible();
+      expectNotSubmitted();
+    });
+  }
 
   function expectStayed() {
     expect(document.querySelector('.exam-alert-success')).toBeNull();
@@ -528,7 +590,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: SUBMIT_LABEL })); });
     const testName = expect.getState().currentTestName || '';
     if (!testName.includes('DO_010')) {
-      const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+      const confirmBtn = screen.queryByRole('button', { name: confirmName });
       if (confirmBtn) {
         await act(async () => { fireEvent.click(confirmBtn); });
       }
@@ -777,7 +839,7 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     vi.mocked(submissionService.getSubmission).mockReturnValueOnce(pending.promise);
     const button = screen.getByRole('button', { name: label });
     await act(async () => { button.click(); button.click(); });
-    const confirmBtn = screen.queryByRole('button', { name: /^Nộp bài$/i });
+    const confirmBtn = screen.queryByRole('button', { name: confirmName });
     if (confirmBtn) await act(async () => { confirmBtn.click(); });
     expect(submissionService.getSubmission).toHaveBeenCalledTimes(2);
     expect(submissionService.submitModule).toHaveBeenCalledTimes(operation === 'submit' ? 1 : 0);
@@ -966,9 +1028,11 @@ describe.each(scenarios)('StudentAssignmentQuiz $skill', scenario => {
     const { unmount } = await setup();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await answerAndSubmit();
-    expect(vi.getTimerCount()).toBe(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const timerCount = vi.getTimerCount();
+    expect(timerCount).toBeGreaterThanOrEqual(1);
     unmount();
-    expect(vi.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(timerCount - 1);
   });
 
   it('does not fabricate module 1 when assignment loading fails', async () => {

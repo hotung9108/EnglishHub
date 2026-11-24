@@ -22,7 +22,14 @@ Vitest + React Testing Library + jest-dom + jsdom chạy bốn màn hình thật
 - StudentAssignmentWriting: đếm từ, bài rỗng, nháp, file validation/upload, bài đóng, chuyển kỹ năng và bài nhiều module.
 - TeacherSubmissionDetails: điểm 0.0/7.5/10.0, điểm âm/>10/rỗng, feedback/note, pending/error, roster, nhiều module, audio và chấm Speaking bằng AI.
 
-Coverage liệt kê rõ bốn file src/pages tương ứng; ngưỡng 80% riêng từng file cho statements, branches, functions và lines. Không phải coverage toàn frontend hoặc editor con. Lệnh trả khác 0 nếu test lỗi hoặc thiếu coverage. Không hạ ngưỡng hoặc loại dòng để làm xanh kết quả.
+`npm run test:ui` áp dụng ngưỡng coverage riêng từng file cho statements, branches, functions và lines theo [cấu hình Vitest](../frontend/vitest.config.ts).
+
+| Nhóm | File được đo | Ngưỡng mỗi chỉ số |
+| --- | --- | ---: |
+| QA-32 | `src/pages/Login.tsx`, `src/pages/TeacherCreateAssignment.tsx`, `src/pages/StudentAssignmentWriting.tsx`, `src/pages/TeacherSubmissionDetails.tsx` | 80% |
+| FE-99 | `src/pages/Teachers.tsx`, `src/components/admin/AdminUserProfileDrawer.tsx` | 81% |
+
+Lệnh trả mã khác 0 nếu có test lỗi hoặc file dưới ngưỡng. `FE99.test.tsx` vẫn chạy hồi quy cho Profile và hai trang chi tiết. Báo cáo đo riêng ba trang này nằm trong [bàn giao FE-99](../production_artifacts/fe_to_tester/FE-99.md).
 
 npm test chạy suite API client/utility hiện có; không phải API integration với server thật. Selenium kiểm thử trình duyệt/tích hợp là tầng riêng, chưa chạy trong QA-32.
 

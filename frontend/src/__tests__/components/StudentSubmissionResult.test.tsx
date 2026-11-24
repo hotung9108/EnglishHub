@@ -376,7 +376,11 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
     const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
 
     await waitFor(() => expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50));
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    await waitFor(() => {
+      const audio = container.querySelector('audio');
+      expect(audio).not.toBeNull();
+      expect(audio).toHaveAttribute('src', FALLBACK_AUDIO_URL);
+    });
     expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledTimes(1);
     expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50);
   });
@@ -455,23 +459,39 @@ describe('StudentSubmissionResult - [FE-51] Annotation Snippet Extraction', () =
       }],
     }));
     const { container } = renderPage(<StudentSubmissionResult />, '/student/submissions/:id', '/student/submissions/40');
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/50/audio.webm?signature=answer'));
+    await waitFor(() => {
+      const audioEl = container.querySelector('audio');
+      expect(audioEl).not.toBeNull();
+      expect(audioEl).toHaveAttribute('src', 'https://storage.example.test/50/audio.webm?signature=answer');
+    });
     let audio = container.querySelector('audio')!;
     configureAudio(audio!, 90);
     fireEvent.error(audio!);
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    await waitFor(() => {
+      const audioEl = container.querySelector('audio');
+      expect(audioEl).not.toBeNull();
+      expect(audioEl).toHaveAttribute('src', FALLBACK_AUDIO_URL);
+    });
     fireEvent.error(container.querySelector('audio')!);
     expect(await screen.findByText('Không thể tải audio bài nộp. Vui lòng thử lại.')).toBeVisible();
     expect(submissionService.getAudioDownloadUrl).toHaveBeenCalledWith(50);
 
     await selectAttemptAndFlush(41);
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm?signature=answer'));
+    await waitFor(() => {
+      const audioEl = container.querySelector('audio');
+      expect(audioEl).not.toBeNull();
+      expect(audioEl).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm?signature=answer');
+    });
     audio = container.querySelector('audio')!;
     expect(audio).toHaveAttribute('src', 'https://storage.example.test/51/audio.webm?signature=answer');
     configureAudio(audio!, 90);
     fireEvent.error(audio!);
 
-    await waitFor(() => expect(container.querySelector('audio')).toHaveAttribute('src', FALLBACK_AUDIO_URL));
+    await waitFor(() => {
+      const audioEl = container.querySelector('audio');
+      expect(audioEl).not.toBeNull();
+      expect(audioEl).toHaveAttribute('src', FALLBACK_AUDIO_URL);
+    });
     expect(submissionService.getAudioDownloadUrl).toHaveBeenNthCalledWith(2, 51);
   });
 

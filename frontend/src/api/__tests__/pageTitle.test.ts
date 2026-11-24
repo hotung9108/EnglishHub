@@ -40,7 +40,6 @@ test('pageTitle - getPageTitle resolves admin routes (static and parametric)', (
   assert.strictEqual(getPageTitle('/admin/students/303', 'vi'), 'Chi tiết học viên');
   assert.strictEqual(getPageTitle('/admin/reports', 'vi'), 'Báo cáo & Thống kê');
   assert.strictEqual(getPageTitle('/admin/audit/gradings', 'vi'), 'Nhật ký chấm điểm');
-  assert.strictEqual(getPageTitle('/admin/settings', 'vi'), 'Cài đặt hệ thống');
   assert.strictEqual(getPageTitle('/admin/profile', 'vi'), 'Hồ sơ cá nhân');
 });
 

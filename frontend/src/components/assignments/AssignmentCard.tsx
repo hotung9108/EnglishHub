@@ -2,6 +2,7 @@ import {
   ArrowRight, BookOpen, Clock, Edit2, GraduationCap, Headphones, Mic, PenTool, Sparkles, Trash2,
 } from 'lucide-react';
 import type { AssignmentSkill, AssignmentStatus } from '../../api/services/assignment.service';
+import { teacherEn, teacherVi } from '../../locales/teacher';
 import { toSkillBadgeTypes, type AssignmentBadgeType } from '../../utils/assignmentSkills';
 import { Button } from '../common/Button';
 import { StatusBadge, type StatusType } from '../common/StatusBadge';
@@ -173,7 +174,10 @@ export function AssignmentCard({
   const submissionPercent = item.totalStudents > 0
     ? Math.min(100, Math.round((item.submittedCount / item.totalStudents) * 100))
     : 0;
-  const lifecycleBadge = lifecycleBadges[item.lifecycleStatus];
+  const lifecycleBadge = Object.hasOwn(lifecycleBadges, item.lifecycleStatus)
+    ? lifecycleBadges[item.lifecycleStatus]
+    : null;
+  const assignmentLabels = isVi ? teacherVi.teacherAssignments : teacherEn.teacherAssignments;
   const isPublished = item.lifecycleStatus === 'PUBLISHED';
   const isClosed = item.lifecycleStatus === 'CLOSED';
 
@@ -188,7 +192,10 @@ export function AssignmentCard({
             <span>{item.className}</span>
           </div>
           {renderSkillBadges(item.skills)}
-          <StatusBadge status={lifecycleBadge.tone} label={isVi ? lifecycleBadge.vi : lifecycleBadge.en} />
+          <StatusBadge
+            status={lifecycleBadge?.tone ?? 'neutral'}
+            label={lifecycleBadge ? lifecycleBadge[isVi ? 'vi' : 'en'] : assignmentLabels.unknownStatus}
+          />
         </div>
 
         <div className="teacher-assignment-card-status">
@@ -258,15 +265,17 @@ export function AssignmentCard({
             </button>
           )}
 
-          <Button
-            type="button"
-            variant={isPublished ? 'danger' : 'secondary'}
-            size="sm"
-            disabled={isUpdatingLifecycle}
-            onClick={() => onChangeLifecycle(item)}
-          >
-            {isPublished ? (isVi ? 'Khóa bài tập' : 'Close assignment') : (isVi ? 'Mở bài tập' : 'Open assignment')}
-          </Button>
+          {lifecycleBadge && (
+            <Button
+              type="button"
+              variant={isPublished ? 'danger' : 'secondary'}
+              size="sm"
+              disabled={isUpdatingLifecycle}
+              onClick={() => onChangeLifecycle(item)}
+            >
+              {isPublished ? (isVi ? 'Khóa bài tập' : 'Close assignment') : (isVi ? 'Mở bài tập' : 'Open assignment')}
+            </Button>
+          )}
 
           {onDelete && (
             <button
