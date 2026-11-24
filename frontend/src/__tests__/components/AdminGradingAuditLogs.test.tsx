@@ -9,7 +9,7 @@ import type {
   GradingDetailResponse, 
   GradingListResponse 
 } from '../../api/services/grading.service';
-import type { GradingChangeLogResponse } from '../../api/services/grading-change-log.service';
+import type { GradingChangeLogListResponse } from '../../api/services/grading-change-log.service';
 import { renderPage } from './renderPage';
 
 const mockGradings: GradingSummaryResponse[] = [
@@ -61,7 +61,6 @@ const mockListResponse: GradingListResponse = {
     page: 1,
     limit: 10,
     total: 4,
-    totalPages: 1,
   },
 };
 
@@ -81,11 +80,9 @@ const mockGradingDetail: GradingDetailResponse = {
   aiInstructionSnapshot: null,
 };
 
-const mockChangeLogsResponse: GradingChangeLogResponse = {
+const mockChangeLogsResponse: GradingChangeLogListResponse = {
   data: [
     {
-      id: 1,
-      gradingId: 101,
       oldScore: 8.0,
       newScore: 8.5,
       note: 'Điều chỉnh điểm sau khi xem xét lại tiêu chí Coherence',
@@ -93,7 +90,6 @@ const mockChangeLogsResponse: GradingChangeLogResponse = {
       changedAt: '2026-11-20T10:35:00Z',
     },
   ],
-  total: 1,
 };
 
 function renderAuditLogs(lang: 'vi' | 'en' = 'vi') {
