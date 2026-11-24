@@ -4,6 +4,7 @@ import {
   ArrowLeft, ArrowRight, Check, Award, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { validateFullName } from '../utils/nameValidation';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
@@ -14,6 +15,7 @@ export const AddTeacher: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [classes, setClasses] = useState<ClassSummary[]>([]);
@@ -80,13 +82,15 @@ export const AddTeacher: React.FC = () => {
         specialization: formData.certs || undefined
       });
 
+      toast.success(isVi ? 'Thêm giảng viên thành công!' : 'Teacher created successfully!');
       navigate('/admin/teachers');
     } catch (err: unknown) {
       if (parseApiError(err).statusCode === 409) {
         setEmailError('duplicate');
         setCurrentStep(1);
       } else {
-        setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.');
+        const msg = err instanceof Error ? err.message : isVi ? 'Không thể tạo tài khoản giảng viên.' : 'Failed to create teacher.';
+        setSubmitError(msg);
       }
     } finally {
       setSubmitting(false);

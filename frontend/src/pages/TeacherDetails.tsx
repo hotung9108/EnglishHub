@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Mail, Award, BookOpen, 
-  Ban, Loader2, ArrowLeft, UserX,
-  CheckCircle2, Pencil
+  Ban, Loader2, ArrowLeft, UserX, Pencil
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
@@ -50,13 +49,11 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
   const [teacherClasses, setTeacherClasses] = useState<ActiveClass[]>([]);
 
   const [newPassword, setNewPassword] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
   const isActive = teacherUser?.status === 'ACTIVE';
   const isLocked = teacherUser?.status === 'LOCKED';
   const canChangeStatus = isActive || isLocked;
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (teacherId === 0) return;
@@ -143,12 +140,8 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
     if (!newPassword.trim() || !teacherUser) return;
     try {
       await userService.updateUser(teacherUser.id, {});
-      setPasswordSuccess(true);
       toastSuccess(isVi ? 'Đổi mật khẩu thành công.' : 'Password updated successfully.');
-      setTimeout(() => {
-        setPasswordSuccess(false);
-        setNewPassword('');
-      }, 1500);
+      setNewPassword('');
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi mật khẩu.' : 'Failed to update password.');
     }
@@ -165,9 +158,7 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
       const msg = nextStatus === 'LOCKED'
         ? (isVi ? 'Đã tạm khóa tài khoản giảng viên.' : 'Teacher account suspended.')
         : (isVi ? 'Đã mở khóa tài khoản giảng viên.' : 'Teacher account reactivated.');
-      setStatusMessage(msg);
       toastSuccess(msg);
-      setTimeout(() => setStatusMessage(null), 3000);
     } catch (err: unknown) {
       toastError(err instanceof Error ? err.message : isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
     }
@@ -203,23 +194,7 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
         </button>
       </div>
 
-      {statusMessage && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md)',
-          backgroundColor: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          color: '#15803d',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          <CheckCircle2 size={18} />
-          <span>{statusMessage}</span>
-        </div>
-      )}
+
 
       {teacherId !== 0 && profile.state === 'loading' ? (
         <div style={{ padding: '64px', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
@@ -418,20 +393,6 @@ function TeacherDetailsPage({ teacherId }: { teacherId: number }) {
               <h3 className="headline-md" style={{ marginBottom: '16px' }}>
                 {isVi ? 'Cấp Lại Mật Khẩu' : 'Reset Teacher Password'}
               </h3>
-
-              {passwordSuccess && (
-                <div style={{
-                  padding: '10px 14px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#15803d',
-                  fontSize: '13px',
-                  marginBottom: '16px'
-                }}>
-                  {isVi ? 'Đổi mật khẩu thành công!' : 'Password updated successfully!'}
-                </div>
-              )}
 
               <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div className="adm-form-group">

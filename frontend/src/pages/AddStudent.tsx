@@ -4,6 +4,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { validateFullName } from '../utils/nameValidation';
 import { userService } from '../api/services/user.service';
 import { classService } from '../api/services/class.service';
@@ -13,6 +14,7 @@ export const AddStudent: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [classes, setClasses] = useState<ClassSummary[]>([]);
@@ -59,6 +61,7 @@ export const AddStudent: React.FC = () => {
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
       setNameError(valResult.errorMessage || '');
+      toast.warning(valResult.errorMessage || '');
       setCurrentStep(1);
       return;
     }
@@ -86,9 +89,12 @@ export const AddStudent: React.FC = () => {
         }
       }
 
+      toast.success(isVi ? 'Thêm học viên thành công!' : 'Student created successfully!');
       navigate('/admin/students');
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể ghi danh học viên mới.' : 'Failed to register student.');
+      const msg = err instanceof Error ? err.message : isVi ? 'Không thể ghi danh học viên mới.' : 'Failed to register student.';
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }

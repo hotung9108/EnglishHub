@@ -9,8 +9,7 @@ import {
   Trash2, 
   Eye, 
   EyeOff, 
-  AlertCircle,
-  CheckCircle2, 
+  CheckCircle2,
   XCircle,
   Sliders,
   Briefcase,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { userService } from '../api/services/user.service';
 import type { Role } from '../types/auth';
 import type { SettingsTab } from '../types/settings.types';
@@ -55,13 +55,12 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     setSearchParams({ tab: newTab });
   };
 
-  // Toast feedback state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+  const toast = useToast();
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
   };
 
   // User form state
@@ -107,7 +106,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
 
   // Password rules validation
   const hasMinLength = newPassword.length >= 8;
@@ -132,20 +130,22 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError('');
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError(t('settings.passwordRequired'));
+      const msg = t('settings.passwordRequired');
+      showToast(msg, 'warning');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError(t('settings.passwordMismatch'));
+      const msg = t('settings.passwordMismatch');
+      showToast(msg, 'warning');
       return;
     }
 
     if (newPassword.length < 8) {
-      setPasswordError(isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự' : 'Password must be at least 8 characters');
+      const msg = isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự' : 'Password must be at least 8 characters';
+      showToast(msg, 'warning');
       return;
     }
 
@@ -157,10 +157,10 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      showToast(t('settings.passwordUpdated'));
+      showToast(t('settings.passwordUpdated'), 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t('settings.passwordMismatch');
-      setPasswordError(msg);
+      showToast(msg, 'error');
     }
   };
 
@@ -170,7 +170,7 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
       setNameError(valResult.errorMessage || '');
-      showToast(valResult.errorMessage || '');
+      showToast(valResult.errorMessage || '', 'warning');
       return;
     }
 
@@ -199,9 +199,9 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
         dateOfBirth: formData.dateOfBirth,
       });
       setFormData(prev => ({ ...prev, name: cleanName }));
-      showToast(t('settings.savedSuccess'));
+      showToast(t('settings.savedSuccess'), 'success');
     } catch {
-      showToast(isVi ? 'Không thể lưu hồ sơ' : 'Failed to update profile');
+      showToast(isVi ? 'Không thể lưu hồ sơ' : 'Failed to update profile', 'error');
     }
   };
 
@@ -228,15 +228,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
 
   return (
     <div className="settings-page">
-      {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="settings-toast">
-          <CheckCircle2 size={18} color="#10B981" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-
       {/* Header */}
       <div className="settings-header">
         <div className="settings-header-info">
@@ -592,13 +583,6 @@ const SettingsView: React.FC<SettingsProps> = ({ defaultTab = 'profile' }) => {
                   {t('profile.passwordHint')}
                 </p>
               </div>
-
-              {passwordError && (
-                <div className="settings-alert-error">
-                  <AlertCircle size={16} />
-                  <span>{passwordError}</span>
-                </div>
-              )}
 
               <div className="settings-grid-3">
                 <div className="settings-field">

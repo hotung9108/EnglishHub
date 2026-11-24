@@ -15,7 +15,7 @@ import {
   isSubmissionGraded,
   getSubmissionFinalScore
 } from '../api/services/submission.service';
-import { Button, EmptyState, Pagination, MetricCard, LoadingState } from '../components/common';
+import { Button, EmptyState, Pagination, MetricCard, LoadingState, useToast } from '../components/common';
 import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
 
 interface EnrolledStudentSubmissionRow {
@@ -41,7 +41,7 @@ export const TeacherAssignmentGrading: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
   const [isClosing, setIsClosing] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
@@ -93,9 +93,11 @@ export const TeacherAssignmentGrading: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
   };
 
   const handleOpenCloseModal = () => {
@@ -426,14 +428,6 @@ export const TeacherAssignmentGrading: React.FC = () => {
 
   return (
     <div className="teacher-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="tad-toast">
-          <CheckCircle2 size={16} className="text-secondary" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Unified Hero Header Card */}
       <section className="teacher-page-hero">
         <div className="teacher-hero-content">

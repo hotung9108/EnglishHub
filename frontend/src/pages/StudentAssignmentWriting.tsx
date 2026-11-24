@@ -688,6 +688,7 @@ const StudentAssignmentWriting: React.FC = () => {
           console.error('Document storage upload failed:', uploadErr);
           const uploadMsg = uploadErr instanceof Error ? uploadErr.message : 'Tải tệp bài làm lên kho lưu trữ thất bại.';
           setError(`Lỗi tải tệp đính kèm: ${uploadMsg}`);
+          toastError(`Lỗi tải tệp đính kèm: ${uploadMsg}`);
           setIsSubmitting(false);
           return;
         }
@@ -745,7 +746,9 @@ const StudentAssignmentWriting: React.FC = () => {
     } catch (err: unknown) {
       console.error('Submit writing assignment error:', err);
       const apiErr = parseApiError(err);
-      setError(apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+      const msg = apiErr.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.';
+      setError(msg);
+      toastError(msg);
     } finally {
       setIsSubmitting(false);
     }

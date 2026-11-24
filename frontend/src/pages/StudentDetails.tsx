@@ -4,12 +4,13 @@ import {
   User, Mail, 
   Award, ShieldCheck, 
   CheckCircle2, FileText,
-  KeyRound, ArrowLeft, Loader2, UserX, Pencil
+  KeyRound, ArrowLeft, Loader2, UserX, Pencil,
+  Copy, Check, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStudentDetails } from '../hooks/useStudentDetails';
 import { AdminUserProfileDrawer } from '../components/admin/AdminUserProfileDrawer';
-import { Button, EmptyState, ConfirmModal } from '../components/common';
+import { Button, EmptyState, ConfirmModal, useToast } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,12 +25,13 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
   const isVi = language === 'vi';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'progress' | 'evaluations' | 'security'>('overview');
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showConfirmResetModal, setShowConfirmResetModal] = useState(false);
+  const [resetResultPassword, setResetResultPassword] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const toast = useToast();
 
   const {
     studentUser,
@@ -38,8 +40,8 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
     isLoading,
     isError,
     errorMessage,
-    statusMessage,
     isTogglingStatus,
+    isResettingPassword,
     toggleSuspend,
     resetPassword,
     refetch,
@@ -49,7 +51,16 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
   });
 
   const handleToggleSuspend = async () => {
-    await toggleSuspend();
+    const success = await toggleSuspend();
+    if (success) {
+      toast.success(
+        isActive
+          ? (isVi ? 'Đã tạm khóa tài khoản học viên.' : 'Student account suspended.')
+          : (isVi ? 'Đã kích hoạt lại tài khoản học viên.' : 'Student account reactivated.')
+      );
+    } else {
+      toast.error(isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
+    }
   };
 
   const handleProfileSaved = () => {
@@ -57,17 +68,32 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
     void refetch();
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword.trim()) return;
-    const ok = await resetPassword(newPassword);
-    if (ok) {
-      setPasswordSuccess(true);
-      setTimeout(() => {
-        setShowPasswordModal(false);
-        setPasswordSuccess(false);
-        setNewPassword('');
-      }, 1500);
+  const handleConfirmResetPassword = async () => {
+    setShowConfirmResetModal(false);
+    const newPass = await resetPassword();
+    if (newPass) {
+      setResetResultPassword(newPass);
+      toast.success(isVi ? 'Đặt lại mật khẩu thành công!' : 'Password reset successfully!');
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetResultPassword) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(resetResultPassword);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = resetResultPassword;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
     }
   };
 
@@ -112,23 +138,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
         </Button>
       </div>
 
-      {statusMessage && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md, 8px)',
-          backgroundColor: 'var(--eh-success-bg)',
-          border: '1px solid var(--eh-success-border)',
-          color: 'var(--eh-success)',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          <CheckCircle2 size={18} />
-          <span>{statusMessage}</span>
-        </div>
-      )}
+
 
       {isError && !studentUser && !isLoading && (
         <div role="alert">
@@ -185,7 +195,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                     variant="secondary"
                     size="sm"
                     icon={<Pencil size={14} />}
-                    disabled={showStatusConfirmModal || showPasswordModal}
+                    disabled={showStatusConfirmModal || showConfirmResetModal || Boolean(resetResultPassword)}
                     onClick={() => setIsProfileDrawerOpen(true)}
                   >
                     {isVi ? 'Sửa' : 'Edit'}
@@ -341,6 +351,9 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có kết quả bài nộp nào cho học viên này' : 'No submission timeline available'}
                   </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
+                  </div>
                 </div>
               ) : (
                 <div className="data-table-wrapper">
@@ -377,6 +390,9 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                   <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có nhận xét hoặc đánh giá học tập nào' : 'No evaluations recorded'}
+                  </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
                   </div>
                 </div>
               ) : (
@@ -415,69 +431,133 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                 <Button 
                   variant="primary"
                   icon={<KeyRound size={16} />}
-                  onClick={() => setShowPasswordModal(true)}
+                  onClick={() => setShowConfirmResetModal(true)}
+                  disabled={isResettingPassword}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}
                 >
-                  {t('studentDetails.btnResetPassword')}
+                  {isResettingPassword ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{isVi ? 'Đang xử lý...' : 'Resetting...'}</span>
+                    </>
+                  ) : (
+                    t('studentDetails.btnResetPassword')
+                  )}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Reset Password Modal */}
-          {showPasswordModal && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}>
-              <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '24px' }}>
-                <h3 className="headline-md" style={{ marginBottom: '8px' }}>{t('studentDetails.btnResetPassword')}</h3>
-                <p className="body-sm text-muted" style={{ marginBottom: '16px' }}>
-                  {isVi ? `Đặt lại mật khẩu cho học viên ${studentName} (${studentCode})` : `Set new password for ${studentName}`}
-                </p>
-                {passwordSuccess ? (
-                  <div style={{ padding: '16px', borderRadius: '8px', background: 'var(--eh-success-bg)', color: 'var(--eh-success)', fontWeight: 600, textAlign: 'center' }}>
-                    <CheckCircle2 size={24} style={{ margin: '0 auto 8px' }} />
-                    {isVi ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!'}
+          {/* Confirm Reset Password Modal */}
+          {showConfirmResetModal && (
+            <ConfirmModal
+              isOpen={showConfirmResetModal}
+              title={isVi ? 'Xác nhận đặt lại mật khẩu' : 'Confirm Password Reset'}
+              message={
+                isVi
+                  ? `Bạn có chắc chắn muốn đặt lại mật khẩu cho học viên "${studentName}" (${studentCode})? Một mật khẩu ngẫu nhiên mới sẽ được hệ thống tạo tự động và hiển thị để bạn sao chép gửi cho học viên.`
+                  : `Are you sure you want to reset password for "${studentName}" (${studentCode})? A new random password will be generated and displayed for you to copy and send to the student.`
+              }
+              confirmText={isVi ? 'Xác nhận đặt lại' : 'Reset Password'}
+              cancelText={isVi ? 'Hủy' : 'Cancel'}
+              variant="primary"
+              onConfirm={handleConfirmResetPassword}
+              onCancel={() => setShowConfirmResetModal(false)}
+            />
+          )}
+
+          {/* Modal hiển thị mật khẩu ngẫu nhiên tạm thời vừa sinh ra */}
+          {resetResultPassword && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                padding: '16px',
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="student-reset-password-success-title"
+            >
+              <div
+                className="card"
+                style={{
+                  width: '100%',
+                  maxWidth: '440px',
+                  padding: '24px',
+                  borderRadius: '12px',
+                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                  background: 'var(--surface, #FFFFFF)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <h3 id="student-reset-password-success-title" style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: 'var(--text-primary, #171412)' }}>
+                      {isVi ? 'Đặt lại mật khẩu thành công' : 'Password Reset Successful'}
+                    </h3>
                   </div>
-                ) : (
-                  <form onSubmit={handleResetPassword}>
-                    <div style={{ marginBottom: '16px' }}>
-                      <label className="label-md" style={{ display: 'block', marginBottom: '6px' }}>
-                        {isVi ? 'Mật khẩu mới' : 'New Password'}
-                      </label>
-                      <input
-                        type="password"
-                        className="input"
-                        placeholder={isVi ? 'Tối thiểu 6 ký tự...' : 'Min 6 characters...'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        style={{ width: '100%' }}
-                      />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetResultPassword(null);
+                      setCopied(false);
+                    }}
+                    className="btn-ghost"
+                    style={{ padding: '4px', cursor: 'pointer', border: 'none', background: 'transparent', color: 'var(--text-secondary, #736B63)' }}
+                    aria-label={isVi ? 'Đóng' : 'Close'}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #736B63)', lineHeight: 1.5 }}>
+                    {isVi
+                      ? 'Vui lòng sao chép mật khẩu mới này và gửi cho học viên. Mật khẩu này chỉ hiển thị một lần duy nhất tại đây.'
+                      : 'Please copy this new password and send it to the student. This password will only be displayed once here.'}
+                  </p>
+
+                  <div style={{ padding: '12px', background: 'var(--surface-dim, #F5F5F4)', borderRadius: '8px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary, #736B63)', marginBottom: '8px', fontWeight: 500 }}>
+                      {isVi ? 'Học viên:' : 'Student:'} {studentName} ({studentUser?.email || studentCode})
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                      <Button 
-                        type="button" 
-                        variant="secondary" 
-                        onClick={() => setShowPasswordModal(false)}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--surface, #FFFFFF)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color, #EAE6DF)' }}>
+                      <code style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 600, color: 'var(--color-primary, #0284C7)', userSelect: 'all', letterSpacing: '0.5px' }}>
+                        {resetResultPassword}
+                      </code>
+                      <Button
+                        variant={copied ? 'primary' : 'secondary'}
+                        size="sm"
+                        icon={copied ? <Check size={14} /> : <Copy size={14} />}
+                        onClick={handleCopyPassword}
+                        title={copied ? (isVi ? 'Đã sao chép' : 'Copied') : (isVi ? 'Sao chép' : 'Copy')}
                       >
-                        {isVi ? 'Hủy' : 'Cancel'}
-                      </Button>
-                      <Button type="submit" variant="primary">
-                        {isVi ? 'Xác nhận' : 'Confirm'}
+                        {copied ? (isVi ? 'Đã sao chép' : 'Copied') : (isVi ? 'Sao chép' : 'Copy')}
                       </Button>
                     </div>
-                  </form>
-                )}
+                  </div>
+
+                  <Button
+                    variant="primary"
+                    style={{ marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                    onClick={() => {
+                      setResetResultPassword(null);
+                      setCopied(false);
+                    }}
+                  >
+                    {isVi ? 'Đã hiểu' : 'Got it'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

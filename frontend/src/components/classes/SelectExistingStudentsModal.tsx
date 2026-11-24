@@ -4,6 +4,7 @@ import {
   Check, Loader2, AlertCircle, RefreshCw 
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useToast } from '../common/ToastContext';
 import { classService, type CandidateStudent } from '../../api/services/class.service';
 
 interface SelectExistingStudentsModalProps {
@@ -28,6 +29,7 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
   onSuccess,
 }) => {
   const { language } = useLanguage();
+  const toast = useToast();
   const isVi = language === 'vi';
 
   const capacity = maxCapacity || 25;
@@ -212,10 +214,16 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
       const rejected = results.filter(r => r.status === 'rejected');
 
       if (rejected.length > 0) {
-        setSubmitError(
-          isVi 
-            ? `Đã thêm ${results.length - rejected.length}/${results.length} học viên. Có ${rejected.length} học viên không thể thêm.`
-            : `Added ${results.length - rejected.length}/${results.length} students. ${rejected.length} failed.`
+        const msg = isVi 
+          ? `Đã thêm ${results.length - rejected.length}/${results.length} học viên. Có ${rejected.length} học viên không thể thêm.`
+          : `Added ${results.length - rejected.length}/${results.length} students. ${rejected.length} failed.`;
+        setSubmitError(msg);
+        toast.warning(msg);
+      } else {
+        toast.success(
+          isVi
+            ? `Đã thêm ${selectedIds.length} học viên vào lớp thành công!`
+            : `Added ${selectedIds.length} students to class successfully!`
         );
       }
 
@@ -226,7 +234,9 @@ export const SelectExistingStudentsModal: React.FC<SelectExistingStudentsModalPr
         onClose();
       }
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi thêm học viên vào lớp.' : 'Failed to add students to class.');
+      const msg = err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi thêm học viên vào lớp.' : 'Failed to add students to class.';
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
