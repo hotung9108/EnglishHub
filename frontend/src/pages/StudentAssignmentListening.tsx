@@ -18,7 +18,6 @@ import { Skeleton } from '../components/common/Skeleton';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
-  getSkillLabel,
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
@@ -519,7 +518,7 @@ const StudentAssignmentListening: React.FC = () => {
         ? 'Cập nhật phần thi Listening thành công! Đang chuyển đến màn hình xem lại bài làm...'
         : 'Nộp bài thành công! Đang chuyển đến màn hình kết quả...')
     : submitState.kind === 'nextSkill'
-      ? `Đã hoàn thành phần thi Listening! Đang chuyển tiếp sang ${getSkillLabel(submitState.nextModule.skill)}...` : null;
+      ? 'Đã hoàn thành phần thi Listening! Đang quay lại trang tổng quan bài tập...' : null;
 
   useEffect(() => {
     if (!scopeReady || (submitState.kind !== 'completed' && submitState.kind !== 'nextSkill')) return;
@@ -527,7 +526,7 @@ const StudentAssignmentListening: React.FC = () => {
     const destination = isReviewMode
       ? `/student/assignments/${submitScope.assignmentId}/overview`
       : (submitState.kind === 'completed' ? `/student/submissions/${submitState.submissionId}`
-          : getSkillRoute(submitState.nextModule.skill, submitScope.assignmentId, submitState.submission.id));
+          : `/student/assignments/${submitScope.assignmentId}/overview`);
     if (submitState.kind === 'completed' && !isReviewMode) notifyAssignmentSubmitted();
     const timer = setTimeout(() => {
       if (viewGeneration.current === generation) navigate(destination, { replace: true });

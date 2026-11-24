@@ -27,8 +27,6 @@ import { Button } from '../components/common';
 import { ExamStepper } from '../components/assignments/ExamStepper';
 import {
   getSkillRoute,
-  getNextIncompleteModule,
-  getSkillLabel,
   getExamPageRedirectRoute,
   resolveEffectiveModules
 } from '../utils/examStepper.utils';
@@ -572,23 +570,11 @@ const StudentAssignmentSpeaking: React.FC = () => {
           navigate(`/student/assignments/${id}/overview`, { replace: true });
         }, 1200);
       } else {
-        const resolvedMods = resolveEffectiveModules(assignment?.modules, currentSubModules);
-        const nextMod = getNextIncompleteModule(resolvedMods, currentSubModules);
-        if (nextMod) {
-          const nextSkillLabel = getSkillLabel(nextMod.skill);
-          const msg = `Đã hoàn thành phần thi Speaking! Đang chuyển tiếp sang ${nextSkillLabel}...`;
-          toastSuccess(msg);
-          const nextRoute = getSkillRoute(nextMod.skill, numericId, subId);
-          setTimeout(() => {
-            navigate(nextRoute, { replace: true });
-          }, 1200);
-        } else {
-          const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
-          toastSuccess(msg);
-          setTimeout(() => {
-            navigate(`/student/assignments/${id}/overview`, { replace: true });
-          }, 1200);
-        }
+        const msg = 'Đã hoàn thành phần thi Speaking! Đang quay lại trang tổng quan bài tập...';
+        toastSuccess(msg);
+        setTimeout(() => {
+          navigate(`/student/assignments/${id}/overview`, { replace: true });
+        }, 1200);
       }
     } catch (err: unknown) {
       const apiErr = parseApiError(err);
