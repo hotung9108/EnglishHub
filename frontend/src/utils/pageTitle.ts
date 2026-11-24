@@ -38,7 +38,6 @@ export const ROUTE_TITLE_RULES: RouteTitleRule[] = [
   { pattern: /^\/admin\/teachers\/?$/, titleVi: 'Quản lý giáo viên', titleEn: 'Teachers' },
   { pattern: /^\/admin\/students\/?$/, titleVi: 'Quản lý học viên', titleEn: 'Students' },
   { pattern: /^\/admin\/reports\/?$/, titleVi: 'Báo cáo & Thống kê', titleEn: 'Reports & Analytics' },
-  { pattern: /^\/admin\/settings\/?$/, titleVi: 'Cài đặt hệ thống', titleEn: 'System Settings' },
   { pattern: /^\/admin\/profile\/?$/, titleVi: 'Hồ sơ cá nhân', titleEn: 'Profile' },
 
   // --- Teacher Nested & Parametric Routes ---

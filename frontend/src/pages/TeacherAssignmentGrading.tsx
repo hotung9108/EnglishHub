@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Edit2, FileText, Search, 
   RefreshCw, AlertCircle, CheckCircle2, Lock,
-  Users, Clock, Award
+  Users, Clock, Award, Download
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -16,6 +16,7 @@ import {
   getSubmissionFinalScore
 } from '../api/services/submission.service';
 import { Button, EmptyState, Pagination, MetricCard, LoadingState } from '../components/common';
+import { exportSubmissionsToCsv } from '../utils/submissionExport.utils';
 
 interface EnrolledStudentSubmissionRow {
   studentId: number;
@@ -42,6 +43,7 @@ export const TeacherAssignmentGrading: React.FC = () => {
   const [reloadKey, setReloadKey] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const { user } = useAuth();
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
@@ -127,6 +129,50 @@ export const TeacherAssignmentGrading: React.FC = () => {
       showToast(errorMsg);
     } finally {
       setIsClosing(false);
+    }
+  };
+
+  const handleExportSubmissions = async () => {
+    if (isExporting || !id) return;
+    if (students.length === 0) {
+      showToast(isVi ? 'Không có dữ liệu bài nộp để xuất file.' : 'No submission data to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      try {
+        const blob = await assignmentService.exportSubmissionsExcel(Number(id));
+        if (blob && blob.size > 0) {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          const dateStr = new Date().toISOString().slice(0, 10);
+          link.download = `submissions-assignment-${id}-${dateStr}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+          return;
+        }
+      } catch {
+        // Fallback to client-side CSV export
+      }
+
+      exportSubmissionsToCsv({
+        assignmentId: id,
+        assignmentTitle: assignment?.title,
+        className,
+        students,
+        isVi
+      });
+      showToast(isVi ? 'Xuất danh sách bài nộp thành công!' : 'Submissions exported successfully!');
+    } catch (err) {
+      console.error('Export submissions failed:', err);
+      showToast(isVi ? 'Không thể xuất danh sách bài nộp. Vui lòng thử lại!' : 'Failed to export submissions. Please try again!');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -444,6 +490,18 @@ export const TeacherAssignmentGrading: React.FC = () => {
               {isVi ? 'Xem nội dung đề bài' : 'View Exam Content'}
             </Button>
 
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              disabled={isLoading || isExporting || students.length === 0}
+              loading={isExporting}
+              onClick={handleExportSubmissions}
+              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
+            >
+              {t('assignmentDetails.btnExport')}
+            </Button>
+
             {isOwner && (
               <Button 
                 variant="secondary"
@@ -588,6 +646,18 @@ export const TeacherAssignmentGrading: React.FC = () => {
                 className="teacher-search-input"
               />
             </div>
+
+            <Button 
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              disabled={isLoading || isExporting || students.length === 0}
+              loading={isExporting}
+              onClick={handleExportSubmissions}
+              title={students.length === 0 ? (isVi ? 'Chưa có dữ liệu bài nộp để xuất' : 'No submissions data to export') : undefined}
+            >
+              {t('assignmentDetails.btnExport')}
+            </Button>
           </div>
         </div>
 
