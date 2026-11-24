@@ -180,6 +180,11 @@ export const Profile: React.FC = () => {
       return;
     }
 
+    if (currentPassword && newPassword === currentPassword) {
+      setPasswordError(isVi ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.' : 'New password must not be identical to current password.');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setPasswordError(isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.');
       return;
@@ -545,9 +550,12 @@ export const Profile: React.FC = () => {
 
                 <form onSubmit={handleUpdatePassword} className="profile-password-form">
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mật khẩu hiện tại' : 'Current Password'} *</label>
+                    <label htmlFor="profile-current-password" className="adm-form-label">
+                      {isVi ? 'Mật khẩu hiện tại' : 'Current Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-current-password"
                         type={showCurrentPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={currentPassword}
@@ -566,9 +574,12 @@ export const Profile: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Mật khẩu mới' : 'New Password'} *</label>
+                    <label htmlFor="profile-new-password" className="adm-form-label">
+                      {isVi ? 'Mật khẩu mới' : 'New Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-new-password"
                         type={showNewPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={newPassword}
@@ -588,9 +599,12 @@ export const Profile: React.FC = () => {
                   </div>
 
                   <div className="adm-form-group">
-                    <label className="adm-form-label">{isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} *</label>
+                    <label htmlFor="profile-confirm-password" className="adm-form-label">
+                      {isVi ? 'Xác nhận mật khẩu mới' : 'Confirm New Password'} *
+                    </label>
                     <div className="relative">
                       <input 
+                        id="profile-confirm-password"
                         type={showConfirmPw ? 'text' : 'password'} 
                         className="input profile-input-pw"
                         value={confirmPassword}

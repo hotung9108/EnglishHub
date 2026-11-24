@@ -72,6 +72,7 @@ export const Accounts: React.FC = () => {
     status: 'ACTIVE' as 'ACTIVE' | 'LOCKED'
   });
   const [nameError, setNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -113,6 +114,7 @@ export const Accounts: React.FC = () => {
   const handleOpenCreateDrawer = () => {
     setEditingUser(null);
     setNameError('');
+    setEmailError('');
     setActionError('');
     setFormData({
       name: '',
@@ -128,6 +130,7 @@ export const Accounts: React.FC = () => {
   const handleOpenEditDrawer = (user: UserListItem) => {
     setEditingUser(user);
     setNameError('');
+    setEmailError('');
     setActionError('');
     setFormData({
       name: user.fullName,
@@ -143,7 +146,10 @@ export const Accounts: React.FC = () => {
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
-    if (!editingUser && !formData.email.trim()) return;
+    if (!editingUser && !formData.email.trim()) {
+      setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+      return;
+    }
 
     const valResult = validateFullName(formData.name, isVi);
     if (!valResult.isValid) {
@@ -541,14 +547,27 @@ export const Accounts: React.FC = () => {
                     <Mail size={16} className="adm-input-icon" />
                     <input 
                       type="email" 
-                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''}`}
+                      className={`input adm-input-with-icon ${editingUser ? 'opacity-80 cursor-not-allowed' : ''} ${emailError ? 'border-error' : ''}`}
                       placeholder="user@center.edu.vn"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        if (emailError) setEmailError('');
+                      }}
+                      onBlur={() => {
+                        if (!editingUser && !formData.email.trim()) {
+                          setEmailError(isVi ? 'Vui lòng nhập địa chỉ email.' : 'Please enter an email address.');
+                        }
+                      }}
                       disabled={!!editingUser}
                       required
                     />
                   </div>
+                  {emailError && (
+                    <span className="text-error text-xs mt-1 block">
+                      {emailError}
+                    </span>
+                  )}
                 </div>
 
                 {!editingUser && (

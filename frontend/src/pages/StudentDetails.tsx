@@ -341,6 +341,9 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có kết quả bài nộp nào cho học viên này' : 'No submission timeline available'}
                   </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
+                  </div>
                 </div>
               ) : (
                 <div className="data-table-wrapper">
@@ -377,6 +380,9 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
                   <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                   <div style={{ fontSize: '15px', fontWeight: 600 }}>
                     {isVi ? 'Chưa có nhận xét hoặc đánh giá học tập nào' : 'No evaluations recorded'}
+                  </div>
+                  <div style={{ fontSize: '13px', marginTop: '6px', color: 'var(--eh-text-muted, #736B63)' }}>
+                    {isVi ? 'Học viên chưa có dữ liệu bài nộp để tổng hợp đánh giá năng lực.' : 'Student has no submission data to aggregate performance evaluation.'}
                   </div>
                 </div>
               ) : (
