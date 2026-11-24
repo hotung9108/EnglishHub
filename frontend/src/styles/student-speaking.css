@@ -569,3 +569,28 @@
   cursor: not-allowed;
   transform: none;
 }
+
+@media (max-width: 768px) {
+  .speaking-container {
+    padding: 12px 14px 48px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+  .speaking-grid {
+    gap: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .speaking-card {
+    border-radius: 10px;
+    box-sizing: border-box;
+  }
+  .speaking-card-header {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
