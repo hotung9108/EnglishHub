@@ -449,6 +449,29 @@
   color: var(--eh-primary-hover, #133D30);
 }
 
+@media (max-width: 768px) {
+  .writing-grid {
+    gap: 16px;
+  }
+  .writing-header-bar {
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .writing-editor-area {
+    min-height: 260px;
+  }
+  .writing-submission-actions {
+    position: sticky;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    padding: 12px 0 16px;
+    z-index: 20;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+  }
+}
+
 .writing-file-info {
   flex: 1;
   min-width: 0;

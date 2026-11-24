@@ -4,7 +4,7 @@ import {
   ArrowLeft, ChevronRight, BookOpen, 
   Bookmark, Highlighter, 
   ChevronLeft, AlertCircle, RefreshCw,
-  CheckCircle2, XCircle, Lightbulb, Trash2
+  CheckCircle2, XCircle, Lightbulb, Trash2, HelpCircle
 } from 'lucide-react';
 import { parseApiError } from '../api';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -112,6 +112,7 @@ const StudentAssignmentReading: React.FC = () => {
   });
   const [bookmarkedQuestions, setBookmarkedQuestions] = useState<Record<number, boolean>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'passage' | 'questions'>('passage');
 
   const numericId = useMemo(() => {
     const parsed = Number(id);
@@ -731,10 +732,34 @@ const StudentAssignmentReading: React.FC = () => {
         </div>
       )}
 
+      {/* Mobile Tab Switcher (< 768px) */}
+      <div className="exam-mobile-tab-bar" role="tablist" aria-label="Reading section tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobileTab === 'passage'}
+          className={`exam-mobile-tab-btn ${mobileTab === 'passage' ? 'active' : ''}`}
+          onClick={() => setMobileTab('passage')}
+        >
+          <BookOpen size={16} />
+          <span>Bài đọc</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobileTab === 'questions'}
+          className={`exam-mobile-tab-btn ${mobileTab === 'questions' ? 'active' : ''}`}
+          onClick={() => setMobileTab('questions')}
+        >
+          <HelpCircle size={16} />
+          <span>Câu hỏi ({Object.keys(selectedAnswers).length}/{totalQuestions})</span>
+        </button>
+      </div>
+
       {/* Main 2-Column Split Workspace */}
       <div className="exam-workspace-grid">
         {/* Left Column: Reading Passage */}
-        <div className="exam-pane-left">
+        <div className={`exam-pane-left ${mobileTab !== 'passage' ? 'mobile-hidden' : ''}`}>
           <div className="exam-passage-header">
             <div className="exam-passage-label">
               <BookOpen size={18} />
@@ -855,7 +880,7 @@ const StudentAssignmentReading: React.FC = () => {
         </div>
 
         {/* Right Column: Questions */}
-        <div className="exam-pane-right">
+        <div className={`exam-pane-right ${mobileTab !== 'questions' ? 'mobile-hidden' : ''}`}>
           {/* Review Mode Banner */}
           {isReviewMode && (
             <div className="exam-review-banner" role="region" aria-label="Review Mode">
