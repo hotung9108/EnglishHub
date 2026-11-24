@@ -5,6 +5,7 @@ import {
   User, Clock, MapPin, Loader2, AlertCircle, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../components/common/ToastContext';
 import { classService } from '../api/services/class.service';
 import { userService } from '../api/services/user.service';
 import type { UserListItem } from '../api/services/user.service';
@@ -15,6 +16,7 @@ export const AddClass: React.FC = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
+  const toast = useToast();
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [teachers, setTeachers] = useState<UserListItem[]>([]);
@@ -91,18 +93,24 @@ export const AddClass: React.FC = () => {
     if (!formData.name.trim()) {
       setNameError(true);
       setCurrentStep(1);
+      toast.warning(isVi ? 'Tên lớp học không được để trống.' : 'Class name is required.');
       return;
     }
     if (!formData.startDate) {
-      setSubmitError(isVi ? 'Vui lòng chọn ngày bắt đầu.' : 'Please select start date.');
+      const msg = isVi ? 'Vui lòng chọn ngày bắt đầu.' : 'Please select start date.';
+      setSubmitError(msg);
+      toast.warning(msg);
       return;
     }
     if (formData.endDate && formData.endDate < formData.startDate) {
-      setSubmitError(isVi ? 'Ngày kết thúc phải sau ngày bắt đầu.' : 'End date must be after start date.');
+      const msg = isVi ? 'Ngày kết thúc phải sau ngày bắt đầu.' : 'End date must be after start date.';
+      setSubmitError(msg);
+      toast.warning(msg);
       return;
     }
     if (!validateTeacher()) {
       setCurrentStep(2);
+      toast.warning(isVi ? 'Vui lòng phân công giảng viên cho lớp.' : 'Please assign a teacher.');
       return;
     }
 
@@ -121,9 +129,12 @@ export const AddClass: React.FC = () => {
         teacherId: Number(formData.teacherId)
       });
 
+      toast.success(isVi ? 'Thêm lớp học thành công!' : 'Class created successfully!');
       navigate('/admin/classes');
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : isVi ? 'Không thể khởi tạo lớp học.' : 'Failed to create class.');
+      const msg = err instanceof Error ? err.message : isVi ? 'Không thể khởi tạo lớp học.' : 'Failed to create class.';
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }

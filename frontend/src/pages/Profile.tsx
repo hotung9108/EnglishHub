@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { 
   User, Shield, 
   Check, Eye, EyeOff, 
-  CheckCircle2, Copy, AlertCircle, Loader2,
+  Copy, Loader2,
   Calendar, Phone, BookOpen
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -41,9 +41,6 @@ export const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [copiedId, setCopiedId] = useState(false);
 
   // Form states
@@ -129,19 +126,18 @@ export const Profile: React.FC = () => {
 
   const handleSaveGeneral = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage('');
 
     const valResult = validateFullName(fullName, isVi);
     if (!valResult.isValid) {
       setNameError(valResult.errorMessage || '');
-      setErrorMessage(valResult.errorMessage || '');
+      toast.warning(valResult.errorMessage || '');
       return;
     }
 
     const phoneResult = validatePhone(phone, isVi);
     if (!phoneResult.isValid) {
       setPhoneError(phoneResult.errorMessage || '');
-      setErrorMessage(phoneResult.errorMessage || '');
+      toast.warning(phoneResult.errorMessage || '');
       return;
     }
 
@@ -163,12 +159,9 @@ export const Profile: React.FC = () => {
         avatar: avatarUrl,
       });
 
-      setSaveSuccess(true);
       toast.success(isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!');
-      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Không thể cập nhật hồ sơ' : 'Failed to update profile');
-      setErrorMessage(msg);
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -177,25 +170,21 @@ export const Profile: React.FC = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setPasswordError('');
 
     if (newPassword.length < 8) {
       const msg = isVi ? 'Mật khẩu mới phải có ít nhất 8 ký tự.' : 'New password must be at least 8 characters.';
-      setPasswordError(msg);
       toast.error(msg);
       return;
     }
 
     if (currentPassword && newPassword === currentPassword) {
       const msg = isVi ? 'Mật khẩu mới không được trùng với mật khẩu hiện tại.' : 'New password must not be identical to current password.';
-      setPasswordError(msg);
       toast.error(msg);
       return;
     }
 
     if (newPassword !== confirmPassword) {
       const msg = isVi ? 'Xác nhận mật khẩu mới không khớp.' : 'New passwords do not match.';
-      setPasswordError(msg);
       toast.error(msg);
       return;
     }
@@ -207,15 +196,12 @@ export const Profile: React.FC = () => {
         newPassword,
       });
 
-      setSaveSuccess(true);
       toast.success(isVi ? 'Cập nhật mật khẩu thành công!' : 'Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isVi ? 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu hiện tại.' : 'Failed to change password. Please check your current password.');
-      setPasswordError(msg);
       toast.error(msg);
     } finally {
       setChangingPassword(false);
@@ -264,20 +250,6 @@ export const Profile: React.FC = () => {
           )}
         </div>
       </div>
-
-      {saveSuccess && (
-        <div className="settings-alert-success">
-          <CheckCircle2 size={18} />
-          <span>{isVi ? 'Đã cập nhật thông tin thành công!' : 'Profile updated successfully!'}</span>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="settings-alert-error">
-          <AlertCircle size={18} />
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       {/* Settings Navigation Tabs */}
       <div className="adm-filter-bar">
@@ -552,13 +524,6 @@ export const Profile: React.FC = () => {
                 <p className="body-sm text-on-surface-variant mb-5">
                   {isVi ? 'Đổi mật khẩu định kỳ giúp bảo vệ tài khoản khỏi truy cập trái phép.' : 'Update your password regularly to prevent unauthorized access.'}
                 </p>
-
-                {passwordError && (
-                  <div className="settings-alert-error">
-                    <AlertCircle size={15} />
-                    <span>{passwordError}</span>
-                  </div>
-                )}
 
                 <form onSubmit={handleUpdatePassword} className="profile-password-form">
                   <div className="adm-form-group">

@@ -10,7 +10,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useStudentDetails } from '../hooks/useStudentDetails';
 import { AdminUserProfileDrawer } from '../components/admin/AdminUserProfileDrawer';
-import { Button, EmptyState, ConfirmModal } from '../components/common';
+import { Button, EmptyState, ConfirmModal, useToast } from '../components/common';
 
 export const StudentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +31,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [hasSavedProfile, setHasSavedProfile] = useState(false);
+  const toast = useToast();
 
   const {
     studentUser,
@@ -39,7 +40,6 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
     isLoading,
     isError,
     errorMessage,
-    statusMessage,
     isTogglingStatus,
     isResettingPassword,
     toggleSuspend,
@@ -51,11 +51,21 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
   });
 
   const handleToggleSuspend = async () => {
-    await toggleSuspend();
+    const success = await toggleSuspend();
+    if (success) {
+      toast.success(
+        isActive
+          ? (isVi ? 'Đã tạm khóa tài khoản học viên.' : 'Student account suspended.')
+          : (isVi ? 'Đã kích hoạt lại tài khoản học viên.' : 'Student account reactivated.')
+      );
+    } else {
+      toast.error(isVi ? 'Không thể đổi trạng thái tài khoản.' : 'Failed to toggle status.');
+    }
   };
 
   const handleProfileSaved = () => {
     setHasSavedProfile(true);
+    toast.success(isVi ? 'Cập nhật thông tin học viên thành công!' : 'Student profile updated successfully!');
     void refetch();
   };
 
@@ -64,6 +74,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
     const newPass = await resetPassword();
     if (newPass) {
       setResetResultPassword(newPass);
+      toast.success(isVi ? 'Đặt lại mật khẩu thành công!' : 'Password reset successfully!');
     }
   };
 
@@ -128,23 +139,7 @@ function StudentDetailsPage({ studentId }: { studentId: number }) {
         </Button>
       </div>
 
-      {statusMessage && (
-        <div style={{
-          padding: '12px 18px',
-          borderRadius: 'var(--radius-md, 8px)',
-          backgroundColor: 'var(--eh-success-bg)',
-          border: '1px solid var(--eh-success-border)',
-          color: 'var(--eh-success)',
-          fontWeight: 600,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          <CheckCircle2 size={18} />
-          <span>{statusMessage}</span>
-        </div>
-      )}
+
 
       {isError && !studentUser && !isLoading && (
         <div role="alert">

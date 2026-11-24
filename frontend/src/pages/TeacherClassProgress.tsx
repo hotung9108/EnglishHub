@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { 
   ChevronRight, TrendingUp, Search, 
   Headphones, BookOpen, Mic, PenTool, 
-  CheckCircle2, AlertCircle, Users, Calendar, 
+  AlertCircle, Users, Calendar, 
   Plus, Download, X, 
   ArrowUpRight, Award, FileText, Send, Eye,
   Sparkles, RefreshCw, BarChart3,
@@ -15,7 +15,7 @@ import { assignmentService, type AssignmentSummary } from '../api/services/assig
 import { submissionService, type SubmissionListItem } from '../api/services/submission.service';
 import { studentEvaluationService } from '../api/services/student-evaluation.service';
 import type { StudentEvaluationListItem } from '../types/student-evaluation.types';
-import { Pagination, LoadingState, Button, ConfirmModal } from '../components/common';
+import { Pagination, LoadingState, Button, ConfirmModal, useToast } from '../components/common';
 import { DateRangeFilter } from '../components/classes/DateRangeFilter';
 import { SelectExistingStudentsModal } from '../components/classes/SelectExistingStudentsModal';
 import { StudentEvaluationAvailabilityNotice } from '../components/classes/StudentEvaluationAvailabilityNotice';
@@ -155,7 +155,7 @@ export const TeacherClassProgress: React.FC = () => {
   const [evaluationHistory, setEvaluationHistory] = useState<StudentEvaluationListItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSendingEvaluation, setIsSendingEvaluation] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   const handleCloseStudentModal = () => {
     setSelectedStudent(null);
@@ -192,9 +192,11 @@ export const TeacherClassProgress: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    if (type === 'error') toast.error(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else if (type === 'info') toast.info(msg);
+    else toast.success(msg);
   };
 
   // Helper score color
@@ -729,14 +731,6 @@ export const TeacherClassProgress: React.FC = () => {
 
   return (
     <div className="tcd-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="tcd-toast-alert">
-          <CheckCircle2 size={16} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* 1. Breadcrumbs */}
       <nav className="tcd-breadcrumbs">
         <Link to="/teacher/classes" className="tcd-breadcrumb-link">

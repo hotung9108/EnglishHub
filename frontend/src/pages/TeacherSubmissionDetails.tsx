@@ -6,7 +6,7 @@ import {
   Save, Send, RefreshCw, AlertCircle, CheckCircle2, Sparkles,
   XCircle, Plus, Trash2, Download, BookOpen, Headphones, Mic, Eye, Edit3, HelpCircle, X
 } from 'lucide-react';
-import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState } from '../components/common';
+import { MetricCard, FileItem, StickyActionBar, Button, EmptyState, MarkdownView, StatusBadge, LoadingState, useToast } from '../components/common';
 import { useLanguage } from '../contexts/LanguageContext';
 import { getAnnotationErrorKind, type AnnotationErrorKind } from '../hooks/useStudentAnswerAnnotations';
 import { parseApiError } from '../api';
@@ -72,7 +72,7 @@ export const TeacherSubmissionDetails: React.FC = () => {
   const [isAnalyzingAi, setIsAnalyzingAi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   // Entities
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
@@ -204,18 +204,12 @@ export const TeacherSubmissionDetails: React.FC = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     if (!isMountedRef.current) return;
-    setToastMessage(msg);
-
-    if (toastTimeoutRef.current !== null) {
-      clearTimeout(toastTimeoutRef.current);
-    }
-
-    toastTimeoutRef.current = setTimeout(() => {
-      if (isMountedRef.current) setToastMessage(null);
-      toastTimeoutRef.current = null;
-    }, 3500);
+    if (type === 'error') toast.error(msg);
+    else if (type === 'success') toast.success(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else toast.info(msg);
   };
 
   useEffect(() => {
@@ -255,7 +249,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
     setIsSubmittingAnnotation(false);
     setDeletingAnnotationIds({});
     setIsCreatingAnnotation(false);
-    setToastMessage(null);
     const generation = ++moduleLoadGenerationRef.current;
     annotationRequestRef.current = {
       generation,
@@ -561,7 +554,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
       setIsSubmittingAnnotation(false);
       setDeletingAnnotationIds({});
       setIsCreatingAnnotation(false);
-      setToastMessage(null);
       const generation = ++moduleLoadGenerationRef.current;
       annotationRequestRef.current = {
         generation,
@@ -2112,14 +2104,6 @@ export const TeacherSubmissionDetails: React.FC = () => {
 
   return (
     <div className="tsd-page-container">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="tsd-toast">
-          <CheckCircle2 size={16} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* Top Breadcrumbs & Actions */}
       <div className="tsd-nav-bar">
         <button

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Users, Award, BookOpen, Plus, UserPlus,
   Loader2, AlertCircle, Trash2, ArrowRightLeft,
-  RotateCcw, ShieldAlert, ChevronRight, CheckCircle2, X
+  RotateCcw, ShieldAlert, ChevronRight, X
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService } from '../api/services/class.service';
@@ -55,8 +55,6 @@ export const ClassDetails: React.FC = () => {
   });
   const [selectedSettingsTeacher, setSelectedSettingsTeacher] = useState<UserListItem | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   // Quick change teacher modal state (UC008 / Issue #344)
   const [showChangeTeacherModal, setShowChangeTeacherModal] = useState(false);
@@ -165,7 +163,6 @@ export const ClassDetails: React.FC = () => {
     if (classNumericId === null) return;
     try {
       setSavingSettings(true);
-      setSettingsError(null);
 
       let updatedDesc = settingsForm.description || '';
       if (/(?:Sĩ số|Capacity|Sĩ số tối đa):\s*\d+/i.test(updatedDesc)) {
@@ -197,11 +194,9 @@ export const ClassDetails: React.FC = () => {
         });
       }
 
-      setSettingsSaved(true);
       toastSuccess(isVi ? 'Cập nhật cài đặt lớp học thành công!' : 'Class settings updated successfully!');
-      setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err: unknown) {
-      setSettingsError(err instanceof Error ? err.message : isVi ? 'Không thể lưu cài đặt lớp học.' : 'Failed to update class.');
+      toastError(err instanceof Error ? err.message : isVi ? 'Không thể lưu cài đặt lớp học.' : 'Failed to update class.');
     } finally {
       setSavingSettings(false);
     }
@@ -726,22 +721,8 @@ export const ClassDetails: React.FC = () => {
             <div className="flex flex-col gap-6 max-w-2xl">
               <div className="card adm-settings-section-card">
                 <h3 className="headline-md mb-4">{t('classDetails.tabSettings')}</h3>
-                
-                {settingsSaved && (
-                  <div className="adm-alert-success mb-4">
-                    <CheckCircle2 size={16} />
-                    <span>{isVi ? 'Cập nhật cài đặt lớp học thành công!' : 'Class settings updated successfully!'}</span>
-                  </div>
-                )}
 
-                {settingsError && (
-                  <div className="adm-alert-error mb-4">
-                    <AlertCircle size={16} />
-                    <span>{settingsError}</span>
-                  </div>
-                )}
-
-                    <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">                                                                                                    
+                <form onSubmit={handleSaveSettings} className="flex flex-col gap-4">                                                                                                    
                       <div className="adm-form-group">
                         <label className="adm-form-label">{isVi ? 'Tên lớp học' : 'Class Title'}</label>                                                                                    
                         <input 

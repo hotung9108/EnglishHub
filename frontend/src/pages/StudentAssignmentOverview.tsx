@@ -15,6 +15,7 @@ import {
   Play
 } from 'lucide-react';
 import { Button, ConfirmModal } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { assignmentService, type AssignmentDetail } from '../api/services/assignment.service';
@@ -55,6 +56,7 @@ const StudentAssignmentOverview: React.FC = () => {
   const { t, language } = useLanguage();
   const isVi = language === 'vi';
   const { user } = useAuth();
+  const toast = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
@@ -292,6 +294,7 @@ const StudentAssignmentOverview: React.FC = () => {
         }
       } catch { /* ignore */ }
       notifyAssignmentSubmitted();
+      toast.success(isVi ? 'Nộp bài thành công!' : 'Assignment submitted successfully!');
       setShowFinalSubmitModal(false);
       navigate(`/student/submissions/${inProgressSub.id}`);
     } catch (err: unknown) {
@@ -299,6 +302,7 @@ const StudentAssignmentOverview: React.FC = () => {
       const errData = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = errData?.response?.data?.message || errData?.message || (isVi ? 'Không thể hoàn tất nộp bài.' : 'Failed to finalize submission.');
       setError(msg);
+      toast.error(msg);
       setShowFinalSubmitModal(false);
     } finally {
       setIsStarting(false);
@@ -308,11 +312,11 @@ const StudentAssignmentOverview: React.FC = () => {
   const handleStartAttempt = async () => {
     if (isStarting) return;
     if (isClosedOrExpired) {
-      setError(
-        assignment?.status === 'CLOSED'
-          ? (isVi ? 'Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.' : 'This assignment is closed.')
-          : (isVi ? 'Bài tập này đã hết hạn nộp bài. Không thể bắt đầu lượt làm mới.' : 'This assignment submission deadline has passed.')
-      );
+      const msg = assignment?.status === 'CLOSED'
+        ? (isVi ? 'Bài tập này đã được giáo viên đóng. Không thể làm bài hoặc nộp bài.' : 'This assignment is closed.')
+        : (isVi ? 'Bài tập này đã hết hạn nộp bài. Không thể bắt đầu lượt làm mới.' : 'This assignment submission deadline has passed.');
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!inProgressSub && !canStartNewAttempt) return;
@@ -332,6 +336,7 @@ const StudentAssignmentOverview: React.FC = () => {
           const errData = startErr as { response?: { data?: { message?: string } }; message?: string };
           const msg = errData?.response?.data?.message || errData?.message || 'Không thể bắt đầu làm bài. Bài tập có thể đã đóng.';
           setError(msg);
+          toast.error(msg);
           setIsStarting(false);
           return;
         }
@@ -347,6 +352,7 @@ const StudentAssignmentOverview: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể khởi tạo bài làm. Vui lòng thử lại.';
       setError(msg);
+      toast.error(msg);
     } finally {
       setIsStarting(false);
     }

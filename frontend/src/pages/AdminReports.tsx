@@ -19,6 +19,7 @@ import type {
 import type { UserListItem } from '../api/services/user.service';
 import type { ClassSummary } from '../api/services/class.service';
 import { Button, MetricCard, EmptyState, Pagination } from '../components/common';
+import { useToast } from '../components/common/ToastContext';
 import {
   filterReportClasses,
   filterAvailableClasses,
@@ -46,6 +47,7 @@ function getSubmissionTotal(submitted: TotalState, graded: TotalState): TotalSta
 export const AdminReports: React.FC = () => {
   const { t, language } = useLanguage();
   const themeContext = useContext(ThemeContext);
+  const toast = useToast();
   const isVi = language === 'vi';
   const isDark = themeContext ? themeContext.theme === 'dark' : false;
 
@@ -422,6 +424,7 @@ export const AdminReports: React.FC = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    toast.success(isVi ? 'Đã xuất báo cáo CSV thành công!' : 'CSV report exported successfully!');
   };
 
   const totalCard = (

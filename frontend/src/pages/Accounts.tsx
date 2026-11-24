@@ -205,9 +205,15 @@ export const Accounts: React.FC = () => {
       }
       await refetch();
       setIsDrawerOpen(false);
+      toastSuccess(
+        editingUser
+          ? (isVi ? 'Cập nhật tài khoản thành công!' : 'Account updated successfully!')
+          : (isVi ? 'Tạo tài khoản thành công!' : 'Account created successfully!')
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : isVi ? 'Có lỗi xảy ra khi lưu tài khoản.' : 'Failed to save account.';
       setActionError(msg);
+      toastError(msg);
     } finally {
       setActionLoading(false);
     }

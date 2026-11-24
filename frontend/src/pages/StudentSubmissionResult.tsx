@@ -32,7 +32,7 @@ import { assignmentService, type AssignmentDetail } from '../api/services/assign
 import { questionService, extractMcqOptions, extractShortAnswerText } from '../api/services/question.service';
 import { gradingService, type StudentGradingResult } from '../api/services/grading.service';
 import { useStudentAnswerAnnotations } from '../hooks/useStudentAnswerAnnotations';
-import { Button, MarkdownView } from '../components/common';
+import { Button, MarkdownView, useToast } from '../components/common';
 import {
   formatAnnotationBadgeLabel,
   normalizeAnnotationCategory,
@@ -130,22 +130,15 @@ export const StudentSubmissionResult: React.FC = () => {
   const [questionFilter, setQuestionFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
   const [isDownloadingDoc, setIsDownloadingDoc] = useState<boolean>(false);
   const [isDownloadingAudio, setIsDownloadingAudio] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toast = useToast();
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, type: 'info' | 'error' | 'success' | 'warning' = 'info') => {
     if (!moduleLoaderMounted.current) return;
-    setToastMessage(msg);
-    if (toastTimeoutRef.current !== null) {
-      clearTimeout(toastTimeoutRef.current);
-    }
-    toastTimeoutRef.current = setTimeout(() => {
-      if (moduleLoaderMounted.current) {
-        setToastMessage(null);
-      }
-      toastTimeoutRef.current = null;
-    }, 3500);
-  }, []);
+    if (type === 'error') toast.error(msg);
+    else if (type === 'success') toast.success(msg);
+    else if (type === 'warning') toast.warning(msg);
+    else toast.info(msg);
+  }, [toast]);
   const [audioUrlOverride, setAudioUrlOverride] = useState<{ moduleId: number; answerId: number; url: string } | null>(null);
   const [audioErrorContext, setAudioErrorContext] = useState<{ moduleId: number; answerId: number } | null>(null);
   const [audioLoadingContext, setAudioLoadingContext] = useState<{ moduleId: number; answerId: number } | null>(null);
@@ -168,9 +161,6 @@ export const StudentSubmissionResult: React.FC = () => {
     moduleLoaderMounted.current = true;
     return () => {
       moduleLoaderMounted.current = false;
-      if (toastTimeoutRef.current !== null) {
-        clearTimeout(toastTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -822,15 +812,15 @@ export const StudentSubmissionResult: React.FC = () => {
   const handleDownloadDoc = async () => {
     const moduleId = selectedModuleId || moduleDetail?.id;
     if (!moduleId) {
-      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.', 'error');
       return;
     }
-    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...');
+    showToast(isVi ? 'Đang tạo liên kết tải tài liệu...' : 'Preparing download...', 'info');
     try {
       setIsDownloadingDoc(true);
       const res = await submissionService.getDocumentDownloadUrl(moduleId, 'download');
       if (!res?.downloadUrl) {
-        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.');
+        showToast(isVi ? 'Không tìm thấy liên kết tải tài liệu.' : 'Document download link not available.', 'error');
         return;
       }
       const link = document.createElement('a');
@@ -843,7 +833,7 @@ export const StudentSubmissionResult: React.FC = () => {
       link.click();
       document.body.removeChild(link);
     } catch {
-      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.');
+      showToast(isVi ? 'Không thể tải tệp bài làm. Vui lòng thử lại sau.' : 'Failed to download submission file. Please try again.', 'error');
     } finally {
       setIsDownloadingDoc(false);
     }
@@ -852,15 +842,15 @@ export const StudentSubmissionResult: React.FC = () => {
   const handleDownloadAudio = async () => {
     const moduleId = selectedModuleId || moduleDetail?.id;
     if (!moduleId) {
-      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.');
+      showToast(isVi ? 'Không tìm thấy thông tin bài nộp để tải.' : 'Submission module information not found.', 'error');
       return;
     }
-    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...');
+    showToast(isVi ? 'Đang tạo liên kết tải bản ghi âm...' : 'Preparing audio download...', 'info');
     try {
       setIsDownloadingAudio(true);
       const res = await submissionService.getAudioDownloadUrl(moduleId, 'download');
       if (!res?.downloadUrl) {
-        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.');
+        showToast(isVi ? 'Không tìm thấy liên kết tải bản ghi âm.' : 'Audio download link not available.', 'error');
         return;
       }
       const link = document.createElement('a');
@@ -873,7 +863,7 @@ export const StudentSubmissionResult: React.FC = () => {
       link.click();
       document.body.removeChild(link);
     } catch {
-      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.');
+      showToast(isVi ? 'Không thể tải bản ghi âm. Vui lòng thử lại sau.' : 'Failed to download audio recording. Please try again.', 'error');
     } finally {
       setIsDownloadingAudio(false);
     }
@@ -989,13 +979,6 @@ export const StudentSubmissionResult: React.FC = () => {
 
   return (
     <div className="student-result-page">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="result-toast">
-          <CheckCircle2 size={16} color="#4ade80" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
       {/* 1. Breadcrumbs */}
       <div className="result-breadcrumbs">
         <button
