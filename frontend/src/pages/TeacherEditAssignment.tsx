@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Minus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown, AlertCircle, RefreshCw, Calendar
+  Layers, ChevronDown, AlertCircle, RefreshCw, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../components/common/ToastContext';
@@ -64,10 +64,8 @@ export const TeacherEditAssignment: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState<number>(0);
 
-  // Preview Modal state & toast
+  // Preview Modal state
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<string>('');
 
   // Class & Stats
   const [classes, setClasses] = useState<ClassSummary[]>([]);
@@ -116,11 +114,15 @@ export const TeacherEditAssignment: React.FC = () => {
     setReloadKey((k) => k + 1);
   };
 
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    toastWarning(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  }, [toastWarning]);
+  const showToast = useCallback((msg: string, type: 'warning' | 'error' | 'success' = 'warning') => {
+    if (type === 'error') {
+      toastError(msg);
+    } else if (type === 'success') {
+      toastSuccess(msg);
+    } else {
+      toastWarning(msg);
+    }
+  }, [toastWarning, toastError, toastSuccess]);
 
   useEffect(() => {
     let isMounted = true;
@@ -776,15 +778,12 @@ export const TeacherEditAssignment: React.FC = () => {
       }
 
       setAssignmentData((prev) => ({ ...prev, modules: updatedModulesList }));
-      setLastSavedTime(new Date().toLocaleTimeString('vi-VN'));
       const successMsg = isVi ? 'Đã lưu thay đổi bài tập thành công!' : 'Assignment saved successfully!';
       toastSuccess(successMsg);
-      setToastMessage(successMsg);
     } catch (err) {
       console.error('Failed to save assignment changes:', err);
       const errorMsg = isVi ? 'Có lỗi xảy ra khi lưu bài tập. Vui lòng thử lại!' : 'Failed to save assignment. Please try again!';
       toastError(errorMsg);
-      setToastMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -1287,14 +1286,7 @@ export const TeacherEditAssignment: React.FC = () => {
         />
       )}
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-24 right-8 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-forest text-white shadow-xl animate-fade-in font-medium text-sm">
-          <CheckCircle2 size={16} />
-          <span>{toastMessage}</span>
-          {lastSavedTime && <span className="text-xs opacity-80">• {lastSavedTime}</span>}
-        </div>
-      )}
+
     </div>
   );
 };

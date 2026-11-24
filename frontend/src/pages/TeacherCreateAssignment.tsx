@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   ArrowLeft, PenTool, Mic, BookOpen, Headphones, 
   Eye, Save, Send, Plus, Minus, Trash2, ArrowUp, ArrowDown,
-  Layers, CheckCircle2, ChevronDown, RefreshCw, Calendar
+  Layers, ChevronDown, RefreshCw, Calendar
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { classService, type ClassSummary } from '../api/services/class.service';
@@ -31,7 +31,7 @@ import {
   SkillListeningEditor,
   AssignmentPreviewModal
 } from '../components/assignments/editor';
-import { StickyActionBar } from '../components/common';
+import { StickyActionBar, useToast } from '../components/common';
 import { formatToLocalDateTimeInput, addDays } from '../utils/dateTime.utils';
 import '../styles/teacher-assignment-edit.css';
 
@@ -53,7 +53,7 @@ export const TeacherCreateAssignment: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState<number | null>(queryClassId ? Number(queryClassId) : null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   // Multi-module management state
   const [activeModuleIndex, setActiveModuleIndex] = useState<number>(0);
@@ -115,9 +115,16 @@ export const TeacherCreateAssignment: React.FC = () => {
     return () => { isMounted = false; };
   }, [queryClassId]);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (msg: string, type: 'warning' | 'error' | 'success' | 'info' = 'warning') => {
+    if (type === 'error') {
+      toast.error(msg);
+    } else if (type === 'success') {
+      toast.success(msg);
+    } else if (type === 'info') {
+      toast.info(msg);
+    } else {
+      toast.warning(msg);
+    }
   };
 
   const handleClassSelectionChange = (classIdNum: number) => {
@@ -480,7 +487,7 @@ export const TeacherCreateAssignment: React.FC = () => {
       const successMsg = isVi 
         ? (status === 'PUBLISHED' ? 'Giao bài tập mới thành công!' : 'Đã lưu bản nháp bài tập mới!') 
         : (status === 'PUBLISHED' ? 'Assignment published successfully!' : 'Assignment draft saved!');
-      setToastMessage(successMsg);
+      showToast(successMsg, 'success');
 
       setTimeout(() => {
         navigate('/teacher/assignments');
@@ -925,13 +932,7 @@ export const TeacherCreateAssignment: React.FC = () => {
         />
       )}
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-24 right-8 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl bg-forest text-white shadow-xl animate-fade-in font-medium text-sm">
-          <CheckCircle2 size={16} />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+
     </div>
   );
 };
