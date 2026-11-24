@@ -817,11 +817,25 @@
   .tcd-container {
     padding: 14px 12px 64px;
     gap: 16px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .tcd-breadcrumbs {
     font-size: 12px;
     gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tcd-card-section {
+    padding: 16px 14px;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
 
   .tcd-hero-card {
@@ -926,11 +940,14 @@
   }
 
   .tcd-filter-pills {
+    width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     flex-wrap: nowrap;
-    padding-bottom: 4px;
+    padding-bottom: 6px;
     scrollbar-width: none;
+    box-sizing: border-box;
   }
 
   .tcd-filter-pills::-webkit-scrollbar {
