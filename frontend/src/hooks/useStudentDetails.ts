@@ -23,7 +23,7 @@ export interface UseStudentDetailsResult {
   isTogglingStatus: boolean;
   isResettingPassword: boolean;
   toggleSuspend: () => Promise<boolean>;
-  resetPassword: (newPassword: string) => Promise<boolean>;
+  resetPassword: () => Promise<string | null>;
   refetch: () => Promise<void>;
 }
 
@@ -145,12 +145,12 @@ export function useStudentDetails({
     }
   }, [studentUser, studentId, isVi]);
 
-  const resetPassword = useCallback(async (newPassword: string): Promise<boolean> => {
-    if (!newPassword.trim() || !studentUser || studentUser.id !== studentId) return false;
+  const resetPassword = useCallback(async (): Promise<string | null> => {
+    if (!studentUser || studentUser.id !== studentId) return null;
     try {
       setIsResettingPassword(true);
-      await userService.updateUser(studentUser.id, {});
-      return true;
+      const res = await userService.resetPassword(studentUser.id);
+      return res.newPassword;
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -159,7 +159,7 @@ export function useStudentDetails({
           ? 'Không thể đổi mật khẩu.'
           : 'Failed to reset password.';
       if (mountedRef.current) setStatusMessage(msg);
-      return false;
+      return null;
     } finally {
       if (mountedRef.current) {
         setIsResettingPassword(false);
