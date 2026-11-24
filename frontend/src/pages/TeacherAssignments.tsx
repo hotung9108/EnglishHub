@@ -725,6 +725,52 @@ export const TeacherAssignments: React.FC = () => {
             </button>
           </div>
 
+          <div className="teacher-pills teacher-status-pills" role="tablist" aria-label="Bộ lọc trạng thái bài tập">
+            <button
+              type="button"
+              className={`teacher-pill ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => {
+                setStatusFilter('all');
+                setCurrentPage(1);
+              }}
+            >
+              {isVi ? 'Tất cả trạng thái' : 'All Statuses'}
+            </button>
+            <button
+              type="button"
+              className={`teacher-pill ${statusFilter === 'PUBLISHED' ? 'active' : ''}`}
+              onClick={() => {
+                setStatusFilter('PUBLISHED');
+                setCurrentPage(1);
+              }}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1.5" />
+              {isVi ? 'Đang mở' : 'Published'}
+            </button>
+            <button
+              type="button"
+              className={`teacher-pill ${statusFilter === 'CLOSED' ? 'active' : ''}`}
+              onClick={() => {
+                setStatusFilter('CLOSED');
+                setCurrentPage(1);
+              }}
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-400 inline-block mr-1.5" />
+              {isVi ? 'Đã đóng' : 'Closed'}
+            </button>
+            <button
+              type="button"
+              className={`teacher-pill ${statusFilter === 'DRAFT' ? 'active' : ''}`}
+              onClick={() => {
+                setStatusFilter('DRAFT');
+                setCurrentPage(1);
+              }}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block mr-1.5" />
+              {isVi ? 'Bản nháp' : 'Draft'}
+            </button>
+          </div>
+
           <label className="flex items-center gap-2 text-sm">
             {t('teacherAssignments.filterStatusLabel')}
             <select

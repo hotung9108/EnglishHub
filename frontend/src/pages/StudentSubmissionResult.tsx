@@ -39,6 +39,7 @@ import {
   type StudentAnnotationCategory,
 } from '../utils/annotationCategory.utils';
 import { extractAnnotationSnippet, extractAnswerContentText, extractTranscriptText } from '../utils/annotationSnippet.utils';
+import { useStudentSubmissionPolling } from '../hooks/useStudentSubmissionPolling';
 import '../styles/student-result.css';
 
 interface DisplayAnnotation {
@@ -530,6 +531,22 @@ export const StudentSubmissionResult: React.FC = () => {
     if (rawScore != null) return true;
     return false;
   }, [submission, activeSubModule, moduleDetail, gradingResult, rawScore]);
+
+  // Issue #379: Polling callback to automatically refresh AI grading results without F5
+  const handleGradingCompleted = useCallback(async (freshSubmission: SubmissionDetail) => {
+    setSubmission(freshSubmission);
+    const targetModuleId = selectedModuleId || freshSubmission.modules?.[0]?.id;
+    if (targetModuleId) {
+      await loadModuleData(targetModuleId);
+    }
+    showToast(isVi ? 'Đã có kết quả chấm điểm từ AI!' : 'AI grading results are ready!');
+  }, [selectedModuleId, loadModuleData, isVi, showToast]);
+
+  useStudentSubmissionPolling({
+    submissionId: submission?.id,
+    isGraded,
+    onGraded: handleGradingCompleted,
+  });
 
   // Annotations
   const filteredAnnotations = useMemo(() => {
