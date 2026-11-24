@@ -809,3 +809,329 @@
   align-items: center;
   gap: 12px;
 }
+
+/* ==========================================================================
+   FE-95: Reading Highlighter & Review Mode Styles
+   ========================================================================== */
+
+/* Reading Text Highlights */
+.exam-highlight {
+  border-radius: 3px;
+  padding: 1px 2px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.exam-highlight:hover {
+  filter: brightness(0.95);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.exam-highlight-yellow {
+  background-color: #fef08a;
+  color: #854d0e;
+  border-bottom: 2px solid #facc15;
+}
+
+.exam-highlight-green {
+  background-color: #bbf7d0;
+  color: #166534;
+  border-bottom: 2px solid #86efac;
+}
+
+.exam-highlight-pink {
+  background-color: #fbcfe8;
+  color: #9d174d;
+  border-bottom: 2px solid #f472b6;
+}
+
+/* Floating Highlight Palette */
+.reading-floating-palette {
+  position: absolute;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  animation: paletteFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  user-select: none;
+}
+
+.reading-floating-palette::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+}
+
+@keyframes paletteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reading-palette-color-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+}
+
+.reading-palette-color-btn:hover {
+  transform: scale(1.15);
+  border-color: #ffffff;
+}
+
+.reading-palette-color-btn.yellow { background-color: #fef08a; }
+.reading-palette-color-btn.green { background-color: #86efac; }
+.reading-palette-color-btn.pink { background-color: #f472b6; }
+
+.reading-palette-divider {
+  width: 1px;
+  height: 16px;
+  background-color: #475569;
+  margin: 0 2px;
+}
+
+.reading-palette-action-btn {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.reading-palette-action-btn:hover {
+  background-color: #334155;
+  color: #ffffff;
+}
+
+/* Highlight Bar in Passage Header */
+.reading-highlight-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-highlight-count-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Review Mode Banner & Score Summary */
+.exam-review-banner {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.exam-review-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.exam-review-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-color: #dcfce7;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.exam-review-banner-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #14532d;
+  margin: 0 0 2px 0;
+}
+
+.exam-review-banner-desc {
+  font-size: 13px;
+  color: #166534;
+  margin: 0;
+}
+
+.exam-review-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exam-review-stat-pill {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.exam-review-stat-pill.correct {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.exam-review-stat-pill.incorrect {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.exam-review-stat-pill.score {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Review Filter Tabs */
+.exam-review-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background-color: #f1f5f9;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+
+.exam-review-filter-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.exam-review-filter-btn:hover {
+  color: #1e293b;
+}
+
+.exam-review-filter-btn.is-active {
+  background-color: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Question Option States in Review Mode */
+.exam-option-item.is-correct-answer {
+  background-color: #f0fdf4 !important;
+  border-color: #22c55e !important;
+  color: #15803d !important;
+}
+
+.exam-option-item.is-student-wrong {
+  background-color: #fef2f2 !important;
+  border-color: #ef4444 !important;
+  color: #b91c1c !important;
+}
+
+.exam-option-item.is-dimmed {
+  opacity: 0.6;
+}
+
+.exam-option-status-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.exam-option-status-badge.correct {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.exam-option-status-badge.wrong {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Review Explanation Card */
+.exam-explanation-card {
+  margin-top: 18px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0f766e;
+  border-radius: 8px;
+}
+
+.exam-explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f766e;
+  margin-bottom: 8px;
+}
+
+.exam-explanation-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #334155;
+  margin: 0 0 10px 0;
+}
+
+.exam-explanation-quote {
+  font-size: 12.5px;
+  font-style: italic;
+  padding: 8px 12px;
+  background-color: #f1f5f9;
+  border-radius: 6px;
+  color: #475569;
+  border-left: 3px solid #94a3b8;
+}
